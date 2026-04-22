@@ -1,0 +1,3102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokerSul – Sistema Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold: #f59e0b;
+            --gold-dim: #92610a;
+            --bg: #0a0a0b;
+            --surface: #111113;
+            --border: #1e1e23;
+            --text-dim: #52525b;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Syne', sans-serif; background: var(--bg); color: #e4e4e7; }
+        .mono { font-family: 'Space Mono', monospace; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+
+        /* Nav Active */
+        .nav-active { background: #1c1c1f; border-left: 3px solid var(--gold); color: #fff; }
+        .nav-item { transition: background 0.15s; cursor: pointer; border-left: 3px solid transparent; }
+        .nav-item:hover:not(.nav-active) { background: #161618; }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 2rem; right: 2rem;
+            background: #18181b; color: #fff;
+            padding: .9rem 1.4rem; border-radius: .75rem;
+            border: 1px solid #2d2d33; font-size: .85rem;
+            opacity: 0; transition: opacity .25s; z-index: 9999; pointer-events: none;
+        }
+        #toast.show { opacity: 1; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.85); backdrop-filter: blur(6px);
+            z-index: 100; align-items: center; justify-content: center; padding: 1.5rem;
+        }
+        .modal-overlay.open { display: flex; }
+
+        /* Card stats */
+        .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1.5rem; }
+
+        /* Tournament card */
+        .t-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; overflow: hidden; }
+        .t-card-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+
+        /* Timer big */
+        .timer-display { font-family: 'Space Mono', monospace; font-size: 4.5rem; font-weight: 700; line-height: 1; color: var(--gold); letter-spacing: -2px; }
+
+        /* Player badge */
+        .player-badge { display: inline-flex; align-items: center; gap: .5rem; background: #1a1a1e; border: 1px solid #2a2a30; border-radius: 2rem; padding: .35rem .85rem; font-size: .8rem; }
+        .player-badge.eliminated { opacity: .4; text-decoration: line-through; }
+        .player-badge.winner { border-color: var(--gold); color: var(--gold); }
+
+        /* Level indicator */
+        .level-dot { width: 8px; height: 8px; border-radius: 50%; background: #27272a; }
+        .level-dot.done { background: var(--gold); }
+        .level-dot.current { background: var(--gold); box-shadow: 0 0 8px var(--gold); transform: scale(1.4); }
+
+        /* Blind table row */
+        .blind-row { display: grid; grid-template-columns: 2rem 1fr 1fr 1fr 2rem; gap: .5rem; align-items: center; padding: .5rem; border-radius: .5rem; }
+        .blind-row.current-level { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); }
+        .blind-row input { background: #18181b; border: 1px solid #2a2a30; border-radius: .4rem; padding: .35rem .5rem; font-size: .8rem; color: #e4e4e7; outline: none; width: 100%; text-align: right; }
+        .blind-row input:focus { border-color: var(--gold); }
+
+        /* Progress bar */
+        .timer-bar-bg { height: 4px; background: #1e1e23; border-radius: 2px; }
+        .timer-bar { height: 4px; background: var(--gold); border-radius: 2px; transition: width .5s linear; }
+        .timer-bar.low { background: #ef4444; }
+
+        /* Payout item */
+        .payout-item { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; background: #0f0f12; border-radius: .6rem; border: 1px solid #1e1e23; }
+
+        /* Button styles */
+        .btn-gold { background: var(--gold); color: #000; font-weight: 700; border-radius: .6rem; padding: .6rem 1.2rem; cursor: pointer; transition: all .15s; border: none; font-family: 'Syne', sans-serif; }
+        .btn-gold:hover { background: #d97706; }
+        .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #27272a; border-radius: .6rem; padding: .6rem 1.2rem; cursor: pointer; transition: all .15s; font-family: 'Syne', sans-serif; }
+        .btn-ghost:hover { background: #18181b; color: #fff; }
+        .btn-danger { background: transparent; color: #ef4444; border: 1px solid #3f1515; border-radius: .6rem; padding: .5rem 1rem; cursor: pointer; transition: all .15s; font-family: 'Syne', sans-serif; font-size: .8rem; }
+        .btn-danger:hover { background: #3f1515; }
+
+        /* Input base */
+        .inp { background: #18181b; border: 1px solid #27272a; border-radius: .6rem; padding: .75rem 1rem; color: #e4e4e7; outline: none; font-family: 'Syne', sans-serif; font-size: .9rem; width: 100%; }
+        .inp:focus { border-color: var(--gold); }
+        .inp-label { font-size: .7rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: .35rem; }
+
+        /* Tag status */
+        .tag { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2rem .55rem; border-radius: 2rem; }
+        .tag-running { background: rgba(34,197,94,.12); color: #22c55e; }
+        .tag-paused { background: rgba(245,158,11,.12); color: #f59e0b; }
+        .tag-break { background: rgba(239,68,68,.12); color: #ef4444; }
+        .tag-waiting { background: rgba(82,82,91,.18); color: #71717a; }
+        .tag-finished { background: rgba(139,92,246,.12); color: #a78bfa; }
+
+        /* Mesas grid */
+        .mesa-card { background: #0f0f12; border: 1px solid #1e1e23; border-radius: .75rem; padding: 1rem; }
+        .seat { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .6rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+        .seat.ocupado { background: rgba(245,158,11,.15); border: 1.5px solid rgba(245,158,11,.4); color: var(--gold); }
+        .seat.livre { background: #18181b; border: 1.5px solid #27272a; color: #52525b; }
+        .seat.eliminado { background: rgba(239,68,68,.08); border: 1.5px solid rgba(239,68,68,.2); color: #7f1d1d; }
+
+        /* Tabs */
+        .tab-btn { padding: .5rem 1rem; font-size: .8rem; font-weight: 700; border-radius: .5rem; cursor: pointer; transition: all .15s; color: #71717a; background: transparent; border: none; font-family: 'Syne', sans-serif; }
+        .tab-btn.active { background: #1e1e23; color: #fff; }
+
+        /* Ranking table */
+        .rank-row { display: grid; grid-template-columns: 2rem 1fr auto auto; gap: 1rem; align-items: center; padding: .65rem 1rem; border-radius: .5rem; }
+        .rank-row:nth-child(odd) { background: #0f0f12; }
+
+        /* Animation */
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        .fade-in { animation: fadeIn .2s ease; }
+
+        @keyframes pulse-gold { 0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.4); } 50% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } }
+        .pulse { animation: pulse-gold 2s infinite; }
+
+        /* Break overlay on TV-like feel */
+        .break-banner { background: linear-gradient(135deg, #1a0a0a, #0a0a0a); border: 1px solid #3f1515; }
+    </style>
+</head>
+<body class="overflow-hidden">
+
+<div id="toast"></div>
+
+<!-- LOGIN -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center" style="background:radial-gradient(ellipse at top, #1a1a1e 0%, #0a0a0b 60%);">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.5rem;padding:3rem;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+        <div class="text-center mb-8">
+            <div style="font-size:3rem;margin-bottom:.5rem;color:var(--gold);">♠</div>
+            <h1 style="font-size:2rem;font-weight:800;letter-spacing:-.03em;">PokerSul</h1>
+            <p style="font-size:.8rem;color:#52525b;margin-top:.25rem;text-transform:uppercase;letter-spacing:.12em;">Sistema Pro de Torneios</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label class="inp-label">E-mail</label>
+                <input id="login-user" value="admin@pokersul.com" type="text" class="inp" onkeypress="if(event.key==='Enter') document.getElementById('login-pass').focus()">
+            </div>
+            <div>
+                <label class="inp-label">Senha</label>
+                <input id="login-pass" value="123456" type="password" class="inp" onkeypress="if(event.key==='Enter') login()">
+            </div>
+
+            <!-- 2FA Toggle (disabled) -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem;background:#0f0f12;border:1px dashed #27272a;border-radius:.6rem;opacity:.55;cursor:not-allowed;" title="Autenticação de 2 fatores — em breve">
+                <div style="display:flex;align-items:center;gap:.65rem;">
+                    <i class="fa-solid fa-shield-halved" style="color:#52525b;"></i>
+                    <div>
+                        <div style="font-size:.8rem;font-weight:700;color:#a1a1aa;">Autenticação 2FA</div>
+                        <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-top:.1rem;">Em breve</div>
+                    </div>
+                </div>
+                <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:not-allowed;">
+                    <input type="checkbox" disabled style="opacity:0;width:0;height:0;">
+                    <span style="position:absolute;inset:0;background:#27272a;border-radius:22px;transition:.2s;"></span>
+                    <span style="position:absolute;top:3px;left:3px;width:16px;height:16px;background:#52525b;border-radius:50%;transition:.2s;"></span>
+                </label>
+            </div>
+
+            <button onclick="login()" class="btn-gold w-full" style="padding:.9rem;font-size:1rem;border-radius:.75rem;margin-top:.5rem;">Entrar no Sistema</button>
+
+            <div id="login-error" style="display:none;font-size:.8rem;color:#ef4444;text-align:center;padding:.5rem;background:rgba(239,68,68,.08);border-radius:.5rem;"></div>
+        </div>
+
+        <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #1e1e23;text-align:center;">
+            <div style="font-size:.65rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.12em;font-weight:700;">Usuário padrão</div>
+            <div style="font-size:.75rem;color:#71717a;font-family:'Space Mono',monospace;margin-top:.35rem;">admin@pokersul.com &bull; 123456</div>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" class="hidden" style="display:none;height:100vh;flex-direction:row;">
+
+    <!-- SIDEBAR -->
+    <div style="width:240px;background:#0d0d0f;border-right:1px solid #1a1a1e;display:flex;flex-direction:column;flex-shrink:0;">
+        <div style="padding:1.5rem 1.5rem 1rem;border-bottom:1px solid #1a1a1e;">
+            <div style="font-size:1.2rem;font-weight:800;display:flex;align-items:center;gap:.5rem;">
+                <span style="color:var(--gold);">♠</span> PokerSul
+            </div>
+            <div style="font-size:.65rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.1em;margin-top:.2rem;">Sistema Pro</div>
+        </div>
+        <nav style="flex:1;padding:.75rem;display:flex;flex-direction:column;gap:.2rem;overflow-y:auto;">
+            <div onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item nav-active" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;">
+                <i class="fa-solid fa-gauge-high" style="width:16px;"></i> Dashboard
+            </div>
+            <div onclick="showPage('jogadores')" id="nav-jogadores" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-users" style="width:16px;"></i> Jogadores
+            </div>
+            <div onclick="showPage('torneios')" id="nav-torneios" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-trophy" style="width:16px;"></i> Torneios
+            </div>
+            <div onclick="showPage('cash')" id="nav-cash" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-coins" style="width:16px;"></i> Cash Game
+            </div>
+            <div onclick="showPage('bar')" id="nav-bar" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-utensils" style="width:16px;"></i> Bar & Vendas
+            </div>
+            <div style="height:1px;background:#1a1a1e;margin:.5rem .5rem;" id="nav-divider-admin"></div>
+            <div onclick="showPage('usuarios')" id="nav-usuarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-user-shield" style="width:16px;"></i> Usuários
+            </div>
+        </nav>
+        <div style="padding:1rem;border-top:1px solid #1a1a1e;">
+            <button id="btn-resetar-db" onclick="confirmarLimparDados()" style="width:100%;font-size:.7rem;color:#3f3f46;background:none;border:none;cursor:pointer;padding:.4rem;font-family:'Syne',sans-serif;display:none;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'">Resetar Database</button>
+            <div style="display:flex;align-items:center;gap:.75rem;background:#18181b;border-radius:.6rem;padding:.75rem;margin-top:.5rem;">
+                <div id="user-avatar" style="width:32px;height:32px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:#000;flex-shrink:0;">AD</div>
+                <div style="flex:1;min-width:0;">
+                    <div id="user-nome" style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+                    <div id="user-role" style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-top:.1rem;">—</div>
+                </div>
+                <button onclick="logout()" title="Sair" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.2rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-right-from-bracket"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <header style="height:56px;border-bottom:1px solid #1a1a1e;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;background:#0a0a0b;flex-shrink:0;">
+            <h2 id="page-title" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:#52525b;">Dashboard</h2>
+            <div id="clock" class="mono" style="color:var(--gold);font-size:1rem;font-weight:700;">00:00:00</div>
+        </header>
+
+        <main style="flex:1;overflow:auto;padding:2rem;">
+
+            <!-- DASHBOARD -->
+            <div id="page-dashboard" class="page-content fade-in">
+                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:2rem;">
+                    <div class="stat-card">
+                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Jogadores</div>
+                        <div id="dash-jogadores" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Torneios Ativos</div>
+                        <div id="dash-torneios" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Prize Pool Total</div>
+                        <div id="dash-prize" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">R$ 0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Rake Total</div>
+                        <div id="dash-rake" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:var(--gold);">R$ 0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Faturamento Bar</div>
+                        <div id="dash-bar-vendas" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#f97316;">R$ 0,00</div>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem;">
+                    <div class="stat-card" style="border-color:rgba(34,197,94,.15);">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-coins"></i> Cash Game — Mesas Ativas</div>
+                        <div id="dash-cash-mesas" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">0</div>
+                    </div>
+                    <div class="stat-card" style="border-color:rgba(34,197,94,.15);">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-coins"></i> Cash Game — Volume Total</div>
+                        <div id="dash-cash-volume" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">R$ 0,00</div>
+                    </div>
+                </div>
+                <div id="dash-torneios-list" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;"></div>
+            </div>
+
+            <!-- JOGADORES -->
+            <div id="page-jogadores" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                    <input onkeyup="filtrarJogadores(this.value)" placeholder="Buscar jogador..." class="inp" style="width:280px;">
+                    <button onclick="openModal('modal-jogador')" class="btn-gold">+ Novo Jogador</button>
+                </div>
+                <div class="t-card">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #1e1e23;">
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Jogador</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Contato</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Torneios</th>
+                                <th style="padding:1rem 1.5rem;text-align:right;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jogadores-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TORNEIOS -->
+            <div id="page-torneios" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                    <h3 style="font-size:1.1rem;font-weight:800;">Torneios</h3>
+                    <button onclick="openModal('modal-novo-torneio')" class="btn-gold">+ Novo Torneio</button>
+                </div>
+                <div id="torneios-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
+                <div id="sem-torneios" style="text-align:center;padding:4rem;color:#3f3f46;">
+                    <i class="fa-solid fa-trophy" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
+                    <div style="font-weight:700;">Nenhum torneio criado</div>
+                    <div style="font-size:.8rem;margin-top:.25rem;">Clique em "+ Novo Torneio" para começar</div>
+                </div>
+            </div>
+
+            <!-- USUÁRIOS -->
+            <div id="page-usuarios" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                    <div>
+                        <h3 style="font-size:1.1rem;font-weight:800;">Gerenciamento de Usuários</h3>
+                        <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">Apenas administradores podem editar esta página</div>
+                    </div>
+                    <button onclick="openModalUsuario()" class="btn-gold" style="font-size:.85rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Novo Usuário</button>
+                </div>
+                <div class="t-card">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #1e1e23;">
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Usuário</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">E-mail</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Papel</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Status</th>
+                                <th style="padding:1rem 1.5rem;text-align:right;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usuarios-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="stat-card" style="margin-top:1.5rem;padding:1.25rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Matriz de Permissões</div>
+                    <div id="matriz-permissoes"></div>
+                </div>
+            </div>
+
+            <!-- CASH / BAR placeholders -->
+            <!-- CASH GAME -->
+            <div id="page-cash" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;">
+                    <button class="tab-btn active" id="cashtab-btn-mesas"     onclick="switchCashTab('cash-mesas', this)"><i class="fa-solid fa-table"></i> Mesas Ativas</button>
+                    <button class="tab-btn"        id="cashtab-btn-historico" onclick="switchCashTab('cash-historico', this)"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                    <button class="tab-btn"        id="cashtab-btn-relatorio" onclick="switchCashTab('cash-relatorio', this)"><i class="fa-solid fa-chart-bar"></i> Relatório</button>
+                </div>
+
+                <!-- SUBTAB: MESAS ATIVAS -->
+                <div id="cash-mesas" class="cashtab-content">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Mesas de Cash Game</div>
+                        <button onclick="openModal('modal-nova-cash-mesa')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Nova Mesa</button>
+                    </div>
+                    <div id="cash-mesas-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
+                    <div id="cash-sem-mesas" style="text-align:center;padding:4rem;color:#3f3f46;">
+                        <i class="fa-solid fa-table" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
+                        <div style="font-weight:700;">Nenhuma mesa ativa</div>
+                        <div style="font-size:.8rem;margin-top:.25rem;">Clique em "+ Nova Mesa" para começar</div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB: HISTÓRICO -->
+                <div id="cash-historico" class="cashtab-content" style="display:none;">
+                    <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Mesas Encerradas</div>
+                    <div id="cash-historico-list" style="display:flex;flex-direction:column;gap:.75rem;"></div>
+                </div>
+
+                <!-- SUBTAB: RELATÓRIO -->
+                <div id="cash-relatorio" class="cashtab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Mesas Encerradas</div>
+                            <div id="cash-rel-qtd" style="font-size:2rem;font-weight:800;margin-top:.4rem;">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Volume Total Movimentado</div>
+                            <div id="cash-rel-volume" style="font-size:2rem;font-weight:800;margin-top:.4rem;">R$ 0,00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake Arrecadado</div>
+                            <div id="cash-rel-rake" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0,00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Sessões de Jogadores</div>
+                            <div id="cash-rel-sessoes" style="font-size:2rem;font-weight:800;margin-top:.4rem;">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Ranking por Jogador</div>
+                        <div id="cash-rel-ranking" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- BAR & VENDAS -->
+            <div id="page-bar" class="page-content fade-in" style="display:none;">
+
+                <!-- Subtabs Bar -->
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;">
+                    <button class="tab-btn active" id="bartab-btn-produtos"   onclick="switchBarTab('bar-produtos', this)"><i class="fa-solid fa-box-open"></i> Produtos</button>
+                    <button class="tab-btn"         id="bartab-btn-comandas"  onclick="switchBarTab('bar-comandas', this)"><i class="fa-solid fa-receipt"></i> Comandas</button>
+                    <button class="tab-btn"         id="bartab-btn-historico" onclick="switchBarTab('bar-historico', this)"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                    <button class="tab-btn"         id="bartab-btn-relatorio" onclick="switchBarTab('bar-relatorio', this)"><i class="fa-solid fa-chart-bar"></i> Relatório</button>
+                </div>
+
+                <!-- SUBTAB: PRODUTOS -->
+                <div id="bar-produtos" class="bartab-content">
+                    <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start;">
+                        <!-- Lista de produtos por grupo -->
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                                <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Catálogo de Produtos</div>
+                                <div style="display:flex;gap:.5rem;align-items:center;">
+                                    <select id="bar-filtro-grupo" class="inp" style="width:160px;padding:.4rem .75rem;font-size:.8rem;" onchange="renderProdutos()">
+                                        <option value="">Todos os grupos</option>
+                                    </select>
+                                    <button onclick="openModal('modal-produto')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Produto</button>
+                                </div>
+                            </div>
+                            <div id="bar-produtos-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        </div>
+                        <!-- Painel de grupos -->
+                        <div class="stat-card" style="padding:1.25rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Grupos</div>
+                            <div id="bar-grupos-list" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem;"></div>
+                            <div style="display:flex;gap:.5rem;">
+                                <input id="novo-grupo-inp" class="inp" placeholder="Novo grupo..." style="font-size:.8rem;padding:.5rem .75rem;">
+                                <button onclick="addGrupo()" class="btn-ghost" style="font-size:.8rem;padding:.5rem .75rem;white-space:nowrap;">+ Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB: COMANDAS -->
+                <div id="bar-comandas" class="bartab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start;">
+                        <!-- Lista de comandas abertas -->
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                                <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Comandas Abertas</div>
+                                <button onclick="openModal('modal-nova-comanda')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Nova Comanda</button>
+                            </div>
+                            <div id="bar-comandas-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                        </div>
+                        <!-- Detalhe comanda selecionada -->
+                        <div id="bar-comanda-detalhe" style="display:none;">
+                            <div class="stat-card" style="padding:1.25rem;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                                    <div>
+                                        <div id="cd-nome" style="font-weight:800;font-size:.95rem;"></div>
+                                        <div id="cd-status" style="font-size:.7rem;color:#52525b;margin-top:.15rem;"></div>
+                                    </div>
+                                    <span id="cd-tag" class="tag tag-running">Aberta</span>
+                                </div>
+                                <!-- Adicionar item -->
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Adicionar Item</div>
+                                <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;">
+                                    <select id="cd-produto-sel" class="inp" style="font-size:.8rem;padding:.5rem .75rem;"></select>
+                                    <div style="display:flex;gap:.5rem;">
+                                        <input id="cd-qtd" type="number" value="1" min="1" class="inp" style="width:70px;font-size:.85rem;padding:.5rem .5rem;text-align:center;">
+                                        <button onclick="addItemComanda()" class="btn-gold" style="flex:1;font-size:.8rem;padding:.5rem;">Adicionar</button>
+                                    </div>
+                                </div>
+                                <!-- Itens da comanda -->
+                                <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Itens</div>
+                                <div id="cd-itens" style="display:flex;flex-direction:column;gap:.3rem;max-height:220px;overflow-y:auto;margin-bottom:1rem;"></div>
+                                <!-- Total -->
+                                <div style="display:flex;justify-content:space-between;align-items:center;padding:.75rem;background:#0f0f12;border-radius:.5rem;border:1px solid #1e1e23;margin-bottom:1rem;">
+                                    <span style="font-size:.8rem;font-weight:700;">Total</span>
+                                    <span id="cd-total" style="font-size:1.1rem;font-weight:800;color:#22c55e;font-family:'Space Mono',monospace;">R$ 0,00</span>
+                                </div>
+                                <!-- Fechar comanda -->
+                                <button onclick="openFecharComanda()" style="width:100%;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#22c55e;border-radius:.6rem;padding:.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.1)'">
+                                    <i class="fa-solid fa-check"></i> Fechar Comanda
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB: HISTÓRICO -->
+                <div id="bar-historico" class="bartab-content" style="display:none;">
+                    <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Vendas Fechadas</div>
+                    <div id="bar-historico-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                </div>
+
+                <!-- SUBTAB: RELATÓRIO -->
+                <div id="bar-relatorio" class="bartab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Faturamento Total</div>
+                            <div id="rel-total" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0,00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Comandas Fechadas</div>
+                            <div id="rel-qtd" style="font-size:2rem;font-weight:800;margin-top:.4rem;">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Ticket Médio</div>
+                            <div id="rel-ticket" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0,00</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                        <div class="stat-card" style="padding:1.25rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Vendas por Grupo</div>
+                            <div id="rel-grupos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        </div>
+                        <div class="stat-card" style="padding:1.25rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Formas de Pagamento</div>
+                            <div id="rel-pagamentos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- ======================== MODALS ======================== -->
+
+<!-- MODAL: NOVO PRODUTO -->
+<div id="modal-produto" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:460px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;" id="modal-produto-titulo">Novo Produto</h3>
+            <button onclick="closeModal('modal-produto')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <input type="hidden" id="prod-edit-id">
+            <div><label class="inp-label">Nome do Produto *</label><input id="prod-nome" class="inp" placeholder="Ex: Coca-Cola Lata"></div>
+            <div><label class="inp-label">Descrição</label><input id="prod-descricao" class="inp" placeholder="Ex: 350ml gelada"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div><label class="inp-label">Valor R$ *</label><input id="prod-valor" type="number" step="0.01" min="0" class="inp" placeholder="0,00"></div>
+                <div><label class="inp-label">Estoque inicial</label><input id="prod-estoque" type="number" min="0" value="0" class="inp"></div>
+            </div>
+            <div>
+                <label class="inp-label">Grupo *</label>
+                <select id="prod-grupo" class="inp"></select>
+            </div>
+            <button onclick="salvarProduto()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;">Salvar Produto</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NOVA COMANDA -->
+<div id="modal-nova-comanda" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;">Abrir Comanda</h3>
+            <button onclick="closeModal('modal-nova-comanda')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label class="inp-label">Jogador *</label>
+                <select id="comanda-jogador" class="inp"></select>
+            </div>
+            <button onclick="abrirComanda()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Abrir Comanda</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FECHAR COMANDA -->
+<div id="modal-fechar-comanda" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-check-circle" style="color:#22c55e;"></i> Fechar Comanda</h3>
+            <button onclick="closeModal('modal-fechar-comanda')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:.25rem;">
+                    <span style="font-size:.8rem;color:#71717a;">Jogador</span>
+                    <span id="fc-jogador" style="font-size:.85rem;font-weight:700;"></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="font-size:.8rem;color:#71717a;">Total</span>
+                    <span id="fc-total" style="font-size:1rem;font-weight:800;color:#22c55e;font-family:'Space Mono',monospace;"></span>
+                </div>
+            </div>
+            <div>
+                <label class="inp-label">Forma de Pagamento</label>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.25rem;">
+                    <label style="display:flex;align-items:center;gap:.4rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.6rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-dinheiro">
+                        <input type="radio" name="pagamento" value="dinheiro" checked onchange="highlightPgto(this)"> <i class="fa-solid fa-money-bill-wave"></i> Dinheiro
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.4rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.6rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-pix">
+                        <input type="radio" name="pagamento" value="pix" onchange="highlightPgto(this)"> <i class="fa-brands fa-pix"></i> PIX
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.4rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.6rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-cartao">
+                        <input type="radio" name="pagamento" value="cartao" onchange="highlightPgto(this)"> <i class="fa-solid fa-credit-card"></i> Cartão
+                    </label>
+                </div>
+            </div>
+            <button onclick="fecharComandaConfirm()" style="width:100%;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:.6rem;padding:.85rem;font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.25)'" onmouseout="this.style.background='rgba(34,197,94,.15)'">
+                Confirmar Pagamento
+            </button>
+        </div>
+    </div>
+</div>
+<!-- MODAL: USUÁRIO -->
+<div id="modal-usuario" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 id="modal-usuario-titulo" style="font-weight:800;font-size:1.1rem;">Novo Usuário</h3>
+            <button onclick="closeModal('modal-usuario')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <input type="hidden" id="u-edit-id">
+            <div><label class="inp-label">Nome *</label><input id="u-nome" class="inp" placeholder="Ex: João Silva"></div>
+            <div><label class="inp-label">E-mail *</label><input id="u-email" type="email" class="inp" placeholder="joao@pokersul.com"></div>
+            <div>
+                <label class="inp-label">Senha <span id="u-senha-hint" style="text-transform:none;letter-spacing:0;color:#52525b;font-weight:400;">(mín. 4 caracteres)</span></label>
+                <input id="u-senha" type="password" class="inp" placeholder="••••••">
+            </div>
+            <div>
+                <label class="inp-label">Papel *</label>
+                <select id="u-role" class="inp" onchange="updatePermissoesPreview()">
+                    <option value="admin">👑 Administrador (acesso total)</option>
+                    <option value="dealer">🃏 Dealer (torneios e cash game)</option>
+                    <option value="caixa">💰 Caixa (bar, pagamentos, comandas)</option>
+                    <option value="recepcao">📋 Recepção (jogadores, inscrições)</option>
+                </select>
+            </div>
+            <div id="u-permissoes-preview" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;"></div>
+            <div>
+                <label class="inp-label">Status</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                    <label style="display:flex;align-items:center;gap:.4rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.5rem;padding:.5rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-ativo">
+                        <input type="radio" name="u-status" value="ativo" checked onchange="highlightStatus(this)"> Ativo
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.4rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.5rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-inativo">
+                        <input type="radio" name="u-status" value="inativo" onchange="highlightStatus(this)"> Inativo
+                    </label>
+                </div>
+            </div>
+            <button onclick="salvarUsuario()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;">Salvar Usuário</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NOVA MESA CASH -->
+<div id="modal-nova-cash-mesa" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;">Nova Mesa de Cash Game</h3>
+            <button onclick="closeModal('modal-nova-cash-mesa')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div><label class="inp-label">Nome da Mesa *</label><input id="cm-nome" class="inp" placeholder="Ex: Mesa 1 NL 1/2"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div><label class="inp-label">Small Blind R$</label><input id="cm-sb" type="number" step="0.5" min="0" value="1" class="inp"></div>
+                <div><label class="inp-label">Big Blind R$</label><input id="cm-bb" type="number" step="0.5" min="0" value="2" class="inp"></div>
+                <div><label class="inp-label">Buy-in Mín R$</label><input id="cm-bmin" type="number" step="1" min="0" value="50" class="inp"></div>
+                <div><label class="inp-label">Buy-in Máx R$</label><input id="cm-bmax" type="number" step="1" min="0" value="200" class="inp"></div>
+            </div>
+            <div>
+                <label class="inp-label">Rake % (por buy-in/recompra)</label>
+                <input id="cm-rake" type="number" step="0.5" min="0" value="0" class="inp" placeholder="0 = sem rake">
+                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Rake aplicado sobre cada compra de fichas</div>
+            </div>
+            <div>
+                <label class="inp-label">Modo da Mesa</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                    <label style="display:flex;align-items:center;gap:.4rem;background:rgba(245,158,11,.1);border:1px solid var(--gold);color:var(--gold);border-radius:.5rem;padding:.6rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-modo-livre">
+                        <input type="radio" name="cm-modo" value="livre" checked onchange="highlightModo(this)"> Livre (sem tempo)
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.4rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.6rem .75rem;cursor:pointer;font-size:.8rem;font-weight:700;" id="lbl-modo-prog">
+                        <input type="radio" name="cm-modo" value="programado" onchange="highlightModo(this)"> Programada
+                    </label>
+                </div>
+            </div>
+            <div id="cm-duracao-wrap" style="display:none;">
+                <label class="inp-label">Duração prevista (horas)</label>
+                <input id="cm-duracao" type="number" step="0.5" min="0.5" value="4" class="inp">
+            </div>
+            <button onclick="criarMesaCash()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;">Abrir Mesa</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ADICIONAR JOGADOR À MESA -->
+<div id="modal-add-cash-jogador" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;">Adicionar Jogador</h3>
+            <button onclick="closeModal('modal-add-cash-jogador')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label class="inp-label">Jogador *</label>
+                <select id="acj-jogador" class="inp"></select>
+            </div>
+            <div id="acj-buyin-range" style="font-size:.75rem;color:#52525b;padding:.5rem .75rem;background:#0f0f12;border-radius:.5rem;"></div>
+            <div>
+                <label class="inp-label">Valor do Buy-in R$ *</label>
+                <input id="acj-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 100">
+            </div>
+            <button onclick="confirmAddCashJogador()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Entrar na Mesa</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: RECOMPRA -->
+<div id="modal-recompra" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-plus-circle" style="color:var(--gold);"></i> Recompra</h3>
+            <button onclick="closeModal('modal-recompra')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="rec-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
+            <div>
+                <label class="inp-label">Valor da Recompra R$ *</label>
+                <input id="rec-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 50">
+            </div>
+            <button onclick="confirmRecompra()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Recompra</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: RETIRAR JOGADOR (CASH-OUT) -->
+<div id="modal-retirar" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-right-from-bracket" style="color:#ef4444;"></i> Retirar Jogador</h3>
+            <button onclick="closeModal('modal-retirar')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="ret-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
+            <div>
+                <label class="inp-label">Valor com que o jogador saiu da mesa R$ *</label>
+                <input id="ret-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 250" oninput="calcResultadoPreview()">
+            </div>
+            <div id="ret-resultado" style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;text-align:center;"></div>
+            <button onclick="confirmRetirar()" style="width:100%;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.6rem;padding:.85rem;font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
+                Confirmar Retirada
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-jogador" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;">Cadastrar Jogador</h3>
+            <button onclick="closeModal('modal-jogador')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div><label class="inp-label">Nome Completo *</label><input id="j-nome" class="inp" placeholder="Ex: João da Silva"></div>
+            <div><label class="inp-label">Apelido</label><input id="j-apelido" class="inp" placeholder="Ex: JoãoAce"></div>
+            <div><label class="inp-label">WhatsApp</label><input id="j-whatsapp" class="inp" placeholder="(46) 9 9999-9999"></div>
+            <button onclick="addJogador()" class="btn-gold" style="padding:.85rem;font-size:.95rem;border-radius:.6rem;margin-top:.5rem;">Cadastrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NOVO TORNEIO -->
+<div id="modal-novo-torneio" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:860px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.2rem;">Novo Torneio</h3>
+            <button onclick="closeModal('modal-novo-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
+            <!-- Configs -->
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Configurações</div>
+                <div><label class="inp-label">Nome do Torneio</label><input id="t-nome" class="inp" placeholder="Ex: Sunday Major"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                    <div><label class="inp-label">Buy-in R$</label><input id="t-buyin" type="number" value="100" class="inp"></div>
+                    <div><label class="inp-label">Rake %</label><input id="t-rake" type="number" value="20" class="inp"></div>
+                    <div><label class="inp-label">Stack Inicial</label><input id="t-stack" type="number" value="20000" class="inp"></div>
+                    <div><label class="inp-label">Nível (min)</label><input id="t-tempo" type="number" value="15" class="inp"></div>
+                </div>
+                <div><label class="inp-label">Re-entry permitido até o nível</label><input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem re-entry"></div>
+                <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
+            </div>
+            <!-- Blinds -->
+            <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de Blinds</div>
+                    <button onclick="addBlindRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;">+ Nível</button>
+                </div>
+                <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 2rem;gap:.35rem;padding:0 .5rem;">
+                    <span></span>
+                    <span style="font-size:.6rem;color:#52525b;text-align:center;">SB</span>
+                    <span style="font-size:.6rem;color:#52525b;text-align:center;">BB</span>
+                    <span style="font-size:.6rem;color:#52525b;text-align:center;">Ante</span>
+                    <span></span>
+                </div>
+                <div id="blinds-setup" style="display:flex;flex-direction:column;gap:.3rem;max-height:280px;overflow-y:auto;padding-right:.25rem;"></div>
+            </div>
+        </div>
+        <button onclick="saveTournament()" class="btn-gold" style="width:100%;padding:1rem;font-size:1rem;border-radius:.75rem;margin-top:1.5rem;">CRIAR E ABRIR TORNEIO</button>
+    </div>
+</div>
+
+<!-- MODAL: TORNEIO DETALHES -->
+<div id="modal-torneio" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:0;width:100%;max-width:1100px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;">
+        <!-- Header do torneio -->
+        <div id="mt-header" style="padding:1.25rem 1.5rem;border-bottom:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <div>
+                <div id="mt-nome" style="font-size:1.1rem;font-weight:800;"></div>
+                <div style="display:flex;align-items:center;gap:.75rem;margin-top:.25rem;">
+                    <span id="mt-status-tag" class="tag tag-waiting">Aguardando</span>
+                    <span id="mt-info" style="font-size:.75rem;color:#52525b;"></span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
+                <button onclick="closeModal('modal-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+            </div>
+        </div>
+        <!-- Tabs -->
+        <div style="padding:.75rem 1.5rem 0;border-bottom:1px solid #1e1e23;display:flex;gap:.25rem;flex-shrink:0;">
+            <button class="tab-btn active" onclick="switchTab('tab-controle', this)">Controle</button>
+            <button class="tab-btn" onclick="switchTab('tab-jogadores', this)">Jogadores</button>
+            <button class="tab-btn" onclick="switchTab('tab-mesas', this)">Mesas</button>
+            <button class="tab-btn" onclick="switchTab('tab-financeiro', this)">Financeiro</button>
+            <button class="tab-btn" onclick="switchTab('tab-blinds', this)">Blinds</button>
+        </div>
+        <!-- Body -->
+        <div style="flex:1;overflow:auto;padding:1.5rem;">
+
+            <!-- TAB: CONTROLE -->
+            <div id="tab-controle" class="tab-content">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                    <!-- Timer + controls -->
+                    <div>
+                        <div class="stat-card" style="text-align:center;padding:2rem;">
+                            <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;" id="mt-nivel-label">Nível 1</div>
+                            <div id="mt-timer" class="timer-display" style="margin:.5rem 0;">00:00</div>
+                            <div id="mt-blinds-display" style="font-size:1.5rem;font-weight:800;color:#e4e4e7;">0 / 0</div>
+                            <div id="mt-ante-display" style="font-size:.8rem;color:#52525b;margin-top:.25rem;">Ante: 0</div>
+                            <div class="timer-bar-bg" style="margin:1rem 0 0;">
+                                <div id="mt-timer-bar" class="timer-bar" style="width:100%;"></div>
+                            </div>
+                        </div>
+                        <!-- Próximo nível -->
+                        <div style="margin-top:.75rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.75rem;display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Próximo Nível</span>
+                            <span id="mt-prox-blinds" style="font-size:.85rem;font-weight:700;color:#a1a1aa;">—</span>
+                        </div>
+                        <!-- Controles -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem;">
+                            <button onclick="adjTime(activeTorneioIdx, 60)" class="btn-ghost" style="font-size:.8rem;">+1 min</button>
+                            <button onclick="adjTime(activeTorneioIdx, -60)" class="btn-ghost" style="font-size:.8rem;">-1 min</button>
+                            <button onclick="prevLevel(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-backward"></i> Nível ant.</button>
+                            <button onclick="nextLevel(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;">Próx. nível <i class="fa-solid fa-forward"></i></button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:2fr 1fr;gap:.5rem;margin-top:.5rem;">
+                            <button id="btn-toggle-timer" onclick="toggleTimer(activeTorneioIdx)" class="btn-gold" style="padding:.85rem;font-size:.9rem;">
+                                <i class="fa-solid fa-play"></i> INICIAR
+                            </button>
+                            <button onclick="toggleBreak(activeTorneioIdx)" id="btn-break" class="btn-ghost" style="font-size:.8rem;">
+                                <i class="fa-solid fa-mug-hot"></i> Break
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Stats do torneio -->
+                    <div style="display:flex;flex-direction:column;gap:.75rem;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                            <div class="stat-card" style="padding:1rem;">
+                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Entradas</div>
+                                <div id="mt-entries" style="font-size:1.75rem;font-weight:800;margin-top:.25rem;">0</div>
+                            </div>
+                            <div class="stat-card" style="padding:1rem;">
+                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Ativos</div>
+                                <div id="mt-ativos" style="font-size:1.75rem;font-weight:800;margin-top:.25rem;color:#22c55e;">0</div>
+                            </div>
+                            <div class="stat-card" style="padding:1rem;">
+                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Prize Pool</div>
+                                <div id="mt-prize" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:#22c55e;">R$ 0</div>
+                            </div>
+                            <div class="stat-card" style="padding:1rem;">
+                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake</div>
+                                <div id="mt-rake-val" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:var(--gold);">R$ 0</div>
+                            </div>
+                        </div>
+                        <!-- Ações rápidas -->
+                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Ações Rápidas</div>
+                        <div style="display:flex;flex-direction:column;gap:.5rem;">
+                            <button onclick="openModalEntrada(activeTorneioIdx)" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
+                                <i class="fa-solid fa-plus"></i> Nova Entrada / Buy-in
+                            </button>
+                            <button onclick="openModalEliminar(activeTorneioIdx)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.6rem;padding:.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">
+                                <i class="fa-solid fa-skull"></i> Eliminar Jogador
+                            </button>
+                        </div>
+                        <!-- Premiação -->
+                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Tabela de Premiação</div>
+                        <div id="mt-payout" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: JOGADORES -->
+            <div id="tab-jogadores" class="tab-content" style="display:none;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                    <!-- Ativos -->
+                    <div>
+                        <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Em Jogo</div>
+                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                    <!-- Eliminados com ranking -->
+                    <div>
+                        <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Eliminados</div>
+                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: MESAS -->
+            <div id="tab-mesas" class="tab-content" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                    <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Distribuição de Mesas</div>
+                    <button onclick="balancearMesas(activeTorneioIdx)" class="btn-ghost" style="font-size:.75rem;"><i class="fa-solid fa-shuffle"></i> Balancear</button>
+                </div>
+                <div id="mt-mesas-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;"></div>
+            </div>
+
+            <!-- TAB: FINANCEIRO -->
+            <div id="tab-financeiro" class="tab-content" style="display:none;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                    <div style="display:flex;flex-direction:column;gap:.75rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Resumo Financeiro</div>
+                        <div id="mt-financeiro" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:.75rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Premiação Projetada</div>
+                        <div id="mt-payout-full" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: BLINDS -->
+            <div id="tab-blinds" class="tab-content" style="display:none;">
+                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Estrutura Completa de Blinds</div>
+                <div id="mt-blinds-full" style="display:flex;flex-direction:column;gap:.3rem;"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ENTRADA -->
+<div id="modal-entrada" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;">Registrar Entrada</h3>
+            <button onclick="closeModal('modal-entrada')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label class="inp-label">Jogador</label>
+                <select id="entrada-jogador" class="inp">
+                    <option value="">Selecionar jogador...</option>
+                </select>
+            </div>
+            <div>
+                <label class="inp-label">Tipo</label>
+                <select id="entrada-tipo" class="inp">
+                    <option value="buyin">Buy-in (entrada normal)</option>
+                    <option value="reentry">Re-entry</option>
+                    <option value="addon">Add-on</option>
+                </select>
+            </div>
+            <button onclick="registrarEntrada()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Entrada</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ELIMINAR -->
+<div id="modal-eliminar" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;color:#ef4444;"><i class="fa-solid fa-skull"></i> Eliminar Jogador</h3>
+            <button onclick="closeModal('modal-eliminar')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label class="inp-label">Jogador eliminado</label>
+                <select id="eliminar-jogador" class="inp"></select>
+            </div>
+            <div id="eliminar-posicao-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:1rem;font-size:.85rem;"></div>
+            <button onclick="confirmarEliminacao()" style="background:#7f1d1d;border:1px solid #991b1b;color:#fca5a5;border-radius:.6rem;padding:.85rem;font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;">Confirmar Eliminação</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+let jogadores  = JSON.parse(localStorage.getItem('ps_jogadores'))  || [];
+let torneios   = JSON.parse(localStorage.getItem('ps_torneios'))   || [];
+let barGrupos  = JSON.parse(localStorage.getItem('ps_bar_grupos')) || ['Refrigerantes','Cervejas','Salgados','Picolés','Outros'];
+let barProdutos= JSON.parse(localStorage.getItem('ps_bar_produtos'))|| [];
+let barComandas= JSON.parse(localStorage.getItem('ps_bar_comandas'))|| [];
+let cashMesas  = JSON.parse(localStorage.getItem('ps_cash_mesas'))  || [];
+let usuarios   = JSON.parse(localStorage.getItem('ps_usuarios'))    || [];
+let currentUser = JSON.parse(sessionStorage.getItem('ps_current_user') || 'null');
+let tvWindow   = null;
+let activeTorneioIdx  = null;
+let activeComandaId   = null;
+let activeCashMesaId  = null;
+let activeCashContext = { mesaId: null, jogadorId: null };
+
+// ============================================================
+// PERMISSIONS MATRIX
+// ============================================================
+const ROLES = {
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','usuarios'] },
+    dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
+    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar'] },
+    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios'] },
+};
+
+// Seed admin padrão + limpeza de dados corrompidos
+usuarios = usuarios.filter(u => u && u.email && u.senha && u.role);
+const temAdmin = usuarios.some(u => u.email && u.email.toLowerCase() === 'admin@pokersul.com');
+if (!temAdmin) {
+    usuarios.push({
+        id: 1,
+        nome: 'Admin Clube',
+        email: 'admin@pokersul.com',
+        senha: '123456',
+        role: 'admin',
+        status: 'ativo',
+        criadoEm: Date.now(),
+    });
+}
+localStorage.setItem('ps_usuarios', JSON.stringify(usuarios));
+
+function hasAccess(page) {
+    if (!currentUser) return false;
+    const role = ROLES[currentUser.role];
+    return role ? role.pages.includes(page) : false;
+}
+
+let blindStructure = [
+    { sb:100,  bb:200,  ante:200  },
+    { sb:200,  bb:400,  ante:400  },
+    { sb:300,  bb:600,  ante:600  },
+    { sb:400,  bb:800,  ante:800  },
+    { sb:500,  bb:1000, ante:1000 },
+    { sb:600,  bb:1200, ante:1200 },
+    { sb:800,  bb:1600, ante:1600 },
+    { sb:1000, bb:2000, ante:2000 },
+    { sb:1500, bb:3000, ante:3000 },
+    { sb:2000, bb:4000, ante:4000 },
+];
+
+function saveData() {
+    localStorage.setItem('ps_jogadores',   JSON.stringify(jogadores));
+    localStorage.setItem('ps_torneios',    JSON.stringify(torneios));
+    localStorage.setItem('ps_bar_grupos',  JSON.stringify(barGrupos));
+    localStorage.setItem('ps_bar_produtos',JSON.stringify(barProdutos));
+    localStorage.setItem('ps_bar_comandas',JSON.stringify(barComandas));
+    localStorage.setItem('ps_cash_mesas',  JSON.stringify(cashMesas));
+    localStorage.setItem('ps_usuarios',    JSON.stringify(usuarios));
+}
+
+// ============================================================
+// CORE
+// ============================================================
+function login() {
+    const email = document.getElementById('login-user').value.trim().toLowerCase();
+    const senha = document.getElementById('login-pass').value;
+    const errEl = document.getElementById('login-error');
+
+    const user = usuarios.find(u => u && u.email && u.email.toLowerCase() === email && u.senha === senha);
+    if (!user) {
+        errEl.style.display = 'block';
+        errEl.innerText = '⚠️ E-mail ou senha inválidos';
+        return;
+    }
+    if (user.status !== 'ativo') {
+        errEl.style.display = 'block';
+        errEl.innerText = '⚠️ Usuário inativo. Contate o administrador.';
+        return;
+    }
+
+    currentUser = { id: user.id, nome: user.nome, email: user.email, role: user.role };
+    sessionStorage.setItem('ps_current_user', JSON.stringify(currentUser));
+    errEl.style.display = 'none';
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'flex';
+
+    applyPermissions();
+    renderDashboard();
+    iniciarRelogio();
+    showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}!`);
+}
+
+function logout() {
+    if (!confirm('Deseja sair do sistema?')) return;
+    sessionStorage.removeItem('ps_current_user');
+    currentUser = null;
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('login-pass').value = '';
+}
+
+function applyPermissions() {
+    if (!currentUser) return;
+
+    // Update sidebar user info
+    const role = ROLES[currentUser.role];
+    const initials = currentUser.nome.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+    document.getElementById('user-avatar').innerText = initials;
+    document.getElementById('user-avatar').style.background = role.color;
+    document.getElementById('user-nome').innerText = currentUser.nome;
+    document.getElementById('user-role').innerText = `${role.icon} ${role.label}`;
+    document.getElementById('user-role').style.color = role.color;
+
+    // Hide nav items not allowed
+    const navMap = {
+        'nav-dashboard': 'dashboard',
+        'nav-jogadores': 'jogadores',
+        'nav-torneios':  'torneios',
+        'nav-cash':      'cash',
+        'nav-bar':       'bar',
+        'nav-usuarios':  'usuarios',
+    };
+    Object.entries(navMap).forEach(([navId, page]) => {
+        const el = document.getElementById(navId);
+        if (el) el.style.display = hasAccess(page) ? 'flex' : 'none';
+    });
+
+    // Show divider only if usuarios visible
+    const divider = document.getElementById('nav-divider-admin');
+    if (divider) divider.style.display = hasAccess('usuarios') ? 'block' : 'none';
+
+    // Admin-only tools
+    const btnReset = document.getElementById('btn-resetar-db');
+    if (btnReset) btnReset.style.display = currentUser.role === 'admin' ? 'block' : 'none';
+
+    // Redirect to first allowed page
+    const firstAllowed = ROLES[currentUser.role].pages[0];
+    showPage(firstAllowed);
+}
+
+function showPage(page) {
+    // Gate by permission
+    if (currentUser && !hasAccess(page)) {
+        showToast('🔒 Você não tem permissão para acessar esta página');
+        return;
+    }
+    document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.nav-item').forEach(l => {
+        l.classList.remove('nav-active');
+        l.style.color = '#52525b';
+    });
+    const pg = document.getElementById('page-' + page);
+    if (pg) { pg.style.display = 'block'; pg.classList.add('fade-in'); }
+    const nav = document.getElementById('nav-' + page);
+    if (nav) { nav.classList.add('nav-active'); nav.style.color = ''; }
+    document.getElementById('page-title').innerText = page.charAt(0).toUpperCase() + page.slice(1);
+    if (page === 'jogadores') renderJogadores();
+    if (page === 'torneios')  renderTorneiosList();
+    if (page === 'dashboard') renderDashboard();
+    if (page === 'bar')       renderBarProdutos();
+    if (page === 'cash')      renderCashMesas();
+    if (page === 'usuarios')  renderUsuarios();
+}
+
+function iniciarRelogio() {
+    setInterval(() => {
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString('pt-BR');
+    }, 1000);
+}
+
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'tab-jogadores') renderTabJogadores();
+    if (tabId === 'tab-mesas')     renderTabMesas();
+    if (tabId === 'tab-financeiro') renderTabFinanceiro();
+    if (tabId === 'tab-blinds')    renderTabBlinds();
+}
+
+// ============================================================
+// JOGADORES
+// ============================================================
+function renderJogadores(data = jogadores) {
+    const tbody = document.getElementById('jogadores-tbody');
+    if (!data.length) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador cadastrado</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = data.map(j => `
+        <tr style="border-bottom:1px solid #1a1a1e;">
+            <td style="padding:.9rem 1.5rem;">
+                <div style="font-weight:700;">${j.nome}</div>
+                ${j.apelido ? `<div style="font-size:.75rem;color:#52525b;">${j.apelido}</div>` : ''}
+            </td>
+            <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:'Space Mono',monospace;">${j.whatsapp || '—'}</td>
+            <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#52525b;">${contarTorneiosJogador(j.id)}</td>
+            <td style="padding:.9rem 1.5rem;text-align:right;">
+                <button onclick="removerJogador(${j.id})" class="btn-danger"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function contarTorneiosJogador(id) {
+    return torneios.filter(t => t.entries.some(e => e.jogadorId === id)).length + ' torneio(s)';
+}
+
+function addJogador() {
+    const nome = document.getElementById('j-nome').value.trim();
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+    jogadores.push({
+        id: Date.now(),
+        nome,
+        apelido:  document.getElementById('j-apelido').value.trim(),
+        whatsapp: document.getElementById('j-whatsapp').value.trim(),
+    });
+    saveData();
+    closeModal('modal-jogador');
+    document.getElementById('j-nome').value = '';
+    document.getElementById('j-apelido').value = '';
+    document.getElementById('j-whatsapp').value = '';
+    renderJogadores();
+    renderDashboard();
+    showToast('✅ Jogador cadastrado!');
+}
+
+function removerJogador(id) {
+    if (!confirm('Deseja remover este jogador?')) return;
+    jogadores = jogadores.filter(j => j.id !== id);
+    saveData();
+    renderJogadores();
+    renderDashboard();
+}
+
+function filtrarJogadores(val) {
+    const v = val.toLowerCase();
+    renderJogadores(jogadores.filter(j =>
+        j.nome.toLowerCase().includes(v) || (j.apelido || '').toLowerCase().includes(v)
+    ));
+}
+
+// ============================================================
+// TORNEIOS — CRUD
+// ============================================================
+function renderBlindsInputs() {
+    const c = document.getElementById('blinds-setup');
+    c.innerHTML = blindStructure.map((b, i) => `
+        <div class="blind-row" id="blindrow-${i}">
+            <span style="font-size:.7rem;color:#52525b;font-weight:700;">${i+1}</span>
+            <input type="number" value="${b.sb}"   onchange="blindStructure[${i}].sb=parseInt(this.value)||0">
+            <input type="number" value="${b.bb}"   onchange="blindStructure[${i}].bb=parseInt(this.value)||0">
+            <input type="number" value="${b.ante}" onchange="blindStructure[${i}].ante=parseInt(this.value)||0">
+            <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
+        </div>
+    `).join('');
+}
+
+function addBlindRow() {
+    const last = blindStructure[blindStructure.length - 1];
+    blindStructure.push({ sb: last.sb*2, bb: last.bb*2, ante: last.ante*2 });
+    renderBlindsInputs();
+}
+
+function removeBlindRow(i) {
+    if (blindStructure.length <= 2) return showToast('⚠️ Mínimo 2 níveis');
+    blindStructure.splice(i, 1);
+    renderBlindsInputs();
+}
+
+function saveTournament() {
+    const nome = document.getElementById('t-nome').value.trim() || 'Torneio PokerSul';
+    const t = {
+        id:           Date.now(),
+        nome,
+        buyin:        parseFloat(document.getElementById('t-buyin').value)  || 100,
+        rake:         parseFloat(document.getElementById('t-rake').value)   || 20,
+        tempoNivel:   parseInt(document.getElementById('t-tempo').value)    || 15,
+        stack:        parseInt(document.getElementById('t-stack').value)    || 20000,
+        reentryAte:   parseInt(document.getElementById('t-reentry').value)  || 0,
+        addonFichas:  parseInt(document.getElementById('t-addon').value)    || 0,
+        blinds:       JSON.parse(JSON.stringify(blindStructure)),
+        nivelAtual:   0,
+        tempoRestante: (parseInt(document.getElementById('t-tempo').value) || 15) * 60,
+        tempoTotal:   (parseInt(document.getElementById('t-tempo').value) || 15) * 60,
+        rodando:      false,
+        isBreak:      false,
+        status:       'waiting', // waiting | running | paused | break | finished
+        entries:      [],        // { jogadorId, tipo:'buyin'|'reentry'|'addon', ts }
+        eliminados:   [],        // { jogadorId, posicao, ts }
+        mesas:        [],
+        createdAt:    Date.now(),
+    };
+    torneios.push(t);
+    saveData();
+    closeModal('modal-novo-torneio');
+    renderTorneiosList();
+    showToast(`🏆 Torneio "${nome}" criado!`);
+    // Abrir detalhes direto
+    abrirDetalhesTorneio(torneios.length - 1);
+}
+
+function renderTorneiosList() {
+    const list = document.getElementById('torneios-list');
+    const sem  = document.getElementById('sem-torneios');
+    if (!torneios.length) {
+        list.innerHTML = '';
+        sem.style.display = 'block';
+        return;
+    }
+    sem.style.display = 'none';
+    list.innerHTML = torneios.map((t, i) => {
+        const ativos = getAtivos(t);
+        const prize  = getPrize(t);
+        const statusTag = getStatusTag(t.status);
+        return `
+        <div class="t-card">
+            <div class="t-card-header">
+                <div>
+                    <div style="font-size:1rem;font-weight:800;">${t.nome}</div>
+                    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem;">
+                        <span class="tag ${statusTag.cls}">${statusTag.label}</span>
+                        <span style="font-size:.75rem;color:#52525b;">Nível ${t.nivelAtual+1} &bull; ${t.blinds[t.nivelAtual].sb}/${t.blinds[t.nivelAtual].bb}</span>
+                    </div>
+                </div>
+                <button onclick="abrirDetalhesTorneio(${i})" class="btn-gold" style="font-size:.85rem;">Abrir <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+            <div style="padding:1rem 2rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;border-bottom:1px solid #1e1e23;">
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Entradas</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;">${t.entries.length}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Ativos</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:#22c55e;">${ativos}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Prize Pool</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:#22c55e;">${formatMoney(prize)}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Timer</div><div class="mono" style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:var(--gold);">${formatTime(t.tempoRestante)}</div></div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// TORNEIO — MODAL DETALHES
+// ============================================================
+function abrirDetalhesTorneio(idx) {
+    activeTorneioIdx = idx;
+    const t = torneios[idx];
+    document.getElementById('mt-nome').innerText = t.nome;
+    updateModalTorneio();
+    // reset to controle tab
+    document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-controle').style.display = 'block';
+    document.querySelector('.tab-btn').classList.add('active');
+    openModal('modal-torneio');
+}
+
+function updateModalTorneio() {
+    const idx = activeTorneioIdx;
+    if (idx === null || !torneios[idx]) return;
+    const t = torneios[idx];
+    const ativos  = getAtivos(t);
+    const prize   = getPrize(t);
+    const rake    = getRake(t);
+    const st      = getStatusTag(t.status);
+
+    document.getElementById('mt-status-tag').className = `tag ${st.cls}`;
+    document.getElementById('mt-status-tag').innerText = st.label;
+    document.getElementById('mt-info').innerText = `Buy-in R$ ${t.buyin} | Rake ${t.rake}%`;
+
+    document.getElementById('mt-nivel-label').innerText = t.isBreak ? 'INTERVALO' : `Nível ${t.nivelAtual + 1}`;
+    document.getElementById('mt-timer').innerText = formatTime(t.tempoRestante);
+    document.getElementById('mt-timer').style.color = t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : 'var(--gold)');
+
+    const cur = t.blinds[t.nivelAtual];
+    document.getElementById('mt-blinds-display').innerText = `${cur.sb.toLocaleString()} / ${cur.bb.toLocaleString()}`;
+    document.getElementById('mt-ante-display').innerText = `Ante: ${cur.ante.toLocaleString()}`;
+
+    const pct = (t.tempoRestante / t.tempoTotal) * 100;
+    const bar = document.getElementById('mt-timer-bar');
+    bar.style.width = pct + '%';
+    bar.className = 'timer-bar' + (pct < 20 ? ' low' : '');
+
+    const prox = t.blinds[t.nivelAtual + 1];
+    document.getElementById('mt-prox-blinds').innerText = prox
+        ? `${prox.sb.toLocaleString()} / ${prox.bb.toLocaleString()} (Ante ${prox.ante.toLocaleString()})`
+        : 'Último nível';
+
+    document.getElementById('mt-entries').innerText = t.entries.filter(e => e.tipo !== 'addon').length;
+    document.getElementById('mt-ativos').innerText  = ativos;
+    document.getElementById('mt-prize').innerText   = formatMoney(prize);
+    document.getElementById('mt-rake-val').innerText = formatMoney(rake);
+
+    const btnTimer = document.getElementById('btn-toggle-timer');
+    if (t.rodando) {
+        btnTimer.innerHTML = '<i class="fa-solid fa-pause"></i> PAUSAR';
+    } else {
+        btnTimer.innerHTML = '<i class="fa-solid fa-play"></i> ' + (t.status === 'waiting' ? 'INICIAR' : 'RETOMAR');
+    }
+
+    const btnBreak = document.getElementById('btn-break');
+    if (t.isBreak) {
+        btnBreak.style.background = 'rgba(239,68,68,.15)';
+        btnBreak.style.color = '#ef4444';
+        btnBreak.style.borderColor = 'rgba(239,68,68,.3)';
+    } else {
+        btnBreak.style.background = '';
+        btnBreak.style.color = '';
+        btnBreak.style.borderColor = '';
+    }
+
+    renderPayout(t, 'mt-payout');
+}
+
+// ============================================================
+// TORNEIO — TABS
+// ============================================================
+function renderTabJogadores() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+
+    const ativoDiv = document.getElementById('mt-jogadores-ativos');
+    const elimDiv  = document.getElementById('mt-jogadores-eliminados');
+
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entriesUniq   = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+    const ativos        = entriesUniq.filter(id => !eliminadosIds.has(id));
+
+    ativoDiv.innerHTML = ativos.length ? ativos.map(id => {
+        const j = jogadores.find(j => j.id === id);
+        const re = t.entries.filter(e => e.jogadorId === id && e.tipo === 'reentry').length;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+            <div>
+                <span style="font-weight:700;font-size:.85rem;">${j ? j.nome : 'Desconhecido'}</span>
+                ${j && j.apelido ? `<span style="font-size:.7rem;color:#52525b;margin-left:.4rem;">${j.apelido}</span>` : ''}
+                ${re ? `<span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);margin-left:.5rem;">${re}x re-entry</span>` : ''}
+            </div>
+            <span style="font-size:.7rem;color:#22c55e;font-weight:700;">● Ativo</span>
+        </div>`;
+    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhum jogador inscrito</div>';
+
+    elimDiv.innerHTML = [...t.eliminados].reverse().map(e => {
+        const j = jogadores.find(j => j.id === e.jogadorId);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.65;">
+            <div>
+                <span style="font-weight:700;font-size:.85rem;">${j ? j.nome : 'Desconhecido'}</span>
+            </div>
+            <span style="font-size:.75rem;color:#ef4444;font-weight:700;">${e.posicao}º lugar</span>
+        </div>`;
+    }).join('') || '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhum eliminado ainda</div>';
+}
+
+function renderTabMesas() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const grid = document.getElementById('mt-mesas-grid');
+    if (!t.mesas.length) {
+        grid.innerHTML = '<div style="color:#3f3f46;font-size:.85rem;grid-column:1/-1;">Nenhuma mesa criada. Registre entradas primeiro.</div>';
+        return;
+    }
+    grid.innerHTML = t.mesas.map((m, mi) => `
+        <div class="mesa-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                <span style="font-size:.75rem;font-weight:800;">Mesa ${m.id}</span>
+                <span style="font-size:.7rem;color:#52525b;">${m.seats.filter(Boolean).length}/9 cadeiras</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;">
+                ${m.seats.map((s, si) => {
+                    const j = s ? jogadores.find(j => j.id === s) : null;
+                    const elim = s && t.eliminados.some(e => e.jogadorId === s);
+                    return `<div class="seat ${s ? (elim ? 'eliminado' : 'ocupado') : 'livre'}" title="${j ? j.nome : `Cadeira ${si+1}`}">${si+1}</div>`;
+                }).join('')}
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderTabFinanceiro() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const entries  = t.entries.filter(e => e.tipo !== 'addon').length;
+    const reentries = t.entries.filter(e => e.tipo === 'reentry').length;
+    const addons   = t.entries.filter(e => e.tipo === 'addon').length;
+    const gross    = entries * t.buyin;
+    const rakeVal  = getRake(t);
+    const prize    = getPrize(t);
+
+    document.getElementById('mt-financeiro').innerHTML = [
+        ['Buy-ins', entries + ' × R$ ' + t.buyin, formatMoney(entries * t.buyin)],
+        ['Re-entries', reentries + ' × R$ ' + t.buyin, formatMoney(reentries * t.buyin)],
+        ['Add-ons', addons, '—'],
+        ['Total Bruto', '', formatMoney(gross + reentries * t.buyin)],
+        ['Rake (' + t.rake + '%)', '', formatMoney(rakeVal)],
+        ['Prize Pool', '', formatMoney(prize)],
+    ].map(([label, sub, val], i) => `
+        <div class="payout-item" style="${i >= 3 ? 'border-color:#27272a;' : ''}">
+            <div>
+                <div style="font-size:.8rem;font-weight:700;${i>=4?'color:var(--gold)':''}">${label}</div>
+                ${sub ? `<div style="font-size:.7rem;color:#52525b;">${sub}</div>` : ''}
+            </div>
+            <div style="font-size:.9rem;font-weight:800;${i===5?'color:#22c55e':i===4?'color:var(--gold)':''}">${val}</div>
+        </div>
+    `).join('');
+
+    renderPayout(t, 'mt-payout-full', true);
+}
+
+function renderTabBlinds() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    document.getElementById('mt-blinds-full').innerHTML = t.blinds.map((b, i) => `
+        <div class="blind-row ${i === t.nivelAtual ? 'current-level' : ''}">
+            <span style="font-size:.7rem;font-weight:700;color:${i===t.nivelAtual?'var(--gold)':'#52525b'};">${i+1}</span>
+            <div style="text-align:right;font-size:.8rem;font-weight:700;${i===t.nivelAtual?'color:#e4e4e7':'color:#71717a'}">${b.sb.toLocaleString()}</div>
+            <div style="text-align:right;font-size:.8rem;font-weight:700;${i===t.nivelAtual?'color:#e4e4e7':'color:#71717a'}">${b.bb.toLocaleString()}</div>
+            <div style="text-align:right;font-size:.8rem;font-weight:700;${i===t.nivelAtual?'color:#e4e4e7':'color:#71717a'}">${b.ante.toLocaleString()}</div>
+            ${i===t.nivelAtual ? '<span style="color:var(--gold);font-size:.6rem;font-weight:800;">◀ ATUAL</span>' : '<span></span>'}
+        </div>
+    `).join('');
+}
+
+// ============================================================
+// PAYOUT
+// ============================================================
+function renderPayout(t, containerId, full = false) {
+    const prize = getPrize(t);
+    const ativos = getAtivos(t) + t.eliminados.length; // total entrantes
+    const splits = calcPayout(ativos, prize);
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    c.innerHTML = splits.map((s, i) => `
+        <div class="payout-item">
+            <div style="display:flex;align-items:center;gap:.5rem;">
+                <span style="font-size:.7rem;font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};width:1.5rem;">
+                    ${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}
+                </span>
+                <span style="font-size:.8rem;font-weight:700;">${s.label}${full&&t.eliminados[ativos-i-2]?' — '+getJogadorNome(t.eliminados[ativos-i-2]?.jogadorId):''}
+                </span>
+            </div>
+            <span style="font-size:.85rem;font-weight:800;color:#22c55e;">${formatMoney(prize * s.pct)}</span>
+        </div>
+    `).join('');
+}
+
+function calcPayout(n, prize) {
+    if (n <= 1)  return [{ label: '1º',  pct: 1.0 }];
+    if (n <= 3)  return [{ label:'1º',pct:.65 },{ label:'2º',pct:.35 }];
+    if (n <= 6)  return [{ label:'1º',pct:.5 },{ label:'2º',pct:.3 },{ label:'3º',pct:.2 }];
+    if (n <= 10) return [{ label:'1º',pct:.4 },{ label:'2º',pct:.25 },{ label:'3º',pct:.15 },{ label:'4º',pct:.12 },{ label:'5º',pct:.08 }];
+    return [{ label:'1º',pct:.35 },{ label:'2º',pct:.2 },{ label:'3º',pct:.13 },{ label:'4º',pct:.1 },{ label:'5º',pct:.08 },{ label:'6º',pct:.07 },{ label:'7º',pct:.07 }];
+}
+
+// ============================================================
+// TORNEIO — CONTROLES
+// ============================================================
+function toggleTimer(idx) {
+    const t = torneios[idx];
+    t.rodando = !t.rodando;
+    if (t.rodando) t.status = 'running';
+    else           t.status = 'paused';
+    saveData();
+    updateModalTorneio();
+    renderTorneiosList();
+}
+
+function adjTime(idx, v) {
+    torneios[idx].tempoRestante = Math.max(0, torneios[idx].tempoRestante + v);
+    saveData();
+    updateModalTorneio();
+    updateTV(idx);
+}
+
+function prevLevel(idx) {
+    const t = torneios[idx];
+    if (t.nivelAtual > 0) {
+        t.nivelAtual--;
+        t.tempoRestante = t.tempoTotal;
+        saveData();
+        updateModalTorneio();
+        updateTV(idx);
+    }
+}
+
+function nextLevel(idx) {
+    const t = torneios[idx];
+    if (t.nivelAtual < t.blinds.length - 1) {
+        t.nivelAtual++;
+        t.tempoRestante = t.tempoTotal;
+        saveData();
+        updateModalTorneio();
+        updateTV(idx);
+        showToast(`⬆️ Nível ${t.nivelAtual + 1}: ${t.blinds[t.nivelAtual].sb}/${t.blinds[t.nivelAtual].bb}`);
+    } else {
+        showToast('⚠️ Último nível atingido');
+    }
+}
+
+function toggleBreak(idx) {
+    const t = torneios[idx];
+    t.isBreak = !t.isBreak;
+    if (t.isBreak) {
+        t._tempoAntes    = t.tempoRestante;
+        t.tempoRestante  = 15 * 60;
+        t.tempoTotal     = 15 * 60;
+        t.status         = 'break';
+    } else {
+        t.tempoRestante  = t._tempoAntes || t.tempoNivel * 60;
+        t.tempoTotal     = t.tempoNivel * 60;
+        t.status         = t.rodando ? 'running' : 'paused';
+    }
+    saveData();
+    updateModalTorneio();
+    updateTV(idx);
+}
+
+// ============================================================
+// TORNEIO — ENTRADAS / ELIMINAÇÕES
+// ============================================================
+function openModalEntrada(idx) {
+    const t = torneios[idx];
+    const sel = document.getElementById('entrada-jogador');
+    sel.innerHTML = '<option value="">Selecionar jogador...</option>';
+
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entriesIds    = new Set(t.entries.filter(e=>e.tipo!=='addon').map(e => e.jogadorId));
+
+    jogadores.forEach(j => {
+        const jaElim = eliminadosIds.has(j.id);
+        const jaEntrou = entriesIds.has(j.id);
+        // Mostra todos, filtrando lógica no submit
+        sel.innerHTML += `<option value="${j.id}" ${jaElim?'':''}>${j.nome}${jaElim?' (elim.)': jaEntrou?' (inscrito)':''}</option>`;
+    });
+
+    // Ajuste opções de tipo
+    const tipoSel = document.getElementById('entrada-tipo');
+    tipoSel.innerHTML = `
+        <option value="buyin">Buy-in (entrada normal)</option>
+        ${t.reentryAte > 0 ? '<option value="reentry">Re-entry</option>' : ''}
+        ${t.addonFichas > 0 ? '<option value="addon">Add-on</option>' : ''}
+    `;
+    openModal('modal-entrada');
+}
+
+function registrarEntrada() {
+    const t   = torneios[activeTorneioIdx];
+    const jid = parseInt(document.getElementById('entrada-jogador').value);
+    const tipo = document.getElementById('entrada-tipo').value;
+
+    if (!jid) return showToast('⚠️ Selecione um jogador');
+
+    const jaEntrou = t.entries.some(e => e.jogadorId === jid && e.tipo !== 'addon');
+    const eliminado = t.eliminados.some(e => e.jogadorId === jid);
+
+    if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Re-entry.');
+    if (tipo === 'reentry' && t.nivelAtual >= t.reentryAte) return showToast(`⚠️ Re-entry encerrado após nível ${t.reentryAte}`);
+    if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
+
+    // Se re-entry: reativar (remover da lista de eliminados)
+    if (tipo === 'reentry') {
+        t.eliminados = t.eliminados.filter(e => e.jogadorId !== jid);
+    }
+
+    t.entries.push({ jogadorId: jid, tipo, ts: Date.now() });
+    alocarJogadorMesa(t, jid);
+    saveData();
+    closeModal('modal-entrada');
+    updateModalTorneio();
+    renderTorneiosList();
+    renderDashboard();
+    showToast(`💰 ${tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in'} registrado!`);
+}
+
+function openModalEliminar(idx) {
+    const t   = torneios[idx];
+    const sel = document.getElementById('eliminar-jogador');
+    sel.innerHTML = '';
+
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entriesIds    = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+    const ativos        = entriesIds.filter(id => !eliminadosIds.has(id));
+
+    if (!ativos.length) return showToast('⚠️ Nenhum jogador ativo');
+
+    ativos.forEach(id => {
+        const j = jogadores.find(j => j.id === id);
+        sel.innerHTML += `<option value="${id}">${j ? j.nome : 'Desconhecido'}</option>`;
+    });
+
+    const posicao = ativos.length;
+    document.getElementById('eliminar-posicao-info').innerHTML = `
+        <div style="color:#71717a;font-size:.8rem;">Posição de saída: <strong style="color:#e4e4e7;">${posicao}º lugar</strong></div>
+        <div style="color:#71717a;font-size:.8rem;margin-top:.25rem;">Jogadores restantes após eliminação: <strong style="color:#e4e4e7;">${posicao - 1}</strong></div>
+    `;
+    sel.onchange = () => {
+        const pos = ativos.length;
+        document.getElementById('eliminar-posicao-info').innerHTML = `
+            <div style="color:#71717a;font-size:.8rem;">Posição de saída: <strong style="color:#e4e4e7;">${pos}º lugar</strong></div>`;
+    };
+    openModal('modal-eliminar');
+}
+
+function confirmarEliminacao() {
+    const t   = torneios[activeTorneioIdx];
+    const jid = parseInt(document.getElementById('eliminar-jogador').value);
+    if (!jid) return;
+
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entriesIds    = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+    const ativos        = entriesIds.filter(id => !eliminadosIds.has(id));
+    const posicao       = ativos.length;
+
+    t.eliminados.push({ jogadorId: jid, posicao, ts: Date.now() });
+    removerJogadorMesa(t, jid);
+
+    const ativosFinal = ativos.length - 1;
+    if (ativosFinal === 1) {
+        t.status = 'finished';
+        t.rodando = false;
+        const vencedorId = ativos.find(id => id !== jid);
+        const venc = jogadores.find(j => j.id === vencedorId);
+        showToast(`🏆 Torneio finalizado! Campeão: ${venc ? venc.nome : 'Desconhecido'}`);
+    }
+
+    saveData();
+    closeModal('modal-eliminar');
+    updateModalTorneio();
+    renderTorneiosList();
+    showToast(`💀 Eliminado em ${posicao}º lugar`);
+}
+
+// ============================================================
+// MESAS
+// ============================================================
+function alocarJogadorMesa(t, jogadorId) {
+    let mesaLivre = t.mesas.find(m => m.seats.filter(Boolean).length < 9);
+    if (!mesaLivre) {
+        const novaMesa = { id: t.mesas.length + 1, seats: Array(9).fill(null) };
+        t.mesas.push(novaMesa);
+        mesaLivre = novaMesa;
+    }
+    const cadeira = mesaLivre.seats.findIndex(s => !s);
+    if (cadeira !== -1) mesaLivre.seats[cadeira] = jogadorId;
+}
+
+function removerJogadorMesa(t, jogadorId) {
+    t.mesas.forEach(m => {
+        const idx = m.seats.findIndex(s => s === jogadorId);
+        if (idx !== -1) m.seats[idx] = null;
+    });
+}
+
+function balancearMesas(idx) {
+    const t = torneios[idx];
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entriesIds    = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+    const ativos        = entriesIds.filter(id => !eliminadosIds.has(id));
+
+    // Remover mesas vazias e redistribuir
+    const qtdMesas = Math.ceil(ativos.length / 9);
+    t.mesas = Array.from({length: qtdMesas}, (_, i) => ({ id: i+1, seats: Array(9).fill(null) }));
+    // Embaralhar ativos
+    const shuffled = [...ativos].sort(() => Math.random() - .5);
+    shuffled.forEach((jid, i) => {
+        const mesa  = Math.floor(i / 9);
+        const cadeira = i % 9;
+        t.mesas[mesa].seats[cadeira] = jid;
+    });
+    saveData();
+    renderTabMesas();
+    showToast('🔀 Mesas balanceadas!');
+}
+
+// ============================================================
+// TV
+// ============================================================
+function updateTV(idx) {
+    if (!tvWindow || tvWindow.closed) return;
+    const t     = torneios[idx];
+    const ativos = getAtivos(t);
+    const avg    = ativos > 0 ? Math.round((ativos * t.stack) / ativos) : 0;
+    const prox   = t.blinds[t.nivelAtual + 1];
+    tvWindow.postMessage({
+        timer:    formatTime(t.tempoRestante),
+        nivel:    t.nivelAtual + 1,
+        blinds:   `${t.blinds[t.nivelAtual].sb.toLocaleString()} / ${t.blinds[t.nivelAtual].bb.toLocaleString()}`,
+        ante:     t.blinds[t.nivelAtual].ante.toLocaleString(),
+        players:  ativos,
+        avg:      avg.toLocaleString(),
+        prize:    formatMoney(getPrize(t)),
+        isBreak:  t.isBreak,
+        next:     prox ? `${prox.sb.toLocaleString()}/${prox.bb.toLocaleString()}` : 'FINAL',
+        pct:      (t.tempoRestante / t.tempoTotal) * 100,
+    }, '*');
+}
+
+function abrirTV(idx) {
+    tvWindow = window.open('', 'PokerTV', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
+    tvWindow.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body{background:#000;color:#fff;overflow:hidden;font-family:'Syne',sans-serif;margin:0;}
+        .mono{font-family:'Space Mono',monospace;}
+        #break-screen{display:none;position:fixed;inset:0;background:#0a0000;z-index:50;align-items:center;justify-content:center;flex-direction:column;}
+        #break-screen.show{display:flex;}
+        .bar-bg{height:6px;background:#111;border-radius:3px;overflow:hidden;}
+        .bar-fill{height:6px;background:#f59e0b;border-radius:3px;transition:width .5s linear;}
+    </style></head>
+    <body style="height:100vh;display:flex;flex-direction:column;padding:3rem 4rem;">
+        <div id="break-screen">
+            <div style="font-size:12rem;font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;">BREAK</div>
+            <div id="break-timer" class="mono" style="font-size:6rem;color:#fff;margin-top:1rem;"></div>
+            <div style="font-size:1.5rem;color:#52525b;margin-top:1rem;text-transform:uppercase;letter-spacing:.3em;">Intervalo</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
+            <div style="font-size:1rem;font-weight:800;color:#27272a;text-transform:uppercase;letter-spacing:.15em;">PokerSul Pro</div>
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <span style="font-size:.8rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.1em;">Próximo nível:</span>
+                <span id="next" style="font-size:1rem;font-weight:800;color:#52525b;"></span>
+            </div>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6rem;">
+            <div style="text-align:center;">
+                <div style="font-size:.7rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.15em;font-weight:800;margin-bottom:.5rem;">Nível</div>
+                <div id="nivel" class="mono" style="font-size:6rem;color:#52525b;font-weight:700;"></div>
+            </div>
+            <div style="text-align:center;">
+                <div id="timer" class="mono" style="font-size:16rem;color:#f59e0b;line-height:1;letter-spacing:-.06em;"></div>
+                <div class="bar-bg" style="margin-top:1rem;width:600px;"><div id="bar" class="bar-fill" style="width:100%;"></div></div>
+            </div>
+            <div style="text-align:center;"></div>
+        </div>
+        <div style="text-align:center;margin-bottom:1.5rem;">
+            <div id="blinds" style="font-size:5rem;font-weight:800;line-height:1;"></div>
+            <div id="ante" style="font-size:1.5rem;color:#52525b;margin-top:.25rem;text-transform:uppercase;letter-spacing:.1em;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #111;padding-top:1.5rem;">
+            <div><div style="font-size:.6rem;color:#27272a;text-transform:uppercase;letter-spacing:.15em;font-weight:800;">Jogadores</div><div id="p" class="mono" style="font-size:4rem;font-weight:700;"></div></div>
+            <div style="text-align:center;"><div style="font-size:.6rem;color:#27272a;text-transform:uppercase;letter-spacing:.15em;font-weight:800;">Prize Pool</div><div id="prize" class="mono" style="font-size:4rem;font-weight:700;color:#22c55e;"></div></div>
+            <div style="text-align:right;"><div style="font-size:.6rem;color:#27272a;text-transform:uppercase;letter-spacing:.15em;font-weight:800;">Avg Stack</div><div id="a" class="mono" style="font-size:4rem;font-weight:700;"></div></div>
+        </div>
+    <script>
+    window.onmessage = e => {
+        const d = e.data;
+        document.getElementById('timer').innerText = d.timer;
+        document.getElementById('nivel').innerText = d.nivel;
+        document.getElementById('blinds').innerText = d.blinds;
+        document.getElementById('ante').innerText = 'Ante ' + d.ante;
+        document.getElementById('p').innerText = d.players;
+        document.getElementById('a').innerText = d.avg;
+        document.getElementById('prize').innerText = d.prize;
+        document.getElementById('next').innerText = 'Próx: ' + d.next;
+        document.getElementById('bar').style.width = d.pct + '%';
+        document.getElementById('bar').style.background = d.pct < 20 ? '#ef4444' : '#f59e0b';
+        document.getElementById('timer').style.color = d.pct < 20 ? '#ef4444' : '#f59e0b';
+        const bs = document.getElementById('break-screen');
+        if(d.isBreak){ bs.classList.add('show'); document.getElementById('break-timer').innerText = d.timer; }
+        else bs.classList.remove('show');
+    };
+    <\/script>
+    </body></html>`);
+    tvWindow.document.close();
+    setTimeout(() => updateTV(idx), 500);
+}
+
+// ============================================================
+// TIMER GLOBAL
+// ============================================================
+setInterval(() => {
+    let changed = false;
+    torneios.forEach((t, i) => {
+        if (t.rodando && t.tempoRestante > 0) {
+            t.tempoRestante--;
+            changed = true;
+            if (activeTorneioIdx === i) updateModalTorneio();
+            updateTV(i);
+            if (t.tempoRestante % 30 === 0) renderTorneiosList();
+        } else if (t.rodando && t.tempoRestante <= 0 && !t.isBreak) {
+            nextLevel(i);
+            changed = true;
+        }
+    });
+    if (changed) saveData();
+
+    // Re-render cash mesas every ~30s to refresh "tempo em mesa" counters
+    if (document.getElementById('page-cash') && document.getElementById('page-cash').style.display !== 'none') {
+        const now = Date.now();
+        if (!window._lastCashRefresh || now - window._lastCashRefresh > 30000) {
+            renderCashMesas();
+            window._lastCashRefresh = now;
+        }
+    }
+}, 1000);
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+    document.getElementById('dash-jogadores').innerText = jogadores.length;
+    const ativos = torneios.filter(t => t.status !== 'finished').length;
+    document.getElementById('dash-torneios').innerText = ativos;
+
+    let totalPrize = 0, totalRake = 0;
+    torneios.forEach(t => { totalPrize += getPrize(t); totalRake += getRake(t); });
+    document.getElementById('dash-prize').innerText = formatMoney(totalPrize);
+    document.getElementById('dash-rake').innerText  = formatMoney(totalRake);
+
+    // Bar revenue card (update if element exists)
+    const barVendasEl = document.getElementById('dash-bar-vendas');
+    if (barVendasEl) {
+        const totalBar = barComandas.filter(c=>c.status==='fechada').reduce((s,c)=>s+c.total,0);
+        barVendasEl.innerText = formatMoney(totalBar);
+    }
+    // Cash game volume card
+    const cashEl = document.getElementById('dash-cash-volume');
+    if (cashEl) {
+        const totalCash = cashMesas.reduce((s,m)=>s+m.jogadores.reduce((ss,j)=>ss+j.totalInvestido,0),0);
+        cashEl.innerText = formatMoney(totalCash);
+    }
+    const cashMesasEl = document.getElementById('dash-cash-mesas');
+    if (cashMesasEl) {
+        cashMesasEl.innerText = cashMesas.filter(m=>m.status==='ativa').length;
+    }
+
+    const dashList = document.getElementById('dash-torneios-list');
+    const recentes = torneios.filter(t => t.status !== 'finished').slice(-4);
+    dashList.innerHTML = recentes.map((t, i) => {
+        const st = getStatusTag(t.status);
+        return `
+        <div class="stat-card" style="cursor:pointer;" onclick="showPage('torneios')">
+            <div style="display:flex;justify-content:space-between;align-items:start;">
+                <div style="font-size:.9rem;font-weight:800;">${t.nome}</div>
+                <span class="tag ${st.cls}">${st.label}</span>
+            </div>
+            <div style="display:flex;gap:1.5rem;margin-top:1rem;">
+                <div><div style="font-size:.6rem;color:#52525b;">Prize Pool</div><div style="font-size:1rem;font-weight:800;color:#22c55e;">${formatMoney(getPrize(t))}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;">Jogadores</div><div style="font-size:1rem;font-weight:800;">${getAtivos(t)}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;">Timer</div><div class="mono" style="font-size:1rem;font-weight:800;color:var(--gold);">${formatTime(t.tempoRestante)}</div></div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function getAtivos(t) {
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entriesIds    = new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId));
+    return [...entriesIds].filter(id => !eliminadosIds.has(id)).length;
+}
+
+function getPrize(t) {
+    const entries = t.entries.filter(e => e.tipo !== 'addon').length;
+    return entries * t.buyin * (1 - t.rake / 100);
+}
+
+function getRake(t) {
+    const entries = t.entries.filter(e => e.tipo !== 'addon').length;
+    return entries * t.buyin * (t.rake / 100);
+}
+
+function getJogadorNome(id) {
+    const j = jogadores.find(j => j.id === id);
+    return j ? j.nome : '—';
+}
+
+function getStatusTag(status) {
+    const map = {
+        waiting:  { cls:'tag-waiting',  label:'Aguardando' },
+        running:  { cls:'tag-running',  label:'Rodando' },
+        paused:   { cls:'tag-paused',   label:'Pausado' },
+        break:    { cls:'tag-break',    label:'Break' },
+        finished: { cls:'tag-finished', label:'Finalizado' },
+    };
+    return map[status] || map.waiting;
+}
+
+function formatTime(s) {
+    return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+}
+
+function formatMoney(v) {
+    return 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ============================================================
+// MODAL / UTIL
+// ============================================================
+function openModal(id) {
+    barPreFillModal(id);
+    const el = document.getElementById(id);
+    el.classList.add('open');
+    if (id === 'modal-novo-torneio') renderBlindsInputs();
+    if (id === 'modal-produto') limparFormProduto();
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function confirmarLimparDados() {
+    if (!confirm('⚠️ Isso apagará TODOS os dados. Continuar?')) return;
+    localStorage.clear();
+    location.reload();
+}
+
+
+// ============================================================
+// BAR & VENDAS
+// ============================================================
+
+// --- GRUPOS ---
+function renderGrupos() {
+    const listEl = document.getElementById('bar-grupos-list');
+    const filtro = document.getElementById('bar-filtro-grupo');
+    if (!listEl) return;
+
+    listEl.innerHTML = barGrupos.map((g, i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+            <span style="font-size:.85rem;font-weight:700;">${g}</span>
+            <button onclick="removerGrupo(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
+        </div>
+    `).join('') || '<div style="color:#3f3f46;font-size:.8rem;">Nenhum grupo</div>';
+
+    if (filtro) {
+        const cur = filtro.value;
+        filtro.innerHTML = '<option value="">Todos os grupos</option>' +
+            barGrupos.map(g => `<option value="${g}" ${cur===g?'selected':''}>${g}</option>`).join('');
+    }
+}
+
+function addGrupo() {
+    const inp = document.getElementById('novo-grupo-inp');
+    const nome = inp.value.trim();
+    if (!nome) return showToast('⚠️ Digite o nome do grupo');
+    if (barGrupos.includes(nome)) return showToast('⚠️ Grupo já existe');
+    barGrupos.push(nome);
+    inp.value = '';
+    saveData();
+    renderGrupos();
+    showToast('✅ Grupo adicionado!');
+}
+
+function removerGrupo(i) {
+    const g = barGrupos[i];
+    const emUso = barProdutos.some(p => p.grupo === g);
+    if (emUso) return showToast('⚠️ Grupo em uso por produto(s)');
+    if (!confirm(`Remover grupo "${g}"?`)) return;
+    barGrupos.splice(i, 1);
+    saveData();
+    renderGrupos();
+    renderProdutos();
+}
+
+// --- PRODUTOS ---
+function renderProdutos() {
+    const el = document.getElementById('bar-produtos-list');
+    if (!el) return;
+    const filtro = (document.getElementById('bar-filtro-grupo') || {}).value || '';
+    const lista = filtro ? barProdutos.filter(p => p.grupo === filtro) : barProdutos;
+
+    if (!lista.length) {
+        el.innerHTML = `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">
+            ${filtro ? `Nenhum produto no grupo "${filtro}"` : 'Nenhum produto cadastrado'}</div>`;
+        return;
+    }
+
+    // Agrupa por grupo
+    const porGrupo = {};
+    lista.forEach(p => { (porGrupo[p.grupo] = porGrupo[p.grupo]||[]).push(p); });
+
+    el.innerHTML = Object.entries(porGrupo).map(([grp, prods]) => `
+        <div style="margin-bottom:1rem;">
+            <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:.25rem 0 .5rem;">${grp}</div>
+            ${prods.map(p => `
+            <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:1rem;align-items:center;padding:.7rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:.3rem;">
+                <div>
+                    <div style="font-weight:700;font-size:.9rem;">${p.nome}</div>
+                    ${p.descricao ? `<div style="font-size:.75rem;color:#71717a;">${p.descricao}</div>` : ''}
+                </div>
+                <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem;color:#22c55e;white-space:nowrap;">${formatMoney(p.valor)}</div>
+                <div style="display:flex;align-items:center;gap:.3rem;">
+                    <span style="font-size:.7rem;color:#52525b;">Est:</span>
+                    <span style="font-size:.85rem;font-weight:700;color:${p.estoque<=5?'#ef4444':p.estoque<=10?'#f59e0b':'#e4e4e7'};">${p.estoque}</span>
+                </div>
+                <div style="display:flex;gap:.4rem;">
+                    <button onclick="editarProduto(${p.id})" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .55rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="removerProduto(${p.id})" class="btn-danger" style="padding:.3rem .55rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+            `).join('')}
+        </div>
+    `).join('');
+}
+
+function renderBarProdutos() {
+    renderGrupos();
+    renderProdutos();
+}
+
+function openModalProduto() {
+    // populate grupo select
+    const sel = document.getElementById('prod-grupo');
+    sel.innerHTML = barGrupos.map(g => `<option value="${g}">${g}</option>`).join('');
+    openModal('modal-produto');
+}
+
+function salvarProduto() {
+    const nome = document.getElementById('prod-nome').value.trim();
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+    const valor = parseFloat(document.getElementById('prod-valor').value);
+    if (!valor || valor <= 0) return showToast('⚠️ Valor inválido');
+    const grupo = document.getElementById('prod-grupo').value;
+    if (!grupo) return showToast('⚠️ Selecione um grupo');
+
+    const editId = document.getElementById('prod-edit-id').value;
+    if (editId) {
+        const idx = barProdutos.findIndex(p => p.id === parseInt(editId));
+        if (idx !== -1) {
+            barProdutos[idx] = { ...barProdutos[idx],
+                nome,
+                descricao: document.getElementById('prod-descricao').value.trim(),
+                valor,
+                grupo,
+                estoque: parseInt(document.getElementById('prod-estoque').value) || 0,
+            };
+        }
+        showToast('✅ Produto atualizado!');
+    } else {
+        barProdutos.push({
+            id: Date.now(),
+            nome,
+            descricao: document.getElementById('prod-descricao').value.trim(),
+            valor,
+            grupo,
+            estoque: parseInt(document.getElementById('prod-estoque').value) || 0,
+        });
+        showToast('✅ Produto cadastrado!');
+    }
+    saveData();
+    closeModal('modal-produto');
+    limparFormProduto();
+    renderProdutos();
+}
+
+function editarProduto(id) {
+    const p = barProdutos.find(p => p.id === id);
+    if (!p) return;
+    // Populate fields THEN open (skip limparFormProduto by opening directly)
+    const el = document.getElementById('modal-produto');
+    barPreFillModal('modal-produto');
+    document.getElementById('modal-produto-titulo').innerText = 'Editar Produto';
+    document.getElementById('prod-edit-id').value    = p.id;
+    document.getElementById('prod-nome').value       = p.nome;
+    document.getElementById('prod-descricao').value  = p.descricao || '';
+    document.getElementById('prod-valor').value      = p.valor;
+    document.getElementById('prod-estoque').value    = p.estoque;
+    const sel = document.getElementById('prod-grupo');
+    sel.innerHTML = barGrupos.map(g => `<option value="${g}" ${g===p.grupo?'selected':''}>${g}</option>`).join('');
+    sel.value = p.grupo;
+    el.classList.add('open');
+}
+
+function removerProduto(id) {
+    if (!confirm('Remover este produto?')) return;
+    barProdutos = barProdutos.filter(p => p.id !== id);
+    saveData();
+    renderProdutos();
+    showToast('🗑️ Produto removido');
+}
+
+function limparFormProduto() {
+    document.getElementById('modal-produto-titulo').innerText = 'Novo Produto';
+    document.getElementById('prod-edit-id').value   = '';
+    document.getElementById('prod-nome').value      = '';
+    document.getElementById('prod-descricao').value = '';
+    document.getElementById('prod-valor').value     = '';
+    document.getElementById('prod-estoque').value   = '0';
+}
+
+// --- COMANDAS ---
+function renderComandas() {
+    const el = document.getElementById('bar-comandas-list');
+    if (!el) return;
+    const abertas = barComandas.filter(c => c.status === 'aberta');
+    if (!abertas.length) {
+        el.innerHTML = `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma comanda aberta</div>`;
+        return;
+    }
+    el.innerHTML = abertas.map(c => {
+        const j = jogadores.find(j => j.id === c.jogadorId);
+        const total = calcTotalComanda(c);
+        const ativa = c.id === activeComandaId;
+        return `
+        <div onclick="selecionarComanda(${c.id})" style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:${ativa?'#1a1a1e':'#0f0f12'};border:1px solid ${ativa?'var(--gold)':'#1e1e23'};border-radius:.6rem;cursor:pointer;transition:all .15s;">
+            <div>
+                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}</div>
+                <div style="font-size:.75rem;color:#52525b;margin-top:.15rem;">${c.itens.length} item(s)</div>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(total)}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.15rem;">${new Date(c.abertoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function selecionarComanda(id) {
+    activeComandaId = id;
+    renderComandas();
+    renderDetalheComanda();
+}
+
+function renderDetalheComanda() {
+    const c = barComandas.find(c => c.id === activeComandaId);
+    const el = document.getElementById('bar-comanda-detalhe');
+    if (!c || !el) return;
+    el.style.display = 'block';
+
+    const j = jogadores.find(j => j.id === c.jogadorId);
+    document.getElementById('cd-nome').innerText = j ? j.nome : '?';
+    document.getElementById('cd-status').innerText = `Aberta às ${new Date(c.abertoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+
+    // Produto select
+    const sel = document.getElementById('cd-produto-sel');
+    sel.innerHTML = barProdutos.length
+        ? barProdutos.map(p => `<option value="${p.id}">${p.nome} — ${formatMoney(p.valor)}${p.estoque===0?' (sem estoque)':''}</option>`).join('')
+        : '<option>Nenhum produto cadastrado</option>';
+
+    // Itens
+    const itensEl = document.getElementById('cd-itens');
+    itensEl.innerHTML = c.itens.length ? c.itens.map((it, i) => {
+        const prod = barProdutos.find(p => p.id === it.produtoId);
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.5rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
+            <div>
+                <span style="font-weight:700;">${prod ? prod.nome : '?'}</span>
+                ${prod && prod.descricao ? `<span style="color:#52525b;margin-left:.3rem;">${prod.descricao}</span>` : ''}
+            </div>
+            <span style="color:#71717a;">${it.qtd}x</span>
+            <span style="font-family:'Space Mono',monospace;color:#22c55e;white-space:nowrap;">${formatMoney(it.subtotal)}</span>
+            <button onclick="removeItemComanda(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
+        </div>`;
+    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Nenhum item ainda</div>';
+
+    document.getElementById('cd-total').innerText = formatMoney(calcTotalComanda(c));
+}
+
+function addItemComanda() {
+    const c = barComandas.find(c => c.id === activeComandaId);
+    if (!c) return showToast('⚠️ Selecione uma comanda');
+    const prodId = parseInt(document.getElementById('cd-produto-sel').value);
+    const qtd    = parseInt(document.getElementById('cd-qtd').value) || 1;
+    const prod   = barProdutos.find(p => p.id === prodId);
+    if (!prod) return showToast('⚠️ Produto inválido');
+    if (prod.estoque < qtd) return showToast(`⚠️ Estoque insuficiente (${prod.estoque} disponível)`);
+
+    // Desconta estoque
+    prod.estoque -= qtd;
+
+    // Agrupa itens iguais
+    const existente = c.itens.find(it => it.produtoId === prodId);
+    if (existente) {
+        existente.qtd += qtd;
+        existente.subtotal = existente.qtd * prod.valor;
+    } else {
+        c.itens.push({ produtoId: prodId, qtd, subtotal: qtd * prod.valor });
+    }
+
+    document.getElementById('cd-qtd').value = 1;
+    saveData();
+    renderDetalheComanda();
+    renderProdutos(); // atualiza estoque exibido
+    showToast(`🛒 ${qtd}x ${prod.nome} adicionado`);
+}
+
+function removeItemComanda(itemIdx) {
+    const c = barComandas.find(c => c.id === activeComandaId);
+    if (!c) return;
+    const item = c.itens[itemIdx];
+    // Devolve estoque
+    const prod = barProdutos.find(p => p.id === item.produtoId);
+    if (prod) prod.estoque += item.qtd;
+    c.itens.splice(itemIdx, 1);
+    saveData();
+    renderDetalheComanda();
+    renderProdutos();
+    renderComandas();
+}
+
+function calcTotalComanda(c) {
+    return c.itens.reduce((s, it) => s + it.subtotal, 0);
+}
+
+function abrirComanda() {
+    const jid = parseInt(document.getElementById('comanda-jogador').value);
+    if (!jid) return showToast('⚠️ Selecione um jogador');
+    const jaAberta = barComandas.find(c => c.jogadorId === jid && c.status === 'aberta');
+    if (jaAberta) return showToast('⚠️ Jogador já tem comanda aberta');
+    barComandas.push({
+        id: Date.now(),
+        jogadorId: jid,
+        itens: [],
+        status: 'aberta',
+        abertoEm: Date.now(),
+        fechadoEm: null,
+        pagamento: null,
+        total: 0,
+    });
+    saveData();
+    closeModal('modal-nova-comanda');
+    renderComandas();
+    showToast('📋 Comanda aberta!');
+}
+
+function openFecharComanda() {
+    const c = barComandas.find(c => c.id === activeComandaId);
+    if (!c) return;
+    if (!c.itens.length) return showToast('⚠️ Comanda vazia');
+    const j = jogadores.find(j => j.id === c.jogadorId);
+    document.getElementById('fc-jogador').innerText = j ? j.nome : '?';
+    document.getElementById('fc-total').innerText   = formatMoney(calcTotalComanda(c));
+    // Reset radio
+    document.querySelector('input[name="pagamento"][value="dinheiro"]').checked = true;
+    highlightPgto(document.querySelector('input[name="pagamento"]:checked'));
+    openModal('modal-fechar-comanda');
+}
+
+function highlightPgto(radio) {
+    ['dinheiro','pix','cartao'].forEach(v => {
+        const lbl = document.getElementById('lbl-' + v);
+        if (lbl) {
+            lbl.style.background    = radio.value === v ? 'rgba(245,158,11,.1)' : '#18181b';
+            lbl.style.borderColor   = radio.value === v ? 'var(--gold)' : '#27272a';
+            lbl.style.color         = radio.value === v ? 'var(--gold)' : '';
+        }
+    });
+}
+
+function fecharComandaConfirm() {
+    const c = barComandas.find(c => c.id === activeComandaId);
+    if (!c) return;
+    const pgto = document.querySelector('input[name="pagamento"]:checked').value;
+    c.status     = 'fechada';
+    c.fechadoEm  = Date.now();
+    c.pagamento  = pgto;
+    c.total      = calcTotalComanda(c);
+    activeComandaId = null;
+    saveData();
+    closeModal('modal-fechar-comanda');
+    document.getElementById('bar-comanda-detalhe').style.display = 'none';
+    renderComandas();
+    renderHistorico();
+    renderRelatorio();
+    renderDashboard();
+    showToast(`✅ Comanda fechada — ${formatMoney(c.total)} via ${pgto}`);
+}
+
+// --- HISTÓRICO ---
+function renderHistorico() {
+    const el = document.getElementById('bar-historico-list');
+    if (!el) return;
+    const fechadas = [...barComandas].filter(c => c.status === 'fechada').reverse();
+    if (!fechadas.length) {
+        el.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma venda registrada</div>';
+        return;
+    }
+    const pgtoIcon = { dinheiro:'fa-money-bill-wave', pix:'fa-brands fa-pix', cartao:'fa-credit-card' };
+    el.innerHTML = fechadas.map(c => {
+        const j = jogadores.find(j => j.id === c.jogadorId);
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+            <div>
+                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}</div>
+                <div style="font-size:.75rem;color:#52525b;">${c.itens.length} item(s) &bull; ${new Date(c.fechadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+            <span class="tag" style="background:#18181b;color:#71717a;font-size:.65rem;"><i class="fa-solid ${pgtoIcon[c.pagamento]||'fa-circle'}"></i> ${c.pagamento}</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(c.total)}</span>
+        </div>`;
+    }).join('');
+}
+
+// --- RELATÓRIO ---
+function renderRelatorio() {
+    const el_total   = document.getElementById('rel-total');
+    const el_qtd     = document.getElementById('rel-qtd');
+    const el_ticket  = document.getElementById('rel-ticket');
+    const el_grupos  = document.getElementById('rel-grupos');
+    const el_pgtos   = document.getElementById('rel-pagamentos');
+    if (!el_total) return;
+
+    const fechadas = barComandas.filter(c => c.status === 'fechada');
+    const total = fechadas.reduce((s, c) => s + c.total, 0);
+    el_total.innerText  = formatMoney(total);
+    el_qtd.innerText    = fechadas.length;
+    el_ticket.innerText = fechadas.length ? formatMoney(total / fechadas.length) : 'R$ 0,00';
+
+    // Por grupo
+    const porGrupo = {};
+    fechadas.forEach(c => {
+        c.itens.forEach(it => {
+            const prod = barProdutos.find(p => p.id === it.produtoId);
+            const g = prod ? prod.grupo : 'Outros';
+            porGrupo[g] = (porGrupo[g] || 0) + it.subtotal;
+        });
+    });
+    el_grupos.innerHTML = Object.entries(porGrupo).sort((a,b)=>b[1]-a[1]).map(([g, v]) => `
+        <div class="payout-item">
+            <span style="font-size:.8rem;font-weight:700;">${g}</span>
+            <span style="font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:#22c55e;">${formatMoney(v)}</span>
+        </div>
+    `).join('') || '<div style="color:#3f3f46;font-size:.8rem;">Sem dados</div>';
+
+    // Por pagamento
+    const porPgto = {};
+    fechadas.forEach(c => { porPgto[c.pagamento] = (porPgto[c.pagamento]||0) + c.total; });
+    const pgtoLabel = { dinheiro:'💵 Dinheiro', pix:'⚡ PIX', cartao:'💳 Cartão' };
+    el_pgtos.innerHTML = Object.entries(porPgto).sort((a,b)=>b[1]-a[1]).map(([p, v]) => `
+        <div class="payout-item">
+            <span style="font-size:.8rem;font-weight:700;">${pgtoLabel[p]||p}</span>
+            <span style="font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--gold);">${formatMoney(v)}</span>
+        </div>
+    `).join('') || '<div style="color:#3f3f46;font-size:.8rem;">Sem dados</div>';
+}
+
+// --- BAR SUBTAB SWITCH ---
+function switchBarTab(tabId, btn) {
+    document.querySelectorAll('.bartab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-bar .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'bar-produtos')  { renderGrupos(); renderProdutos(); }
+    if (tabId === 'bar-comandas')  { renderComandas(); if(activeComandaId) renderDetalheComanda(); }
+    if (tabId === 'bar-historico') renderHistorico();
+    if (tabId === 'bar-relatorio') renderRelatorio();
+}
+
+// Bar modal pre-fill hooks - called from openModal
+function barPreFillModal(id) {
+    if (id === 'modal-produto') {
+        const sel = document.getElementById('prod-grupo');
+        if (sel) sel.innerHTML = barGrupos.map(g => `<option value="${g}">${g}</option>`).join('');
+    }
+    if (id === 'modal-nova-comanda') {
+        const sel = document.getElementById('comanda-jogador');
+        if (sel) {
+            const semComanda = jogadores.filter(j => !barComandas.find(c => c.jogadorId === j.id && c.status === 'aberta'));
+            sel.innerHTML = semComanda.length
+                ? semComanda.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('')
+                : '<option value="">Nenhum jogador disponível</option>';
+        }
+    }
+}
+
+
+// ============================================================
+// CASH GAME
+// ============================================================
+
+// --- MESAS ---
+function switchCashTab(tabId, btn) {
+    document.querySelectorAll('.cashtab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-cash .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'cash-mesas')     renderCashMesas();
+    if (tabId === 'cash-historico') renderCashHistorico();
+    if (tabId === 'cash-relatorio') renderCashRelatorio();
+}
+
+function highlightModo(radio) {
+    const livre = document.getElementById('lbl-modo-livre');
+    const prog  = document.getElementById('lbl-modo-prog');
+    const durWrap = document.getElementById('cm-duracao-wrap');
+    if (radio.value === 'livre') {
+        livre.style.background  = 'rgba(245,158,11,.1)';
+        livre.style.borderColor = 'var(--gold)';
+        livre.style.color       = 'var(--gold)';
+        prog.style.background   = '#18181b';
+        prog.style.borderColor  = '#27272a';
+        prog.style.color        = '';
+        durWrap.style.display   = 'none';
+    } else {
+        prog.style.background   = 'rgba(245,158,11,.1)';
+        prog.style.borderColor  = 'var(--gold)';
+        prog.style.color        = 'var(--gold)';
+        livre.style.background  = '#18181b';
+        livre.style.borderColor = '#27272a';
+        livre.style.color       = '';
+        durWrap.style.display   = 'block';
+    }
+}
+
+function criarMesaCash() {
+    const nome = document.getElementById('cm-nome').value.trim();
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+    const sb   = parseFloat(document.getElementById('cm-sb').value)   || 0;
+    const bb   = parseFloat(document.getElementById('cm-bb').value)   || 0;
+    const bmin = parseFloat(document.getElementById('cm-bmin').value) || 0;
+    const bmax = parseFloat(document.getElementById('cm-bmax').value) || 0;
+    const rake = parseFloat(document.getElementById('cm-rake').value) || 0;
+    const modo = document.querySelector('input[name="cm-modo"]:checked').value;
+    const duracao = parseFloat(document.getElementById('cm-duracao').value) || 0;
+
+    if (bmin > bmax) return showToast('⚠️ Buy-in mínimo maior que máximo');
+
+    cashMesas.push({
+        id: Date.now(),
+        nome, sb, bb, bmin, bmax, rake, modo,
+        duracaoHoras: modo === 'programado' ? duracao : 0,
+        status: 'ativa',
+        abertoEm: Date.now(),
+        fechadoEm: null,
+        jogadores: [],
+        // sessoes mantém o registro completo (jogadores saíram também)
+        sessoes: [],
+    });
+    saveData();
+    closeModal('modal-nova-cash-mesa');
+    // Reset form
+    document.getElementById('cm-nome').value = '';
+    renderCashMesas();
+    showToast(`🃏 Mesa "${nome}" aberta!`);
+}
+
+function renderCashMesas() {
+    const list  = document.getElementById('cash-mesas-list');
+    const empty = document.getElementById('cash-sem-mesas');
+    if (!list) return;
+
+    const ativas = cashMesas.filter(m => m.status === 'ativa');
+    if (!ativas.length) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    list.innerHTML = ativas.map(m => {
+        const tempoAberto = formatDuration(Date.now() - m.abertoEm);
+        const totalInvestido = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
+        const ativos = m.jogadores.filter(j => j.status === 'ativo');
+        const pctCheio = Math.min(100, (ativos.length / 9) * 100);
+
+        return `
+        <div class="t-card">
+            <div style="padding:1.25rem 1.5rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e1e23;">
+                <div>
+                    <div style="font-size:1rem;font-weight:800;">${m.nome}</div>
+                    <div style="display:flex;gap:.75rem;align-items:center;margin-top:.35rem;">
+                        <span class="tag tag-running">Ativa</span>
+                        <span style="font-size:.75rem;color:#52525b;">Blinds R$ ${m.sb}/${m.bb} &bull; Buy-in R$ ${m.bmin}–${m.bmax}${m.rake>0?` &bull; Rake ${m.rake}%`:''}</span>
+                        <span style="font-size:.75rem;color:#71717a;font-family:'Space Mono',monospace;"><i class="fa-regular fa-clock"></i> ${tempoAberto}</span>
+                    </div>
+                </div>
+                <div style="display:flex;gap:.5rem;">
+                    <button onclick="abrirAddJogadorCash(${m.id})" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Jogador</button>
+                    <button onclick="encerrarMesaCash(${m.id})" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;" title="Encerrar mesa"><i class="fa-solid fa-stop"></i> Encerrar</button>
+                </div>
+            </div>
+            <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;border-bottom:1px solid #1e1e23;">
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Na Mesa</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:#22c55e;">${ativos.length}/9</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Entradas totais</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;">${m.jogadores.length}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Volume investido</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:#22c55e;">${formatMoney(totalInvestido)}</div></div>
+                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake acumulado</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:var(--gold);">${formatMoney(getCashRake(m))}</div></div>
+            </div>
+            <div style="padding:1rem 1.5rem;">
+                <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Jogadores na Mesa</div>
+                ${renderJogadoresCashMesa(m)}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderJogadoresCashMesa(m) {
+    if (!m.jogadores.length) {
+        return `<div style="color:#3f3f46;font-size:.85rem;padding:1rem 0;text-align:center;">Nenhum jogador. Adicione para começar.</div>`;
+    }
+    const ativos = m.jogadores.filter(j => j.status === 'ativo');
+    const saidos = m.jogadores.filter(j => j.status === 'saiu');
+
+    let html = '';
+    if (ativos.length) {
+        html += ativos.map(j => {
+            const jog = jogadores.find(x => x.id === j.jogadorId);
+            const recompras = j.movimentos.filter(mv => mv.tipo === 'recompra').length;
+            return `
+            <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:.4rem;">
+                <div style="width:32px;height:32px;border-radius:50%;background:rgba(34,197,94,.15);border:1.5px solid rgba(34,197,94,.3);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;">${(jog?jog.nome:'?').substring(0,2).toUpperCase()}</div>
+                <div>
+                    <div style="font-weight:700;font-size:.9rem;">${jog ? jog.nome : '?'}</div>
+                    <div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">
+                        <i class="fa-solid fa-clock"></i> ${formatDuration(Date.now() - j.entrouEm)}
+                        ${recompras > 0 ? ` &bull; <span style="color:var(--gold);">${recompras} recompra${recompras>1?'s':''}</span>` : ''}
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Investido</div>
+                    <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem;color:#22c55e;">${formatMoney(j.totalInvestido)}</div>
+                </div>
+                <div style="display:flex;gap:.35rem;">
+                    <button onclick="abrirRecompra(${m.id}, ${j.jogadorId})" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Syne',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
+                    <button onclick="abrirRetirar(${m.id}, ${j.jogadorId})" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Syne',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+                </div>
+                <div></div>
+            </div>`;
+        }).join('');
+    }
+    if (saidos.length) {
+        html += `<div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:.75rem;margin-bottom:.4rem;">Já saíram (${saidos.length})</div>`;
+        html += saidos.map(j => {
+            const jog = jogadores.find(x => x.id === j.jogadorId);
+            const resultado = j.saiuCom - j.totalInvestido;
+            const positivo = resultado >= 0;
+            return `
+            <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:1rem;align-items:center;padding:.6rem 1rem;background:#0a0a0b;border:1px solid #18181b;border-radius:.6rem;margin-bottom:.3rem;opacity:.75;">
+                <div style="width:28px;height:28px;border-radius:50%;background:#1e1e23;color:#71717a;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;">${(jog?jog.nome:'?').substring(0,2).toUpperCase()}</div>
+                <div style="font-weight:700;font-size:.85rem;color:#a1a1aa;">${jog ? jog.nome : '?'}</div>
+                <div style="font-family:'Space Mono',monospace;font-size:.75rem;color:#52525b;">${formatMoney(j.totalInvestido)} → ${formatMoney(j.saiuCom)}</div>
+                <div style="font-family:'Space Mono',monospace;font-weight:800;font-size:.85rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(resultado)}</div>
+            </div>`;
+        }).join('');
+    }
+    return html;
+}
+
+function getCashRake(m) {
+    return m.jogadores.reduce((s, j) => {
+        return s + j.movimentos.reduce((ss, mv) => ss + (mv.rakeCobrado || 0), 0);
+    }, 0);
+}
+
+// --- ADICIONAR JOGADOR ---
+function abrirAddJogadorCash(mesaId) {
+    activeCashContext.mesaId = mesaId;
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+
+    const sel = document.getElementById('acj-jogador');
+    const ativosIds = new Set(m.jogadores.filter(j => j.status === 'ativo').map(j => j.jogadorId));
+    const disponiveis = jogadores.filter(j => !ativosIds.has(j.id));
+
+    if (!disponiveis.length) return showToast('⚠️ Todos os jogadores cadastrados já estão na mesa');
+
+    sel.innerHTML = disponiveis.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('');
+    document.getElementById('acj-buyin-range').innerText = `Buy-in permitido: R$ ${m.bmin} – R$ ${m.bmax}${m.rake>0?` (rake ${m.rake}%)`:''}`;
+    document.getElementById('acj-valor').value = m.bmin;
+    openModal('modal-add-cash-jogador');
+}
+
+function confirmAddCashJogador() {
+    const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
+    if (!m) return;
+    const jid = parseInt(document.getElementById('acj-jogador').value);
+    const valor = parseFloat(document.getElementById('acj-valor').value) || 0;
+
+    if (!jid) return showToast('⚠️ Selecione um jogador');
+    if (valor < m.bmin || valor > m.bmax) return showToast(`⚠️ Buy-in deve ser entre R$ ${m.bmin} e R$ ${m.bmax}`);
+    if (m.jogadores.filter(j => j.status === 'ativo').length >= 9) return showToast('⚠️ Mesa cheia (9 lugares)');
+
+    const rakeCobrado = valor * (m.rake / 100);
+
+    m.jogadores.push({
+        jogadorId: jid,
+        status: 'ativo',
+        entrouEm: Date.now(),
+        saiuEm: null,
+        totalInvestido: valor,
+        saiuCom: 0,
+        movimentos: [{ tipo: 'buyin', valor, rakeCobrado, ts: Date.now() }],
+    });
+
+    saveData();
+    closeModal('modal-add-cash-jogador');
+    renderCashMesas();
+    const jog = jogadores.find(j => j.id === jid);
+    showToast(`👤 ${jog ? jog.nome : 'Jogador'} entrou com ${formatMoney(valor)}`);
+}
+
+// --- RECOMPRA ---
+function abrirRecompra(mesaId, jogadorId) {
+    activeCashContext = { mesaId, jogadorId };
+    const m = cashMesas.find(x => x.id === mesaId);
+    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId && jj.status === 'ativo');
+    const jog = jogadores.find(x => x.id === jogadorId);
+
+    document.getElementById('rec-info').innerHTML = `
+        <div style="color:#71717a;margin-bottom:.25rem;"><strong style="color:#e4e4e7;">${jog?jog.nome:'?'}</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span>Já investido:</span><span style="color:#22c55e;font-family:'Space Mono',monospace;font-weight:700;">${formatMoney(j.totalInvestido)}</span></div>
+        ${m.rake>0?`<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Rake:</span><span style="color:var(--gold);">${m.rake}%</span></div>`:''}
+    `;
+    document.getElementById('rec-valor').value = m.bmin;
+    openModal('modal-recompra');
+}
+
+function confirmRecompra() {
+    const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
+    const j = m.jogadores.find(jj => jj.jogadorId === activeCashContext.jogadorId && jj.status === 'ativo');
+    const valor = parseFloat(document.getElementById('rec-valor').value) || 0;
+    if (valor <= 0) return showToast('⚠️ Valor inválido');
+
+    const rakeCobrado = valor * (m.rake / 100);
+    j.totalInvestido += valor;
+    j.movimentos.push({ tipo: 'recompra', valor, rakeCobrado, ts: Date.now() });
+
+    saveData();
+    closeModal('modal-recompra');
+    renderCashMesas();
+    const jog = jogadores.find(x => x.id === j.jogadorId);
+    showToast(`🔄 Recompra de ${formatMoney(valor)} para ${jog?jog.nome:'jogador'}`);
+}
+
+// --- RETIRAR ---
+function abrirRetirar(mesaId, jogadorId) {
+    activeCashContext = { mesaId, jogadorId };
+    const m = cashMesas.find(x => x.id === mesaId);
+    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId && jj.status === 'ativo');
+    const jog = jogadores.find(x => x.id === jogadorId);
+    const recompras = j.movimentos.filter(mv => mv.tipo === 'recompra').length;
+
+    document.getElementById('ret-info').innerHTML = `
+        <div style="color:#71717a;margin-bottom:.5rem;"><strong style="color:#e4e4e7;">${jog?jog.nome:'?'}</strong></div>
+        <div style="display:flex;justify-content:space-between;"><span>Buy-in inicial:</span><span style="font-family:'Space Mono',monospace;">${formatMoney(j.movimentos[0].valor)}</span></div>
+        ${recompras>0?`<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Recompras:</span><span style="color:var(--gold);">${recompras}x</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;margin-top:.25rem;border-top:1px solid #1e1e23;padding-top:.4rem;"><span style="font-weight:700;">Total investido:</span><span style="color:#22c55e;font-family:'Space Mono',monospace;font-weight:800;">${formatMoney(j.totalInvestido)}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Tempo em jogo:</span><span style="font-family:'Space Mono',monospace;">${formatDuration(Date.now() - j.entrouEm)}</span></div>
+    `;
+    document.getElementById('ret-valor').value = '';
+    document.getElementById('ret-resultado').innerHTML = '<div style="color:#52525b;font-size:.8rem;">Digite o valor de saída para ver o resultado</div>';
+    openModal('modal-retirar');
+}
+
+function calcResultadoPreview() {
+    const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
+    const j = m.jogadores.find(jj => jj.jogadorId === activeCashContext.jogadorId && jj.status === 'ativo');
+    const valor = parseFloat(document.getElementById('ret-valor').value) || 0;
+    const resultado = valor - j.totalInvestido;
+    const positivo = resultado >= 0;
+    document.getElementById('ret-resultado').innerHTML = `
+        <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem;">Resultado da sessão</div>
+        <div style="font-family:'Space Mono',monospace;font-size:1.75rem;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">
+            ${positivo?'+':''}${formatMoney(resultado)}
+        </div>
+        <div style="font-size:.7rem;color:#71717a;margin-top:.25rem;">
+            ${positivo ? '🟢 Lucro' : resultado === 0 ? '⚪ Empate' : '🔴 Prejuízo'}
+        </div>
+    `;
+}
+
+function confirmRetirar() {
+    const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
+    const j = m.jogadores.find(jj => jj.jogadorId === activeCashContext.jogadorId && jj.status === 'ativo');
+    const valor = parseFloat(document.getElementById('ret-valor').value) || 0;
+    if (valor < 0) return showToast('⚠️ Valor inválido');
+
+    j.status  = 'saiu';
+    j.saiuEm  = Date.now();
+    j.saiuCom = valor;
+    j.movimentos.push({ tipo: 'saida', valor, rakeCobrado: 0, ts: Date.now() });
+
+    saveData();
+    closeModal('modal-retirar');
+    renderCashMesas();
+
+    const resultado = valor - j.totalInvestido;
+    const jog = jogadores.find(x => x.id === j.jogadorId);
+    showToast(`🚪 ${jog?jog.nome:'Jogador'} saiu com ${formatMoney(valor)} (${resultado>=0?'+':''}${formatMoney(resultado)})`);
+}
+
+// --- ENCERRAR MESA ---
+function encerrarMesaCash(mesaId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+    const ativos = m.jogadores.filter(j => j.status === 'ativo');
+    if (ativos.length > 0) {
+        if (!confirm(`⚠️ Ainda há ${ativos.length} jogador(es) na mesa. Retire todos antes de encerrar.`)) return;
+        return showToast('⚠️ Retire os jogadores ativos antes de encerrar');
+    }
+    if (!confirm(`Encerrar mesa "${m.nome}"?`)) return;
+    m.status = 'encerrada';
+    m.fechadoEm = Date.now();
+    saveData();
+    renderCashMesas();
+    renderCashHistorico();
+    renderCashRelatorio();
+    showToast(`✅ Mesa "${m.nome}" encerrada`);
+}
+
+// --- HISTÓRICO ---
+function renderCashHistorico() {
+    const el = document.getElementById('cash-historico-list');
+    if (!el) return;
+    const encerradas = [...cashMesas].filter(m => m.status === 'encerrada').reverse();
+    if (!encerradas.length) {
+        el.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma mesa encerrada ainda</div>';
+        return;
+    }
+    el.innerHTML = encerradas.map(m => {
+        const volume = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
+        const rake   = getCashRake(m);
+        const dur    = formatDuration((m.fechadoEm||Date.now()) - m.abertoEm);
+        return `
+        <div class="t-card" style="padding:1.25rem 1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.75rem;">
+                <div>
+                    <div style="font-weight:800;font-size:.95rem;">${m.nome}</div>
+                    <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">
+                        ${new Date(m.abertoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                        &bull; Duração ${dur}
+                        &bull; Blinds R$ ${m.sb}/${m.bb}
+                    </div>
+                </div>
+                <div style="display:flex;gap:1.5rem;">
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Jogadores</div><div style="font-size:1rem;font-weight:800;">${m.jogadores.length}</div></div>
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Volume</div><div style="font-size:1rem;font-weight:800;color:#22c55e;">${formatMoney(volume)}</div></div>
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Rake</div><div style="font-size:1rem;font-weight:800;color:var(--gold);">${formatMoney(rake)}</div></div>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;">
+                ${m.jogadores.map(j => {
+                    const jog = jogadores.find(x => x.id === j.jogadorId);
+                    const resultado = j.saiuCom - j.totalInvestido;
+                    const positivo = resultado >= 0;
+                    return `
+                    <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:1rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
+                        <span style="font-weight:700;">${jog ? jog.nome : '?'}</span>
+                        <span style="font-family:'Space Mono',monospace;color:#71717a;">Inv: ${formatMoney(j.totalInvestido)}</span>
+                        <span style="font-family:'Space Mono',monospace;color:#71717a;">Saiu: ${formatMoney(j.saiuCom)}</span>
+                        <span style="font-family:'Space Mono',monospace;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(resultado)}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// --- RELATÓRIO ---
+function renderCashRelatorio() {
+    const el_qtd     = document.getElementById('cash-rel-qtd');
+    const el_volume  = document.getElementById('cash-rel-volume');
+    const el_rake    = document.getElementById('cash-rel-rake');
+    const el_sessoes = document.getElementById('cash-rel-sessoes');
+    const el_rank    = document.getElementById('cash-rel-ranking');
+    if (!el_qtd) return;
+
+    const encerradas = cashMesas.filter(m => m.status === 'encerrada');
+    const volume = encerradas.reduce((s, m) => s + m.jogadores.reduce((ss, j) => ss + j.totalInvestido, 0), 0);
+    const rake   = encerradas.reduce((s, m) => s + getCashRake(m), 0);
+    const sessoes = encerradas.reduce((s, m) => s + m.jogadores.length, 0);
+
+    el_qtd.innerText     = encerradas.length;
+    el_volume.innerText  = formatMoney(volume);
+    el_rake.innerText    = formatMoney(rake);
+    el_sessoes.innerText = sessoes;
+
+    // Ranking por jogador (só de mesas encerradas)
+    const porJogador = {};
+    encerradas.forEach(m => {
+        m.jogadores.forEach(j => {
+            if (!porJogador[j.jogadorId]) porJogador[j.jogadorId] = { invest: 0, saiu: 0, sessoes: 0 };
+            porJogador[j.jogadorId].invest  += j.totalInvestido;
+            porJogador[j.jogadorId].saiu    += j.saiuCom;
+            porJogador[j.jogadorId].sessoes += 1;
+        });
+    });
+    const ranking = Object.entries(porJogador).map(([id, d]) => ({
+        id: parseInt(id),
+        resultado: d.saiu - d.invest,
+        ...d,
+    })).sort((a, b) => b.resultado - a.resultado);
+
+    el_rank.innerHTML = ranking.length ? ranking.map((r, i) => {
+        const jog = jogadores.find(x => x.id === r.id);
+        const positivo = r.resultado >= 0;
+        return `
+        <div style="display:grid;grid-template-columns:2rem 1fr auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border-radius:.5rem;font-size:.85rem;">
+            <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}</span>
+            <span style="font-weight:700;">${jog ? jog.nome : '?'}</span>
+            <span style="font-family:'Space Mono',monospace;color:#71717a;font-size:.75rem;">${r.sessoes} sess${r.sessoes>1?'ões':'ão'}</span>
+            <span style="font-family:'Space Mono',monospace;color:#71717a;font-size:.75rem;">Inv ${formatMoney(r.invest)}</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(r.resultado)}</span>
+        </div>`;
+    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhuma sessão encerrada ainda</div>';
+}
+
+// --- DURATION FORMATTER ---
+function formatDuration(ms) {
+    const total = Math.floor(ms / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    if (h > 0) return `${h}h${m.toString().padStart(2,'0')}m`;
+    return `${m}m`;
+}
+
+
+// ============================================================
+// USUÁRIOS & PERMISSÕES
+// ============================================================
+function renderUsuarios() {
+    const tbody = document.getElementById('usuarios-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = usuarios.map(u => {
+        const role = ROLES[u.role];
+        const isMe = currentUser && u.id === currentUser.id;
+        return `
+        <tr style="border-bottom:1px solid #1a1a1e;">
+            <td style="padding:.9rem 1.5rem;">
+                <div style="display:flex;align-items:center;gap:.75rem;">
+                    <div style="width:32px;height:32px;background:${role.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:#000;">${u.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
+                    <div>
+                        <div style="font-weight:700;">${u.nome}${isMe?' <span style="font-size:.65rem;color:var(--gold);font-weight:800;">(você)</span>':''}</div>
+                    </div>
+                </div>
+            </td>
+            <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:'Space Mono',monospace;">${u.email}</td>
+            <td style="padding:.9rem 1.5rem;"><span class="tag" style="background:${role.color}22;color:${role.color};">${role.icon} ${role.label}</span></td>
+            <td style="padding:.9rem 1.5rem;">
+                <span class="tag ${u.status==='ativo'?'tag-running':'tag-waiting'}">${u.status==='ativo'?'● Ativo':'○ Inativo'}</span>
+            </td>
+            <td style="padding:.9rem 1.5rem;text-align:right;">
+                <button onclick="editarUsuario(${u.id})" class="btn-ghost" style="padding:.35rem .65rem;font-size:.75rem;margin-right:.3rem;"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="removerUsuario(${u.id})" class="btn-danger" ${isMe?'disabled style="opacity:.3;cursor:not-allowed;"':''}><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    // Matriz de permissões
+    renderMatrizPermissoes();
+}
+
+function renderMatrizPermissoes() {
+    const el = document.getElementById('matriz-permissoes');
+    if (!el) return;
+    const paginas = [
+        { key:'dashboard', label:'Dashboard',  icon:'fa-gauge-high' },
+        { key:'jogadores', label:'Jogadores',  icon:'fa-users' },
+        { key:'torneios',  label:'Torneios',   icon:'fa-trophy' },
+        { key:'cash',      label:'Cash Game',  icon:'fa-coins' },
+        { key:'bar',       label:'Bar & Vendas', icon:'fa-utensils' },
+        { key:'usuarios',  label:'Usuários',   icon:'fa-user-shield' },
+    ];
+    const rolesKeys = Object.keys(ROLES);
+    el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+        <thead>
+            <tr>
+                <th style="text-align:left;padding:.5rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Módulo</th>
+                ${rolesKeys.map(k => `<th style="text-align:center;padding:.5rem;font-size:.7rem;color:${ROLES[k].color};font-weight:800;">${ROLES[k].icon} ${ROLES[k].label}</th>`).join('')}
+            </tr>
+        </thead>
+        <tbody>
+            ${paginas.map(p => `
+                <tr style="border-top:1px solid #1a1a1e;">
+                    <td style="padding:.5rem;font-weight:700;"><i class="fa-solid ${p.icon}" style="width:16px;color:#52525b;"></i> ${p.label}</td>
+                    ${rolesKeys.map(k => `<td style="text-align:center;padding:.5rem;">${ROLES[k].pages.includes(p.key) ? '<span style="color:#22c55e;">✓</span>' : '<span style="color:#3f3f46;">—</span>'}</td>`).join('')}
+                </tr>
+            `).join('')}
+        </tbody>
+    </table>`;
+}
+
+function openModalUsuario() {
+    document.getElementById('modal-usuario-titulo').innerText = 'Novo Usuário';
+    document.getElementById('u-edit-id').value = '';
+    document.getElementById('u-nome').value    = '';
+    document.getElementById('u-email').value   = '';
+    document.getElementById('u-senha').value   = '';
+    document.getElementById('u-senha-hint').innerText = '(mín. 4 caracteres)';
+    document.getElementById('u-role').value    = 'dealer';
+    document.querySelector('input[name="u-status"][value="ativo"]').checked = true;
+    highlightStatus(document.querySelector('input[name="u-status"]:checked'));
+    updatePermissoesPreview();
+    openModal('modal-usuario');
+}
+
+function editarUsuario(id) {
+    const u = usuarios.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('modal-usuario-titulo').innerText = 'Editar Usuário';
+    document.getElementById('u-edit-id').value = u.id;
+    document.getElementById('u-nome').value    = u.nome;
+    document.getElementById('u-email').value   = u.email;
+    document.getElementById('u-senha').value   = '';
+    document.getElementById('u-senha-hint').innerText = '(deixe em branco para manter a atual)';
+    document.getElementById('u-role').value    = u.role;
+    document.querySelector(`input[name="u-status"][value="${u.status}"]`).checked = true;
+    highlightStatus(document.querySelector('input[name="u-status"]:checked'));
+    updatePermissoesPreview();
+    // Open without triggering the "new user" reset
+    const el = document.getElementById('modal-usuario');
+    el.classList.add('open');
+}
+
+function salvarUsuario() {
+    const nome  = document.getElementById('u-nome').value.trim();
+    const email = document.getElementById('u-email').value.trim().toLowerCase();
+    const senha = document.getElementById('u-senha').value;
+    const role  = document.getElementById('u-role').value;
+    const status = document.querySelector('input[name="u-status"]:checked').value;
+    const editId = document.getElementById('u-edit-id').value;
+
+    if (!nome)  return showToast('⚠️ Nome obrigatório');
+    if (!email || !email.includes('@')) return showToast('⚠️ E-mail inválido');
+
+    // Email duplicado
+    const emailDup = usuarios.find(u => u.email.toLowerCase() === email && (!editId || u.id !== parseInt(editId)));
+    if (emailDup) return showToast('⚠️ Já existe usuário com este e-mail');
+
+    if (editId) {
+        const u = usuarios.find(x => x.id === parseInt(editId));
+        u.nome = nome; u.email = email; u.role = role; u.status = status;
+        if (senha) {
+            if (senha.length < 4) return showToast('⚠️ Senha mínimo 4 caracteres');
+            u.senha = senha;
+        }
+        // Se editou o usuário logado, atualizar sessão
+        if (currentUser && u.id === currentUser.id) {
+            currentUser = { id: u.id, nome: u.nome, email: u.email, role: u.role };
+            sessionStorage.setItem('ps_current_user', JSON.stringify(currentUser));
+            applyPermissions();
+        }
+        showToast('✅ Usuário atualizado');
+    } else {
+        if (!senha || senha.length < 4) return showToast('⚠️ Senha mínimo 4 caracteres');
+        usuarios.push({
+            id: Date.now(), nome, email, senha, role, status, criadoEm: Date.now(),
+        });
+        showToast('✅ Usuário criado');
+    }
+    saveData();
+    closeModal('modal-usuario');
+    renderUsuarios();
+}
+
+function removerUsuario(id) {
+    if (currentUser && id === currentUser.id) return showToast('⚠️ Você não pode remover a si mesmo');
+    const u = usuarios.find(x => x.id === id);
+    if (!u) return;
+    const admins = usuarios.filter(x => x.role === 'admin' && x.status === 'ativo');
+    if (u.role === 'admin' && admins.length <= 1) return showToast('⚠️ Precisa haver pelo menos um admin ativo');
+    if (!confirm(`Remover o usuário "${u.nome}"?`)) return;
+    usuarios = usuarios.filter(x => x.id !== id);
+    saveData();
+    renderUsuarios();
+    showToast('🗑️ Usuário removido');
+}
+
+function highlightStatus(radio) {
+    const a = document.getElementById('lbl-ativo');
+    const i = document.getElementById('lbl-inativo');
+    if (radio.value === 'ativo') {
+        a.style.background = 'rgba(34,197,94,.1)'; a.style.borderColor = 'rgba(34,197,94,.25)'; a.style.color = '#22c55e';
+        i.style.background = '#18181b';            i.style.borderColor = '#27272a';              i.style.color = '';
+    } else {
+        i.style.background = 'rgba(82,82,91,.15)'; i.style.borderColor = '#52525b';              i.style.color = '#a1a1aa';
+        a.style.background = '#18181b';            a.style.borderColor = '#27272a';              a.style.color = '';
+    }
+}
+
+function updatePermissoesPreview() {
+    const role = document.getElementById('u-role').value;
+    const r = ROLES[role];
+    if (!r) return;
+    const paginasLabels = {
+        dashboard:'Dashboard', jogadores:'Jogadores', torneios:'Torneios',
+        cash:'Cash Game', bar:'Bar & Vendas', usuarios:'Usuários',
+    };
+    const el = document.getElementById('u-permissoes-preview');
+    el.innerHTML = `
+        <div style="color:${r.color};font-weight:700;margin-bottom:.35rem;">${r.icon} Acesso a ${r.pages.length} módulo(s):</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem;">
+            ${r.pages.map(p => `<span style="background:#18181b;border:1px solid #27272a;border-radius:2rem;padding:.2rem .6rem;font-size:.7rem;color:#a1a1aa;">${paginasLabels[p]||p}</span>`).join('')}
+        </div>`;
+}
+
+// Init
+window.onload = () => {
+    // Restore session if valid
+    if (currentUser && usuarios.find(u => u.id === currentUser.id && u.status === 'ativo')) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'flex';
+        applyPermissions();
+        renderDashboard();
+        iniciarRelogio();
+    } else {
+        currentUser = null;
+        sessionStorage.removeItem('ps_current_user');
+    }
+};
+</script>
+</body>
+</html>
