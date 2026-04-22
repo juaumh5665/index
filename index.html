@@ -231,6 +231,9 @@
             <div onclick="showPage('bar')" id="nav-bar" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-utensils" style="width:16px;"></i> Bar & Vendas
             </div>
+            <div onclick="showPage('caixa')" id="nav-caixa" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-cash-register" style="width:16px;"></i> Caixa
+            </div>
             <div style="height:1px;background:#1a1a1e;margin:.5rem .5rem;" id="nav-divider-admin"></div>
             <div onclick="showPage('usuarios')" id="nav-usuarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-user-shield" style="width:16px;"></i> Usuários
@@ -295,6 +298,16 @@
                         <div id="dash-cash-volume" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">R$ 0,00</div>
                     </div>
                 </div>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem;">
+                    <div class="stat-card" style="border-color:rgba(239,68,68,.15);">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-hand-holding-dollar"></i> Caixa — Total a Receber</div>
+                        <div id="dash-caixa-receber" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#ef4444;">R$ 0,00</div>
+                    </div>
+                    <div class="stat-card" style="border-color:rgba(132,204,22,.15);">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-wallet"></i> Caixa — Total em Crédito</div>
+                        <div id="dash-caixa-credito" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#84cc16;">R$ 0,00</div>
+                    </div>
+                </div>
                 <div id="dash-torneios-list" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;"></div>
             </div>
 
@@ -311,6 +324,7 @@
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Jogador</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Contato</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Torneios</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Saldo</th>
                                 <th style="padding:1rem 1.5rem;text-align:right;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Ações</th>
                             </tr>
                         </thead>
@@ -359,6 +373,95 @@
                 <div class="stat-card" style="margin-top:1.5rem;padding:1.25rem;">
                     <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Matriz de Permissões</div>
                     <div id="matriz-permissoes"></div>
+                </div>
+            </div>
+
+            <!-- CAIXA -->
+            <div id="page-caixa" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
+                    <button class="tab-btn active" id="caixatab-btn-aberto"      onclick="switchCaixaTab('caixa-aberto', this)"><i class="fa-solid fa-receipt"></i> Contas em Aberto</button>
+                    <button class="tab-btn"        id="caixatab-btn-fechamento"  onclick="switchCaixaTab('caixa-fechamento', this)"><i class="fa-solid fa-calendar-check"></i> Fechamento do Dia</button>
+                    <button class="tab-btn"        id="caixatab-btn-historico"   onclick="switchCaixaTab('caixa-historico', this)"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                    <button class="tab-btn"        id="caixatab-btn-transacoes"  onclick="switchCaixaTab('caixa-transacoes', this)"><i class="fa-solid fa-list"></i> Transações</button>
+                </div>
+
+                <!-- ABA: CONTAS EM ABERTO -->
+                <div id="caixa-aberto" class="caixatab-content">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Jogadores Devedores</div>
+                            <div id="caixa-qtd-devedores" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#ef4444;">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Total a Receber</div>
+                            <div id="caixa-total-receber" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#ef4444;">R$ 0,00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Jogadores com Crédito</div>
+                            <div id="caixa-qtd-credito" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#22c55e;">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Total em Crédito</div>
+                            <div id="caixa-total-credito" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0,00</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Saldos por Jogador</div>
+                        <div style="display:flex;gap:.5rem;">
+                            <select id="caixa-filtro" class="inp" style="padding:.4rem .75rem;font-size:.8rem;width:180px;" onchange="renderCaixaAberto()">
+                                <option value="todos">Todos os saldos</option>
+                                <option value="devedor" selected>Apenas devedores</option>
+                                <option value="credito">Apenas com crédito</option>
+                                <option value="zerado">Zerados</option>
+                            </select>
+                            <button onclick="openModalDepositoRapido()" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-plus-circle"></i> Depósito</button>
+                        </div>
+                    </div>
+                    <div id="caixa-aberto-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                </div>
+
+                <!-- ABA: FECHAMENTO -->
+                <div id="caixa-fechamento" class="caixatab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;align-items:start;">
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                                <div>
+                                    <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Fechamento do Caixa</div>
+                                    <div id="fechamento-data" style="font-size:1rem;font-weight:800;margin-top:.2rem;"></div>
+                                </div>
+                                <button onclick="confirmarFechamentoDia()" class="btn-gold" style="font-size:.85rem;padding:.6rem 1.2rem;"><i class="fa-solid fa-lock"></i> Fechar o Dia</button>
+                            </div>
+                            <div id="fechamento-resumo" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                        </div>
+                        <div class="stat-card" style="padding:1.25rem;position:sticky;top:0;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Totalizador do Dia</div>
+                            <div id="fechamento-totalizador" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: HISTÓRICO -->
+                <div id="caixa-historico" class="caixatab-content" style="display:none;">
+                    <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Fechamentos Anteriores</div>
+                    <div id="caixa-historico-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                </div>
+
+                <!-- ABA: TRANSAÇÕES -->
+                <div id="caixa-transacoes" class="caixatab-content" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                        <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Todas as Transações</div>
+                        <select id="caixa-trans-filtro" class="inp" style="padding:.4rem .75rem;font-size:.8rem;width:200px;" onchange="renderCaixaTransacoes()">
+                            <option value="todas">Todos os tipos</option>
+                            <option value="buyin">Buy-ins torneio</option>
+                            <option value="reentry">Re-entries</option>
+                            <option value="cash">Cash game</option>
+                            <option value="bar">Bar & Vendas</option>
+                            <option value="pagamento">Pagamentos</option>
+                            <option value="deposito">Depósitos</option>
+                            <option value="cashout">Retiradas (cash)</option>
+                        </select>
+                    </div>
+                    <div id="caixa-transacoes-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
                 </div>
             </div>
 
@@ -840,6 +943,63 @@
         </div>
     </div>
 </div>
+<!-- MODAL: DETALHES / PAGAMENTO DO JOGADOR -->
+<div id="modal-pagamento-jogador" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:0;width:100%;max-width:800px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div id="pj-nome" style="font-weight:800;font-size:1.1rem;"></div>
+                <div id="pj-info" style="font-size:.75rem;color:#52525b;margin-top:.25rem;"></div>
+            </div>
+            <button onclick="closeModal('modal-pagamento-jogador')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <!-- Saldo card -->
+        <div style="padding:1.25rem 1.5rem;border-bottom:1px solid #1e1e23;">
+            <div id="pj-saldo-card" style="padding:1.5rem;border-radius:.8rem;text-align:center;"></div>
+        </div>
+        <!-- Tabs -->
+        <div style="padding:.5rem 1.5rem 0;border-bottom:1px solid #1e1e23;display:flex;gap:.25rem;">
+            <button class="tab-btn active" id="pjtab-btn-extrato"    onclick="switchPagamentoTab('pj-extrato', this)">Extrato</button>
+            <button class="tab-btn"        id="pjtab-btn-pagar"      onclick="switchPagamentoTab('pj-pagar', this)">Pagar Conta</button>
+            <button class="tab-btn"        id="pjtab-btn-depositar"  onclick="switchPagamentoTab('pj-depositar', this)">Depositar</button>
+        </div>
+        <div style="flex:1;overflow:auto;padding:1.5rem;">
+            <!-- TAB: EXTRATO -->
+            <div id="pj-extrato" class="pj-tab-content">
+                <div id="pj-extrato-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+            </div>
+            <!-- TAB: PAGAR -->
+            <div id="pj-pagar" class="pj-tab-content" style="display:none;">
+                <div id="pj-pagar-content"></div>
+            </div>
+            <!-- TAB: DEPOSITAR -->
+            <div id="pj-depositar" class="pj-tab-content" style="display:none;">
+                <div id="pj-depositar-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: DEPÓSITO RÁPIDO -->
+<div id="modal-deposito-rapido" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-plus-circle" style="color:#22c55e;"></i> Depósito / Crédito</h3>
+            <button onclick="closeModal('modal-deposito-rapido')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div><label class="inp-label">Jogador *</label><select id="dep-jogador" class="inp"></select></div>
+            <div><label class="inp-label">Valor R$ *</label><input id="dep-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 200"></div>
+            <div>
+                <label class="inp-label">Forma de Pagamento *</label>
+                <div id="dep-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
+            </div>
+            <div><label class="inp-label">Observação</label><input id="dep-obs" class="inp" placeholder="Ex: Depósito antecipado"></div>
+            <button onclick="confirmarDeposito()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Depósito</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: USUÁRIO -->
 <div id="modal-usuario" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
@@ -1244,6 +1404,18 @@ let barComandas= JSON.parse(localStorage.getItem('ps_bar_comandas'))|| [];
 let cashMesas  = JSON.parse(localStorage.getItem('ps_cash_mesas'))  || [];
 let usuarios   = JSON.parse(localStorage.getItem('ps_usuarios'))    || [];
 let config     = JSON.parse(localStorage.getItem('ps_config'))      || {};
+let transacoes = JSON.parse(localStorage.getItem('ps_transacoes'))  || [];
+let fechamentos= JSON.parse(localStorage.getItem('ps_fechamentos')) || [];
+
+// Payment methods metadata
+const PAYMENT_METHODS = {
+    dinheiro: { label: 'Dinheiro',        icon: 'fa-money-bill-wave', color: '#22c55e' },
+    pix:      { label: 'PIX',             icon: 'fa-qrcode',          color: '#06b6d4' },
+    debito:   { label: 'Cartão Débito',   icon: 'fa-credit-card',     color: '#3b82f6' },
+    credito:  { label: 'Cartão Crédito',  icon: 'fa-credit-card',     color: '#a855f7' },
+    cheque:   { label: 'Cheque',          icon: 'fa-money-check',     color: '#f59e0b' },
+    credito_sistema: { label: 'Crédito no Sistema', icon: 'fa-wallet', color: '#84cc16' },
+};
 let currentUser = JSON.parse(sessionStorage.getItem('ps_current_user') || 'null');
 
 // Default config
@@ -1277,10 +1449,10 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','usuarios','config'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','config'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
-    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar'] },
-    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios'] },
+    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa'] },
+    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
 };
 
 // Seed admin padrão + limpeza de dados corrompidos
@@ -1326,6 +1498,8 @@ function saveData() {
     localStorage.setItem('ps_bar_comandas',JSON.stringify(barComandas));
     localStorage.setItem('ps_cash_mesas',  JSON.stringify(cashMesas));
     localStorage.setItem('ps_usuarios',    JSON.stringify(usuarios));
+    localStorage.setItem('ps_transacoes',  JSON.stringify(transacoes));
+    localStorage.setItem('ps_fechamentos', JSON.stringify(fechamentos));
 }
 
 // ============================================================
@@ -1391,6 +1565,7 @@ function applyPermissions() {
         'nav-bar':       'bar',
         'nav-usuarios':  'usuarios',
         'nav-config':    'config',
+        'nav-caixa':     'caixa',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
         const el = document.getElementById(navId);
@@ -1433,6 +1608,7 @@ function showPage(page) {
     if (page === 'cash')      renderCashMesas();
     if (page === 'usuarios')  renderUsuarios();
     if (page === 'config')    renderConfig();
+    if (page === 'caixa')     renderCaixa();
 }
 
 function iniciarRelogio() {
@@ -1461,7 +1637,12 @@ function renderJogadores(data = jogadores) {
         tbody.innerHTML = `<tr><td colspan="4" style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador cadastrado</td></tr>`;
         return;
     }
-    tbody.innerHTML = data.map(j => `
+    tbody.innerHTML = data.map(j => {
+        const saldo = getSaldoJogador(j.id);
+        const devedor = saldo < 0;
+        const credito = saldo > 0;
+        const corSaldo = devedor ? '#ef4444' : credito ? '#22c55e' : '#52525b';
+        return `
         <tr style="border-bottom:1px solid #1a1a1e;">
             <td style="padding:.9rem 1.5rem;">
                 <div style="font-weight:700;">${j.nome}</div>
@@ -1469,11 +1650,16 @@ function renderJogadores(data = jogadores) {
             </td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:'Space Mono',monospace;">${j.whatsapp || '—'}</td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#52525b;">${contarTorneiosJogador(j.id)}</td>
+            <td style="padding:.9rem 1.5rem;">
+                <div style="font-family:'Space Mono',monospace;font-weight:800;color:${corSaldo};font-size:.9rem;">${saldo===0?formatMoney(0):(devedor?'-':'+')+formatMoney(Math.abs(saldo))}</div>
+                <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Devedor':credito?'Crédito':'Zerado'}</div>
+            </td>
             <td style="padding:.9rem 1.5rem;text-align:right;">
+                <button onclick="abrirPagamentoJogador(${j.id})" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;margin-right:.3rem;" title="Pagamentos e extrato"><i class="fa-solid fa-wallet"></i> Conta</button>
                 <button onclick="removerJogador(${j.id})" class="btn-danger"><i class="fa-solid fa-trash"></i></button>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function contarTorneiosJogador(id) {
@@ -1932,6 +2118,20 @@ function registrarEntrada() {
 
     t.entries.push({ jogadorId: jid, tipo, ts: Date.now() });
     alocarJogadorMesa(t, jid);
+
+    // Registra transação no caixa
+    const descTipo = tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in';
+    if (tipo !== 'addon') {
+        registrarTransacao({
+            jogadorId: jid,
+            tipo: tipo === 'reentry' ? 'reentry' : 'buyin',
+            valor: -t.buyin,
+            descricao: `${descTipo} · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+        });
+    }
+
     saveData();
     closeModal('modal-entrada');
     updateModalTorneio();
@@ -2191,6 +2391,16 @@ function renderDashboard() {
     const cashMesasEl = document.getElementById('dash-cash-mesas');
     if (cashMesasEl) {
         cashMesasEl.innerText = cashMesas.filter(m=>m.status==='ativa').length;
+    }
+    // Caixa stats
+    const caixaReceberEl = document.getElementById('dash-caixa-receber');
+    const caixaCreditoEl = document.getElementById('dash-caixa-credito');
+    if (caixaReceberEl && jogadores.length) {
+        const saldos = jogadores.map(j => getSaldoJogador(j.id));
+        const receber = saldos.filter(s => s < 0).reduce((s, v) => s + Math.abs(v), 0);
+        const credito = saldos.filter(s => s > 0).reduce((s, v) => s + v, 0);
+        caixaReceberEl.innerText = formatMoney(receber);
+        if (caixaCreditoEl) caixaCreditoEl.innerText = formatMoney(credito);
     }
 
     const dashList = document.getElementById('dash-torneios-list');
@@ -2644,6 +2854,27 @@ function fecharComandaConfirm() {
     c.fechadoEm  = Date.now();
     c.pagamento  = pgto;
     c.total      = calcTotalComanda(c);
+
+    // Registra transação bar: débito na conta e simultaneamente crédito pelo pagamento
+    // Resultado líquido: saldo não muda (jogador pagou na hora)
+    registrarTransacao({
+        jogadorId: c.jogadorId,
+        tipo: 'bar',
+        valor: -c.total,
+        descricao: `Comanda bar (${c.itens.length} iten${c.itens.length>1?'s':''})`,
+        origem: 'bar',
+        refId: c.id,
+    });
+    registrarTransacao({
+        jogadorId: c.jogadorId,
+        tipo: 'pagamento',
+        valor: c.total,
+        descricao: `Pagamento comanda via ${pgto}`,
+        metodo: pgto === 'dinheiro' ? 'dinheiro' : pgto === 'pix' ? 'pix' : 'credito',
+        origem: 'bar',
+        refId: c.id,
+    });
+
     activeComandaId = null;
     saveData();
     closeModal('modal-fechar-comanda');
@@ -2969,6 +3200,16 @@ function confirmAddCashJogador() {
         movimentos: [{ tipo: 'buyin', valor, rakeCobrado, ts: Date.now() }],
     });
 
+    // Registra transação no caixa
+    registrarTransacao({
+        jogadorId: jid,
+        tipo: 'cash_in',
+        valor: -valor,
+        descricao: `Buy-in cash · ${m.nome}`,
+        origem: 'cash',
+        refId: m.id,
+    });
+
     saveData();
     closeModal('modal-add-cash-jogador');
     renderCashMesas();
@@ -3001,6 +3242,16 @@ function confirmRecompra() {
     const rakeCobrado = valor * (m.rake / 100);
     j.totalInvestido += valor;
     j.movimentos.push({ tipo: 'recompra', valor, rakeCobrado, ts: Date.now() });
+
+    // Registra transação
+    registrarTransacao({
+        jogadorId: j.jogadorId,
+        tipo: 'cash_rec',
+        valor: -valor,
+        descricao: `Recompra cash · ${m.nome}`,
+        origem: 'cash',
+        refId: m.id,
+    });
 
     saveData();
     closeModal('modal-recompra');
@@ -3056,6 +3307,18 @@ function confirmRetirar() {
     j.saiuEm  = Date.now();
     j.saiuCom = valor;
     j.movimentos.push({ tipo: 'saida', valor, rakeCobrado: 0, ts: Date.now() });
+
+    // Registra saída no caixa (positivo — jogador recebe)
+    if (valor > 0) {
+        registrarTransacao({
+            jogadorId: j.jogadorId,
+            tipo: 'cash_out',
+            valor: valor,
+            descricao: `Retirada cash · ${m.nome}`,
+            origem: 'cash',
+            refId: m.id,
+        });
+    }
 
     saveData();
     closeModal('modal-retirar');
@@ -3565,13 +3828,15 @@ function renderBackupStats() {
             <div>🃏 Mesas Cash: <strong style="color:#e4e4e7;">${cashMesas.length}</strong></div>
             <div>🛒 Produtos: <strong style="color:#e4e4e7;">${barProdutos.length}</strong></div>
             <div>📋 Comandas: <strong style="color:#e4e4e7;">${barComandas.length}</strong></div>
+            <div>💵 Transações: <strong style="color:#e4e4e7;">${transacoes.length}</strong></div>
+            <div>🔒 Fechamentos: <strong style="color:#e4e4e7;">${fechamentos.length}</strong></div>
         </div>`;
 }
 
 function exportarBackup() {
     const data = {
         __meta: { sistema: 'PokerSul', versao: '1.5', exportadoEm: new Date().toISOString() },
-        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config,
+        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config, transacoes, fechamentos,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
@@ -3605,6 +3870,8 @@ function importarBackup(event) {
             barProdutos = data.barProdutos || [];
             barComandas = data.barComandas || [];
             usuarios    = data.usuarios    || usuarios;
+            transacoes  = data.transacoes  || [];
+            fechamentos = data.fechamentos || [];
             if (data.config) config = mergeConfig(data.config, DEFAULT_CONFIG);
             saveData();
             showToast('✅ Backup restaurado! Recarregando...');
@@ -3693,6 +3960,592 @@ function playBeep() {
         gain.gain.value = 0.1;
         osc.start(); osc.stop(ctx.currentTime + 0.15);
     } catch (e) {}
+}
+
+
+// ============================================================
+// CAIXA UNIFICADO — TRANSAÇÕES & SALDO
+// ============================================================
+
+// Transação: { id, jogadorId, tipo, valor, descricao, metodo, origem, ts, fechamentoId }
+// Convenção de sinal:
+//   valor NEGATIVO = jogador DEVE (gastou/inscreveu)
+//   valor POSITIVO = jogador RECEBE/TEM CRÉDITO (pagou, depositou, ganhou cash)
+
+function registrarTransacao(dados) {
+    const t = {
+        id: Date.now() + Math.random(),
+        ts: Date.now(),
+        fechamentoId: null,
+        ...dados,
+    };
+    transacoes.push(t);
+    saveData();
+    return t;
+}
+
+function getSaldoJogador(jogadorId) {
+    return transacoes
+        .filter(t => t.jogadorId === jogadorId)
+        .reduce((s, t) => s + t.valor, 0);
+}
+
+function getExtratoJogador(jogadorId) {
+    return transacoes
+        .filter(t => t.jogadorId === jogadorId)
+        .sort((a, b) => b.ts - a.ts);
+}
+
+// ============================================================
+// CAIXA — PÁGINA
+// ============================================================
+function switchCaixaTab(tabId, btn) {
+    document.querySelectorAll('.caixatab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-caixa .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'caixa-aberto')     renderCaixaAberto();
+    if (tabId === 'caixa-fechamento') renderCaixaFechamento();
+    if (tabId === 'caixa-historico')  renderCaixaHistorico();
+    if (tabId === 'caixa-transacoes') renderCaixaTransacoes();
+}
+
+function renderCaixa() {
+    renderCaixaAberto();
+}
+
+function renderCaixaAberto() {
+    const filtro = (document.getElementById('caixa-filtro') || {}).value || 'devedor';
+    const saldos = jogadores.map(j => ({
+        jogador: j,
+        saldo: getSaldoJogador(j.id),
+    }));
+
+    // Stats
+    const devedores = saldos.filter(s => s.saldo < 0);
+    const credito   = saldos.filter(s => s.saldo > 0);
+    const totalReceber = devedores.reduce((s, x) => s + Math.abs(x.saldo), 0);
+    const totalCredito = credito.reduce((s, x) => s + x.saldo, 0);
+
+    const qtdDev = document.getElementById('caixa-qtd-devedores');
+    if (qtdDev) qtdDev.innerText = devedores.length;
+    const qtdCred = document.getElementById('caixa-qtd-credito');
+    if (qtdCred) qtdCred.innerText = credito.length;
+    const tRec = document.getElementById('caixa-total-receber');
+    if (tRec) tRec.innerText = formatMoney(totalReceber);
+    const tCred = document.getElementById('caixa-total-credito');
+    if (tCred) tCred.innerText = formatMoney(totalCredito);
+
+    // Filtro
+    let lista = saldos;
+    if (filtro === 'devedor') lista = saldos.filter(s => s.saldo < 0);
+    else if (filtro === 'credito') lista = saldos.filter(s => s.saldo > 0);
+    else if (filtro === 'zerado') lista = saldos.filter(s => s.saldo === 0);
+
+    lista.sort((a, b) => a.saldo - b.saldo);  // devedores primeiro
+
+    const el = document.getElementById('caixa-aberto-list');
+    if (!el) return;
+    if (!lista.length) {
+        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador neste filtro</div>`;
+        return;
+    }
+    el.innerHTML = lista.map(({ jogador, saldo }) => {
+        const devedor = saldo < 0;
+        const credito = saldo > 0;
+        const zerado  = saldo === 0;
+        return `
+        <div onclick="abrirPagamentoJogador(${jogador.id})" style="display:grid;grid-template-columns:auto 1fr auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
+            <div style="width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
+            <div>
+                <div style="font-weight:700;font-size:.9rem;">${jogador.nome}</div>
+                ${jogador.apelido ? `<div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">${jogador.apelido}</div>` : ''}
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Deve':credito?'Crédito':'Saldo'}</div>
+                <div style="font-family:'Space Mono',monospace;font-weight:800;color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};font-size:1rem;">${zerado?formatMoney(0):(devedor?'-':'+')+formatMoney(Math.abs(saldo))}</div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="color:#3f3f46;"></i>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// MODAL PAGAMENTO DO JOGADOR
+// ============================================================
+let pagamentoJogadorId = null;
+
+function abrirPagamentoJogador(jogadorId) {
+    pagamentoJogadorId = jogadorId;
+    const j = jogadores.find(x => x.id === jogadorId);
+    if (!j) return;
+    const saldo = getSaldoJogador(jogadorId);
+    document.getElementById('pj-nome').innerText = j.nome;
+    document.getElementById('pj-info').innerText = `${j.apelido?j.apelido+' · ':''}${j.whatsapp || ''}`;
+
+    renderSaldoCard(saldo);
+    renderExtratoJogador();
+    // reset tabs
+    document.querySelectorAll('.pj-tab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#modal-pagamento-jogador .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('pj-extrato').style.display = 'block';
+    document.getElementById('pjtab-btn-extrato').classList.add('active');
+    openModal('modal-pagamento-jogador');
+}
+
+function renderSaldoCard(saldo) {
+    const devedor = saldo < 0;
+    const credito = saldo > 0;
+    const el = document.getElementById('pj-saldo-card');
+    if (!el) return;
+    const cor = devedor ? '#ef4444' : credito ? '#22c55e' : '#71717a';
+    const bg  = devedor ? 'rgba(239,68,68,.08)' : credito ? 'rgba(34,197,94,.08)' : '#0f0f12';
+    const border = devedor ? 'rgba(239,68,68,.2)' : credito ? 'rgba(34,197,94,.2)' : '#1e1e23';
+    el.style.background   = bg;
+    el.style.border       = `1px solid ${border}`;
+    el.innerHTML = `
+        <div style="font-size:.65rem;color:${cor};text-transform:uppercase;letter-spacing:.1em;font-weight:700;">${devedor?'Saldo Devedor':credito?'Crédito Disponível':'Conta Quitada'}</div>
+        <div style="font-family:'Space Mono',monospace;font-weight:800;font-size:2.2rem;color:${cor};margin-top:.25rem;">
+            ${devedor?'-':credito?'+':''}${formatMoney(Math.abs(saldo))}
+        </div>
+        ${devedor?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Valor a receber do jogador</div>`
+                :credito?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Pode ser usado em buy-ins, bar ou cash</div>`
+                :`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Nenhuma pendência</div>`}
+    `;
+}
+
+function switchPagamentoTab(tabId, btn) {
+    document.querySelectorAll('.pj-tab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#modal-pagamento-jogador .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'pj-extrato')    renderExtratoJogador();
+    if (tabId === 'pj-pagar')      renderPagarConta();
+    if (tabId === 'pj-depositar')  renderDepositar();
+}
+
+function renderExtratoJogador() {
+    const el = document.getElementById('pj-extrato-list');
+    if (!el) return;
+    const ext = getExtratoJogador(pagamentoJogadorId);
+    if (!ext.length) {
+        el.innerHTML = `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma transação ainda</div>`;
+        return;
+    }
+    el.innerHTML = ext.map(t => {
+        const positivo = t.valor >= 0;
+        const metodo = t.metodo ? PAYMENT_METHODS[t.metodo] : null;
+        return `
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${positivo?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${positivo?'#22c55e':'#ef4444'};display:flex;align-items:center;justify-content:center;font-size:.75rem;">
+                <i class="fa-solid ${getTipoIcon(t.tipo)}"></i>
+            </div>
+            <div>
+                <div style="font-weight:700;font-size:.85rem;">${t.descricao}</div>
+                <div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">
+                    ${new Date(t.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                    ${metodo?` · <i class="fa-solid ${metodo.icon}" style="color:${metodo.color};"></i> ${metodo.label}`:''}
+                </div>
+            </div>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;font-size:.9rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
+            <button onclick="removerTransacao(${t.id})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar transação" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-rotate-left"></i></button>
+        </div>`;
+    }).join('');
+}
+
+function getTipoIcon(tipo) {
+    const icons = {
+        buyin:    'fa-trophy',       reentry:   'fa-rotate',
+        cash_in:  'fa-coins',        cash_out:  'fa-right-from-bracket',
+        cash_rec: 'fa-plus-circle',  bar:       'fa-utensils',
+        pagamento:'fa-credit-card',  deposito:  'fa-wallet',
+    };
+    return icons[tipo] || 'fa-circle-dot';
+}
+
+// ============================================================
+// PAGAR CONTA
+// ============================================================
+function renderPagarConta() {
+    const saldo = getSaldoJogador(pagamentoJogadorId);
+    const el = document.getElementById('pj-pagar-content');
+    if (!el) return;
+    if (saldo >= 0) {
+        el.innerHTML = `
+            <div style="padding:2.5rem;text-align:center;color:#52525b;">
+                <i class="fa-solid fa-circle-check" style="font-size:2.5rem;color:#22c55e;margin-bottom:.75rem;display:block;"></i>
+                <div style="font-size:.95rem;font-weight:700;color:#e4e4e7;">Conta Quitada</div>
+                <div style="font-size:.8rem;margin-top:.35rem;">Este jogador não tem saldo devedor</div>
+            </div>`;
+        return;
+    }
+    const divida = Math.abs(saldo);
+    el.innerHTML = `
+        <div style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:1rem;">
+            <div style="font-size:.7rem;color:#71717a;">Valor a pagar:</div>
+            <div style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.5rem;color:#ef4444;margin-top:.2rem;">${formatMoney(divida)}</div>
+        </div>
+        <label class="inp-label">Valor do Pagamento R$</label>
+        <input id="pj-pagar-valor" type="number" step="0.01" min="0" max="${divida}" value="${divida}" class="inp" oninput="validarValorPagamento()">
+        <div id="pj-pagar-aviso" style="font-size:.7rem;color:#71717a;margin-top:.35rem;"></div>
+        <label class="inp-label" style="margin-top:1rem;">Forma de Pagamento</label>
+        <div id="pj-pagar-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
+        <label class="inp-label" style="margin-top:1rem;">Observação</label>
+        <input id="pj-pagar-obs" class="inp" placeholder="Opcional">
+        <button onclick="confirmarPagamentoConta()" class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;margin-top:1.25rem;">
+            <i class="fa-solid fa-check"></i> Confirmar Pagamento
+        </button>`;
+    renderMetodosPagamento('pj-pagar-metodos', 'pagar', true);
+}
+
+function validarValorPagamento() {
+    const saldo = getSaldoJogador(pagamentoJogadorId);
+    const divida = Math.abs(saldo);
+    const valor = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
+    const aviso = document.getElementById('pj-pagar-aviso');
+    if (valor > divida) {
+        aviso.innerHTML = `<span style="color:#22c55e;">💰 Valor acima da dívida — o excedente ${formatMoney(valor - divida)} será adicionado como crédito.</span>`;
+    } else if (valor < divida && valor > 0) {
+        aviso.innerHTML = `<span style="color:#f59e0b;">⚠️ Pagamento parcial — restará ${formatMoney(divida - valor)} em aberto.</span>`;
+    } else if (valor === divida) {
+        aviso.innerHTML = `<span style="color:#22c55e;">✓ Pagamento total — conta será quitada.</span>`;
+    } else {
+        aviso.innerText = '';
+    }
+}
+
+function confirmarPagamentoConta() {
+    const valor = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
+    if (valor <= 0) return showToast('⚠️ Valor inválido');
+    const metodo = (document.querySelector('input[name="metodo-pagar"]:checked') || {}).value;
+    if (!metodo) return showToast('⚠️ Selecione a forma de pagamento');
+    const obs = document.getElementById('pj-pagar-obs').value.trim();
+    const j = jogadores.find(x => x.id === pagamentoJogadorId);
+
+    registrarTransacao({
+        jogadorId: pagamentoJogadorId,
+        tipo: 'pagamento',
+        valor: valor,   // positivo — abate dívida
+        descricao: `Pagamento via ${PAYMENT_METHODS[metodo].label}${obs?' — '+obs:''}`,
+        metodo: metodo,
+        origem: 'caixa',
+    });
+
+    showToast(`✅ Pagamento de ${formatMoney(valor)} registrado para ${j.nome}`);
+    renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+    renderPagarConta();
+    renderExtratoJogador();
+    renderCaixaAberto();
+    renderDashboard();
+}
+
+// ============================================================
+// DEPOSITAR
+// ============================================================
+function renderDepositar() {
+    const el = document.getElementById('pj-depositar-content');
+    if (!el) return;
+    el.innerHTML = `
+        <div style="padding:1rem;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:.6rem;margin-bottom:1rem;font-size:.8rem;color:#a1a1aa;">
+            <i class="fa-solid fa-info-circle" style="color:#22c55e;"></i> Depósito antecipado adiciona crédito ao jogador (1:1). O crédito é usado automaticamente em futuros lançamentos.
+        </div>
+        <label class="inp-label">Valor do Depósito R$</label>
+        <input id="pj-dep-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 200">
+        <label class="inp-label" style="margin-top:1rem;">Forma de Pagamento</label>
+        <div id="pj-dep-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
+        <label class="inp-label" style="margin-top:1rem;">Observação</label>
+        <input id="pj-dep-obs" class="inp" placeholder="Ex: Recarga de crédito">
+        <button onclick="confirmarDepositoNoModal()" class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;margin-top:1.25rem;">
+            <i class="fa-solid fa-plus-circle"></i> Confirmar Depósito
+        </button>`;
+    renderMetodosPagamento('pj-dep-metodos', 'dep', false);
+}
+
+function confirmarDepositoNoModal() {
+    const valor = parseFloat(document.getElementById('pj-dep-valor').value) || 0;
+    if (valor <= 0) return showToast('⚠️ Valor inválido');
+    const metodo = (document.querySelector('input[name="metodo-dep"]:checked') || {}).value;
+    if (!metodo) return showToast('⚠️ Selecione a forma de pagamento');
+    const obs = document.getElementById('pj-dep-obs').value.trim();
+
+    registrarTransacao({
+        jogadorId: pagamentoJogadorId,
+        tipo: 'deposito',
+        valor: valor,
+        descricao: `Depósito via ${PAYMENT_METHODS[metodo].label}${obs?' — '+obs:''}`,
+        metodo: metodo,
+        origem: 'caixa',
+    });
+
+    showToast(`💰 Depósito de ${formatMoney(valor)} registrado`);
+    renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+    renderExtratoJogador();
+    renderCaixaAberto();
+}
+
+// ============================================================
+// DEPÓSITO RÁPIDO (fora do extrato)
+// ============================================================
+function openModalDepositoRapido() {
+    const sel = document.getElementById('dep-jogador');
+    sel.innerHTML = jogadores.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('') || '<option>Nenhum jogador</option>';
+    document.getElementById('dep-valor').value = '';
+    document.getElementById('dep-obs').value = '';
+    renderMetodosPagamento('dep-metodos', 'quick', false);
+    openModal('modal-deposito-rapido');
+}
+
+function confirmarDeposito() {
+    const jid = parseInt(document.getElementById('dep-jogador').value);
+    const valor = parseFloat(document.getElementById('dep-valor').value) || 0;
+    const metodo = (document.querySelector('input[name="metodo-quick"]:checked') || {}).value;
+    const obs = document.getElementById('dep-obs').value.trim();
+    if (!jid || valor <= 0 || !metodo) return showToast('⚠️ Preencha todos os campos');
+
+    registrarTransacao({
+        jogadorId: jid,
+        tipo: 'deposito',
+        valor: valor,
+        descricao: `Depósito via ${PAYMENT_METHODS[metodo].label}${obs?' — '+obs:''}`,
+        metodo: metodo,
+        origem: 'caixa',
+    });
+    const j = jogadores.find(x => x.id === jid);
+    closeModal('modal-deposito-rapido');
+    renderCaixaAberto();
+    showToast(`💰 Depósito de ${formatMoney(valor)} para ${j.nome}`);
+}
+
+// ============================================================
+// MÉTODOS DE PAGAMENTO (radio cards)
+// ============================================================
+function renderMetodosPagamento(containerId, suffix, excludeCreditoSistema) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const metodos = Object.entries(PAYMENT_METHODS)
+        .filter(([k]) => !excludeCreditoSistema || k !== 'credito_sistema');
+    el.innerHTML = metodos.map(([k, m], i) => `
+        <label style="display:flex;align-items:center;gap:.5rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.6rem .75rem;cursor:pointer;font-size:.8rem;font-weight:600;" id="lbl-${suffix}-${k}">
+            <input type="radio" name="metodo-${suffix}" value="${k}" ${i===0?'checked':''} onchange="highlightMetodo(this, '${suffix}')" style="accent-color:var(--gold);">
+            <i class="fa-solid ${m.icon}" style="color:${m.color};width:16px;"></i> ${m.label}
+        </label>
+    `).join('');
+    // Auto-highlight first
+    const first = el.querySelector('input[type="radio"]');
+    if (first) highlightMetodo(first, suffix);
+}
+
+function highlightMetodo(radio, suffix) {
+    document.querySelectorAll(`input[name="metodo-${suffix}"]`).forEach(r => {
+        const lbl = document.getElementById(`lbl-${suffix}-${r.value}`);
+        if (!lbl) return;
+        if (r.checked) {
+            const m = PAYMENT_METHODS[r.value];
+            lbl.style.background = m.color + '15';
+            lbl.style.borderColor = m.color;
+            lbl.style.color = m.color;
+        } else {
+            lbl.style.background = '#18181b';
+            lbl.style.borderColor = '#27272a';
+            lbl.style.color = '';
+        }
+    });
+}
+
+// ============================================================
+// ESTORNO (remover transação)
+// ============================================================
+function removerTransacao(id) {
+    const t = transacoes.find(x => x.id === id);
+    if (!t) return;
+    if (t.fechamentoId) return showToast('⚠️ Transação já faz parte de fechamento');
+    if (!confirm(`Estornar transação "${t.descricao}" de ${formatMoney(t.valor)}?`)) return;
+    transacoes = transacoes.filter(x => x.id !== id);
+    saveData();
+    if (pagamentoJogadorId) {
+        renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+        renderExtratoJogador();
+    }
+    renderCaixaAberto();
+    showToast('↩️ Transação estornada');
+}
+
+// ============================================================
+// FECHAMENTO DO DIA
+// ============================================================
+function renderCaixaFechamento() {
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+    document.getElementById('fechamento-data').innerText = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+
+    // Transações do dia não fechadas
+    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje);
+
+    // Resumo por jogador
+    const porJogador = {};
+    abertas.forEach(t => {
+        if (!porJogador[t.jogadorId]) porJogador[t.jogadorId] = { debitos: 0, creditos: 0, txs: [] };
+        if (t.valor < 0) porJogador[t.jogadorId].debitos += Math.abs(t.valor);
+        else porJogador[t.jogadorId].creditos += t.valor;
+        porJogador[t.jogadorId].txs.push(t);
+    });
+
+    const resumoEl = document.getElementById('fechamento-resumo');
+    if (!Object.keys(porJogador).length) {
+        resumoEl.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;">
+            <i class="fa-solid fa-calendar-xmark" style="font-size:2rem;margin-bottom:.75rem;display:block;"></i>
+            <div style="font-weight:700;">Nenhuma transação hoje</div>
+            <div style="font-size:.8rem;margin-top:.35rem;">O fechamento só fecha transações do dia atual</div>
+        </div>`;
+    } else {
+        resumoEl.innerHTML = Object.entries(porJogador).map(([jid, d]) => {
+            const j = jogadores.find(x => x.id === parseInt(jid));
+            const saldoLiq = d.creditos - d.debitos;
+            return `
+            <div class="stat-card" style="padding:.85rem 1rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                    <span style="font-weight:700;font-size:.9rem;">${j?j.nome:'?'}</span>
+                    <span style="font-family:'Space Mono',monospace;font-weight:800;color:${saldoLiq>=0?'#22c55e':'#ef4444'};">${saldoLiq>=0?'+':''}${formatMoney(saldoLiq)}</span>
+                </div>
+                <div style="display:flex;gap:1rem;font-size:.7rem;color:#71717a;">
+                    <span>Débitos: <strong style="color:#ef4444;">${formatMoney(d.debitos)}</strong></span>
+                    <span>Créditos: <strong style="color:#22c55e;">${formatMoney(d.creditos)}</strong></span>
+                    <span style="color:#52525b;">· ${d.txs.length} transação(ões)</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Totalizador por método
+    const porMetodo = {};
+    abertas.filter(t => t.metodo).forEach(t => {
+        if (!porMetodo[t.metodo]) porMetodo[t.metodo] = { in: 0, out: 0 };
+        if (t.valor > 0) porMetodo[t.metodo].in  += t.valor;
+        else              porMetodo[t.metodo].out += Math.abs(t.valor);
+    });
+
+    const totEl = document.getElementById('fechamento-totalizador');
+    const totalIn  = abertas.filter(t => t.valor > 0).reduce((s,t)=>s+t.valor, 0);
+    const totalOut = abertas.filter(t => t.valor < 0).reduce((s,t)=>s+Math.abs(t.valor), 0);
+
+    totEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;padding:.6rem .85rem;background:rgba(34,197,94,.08);border-radius:.4rem;">
+            <span style="font-size:.75rem;">💵 Total de entradas</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:#22c55e;">${formatMoney(totalIn)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .85rem;background:rgba(239,68,68,.08);border-radius:.4rem;">
+            <span style="font-size:.75rem;">💸 Total lançado a receber</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:#ef4444;">${formatMoney(totalOut)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .85rem;background:#0f0f12;border-radius:.4rem;border:1px solid #27272a;">
+            <span style="font-size:.75rem;font-weight:700;">Saldo Líquido</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:${totalIn-totalOut>=0?'#22c55e':'#ef4444'};">${totalIn-totalOut>=0?'+':''}${formatMoney(totalIn-totalOut)}</span>
+        </div>
+        ${Object.keys(porMetodo).length ? `
+        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:.75rem;">Por forma de pagamento</div>
+        ${Object.entries(porMetodo).map(([k, d]) => {
+            const m = PAYMENT_METHODS[k];
+            return `
+            <div style="display:flex;justify-content:space-between;padding:.5rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.75rem;">
+                <span><i class="fa-solid ${m.icon}" style="color:${m.color};"></i> ${m.label}</span>
+                <span style="font-family:'Space Mono',monospace;color:${m.color};font-weight:700;">${formatMoney(d.in)}</span>
+            </div>`;
+        }).join('')}` : ''}
+    `;
+}
+
+function confirmarFechamentoDia() {
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje);
+
+    if (!abertas.length) return showToast('⚠️ Nenhuma transação para fechar hoje');
+    if (!confirm(`Confirmar fechamento de ${abertas.length} transação(ões) de hoje?\n\nApós fechadas, não poderão mais ser estornadas.`)) return;
+
+    const totalIn  = abertas.filter(t => t.valor > 0).reduce((s,t)=>s+t.valor, 0);
+    const totalOut = abertas.filter(t => t.valor < 0).reduce((s,t)=>s+Math.abs(t.valor), 0);
+
+    const fechamento = {
+        id: Date.now(),
+        data: Date.now(),
+        dataLabel: hoje.toLocaleDateString('pt-BR'),
+        operador: currentUser ? currentUser.nome : '-',
+        qtdTransacoes: abertas.length,
+        totalEntradas: totalIn,
+        totalSaidas:   totalOut,
+        saldoLiquido:  totalIn - totalOut,
+    };
+    fechamentos.push(fechamento);
+
+    // Vincula transações ao fechamento
+    abertas.forEach(t => { t.fechamentoId = fechamento.id; });
+
+    saveData();
+    showToast(`🔒 Fechamento realizado — ${abertas.length} transações`);
+    renderCaixaFechamento();
+    renderCaixaHistorico();
+}
+
+function renderCaixaHistorico() {
+    const el = document.getElementById('caixa-historico-list');
+    if (!el) return;
+    if (!fechamentos.length) {
+        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum fechamento realizado ainda</div>`;
+        return;
+    }
+    el.innerHTML = [...fechamentos].reverse().map(f => `
+        <div class="stat-card" style="padding:1rem 1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:800;font-size:.9rem;">${f.dataLabel}</div>
+                    <div style="font-size:.7rem;color:#52525b;margin-top:.2rem;">Operador: ${f.operador} · ${f.qtdTransacoes} transação(ões)</div>
+                </div>
+                <div style="display:flex;gap:1.25rem;">
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Entradas</div><div style="font-family:'Space Mono',monospace;color:#22c55e;font-weight:800;">${formatMoney(f.totalEntradas)}</div></div>
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Saídas</div><div style="font-family:'Space Mono',monospace;color:#ef4444;font-weight:800;">${formatMoney(f.totalSaidas)}</div></div>
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Líquido</div><div style="font-family:'Space Mono',monospace;color:${f.saldoLiquido>=0?'#22c55e':'#ef4444'};font-weight:800;">${f.saldoLiquido>=0?'+':''}${formatMoney(f.saldoLiquido)}</div></div>
+                </div>
+            </div>
+        </div>`).join('');
+}
+
+function renderCaixaTransacoes() {
+    const el = document.getElementById('caixa-transacoes-list');
+    if (!el) return;
+    const filtro = (document.getElementById('caixa-trans-filtro') || {}).value || 'todas';
+    let lista = [...transacoes].sort((a,b) => b.ts - a.ts);
+
+    const mapFiltro = {
+        buyin: ['buyin'],
+        reentry: ['reentry'],
+        cash: ['cash_in','cash_out','cash_rec'],
+        bar: ['bar'],
+        pagamento: ['pagamento'],
+        deposito: ['deposito'],
+        cashout: ['cash_out'],
+    };
+    if (mapFiltro[filtro]) lista = lista.filter(t => mapFiltro[filtro].includes(t.tipo));
+
+    if (!lista.length) {
+        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma transação neste filtro</div>`;
+        return;
+    }
+    el.innerHTML = lista.slice(0, 300).map(t => {
+        const j = jogadores.find(x => x.id === t.jogadorId);
+        const positivo = t.valor >= 0;
+        const metodo = t.metodo ? PAYMENT_METHODS[t.metodo] : null;
+        return `
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;">
+            <div style="width:28px;height:28px;border-radius:50%;background:${positivo?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${positivo?'#22c55e':'#ef4444'};display:flex;align-items:center;justify-content:center;font-size:.7rem;"><i class="fa-solid ${getTipoIcon(t.tipo)}"></i></div>
+            <div>
+                <div style="font-weight:700;">${j?j.nome:'?'} — ${t.descricao}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(t.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${metodo?' · '+metodo.label:''}</div>
+            </div>
+            ${t.fechamentoId?`<span class="tag tag-finished" style="font-size:.6rem;">Fechado</span>`:'<span></span>'}
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
+            ${!t.fechamentoId ? `<button onclick="removerTransacao(${t.id})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar"><i class="fa-solid fa-rotate-left"></i></button>` : '<span></span>'}
+        </div>`;
+    }).join('');
 }
 
 // Init
