@@ -6,7 +6,9 @@
     <title>PokerSul – Sistema Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --gold: #f59e0b;
@@ -17,7 +19,7 @@
             --text-dim: #52525b;
         }
         * { box-sizing: border-box; }
-        body { font-family: 'Syne', sans-serif; background: var(--bg); color: #e4e4e7; }
+        body { font-family: 'Manrope', sans-serif; background: var(--bg); color: #e4e4e7; font-feature-settings: 'ss01','cv11'; letter-spacing: -0.005em; }
         .mono { font-family: 'Space Mono', monospace; }
 
         /* Scrollbar */
@@ -83,15 +85,15 @@
         .payout-item { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; background: #0f0f12; border-radius: .6rem; border: 1px solid #1e1e23; }
 
         /* Button styles */
-        .btn-gold { background: var(--gold); color: #000; font-weight: 700; border-radius: .6rem; padding: .6rem 1.2rem; cursor: pointer; transition: all .15s; border: none; font-family: 'Syne', sans-serif; }
+        .btn-gold { background: var(--gold); color: #000; font-weight: 700; border-radius: .6rem; padding: .6rem 1.2rem; cursor: pointer; transition: all .15s; border: none; font-family: 'Manrope', sans-serif; }
         .btn-gold:hover { background: #d97706; }
-        .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #27272a; border-radius: .6rem; padding: .6rem 1.2rem; cursor: pointer; transition: all .15s; font-family: 'Syne', sans-serif; }
+        .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #27272a; border-radius: .6rem; padding: .6rem 1.2rem; cursor: pointer; transition: all .15s; font-family: 'Manrope', sans-serif; }
         .btn-ghost:hover { background: #18181b; color: #fff; }
-        .btn-danger { background: transparent; color: #ef4444; border: 1px solid #3f1515; border-radius: .6rem; padding: .5rem 1rem; cursor: pointer; transition: all .15s; font-family: 'Syne', sans-serif; font-size: .8rem; }
+        .btn-danger { background: transparent; color: #ef4444; border: 1px solid #3f1515; border-radius: .6rem; padding: .5rem 1rem; cursor: pointer; transition: all .15s; font-family: 'Manrope', sans-serif; font-size: .8rem; }
         .btn-danger:hover { background: #3f1515; }
 
         /* Input base */
-        .inp { background: #18181b; border: 1px solid #27272a; border-radius: .6rem; padding: .75rem 1rem; color: #e4e4e7; outline: none; font-family: 'Syne', sans-serif; font-size: .9rem; width: 100%; }
+        .inp { background: #18181b; border: 1px solid #27272a; border-radius: .6rem; padding: .75rem 1rem; color: #e4e4e7; outline: none; font-family: 'Manrope', sans-serif; font-size: .9rem; width: 100%; }
         .inp:focus { border-color: var(--gold); }
         .inp-label { font-size: .7rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: .35rem; }
 
@@ -111,14 +113,37 @@
         .seat.eliminado { background: rgba(239,68,68,.08); border: 1.5px solid rgba(239,68,68,.2); color: #7f1d1d; }
 
         /* Tabs */
-        .tab-btn { padding: .5rem 1rem; font-size: .8rem; font-weight: 700; border-radius: .5rem; cursor: pointer; transition: all .15s; color: #71717a; background: transparent; border: none; font-family: 'Syne', sans-serif; }
+        .tab-btn { padding: .5rem 1rem; font-size: .8rem; font-weight: 700; border-radius: .5rem; cursor: pointer; transition: all .15s; color: #71717a; background: transparent; border: none; font-family: 'Manrope', sans-serif; }
         .tab-btn.active { background: #1e1e23; color: #fff; }
 
         /* Ranking table */
         .rank-row { display: grid; grid-template-columns: 2rem 1fr auto auto; gap: 1rem; align-items: center; padding: .65rem 1rem; border-radius: .5rem; }
         .rank-row:nth-child(odd) { background: #0f0f12; }
 
-        /* Animation */
+        /* Config UI */
+.pref-option { display:flex; align-items:center; gap:.5rem; background:#18181b; border:1px solid #27272a; border-radius:.5rem; padding:.6rem .8rem; cursor:pointer; font-size:.85rem; font-weight:600; transition:all .15s; }
+.pref-option:hover { border-color: var(--gold); }
+.pref-option.selected { background:rgba(245,158,11,.1); border-color: var(--gold); color: var(--gold); }
+.pref-option input { accent-color: var(--gold); }
+.pref-toggle { display:flex; justify-content:space-between; align-items:center; padding:.85rem 1rem; background:#0f0f12; border:1px solid #1e1e23; border-radius:.5rem; }
+
+/* Toggle Switch */
+.switch { position:relative; display:inline-block; width:42px; height:22px; flex-shrink:0; }
+.switch input { opacity:0; width:0; height:0; }
+.slider { position:absolute; inset:0; background:#27272a; border-radius:22px; transition:.25s; cursor:pointer; }
+.slider:before { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; background:#a1a1aa; border-radius:50%; transition:.25s; }
+.switch input:checked + .slider { background: var(--gold); }
+.switch input:checked + .slider:before { transform: translateX(20px); background:#000; }
+
+/* Color swatches */
+.color-swatch { width:32px; height:32px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition: all .15s; }
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.selected { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 0 2px #000; }
+
+/* Logo preview */
+#cfg-logo-preview img { max-width:100%; max-height:100%; border-radius:1rem; object-fit:cover; }
+
+/* Animation */
         @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .fade-in { animation: fadeIn .2s ease; }
 
@@ -210,9 +235,12 @@
             <div onclick="showPage('usuarios')" id="nav-usuarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-user-shield" style="width:16px;"></i> Usuários
             </div>
+            <div onclick="showPage('config')" id="nav-config" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-gear" style="width:16px;"></i> Configurações
+            </div>
         </nav>
         <div style="padding:1rem;border-top:1px solid #1a1a1e;">
-            <button id="btn-resetar-db" onclick="confirmarLimparDados()" style="width:100%;font-size:.7rem;color:#3f3f46;background:none;border:none;cursor:pointer;padding:.4rem;font-family:'Syne',sans-serif;display:none;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'">Resetar Database</button>
+            <button id="btn-resetar-db" onclick="confirmarLimparDados()" style="width:100%;font-size:.7rem;color:#3f3f46;background:none;border:none;cursor:pointer;padding:.4rem;font-family:'Manrope',sans-serif;display:none;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'">Resetar Database</button>
             <div style="display:flex;align-items:center;gap:.75rem;background:#18181b;border-radius:.6rem;padding:.75rem;margin-top:.5rem;">
                 <div id="user-avatar" style="width:32px;height:32px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:#000;flex-shrink:0;">AD</div>
                 <div style="flex:1;min-width:0;">
@@ -332,6 +360,222 @@
                     <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Matriz de Permissões</div>
                     <div id="matriz-permissoes"></div>
                 </div>
+            </div>
+
+            <!-- CONFIGURAÇÕES -->
+            <div id="page-config" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
+                    <button class="tab-btn active" id="cfgtab-btn-clube"       onclick="switchConfigTab('cfg-clube', this)"><i class="fa-solid fa-building"></i> Clube</button>
+                    <button class="tab-btn"        id="cfgtab-btn-preferencias" onclick="switchConfigTab('cfg-preferencias', this)"><i class="fa-solid fa-sliders"></i> Preferências</button>
+                    <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this)"><i class="fa-solid fa-trophy"></i> Torneios</button>
+                    <button class="tab-btn"        id="cfgtab-btn-cash"        onclick="switchConfigTab('cfg-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
+                    <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
+                    <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
+                </div>
+
+                <!-- ABA: CLUBE -->
+                <div id="cfg-clube" class="configtab-content">
+                    <div style="display:grid;grid-template-columns:1fr 280px;gap:1.5rem;align-items:start;">
+                        <div class="stat-card" style="padding:1.5rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Dados do Clube</div>
+                            <div style="display:flex;flex-direction:column;gap:1rem;">
+                                <div><label class="inp-label">Nome do Clube</label><input id="cfg-clube-nome" class="inp" placeholder="Ex: PokerSul Pato Branco"></div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                                    <div><label class="inp-label">CNPJ</label><input id="cfg-clube-cnpj" class="inp" placeholder="00.000.000/0000-00"></div>
+                                    <div><label class="inp-label">Telefone</label><input id="cfg-clube-fone" class="inp" placeholder="(46) 9 0000-0000"></div>
+                                </div>
+                                <div><label class="inp-label">Endereço</label><input id="cfg-clube-endereco" class="inp" placeholder="Rua, número, bairro"></div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                                    <div><label class="inp-label">Cidade</label><input id="cfg-clube-cidade" class="inp" placeholder="Pato Branco"></div>
+                                    <div><label class="inp-label">UF</label><input id="cfg-clube-uf" class="inp" placeholder="PR" maxlength="2"></div>
+                                </div>
+                                <div><label class="inp-label">E-mail de Contato</label><input id="cfg-clube-email" type="email" class="inp" placeholder="contato@clube.com"></div>
+                                <button onclick="salvarConfigClube()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:.25rem;">Salvar Dados do Clube</button>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:1.5rem;text-align:center;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Logo do Clube</div>
+                            <div id="cfg-logo-preview" style="width:180px;height:180px;margin:0 auto;border-radius:1rem;background:#0f0f12;border:2px dashed #27272a;display:flex;align-items:center;justify-content:center;font-size:4rem;color:var(--gold);">♠</div>
+                            <label for="cfg-logo-input" style="display:block;margin-top:1rem;padding:.6rem;background:#18181b;border:1px solid #27272a;border-radius:.5rem;font-size:.8rem;font-weight:700;cursor:pointer;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#27272a'">
+                                <i class="fa-solid fa-upload"></i> Enviar Logo
+                            </label>
+                            <input id="cfg-logo-input" type="file" accept="image/*" style="display:none;" onchange="uploadLogo(event)">
+                            <button onclick="removerLogo()" style="display:block;margin-top:.4rem;width:100%;background:none;border:none;color:#52525b;font-size:.7rem;cursor:pointer;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'">Remover logo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: PREFERÊNCIAS -->
+                <div id="cfg-preferencias" class="configtab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="stat-card" style="padding:1.5rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Aparência</div>
+                            <div style="display:flex;flex-direction:column;gap:1rem;">
+                                <div>
+                                    <label class="inp-label">Tema</label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                                        <label class="pref-option" id="lbl-tema-escuro" onclick="setTema('escuro')">
+                                            <input type="radio" name="tema" value="escuro" checked>
+                                            <i class="fa-solid fa-moon"></i> Escuro
+                                        </label>
+                                        <label class="pref-option" id="lbl-tema-claro" onclick="setTema('claro')" style="opacity:.5;cursor:not-allowed;" title="Em breve">
+                                            <input type="radio" name="tema" value="claro" disabled>
+                                            <i class="fa-solid fa-sun"></i> Claro (em breve)
+                                        </label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="inp-label">Cor de Destaque</label>
+                                    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                                        <div onclick="setAccent('#f59e0b')" class="color-swatch" data-color="#f59e0b" style="background:#f59e0b;"></div>
+                                        <div onclick="setAccent('#22c55e')" class="color-swatch" data-color="#22c55e" style="background:#22c55e;"></div>
+                                        <div onclick="setAccent('#3b82f6')" class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;"></div>
+                                        <div onclick="setAccent('#a855f7')" class="color-swatch" data-color="#a855f7" style="background:#a855f7;"></div>
+                                        <div onclick="setAccent('#ef4444')" class="color-swatch" data-color="#ef4444" style="background:#ef4444;"></div>
+                                        <div onclick="setAccent('#06b6d4')" class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:1.5rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Som & Alertas</div>
+                            <div style="display:flex;flex-direction:column;gap:1rem;">
+                                <div class="pref-toggle">
+                                    <div>
+                                        <div style="font-size:.85rem;font-weight:700;">Sons do Sistema</div>
+                                        <div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">Toques ao trocar nível, adicionar jogador, etc.</div>
+                                    </div>
+                                    <label class="switch"><input type="checkbox" id="cfg-som-on" checked><span class="slider"></span></label>
+                                </div>
+                                <div class="pref-toggle">
+                                    <div>
+                                        <div style="font-size:.85rem;font-weight:700;">Alerta de Fim de Nível</div>
+                                        <div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">Bip ao restar 1 minuto no nível</div>
+                                    </div>
+                                    <label class="switch"><input type="checkbox" id="cfg-alerta-nivel" checked><span class="slider"></span></label>
+                                </div>
+                                <div>
+                                    <label class="inp-label">Idioma</label>
+                                    <select id="cfg-idioma" class="inp">
+                                        <option value="pt-BR">🇧🇷 Português (Brasil)</option>
+                                        <option value="en-US" disabled>🇺🇸 English (em breve)</option>
+                                        <option value="es-ES" disabled>🇪🇸 Español (em breve)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="salvarPreferencias()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;">Salvar Preferências</button>
+                </div>
+
+                <!-- ABA: TORNEIOS (padrões) -->
+                <div id="cfg-torneios" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Valores Padrão para Novos Torneios</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1.25rem;">Estes valores aparecem como padrão ao criar um novo torneio. Podem ser alterados individualmente em cada torneio.</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+                            <div><label class="inp-label">Buy-in Padrão R$</label><input id="cfg-torn-buyin" type="number" class="inp" value="100"></div>
+                            <div><label class="inp-label">Rake Padrão %</label><input id="cfg-torn-rake" type="number" class="inp" value="20"></div>
+                            <div><label class="inp-label">Stack Inicial</label><input id="cfg-torn-stack" type="number" class="inp" value="20000"></div>
+                            <div><label class="inp-label">Duração do Nível (min)</label><input id="cfg-torn-tempo" type="number" class="inp" value="15"></div>
+                            <div><label class="inp-label">Re-entry até o nível</label><input id="cfg-torn-reentry" type="number" class="inp" value="6"></div>
+                            <div><label class="inp-label">Add-on (fichas)</label><input id="cfg-torn-addon" type="number" class="inp" value="0"></div>
+                        </div>
+                        <button onclick="salvarConfigTorneios()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1.25rem;width:100%;">Salvar Padrões de Torneio</button>
+                    </div>
+                </div>
+
+                <!-- ABA: CASH GAME (padrões) -->
+                <div id="cfg-cash" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Valores Padrão para Novas Mesas de Cash</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1.25rem;">Estes valores aparecem como padrão ao abrir uma nova mesa de cash game.</div>
+                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;">
+                            <div><label class="inp-label">Small Blind R$</label><input id="cfg-cash-sb" type="number" step="0.5" class="inp" value="1"></div>
+                            <div><label class="inp-label">Big Blind R$</label><input id="cfg-cash-bb" type="number" step="0.5" class="inp" value="2"></div>
+                            <div><label class="inp-label">Buy-in Mínimo R$</label><input id="cfg-cash-bmin" type="number" class="inp" value="50"></div>
+                            <div><label class="inp-label">Buy-in Máximo R$</label><input id="cfg-cash-bmax" type="number" class="inp" value="200"></div>
+                            <div style="grid-column:1/-1;"><label class="inp-label">Rake Padrão %</label><input id="cfg-cash-rake" type="number" step="0.5" class="inp" value="0"></div>
+                        </div>
+                        <button onclick="salvarConfigCash()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1.25rem;width:100%;">Salvar Padrões de Cash Game</button>
+                    </div>
+                </div>
+
+                <!-- ABA: BACKUP -->
+                <div id="cfg-backup" class="configtab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="stat-card" style="padding:1.5rem;">
+                            <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-download"></i> Exportar Dados</div>
+                            <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:1rem;line-height:1.5;">Baixe um arquivo JSON com todos os dados do sistema: jogadores, torneios, cash game, bar, usuários e configurações.</div>
+                            <div id="backup-stats" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:.85rem;font-size:.75rem;color:#71717a;margin-bottom:1rem;"></div>
+                            <button onclick="exportarBackup()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;width:100%;"><i class="fa-solid fa-download"></i> Baixar Backup</button>
+                        </div>
+                        <div class="stat-card" style="padding:1.5rem;border-color:rgba(239,68,68,.15);">
+                            <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-upload"></i> Restaurar Dados</div>
+                            <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:1rem;line-height:1.5;">⚠️ Cuidado: restaurar um backup substituirá todos os dados atuais.</div>
+                            <label for="backup-import-input" style="display:block;padding:.8rem;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.6rem;text-align:center;font-weight:700;cursor:pointer;font-size:.85rem;" onmouseover="this.style.background='rgba(239,68,68,.16)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">
+                                <i class="fa-solid fa-upload"></i> Selecionar Arquivo JSON
+                            </label>
+                            <input id="backup-import-input" type="file" accept="application/json" style="display:none;" onchange="importarBackup(event)">
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;border-color:rgba(239,68,68,.15);">
+                        <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Zona de Perigo</div>
+                        <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:1rem;">Apagar completamente todos os dados do sistema (irreversível).</div>
+                        <button onclick="confirmarLimparDados()" style="padding:.7rem 1rem;background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;font-size:.8rem;" onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background='transparent'">
+                            <i class="fa-solid fa-trash"></i> Resetar Todo o Sistema
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ABA: INTEGRAÇÕES -->
+                <div id="cfg-integracoes" class="configtab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="stat-card" style="padding:1.5rem;">
+                            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;">
+                                <div style="width:40px;height:40px;background:rgba(37,211,102,.15);border-radius:.5rem;display:flex;align-items:center;justify-content:center;color:#25d366;"><i class="fa-brands fa-whatsapp" style="font-size:1.3rem;"></i></div>
+                                <div>
+                                    <div style="font-weight:700;">WhatsApp</div>
+                                    <div style="font-size:.7rem;color:#52525b;">Enviar confirmações e resultados</div>
+                                </div>
+                                <span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);margin-left:auto;">Básico</span>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:.75rem;">
+                                <div class="pref-toggle">
+                                    <div style="font-size:.8rem;font-weight:700;">Habilitar envio via WhatsApp</div>
+                                    <label class="switch"><input type="checkbox" id="cfg-whatsapp-on"><span class="slider"></span></label>
+                                </div>
+                                <div><label class="inp-label">Mensagem Padrão (Inscrição)</label>
+                                <textarea id="cfg-whatsapp-msg" class="inp" rows="3" style="resize:vertical;font-family:inherit;">Olá {nome}! Sua inscrição no torneio {torneio} foi confirmada. Buy-in R$ {buyin}. Boa sorte!</textarea>
+                                <div style="font-size:.65rem;color:#52525b;margin-top:.35rem;">Use {nome}, {torneio}, {buyin} como variáveis</div></div>
+                                <button onclick="salvarIntegracoes()" class="btn-ghost" style="font-size:.8rem;">Salvar WhatsApp</button>
+                            </div>
+                        </div>
+                        <div class="stat-card" style="padding:1.5rem;">
+                            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;">
+                                <div style="width:40px;height:40px;background:rgba(139,92,246,.15);border-radius:.5rem;display:flex;align-items:center;justify-content:center;color:#a78bfa;"><i class="fa-solid fa-print" style="font-size:1.2rem;"></i></div>
+                                <div>
+                                    <div style="font-weight:700;">Impressora de Cupom</div>
+                                    <div style="font-size:.7rem;color:#52525b;">Imprimir comandas e recibos</div>
+                                </div>
+                                <span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);margin-left:auto;">Navegador</span>
+                            </div>
+                            <div style="display:flex;flex-direction:column;gap:.75rem;">
+                                <div class="pref-toggle">
+                                    <div style="font-size:.8rem;font-weight:700;">Imprimir comanda ao fechar</div>
+                                    <label class="switch"><input type="checkbox" id="cfg-print-comanda"><span class="slider"></span></label>
+                                </div>
+                                <div class="pref-toggle">
+                                    <div style="font-size:.8rem;font-weight:700;">Imprimir recibo de buy-in</div>
+                                    <label class="switch"><input type="checkbox" id="cfg-print-buyin"><span class="slider"></span></label>
+                                </div>
+                                <div><label class="inp-label">Texto do rodapé</label><input id="cfg-print-footer" class="inp" placeholder="Obrigado pela preferência!"></div>
+                                <button onclick="salvarIntegracoes(); testarImpressao()" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-print"></i> Salvar e Testar Impressão</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- CASH / BAR placeholders -->
@@ -467,7 +711,7 @@
                                     <span id="cd-total" style="font-size:1.1rem;font-weight:800;color:#22c55e;font-family:'Space Mono',monospace;">R$ 0,00</span>
                                 </div>
                                 <!-- Fechar comanda -->
-                                <button onclick="openFecharComanda()" style="width:100%;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#22c55e;border-radius:.6rem;padding:.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.1)'">
+                                <button onclick="openFecharComanda()" style="width:100%;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#22c55e;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.85rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.1)'">
                                     <i class="fa-solid fa-check"></i> Fechar Comanda
                                 </button>
                             </div>
@@ -590,7 +834,7 @@
                     </label>
                 </div>
             </div>
-            <button onclick="fecharComandaConfirm()" style="width:100%;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:.6rem;padding:.85rem;font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.25)'" onmouseout="this.style.background='rgba(34,197,94,.15)'">
+            <button onclick="fecharComandaConfirm()" style="width:100%;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.25)'" onmouseout="this.style.background='rgba(34,197,94,.15)'">
                 Confirmar Pagamento
             </button>
         </div>
@@ -731,7 +975,7 @@
                 <input id="ret-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 250" oninput="calcResultadoPreview()">
             </div>
             <div id="ret-resultado" style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;text-align:center;"></div>
-            <button onclick="confirmRetirar()" style="width:100%;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.6rem;padding:.85rem;font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
+            <button onclick="confirmRetirar()" style="width:100%;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
                 Confirmar Retirada
             </button>
         </div>
@@ -880,10 +1124,10 @@
                         <!-- Ações rápidas -->
                         <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Ações Rápidas</div>
                         <div style="display:flex;flex-direction:column;gap:.5rem;">
-                            <button onclick="openModalEntrada(activeTorneioIdx)" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
+                            <button onclick="openModalEntrada(activeTorneioIdx)" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
                                 <i class="fa-solid fa-plus"></i> Nova Entrada / Buy-in
                             </button>
-                            <button onclick="openModalEliminar(activeTorneioIdx)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.6rem;padding:.75rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">
+                            <button onclick="openModalEliminar(activeTorneioIdx)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">
                                 <i class="fa-solid fa-skull"></i> Eliminar Jogador
                             </button>
                         </div>
@@ -983,7 +1227,7 @@
                 <select id="eliminar-jogador" class="inp"></select>
             </div>
             <div id="eliminar-posicao-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:1rem;font-size:.85rem;"></div>
-            <button onclick="confirmarEliminacao()" style="background:#7f1d1d;border:1px solid #991b1b;color:#fca5a5;border-radius:.6rem;padding:.85rem;font-family:'Syne',sans-serif;font-weight:700;cursor:pointer;">Confirmar Eliminação</button>
+            <button onclick="confirmarEliminacao()" style="background:#7f1d1d;border:1px solid #991b1b;color:#fca5a5;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:700;cursor:pointer;">Confirmar Eliminação</button>
         </div>
     </div>
 </div>
@@ -999,7 +1243,30 @@ let barProdutos= JSON.parse(localStorage.getItem('ps_bar_produtos'))|| [];
 let barComandas= JSON.parse(localStorage.getItem('ps_bar_comandas'))|| [];
 let cashMesas  = JSON.parse(localStorage.getItem('ps_cash_mesas'))  || [];
 let usuarios   = JSON.parse(localStorage.getItem('ps_usuarios'))    || [];
+let config     = JSON.parse(localStorage.getItem('ps_config'))      || {};
 let currentUser = JSON.parse(sessionStorage.getItem('ps_current_user') || 'null');
+
+// Default config
+const DEFAULT_CONFIG = {
+    clube: { nome:'PokerSul', cnpj:'', fone:'', endereco:'', cidade:'', uf:'', email:'', logo:null },
+    preferencias: { tema:'escuro', accent:'#f59e0b', somOn:true, alertaNivel:true, idioma:'pt-BR' },
+    torneios: { buyin:100, rake:20, stack:20000, tempoNivel:15, reentryAte:6, addonFichas:0 },
+    cash:     { sb:1, bb:2, bmin:50, bmax:200, rake:0 },
+    integracoes: { whatsappOn:false, whatsappMsg:'Olá {nome}! Sua inscrição no torneio {torneio} foi confirmada. Buy-in R$ {buyin}. Boa sorte!', printComanda:false, printBuyin:false, printFooter:'Obrigado pela preferência!' },
+};
+// Deep merge defaults
+function mergeConfig(target, defaults) {
+    Object.keys(defaults).forEach(k => {
+        if (typeof defaults[k] === 'object' && defaults[k] !== null && !Array.isArray(defaults[k])) {
+            target[k] = mergeConfig(target[k] || {}, defaults[k]);
+        } else if (target[k] === undefined) {
+            target[k] = defaults[k];
+        }
+    });
+    return target;
+}
+config = mergeConfig(config, DEFAULT_CONFIG);
+localStorage.setItem('ps_config', JSON.stringify(config));
 let tvWindow   = null;
 let activeTorneioIdx  = null;
 let activeComandaId   = null;
@@ -1010,7 +1277,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','usuarios'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','usuarios','config'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios'] },
@@ -1123,6 +1390,7 @@ function applyPermissions() {
         'nav-cash':      'cash',
         'nav-bar':       'bar',
         'nav-usuarios':  'usuarios',
+        'nav-config':    'config',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
         const el = document.getElementById(navId);
@@ -1164,6 +1432,7 @@ function showPage(page) {
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
     if (page === 'usuarios')  renderUsuarios();
+    if (page === 'config')    renderConfig();
 }
 
 function iniciarRelogio() {
@@ -1801,7 +2070,7 @@ function abrirTV(idx) {
     <script src="https://cdn.tailwindcss.com"><\/script>
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        body{background:#000;color:#fff;overflow:hidden;font-family:'Syne',sans-serif;margin:0;}
+        body{background:#000;color:#fff;overflow:hidden;font-family:'Manrope',sans-serif;margin:0;}
         .mono{font-family:'Space Mono',monospace;}
         #break-screen{display:none;position:fixed;inset:0;background:#0a0000;z-index:50;align-items:center;justify-content:center;flex-direction:column;}
         #break-screen.show{display:flex;}
@@ -1993,7 +2262,27 @@ function openModal(id) {
     barPreFillModal(id);
     const el = document.getElementById(id);
     el.classList.add('open');
-    if (id === 'modal-novo-torneio') renderBlindsInputs();
+    if (id === 'modal-novo-torneio') {
+        renderBlindsInputs();
+        // Pre-fill with config defaults
+        if (config && config.torneios) {
+            document.getElementById('t-buyin').value   = config.torneios.buyin;
+            document.getElementById('t-rake').value    = config.torneios.rake;
+            document.getElementById('t-stack').value   = config.torneios.stack;
+            document.getElementById('t-tempo').value   = config.torneios.tempoNivel;
+            document.getElementById('t-reentry').value = config.torneios.reentryAte;
+            document.getElementById('t-addon').value   = config.torneios.addonFichas;
+        }
+    }
+    if (id === 'modal-nova-cash-mesa') {
+        if (config && config.cash) {
+            document.getElementById('cm-sb').value    = config.cash.sb;
+            document.getElementById('cm-bb').value    = config.cash.bb;
+            document.getElementById('cm-bmin').value  = config.cash.bmin;
+            document.getElementById('cm-bmax').value  = config.cash.bmax;
+            document.getElementById('cm-rake').value  = config.cash.rake;
+        }
+    }
     if (id === 'modal-produto') limparFormProduto();
 }
 
@@ -2609,8 +2898,8 @@ function renderJogadoresCashMesa(m) {
                     <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem;color:#22c55e;">${formatMoney(j.totalInvestido)}</div>
                 </div>
                 <div style="display:flex;gap:.35rem;">
-                    <button onclick="abrirRecompra(${m.id}, ${j.jogadorId})" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Syne',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
-                    <button onclick="abrirRetirar(${m.id}, ${j.jogadorId})" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Syne',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+                    <button onclick="abrirRecompra(${m.id}, ${j.jogadorId})" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
+                    <button onclick="abrirRetirar(${m.id}, ${j.jogadorId})" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
                 </div>
                 <div></div>
             </div>`;
@@ -3083,8 +3372,332 @@ function updatePermissoesPreview() {
         </div>`;
 }
 
+
+// ============================================================
+// CONFIGURAÇÕES
+// ============================================================
+function switchConfigTab(tabId, btn) {
+    document.querySelectorAll('.configtab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-config .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'cfg-backup') renderBackupStats();
+}
+
+function renderConfig() {
+    // Carregar valores nos inputs
+    // Clube
+    document.getElementById('cfg-clube-nome').value     = config.clube.nome || '';
+    document.getElementById('cfg-clube-cnpj').value     = config.clube.cnpj || '';
+    document.getElementById('cfg-clube-fone').value     = config.clube.fone || '';
+    document.getElementById('cfg-clube-endereco').value = config.clube.endereco || '';
+    document.getElementById('cfg-clube-cidade').value   = config.clube.cidade || '';
+    document.getElementById('cfg-clube-uf').value       = config.clube.uf || '';
+    document.getElementById('cfg-clube-email').value    = config.clube.email || '';
+    renderLogoPreview();
+
+    // Preferências
+    document.getElementById('cfg-som-on').checked       = config.preferencias.somOn;
+    document.getElementById('cfg-alerta-nivel').checked = config.preferencias.alertaNivel;
+    document.getElementById('cfg-idioma').value         = config.preferencias.idioma;
+    setTemaUI(config.preferencias.tema);
+    setAccentUI(config.preferencias.accent);
+
+    // Torneios defaults
+    document.getElementById('cfg-torn-buyin').value   = config.torneios.buyin;
+    document.getElementById('cfg-torn-rake').value    = config.torneios.rake;
+    document.getElementById('cfg-torn-stack').value   = config.torneios.stack;
+    document.getElementById('cfg-torn-tempo').value   = config.torneios.tempoNivel;
+    document.getElementById('cfg-torn-reentry').value = config.torneios.reentryAte;
+    document.getElementById('cfg-torn-addon').value   = config.torneios.addonFichas;
+
+    // Cash defaults
+    document.getElementById('cfg-cash-sb').value    = config.cash.sb;
+    document.getElementById('cfg-cash-bb').value    = config.cash.bb;
+    document.getElementById('cfg-cash-bmin').value  = config.cash.bmin;
+    document.getElementById('cfg-cash-bmax').value  = config.cash.bmax;
+    document.getElementById('cfg-cash-rake').value  = config.cash.rake;
+
+    // Integrações
+    document.getElementById('cfg-whatsapp-on').checked  = config.integracoes.whatsappOn;
+    document.getElementById('cfg-whatsapp-msg').value   = config.integracoes.whatsappMsg;
+    document.getElementById('cfg-print-comanda').checked = config.integracoes.printComanda;
+    document.getElementById('cfg-print-buyin').checked  = config.integracoes.printBuyin;
+    document.getElementById('cfg-print-footer').value   = config.integracoes.printFooter;
+}
+
+// --- CLUBE ---
+function salvarConfigClube() {
+    config.clube = {
+        ...config.clube,
+        nome:     document.getElementById('cfg-clube-nome').value.trim(),
+        cnpj:     document.getElementById('cfg-clube-cnpj').value.trim(),
+        fone:     document.getElementById('cfg-clube-fone').value.trim(),
+        endereco: document.getElementById('cfg-clube-endereco').value.trim(),
+        cidade:   document.getElementById('cfg-clube-cidade').value.trim(),
+        uf:       document.getElementById('cfg-clube-uf').value.trim().toUpperCase(),
+        email:    document.getElementById('cfg-clube-email').value.trim(),
+    };
+    salvarConfig();
+    aplicarNomeClube();
+    showToast('✅ Dados do clube salvos!');
+}
+
+function aplicarNomeClube() {
+    if (!config.clube.nome) return;
+    const titulos = document.querySelectorAll('nav div[id="nav-dashboard"]');
+    // Atualiza cabeçalho do sidebar
+    const sidebarTitle = document.querySelector('[style*="font-size:1.2rem;font-weight:800"]');
+    if (sidebarTitle && sidebarTitle.innerText.includes('PokerSul')) {
+        sidebarTitle.innerHTML = `<span style="color:var(--gold);">♠</span> ${config.clube.nome}`;
+    }
+    document.title = config.clube.nome + ' – Sistema Pro';
+}
+
+function uploadLogo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) return showToast('⚠️ Logo muito grande (máx 500KB)');
+    const reader = new FileReader();
+    reader.onload = e => {
+        config.clube.logo = e.target.result;
+        salvarConfig();
+        renderLogoPreview();
+        showToast('✅ Logo carregado!');
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderLogoPreview() {
+    const el = document.getElementById('cfg-logo-preview');
+    if (!el) return;
+    if (config.clube.logo) {
+        el.innerHTML = `<img src="${config.clube.logo}" alt="Logo">`;
+        el.style.border = '2px solid var(--gold)';
+    } else {
+        el.innerHTML = '♠';
+        el.style.border = '2px dashed #27272a';
+    }
+}
+
+function removerLogo() {
+    if (!config.clube.logo) return;
+    if (!confirm('Remover o logo?')) return;
+    config.clube.logo = null;
+    salvarConfig();
+    renderLogoPreview();
+    showToast('🗑️ Logo removido');
+}
+
+// --- PREFERÊNCIAS ---
+function setTema(tema) {
+    if (tema === 'claro') return showToast('⚠️ Tema claro em breve');
+    setTemaUI(tema);
+}
+
+function setTemaUI(tema) {
+    document.querySelectorAll('#cfg-preferencias .pref-option').forEach(el => el.classList.remove('selected'));
+    const lbl = document.getElementById('lbl-tema-' + tema);
+    if (lbl) lbl.classList.add('selected');
+}
+
+function setAccent(color) {
+    setAccentUI(color);
+    document.documentElement.style.setProperty('--gold', color);
+    config.preferencias.accent = color;
+    salvarConfig();
+    showToast(`🎨 Cor aplicada: ${color}`);
+}
+
+function setAccentUI(color) {
+    document.querySelectorAll('.color-swatch').forEach(el => {
+        el.classList.toggle('selected', el.dataset.color === color);
+    });
+}
+
+function salvarPreferencias() {
+    config.preferencias = {
+        ...config.preferencias,
+        somOn:       document.getElementById('cfg-som-on').checked,
+        alertaNivel: document.getElementById('cfg-alerta-nivel').checked,
+        idioma:      document.getElementById('cfg-idioma').value,
+    };
+    salvarConfig();
+    showToast('✅ Preferências salvas!');
+}
+
+// --- TORNEIOS DEFAULTS ---
+function salvarConfigTorneios() {
+    config.torneios = {
+        buyin:       parseFloat(document.getElementById('cfg-torn-buyin').value)   || 100,
+        rake:        parseFloat(document.getElementById('cfg-torn-rake').value)    || 20,
+        stack:       parseInt(document.getElementById('cfg-torn-stack').value)     || 20000,
+        tempoNivel:  parseInt(document.getElementById('cfg-torn-tempo').value)     || 15,
+        reentryAte:  parseInt(document.getElementById('cfg-torn-reentry').value)   || 0,
+        addonFichas: parseInt(document.getElementById('cfg-torn-addon').value)     || 0,
+    };
+    salvarConfig();
+    showToast('✅ Padrões de torneio salvos!');
+}
+
+// --- CASH DEFAULTS ---
+function salvarConfigCash() {
+    config.cash = {
+        sb:    parseFloat(document.getElementById('cfg-cash-sb').value)   || 1,
+        bb:    parseFloat(document.getElementById('cfg-cash-bb').value)   || 2,
+        bmin:  parseFloat(document.getElementById('cfg-cash-bmin').value) || 50,
+        bmax:  parseFloat(document.getElementById('cfg-cash-bmax').value) || 200,
+        rake:  parseFloat(document.getElementById('cfg-cash-rake').value) || 0,
+    };
+    salvarConfig();
+    showToast('✅ Padrões de cash game salvos!');
+}
+
+// --- BACKUP / RESTORE ---
+function renderBackupStats() {
+    const el = document.getElementById('backup-stats');
+    if (!el) return;
+    el.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;">
+            <div>👥 Jogadores: <strong style="color:#e4e4e7;">${jogadores.length}</strong></div>
+            <div>👤 Usuários: <strong style="color:#e4e4e7;">${usuarios.length}</strong></div>
+            <div>🏆 Torneios: <strong style="color:#e4e4e7;">${torneios.length}</strong></div>
+            <div>🃏 Mesas Cash: <strong style="color:#e4e4e7;">${cashMesas.length}</strong></div>
+            <div>🛒 Produtos: <strong style="color:#e4e4e7;">${barProdutos.length}</strong></div>
+            <div>📋 Comandas: <strong style="color:#e4e4e7;">${barComandas.length}</strong></div>
+        </div>`;
+}
+
+function exportarBackup() {
+    const data = {
+        __meta: { sistema: 'PokerSul', versao: '1.5', exportadoEm: new Date().toISOString() },
+        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const ts   = new Date().toISOString().slice(0,10);
+    a.href     = url;
+    a.download = `pokersul-backup-${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('💾 Backup baixado!');
+}
+
+function importarBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!confirm('⚠️ Isso SUBSTITUIRÁ todos os dados atuais. Continuar?')) {
+        event.target.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.__meta || data.__meta.sistema !== 'PokerSul') {
+                return showToast('⚠️ Arquivo de backup inválido');
+            }
+            jogadores   = data.jogadores   || [];
+            torneios    = data.torneios    || [];
+            cashMesas   = data.cashMesas   || [];
+            barGrupos   = data.barGrupos   || [];
+            barProdutos = data.barProdutos || [];
+            barComandas = data.barComandas || [];
+            usuarios    = data.usuarios    || usuarios;
+            if (data.config) config = mergeConfig(data.config, DEFAULT_CONFIG);
+            saveData();
+            showToast('✅ Backup restaurado! Recarregando...');
+            setTimeout(() => location.reload(), 1500);
+        } catch (err) {
+            showToast('⚠️ Erro ao ler arquivo: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// --- INTEGRAÇÕES ---
+function salvarIntegracoes() {
+    config.integracoes = {
+        whatsappOn:   document.getElementById('cfg-whatsapp-on').checked,
+        whatsappMsg:  document.getElementById('cfg-whatsapp-msg').value,
+        printComanda: document.getElementById('cfg-print-comanda').checked,
+        printBuyin:   document.getElementById('cfg-print-buyin').checked,
+        printFooter:  document.getElementById('cfg-print-footer').value,
+    };
+    salvarConfig();
+    showToast('✅ Integrações salvas!');
+}
+
+function testarImpressao() {
+    const win = window.open('', '_blank', 'width=400,height=600');
+    win.document.write(`
+        <html><head><title>Teste de Impressão</title>
+        <style>
+            body { font-family: 'Courier New', monospace; padding: 20px; font-size: 12px; }
+            h2 { text-align: center; margin: 0 0 10px; }
+            .line { border-top: 1px dashed #000; margin: 8px 0; }
+            .row { display: flex; justify-content: space-between; margin: 4px 0; }
+            .footer { text-align: center; margin-top: 15px; font-size: 11px; }
+        </style></head>
+        <body>
+            <h2>${config.clube.nome || 'PokerSul'}</h2>
+            <div style="text-align:center;font-size:11px;">${config.clube.endereco || ''}</div>
+            <div style="text-align:center;font-size:11px;">${config.clube.cidade || ''} ${config.clube.uf ? '- '+config.clube.uf : ''}</div>
+            <div class="line"></div>
+            <div style="text-align:center;font-weight:bold;">TESTE DE IMPRESSÃO</div>
+            <div class="line"></div>
+            <div class="row"><span>Data:</span><span>${new Date().toLocaleString('pt-BR')}</span></div>
+            <div class="row"><span>Operador:</span><span>${currentUser ? currentUser.nome : '-'}</span></div>
+            <div class="line"></div>
+            <div class="footer">${config.integracoes.printFooter || ''}</div>
+            <script>window.onload = () => window.print();<\/script>
+        </body></html>
+    `);
+    win.document.close();
+}
+
+// --- CORE ---
+function salvarConfig() {
+    localStorage.setItem('ps_config', JSON.stringify(config));
+}
+
+function aplicarConfigGlobal() {
+    // Aplica cor de destaque salva
+    if (config.preferencias.accent) {
+        document.documentElement.style.setProperty('--gold', config.preferencias.accent);
+    }
+    // Aplica nome do clube
+    aplicarNomeClube();
+    // Aplica logo no sidebar se houver
+    aplicarLogoSidebar();
+}
+
+function aplicarLogoSidebar() {
+    const titleDiv = document.querySelector('[style*="font-size:1.2rem;font-weight:800"]');
+    if (!titleDiv || !config.clube.logo) return;
+    // Substitui o ♠ por miniatura do logo
+    const clubeNome = config.clube.nome || 'PokerSul';
+    titleDiv.innerHTML = `<img src="${config.clube.logo}" style="width:24px;height:24px;border-radius:4px;object-fit:cover;"> ${clubeNome}`;
+}
+
+// Som helper (respeitando preferência)
+function playBeep() {
+    if (!config.preferencias.somOn) return;
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
+        osc.start(); osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+}
+
 // Init
 window.onload = () => {
+    aplicarConfigGlobal();
     // Restore session if valid
     if (currentUser && usuarios.find(u => u.id === currentUser.id && u.status === 'ativo')) {
         document.getElementById('login-screen').style.display = 'none';
