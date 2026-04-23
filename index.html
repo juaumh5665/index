@@ -143,6 +143,11 @@
 /* Logo preview */
 #cfg-logo-preview img { max-width:100%; max-height:100%; border-radius:1rem; object-fit:cover; }
 
+/* Report period buttons */
+.rp-btn { padding:.45rem .85rem; font-size:.75rem; font-weight:700; border-radius:.4rem; border:1px solid #27272a; background:#18181b; color:#a1a1aa; cursor:pointer; transition:all .15s; font-family:'Manrope',sans-serif; }
+.rp-btn:hover { border-color: var(--gold); color: var(--gold); }
+.rp-btn.rp-active { background: rgba(245,158,11,.12); border-color: var(--gold); color: var(--gold); }
+
 /* Animation */
         @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .fade-in { animation: fadeIn .2s ease; }
@@ -233,6 +238,9 @@
             </div>
             <div onclick="showPage('caixa')" id="nav-caixa" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-cash-register" style="width:16px;"></i> Caixa
+            </div>
+            <div onclick="showPage('relatorios')" id="nav-relatorios" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-chart-line" style="width:16px;"></i> Relatórios
             </div>
             <div style="height:1px;background:#1a1a1e;margin:.5rem .5rem;" id="nav-divider-admin"></div>
             <div onclick="showPage('usuarios')" id="nav-usuarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
@@ -495,6 +503,142 @@
                     </div>
                     <div id="caixa-transacoes-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
                 </div>
+            </div>
+
+            <!-- RELATÓRIOS -->
+            <div id="page-relatorios" class="page-content fade-in" style="display:none;">
+
+                <!-- Filtro de período global -->
+                <div style="display:flex;gap:.5rem;align-items:flex-end;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid #1e1e23;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:280px;">
+                        <label class="inp-label">Período</label>
+                        <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+                            <button onclick="setReportPeriod('hoje')" id="rp-hoje" class="rp-btn">Hoje</button>
+                            <button onclick="setReportPeriod('ontem')" id="rp-ontem" class="rp-btn">Ontem</button>
+                            <button onclick="setReportPeriod('7d')" id="rp-7d" class="rp-btn">7 dias</button>
+                            <button onclick="setReportPeriod('30d')" id="rp-30d" class="rp-btn rp-active">30 dias</button>
+                            <button onclick="setReportPeriod('mes')" id="rp-mes" class="rp-btn">Este mês</button>
+                            <button onclick="setReportPeriod('tudo')" id="rp-tudo" class="rp-btn">Tudo</button>
+                            <button onclick="setReportPeriod('custom')" id="rp-custom" class="rp-btn">Personalizado</button>
+                        </div>
+                    </div>
+                    <div id="rp-custom-wrap" style="display:none;gap:.5rem;align-items:flex-end;">
+                        <div><label class="inp-label">De</label><input id="rp-de" type="date" class="inp" onchange="setReportPeriod('custom')"></div>
+                        <div><label class="inp-label">Até</label><input id="rp-ate" type="date" class="inp" onchange="setReportPeriod('custom')"></div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Período analisado</div>
+                        <div id="rp-info" style="font-size:.85rem;font-weight:700;margin-top:.25rem;"></div>
+                    </div>
+                </div>
+
+                <!-- Tabs de relatório -->
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
+                    <button class="tab-btn active" id="reltab-btn-geral"     onclick="switchReportTab('rel-geral', this)"><i class="fa-solid fa-chart-pie"></i> Visão Geral</button>
+                    <button class="tab-btn"        id="reltab-btn-torneios"  onclick="switchReportTab('rel-torneios', this)"><i class="fa-solid fa-trophy"></i> Torneios</button>
+                    <button class="tab-btn"        id="reltab-btn-cash"      onclick="switchReportTab('rel-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
+                    <button class="tab-btn"        id="reltab-btn-bar"       onclick="switchReportTab('rel-bar', this)"><i class="fa-solid fa-utensils"></i> Bar</button>
+                    <button class="tab-btn"        id="reltab-btn-clientes"  onclick="switchReportTab('rel-clientes', this)"><i class="fa-solid fa-users"></i> Clientes</button>
+                    <button class="tab-btn"        id="reltab-btn-pagamentos" onclick="switchReportTab('rel-pagamentos', this)"><i class="fa-solid fa-credit-card"></i> Pagamentos</button>
+                </div>
+
+                <!-- ABA: VISÃO GERAL -->
+                <div id="rel-geral" class="reltab-content">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Faturamento Total</div><div id="rg-fat" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Rake Torneios</div><div id="rg-rake-t" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Rake Cash</div><div id="rg-rake-c" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Vendas Bar</div><div id="rg-bar" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#f97316;">R$ 0</div></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Torneios Realizados</div><div id="rg-qtd-t" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Mesas Cash Encerradas</div><div id="rg-qtd-c" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Comandas Fechadas</div><div id="rg-qtd-b" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                    </div>
+                    <!-- Gráfico de evolução -->
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Movimento por dia</div>
+                        <div id="rg-chart" style="height:200px;"></div>
+                    </div>
+                </div>
+
+                <!-- ABA: TORNEIOS -->
+                <div id="rel-torneios" class="reltab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Torneios</div><div id="rt-qtd" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Buy-ins</div><div id="rt-buyins" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Re-entries</div><div id="rt-reentries" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Rake</div><div id="rt-rake" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
+                    </div>
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Detalhamento por Torneio</div>
+                            <button onclick="exportRelTorneios()" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem;"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+                        </div>
+                        <div id="rt-lista" style="display:flex;flex-direction:column;gap:.4rem;max-height:500px;overflow-y:auto;"></div>
+                    </div>
+                </div>
+
+                <!-- ABA: CASH -->
+                <div id="rel-cash" class="reltab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Mesas</div><div id="rc-qtd" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Volume</div><div id="rc-volume" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Rake</div><div id="rc-rake" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Horas de Mesa</div><div id="rc-horas" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0h</div></div>
+                    </div>
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Mesas no Período</div>
+                            <button onclick="exportRelCash()" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem;"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+                        </div>
+                        <div id="rc-lista" style="display:flex;flex-direction:column;gap:.4rem;max-height:500px;overflow-y:auto;"></div>
+                    </div>
+                </div>
+
+                <!-- ABA: BAR -->
+                <div id="rel-bar" class="reltab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Comandas</div><div id="rb-qtd" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Faturamento</div><div id="rb-fat" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Ticket Médio</div><div id="rb-ticket" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Itens Vendidos</div><div id="rb-itens" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="stat-card" style="padding:1.25rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Top Produtos Vendidos</div>
+                            <div id="rb-top-produtos" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                        </div>
+                        <div class="stat-card" style="padding:1.25rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Por Grupo</div>
+                            <div id="rb-por-grupo" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: CLIENTES -->
+                <div id="rel-clientes" class="reltab-content" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:.75rem;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Ranking de Clientes por Gasto</div>
+                            <div style="font-size:.75rem;color:#71717a;margin-top:.2rem;">Clique em um cliente para ver detalhamento por módulo</div>
+                        </div>
+                        <div style="display:flex;gap:.5rem;align-items:center;">
+                            <input id="rcli-busca" oninput="renderRelClientes()" placeholder="Buscar cliente..." class="inp" style="width:200px;padding:.4rem .75rem;font-size:.8rem;">
+                            <button onclick="exportRelClientes()" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem;"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        </div>
+                    </div>
+                    <div id="rcli-lista" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                </div>
+
+                <!-- ABA: PAGAMENTOS -->
+                <div id="rel-pagamentos" class="reltab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Recebimentos por Forma de Pagamento</div>
+                        <div id="rp-pagamentos-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- CONFIGURAÇÕES -->
@@ -1743,7 +1887,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','config'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','config','relatorios'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
@@ -1863,6 +2007,7 @@ function applyPermissions() {
         'nav-usuarios':  'usuarios',
         'nav-config':    'config',
         'nav-caixa':     'caixa',
+        'nav-relatorios':'relatorios',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
         const el = document.getElementById(navId);
@@ -1911,6 +2056,9 @@ function showPage(page) {
     if (page === 'usuarios')  renderUsuarios();
     if (page === 'config')    renderConfig();
     if (page === 'caixa')     renderCaixa();
+    if (page === 'relatorios') {
+        setReportPeriod(_reportPeriod.tipo || '30d');
+    }
 }
 
 function iniciarRelogio() {
@@ -6275,6 +6423,534 @@ function calcTotalFichasDict(dict) {
         const f = fichasDenominacoes[parseInt(i)];
         return s + (f ? (f.valor * qtd) : 0);
     }, 0);
+}
+
+
+
+// ============================================================
+// RELATÓRIOS
+// ============================================================
+let _reportPeriod = { tipo:'30d', de:null, ate:null };
+
+function setReportPeriod(tipo) {
+    const now = new Date();
+    const hoje = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    let de, ate = Date.now();
+
+    document.querySelectorAll('.rp-btn').forEach(b => b.classList.remove('rp-active'));
+    const btn = document.getElementById('rp-' + tipo);
+    if (btn) btn.classList.add('rp-active');
+
+    const customWrap = document.getElementById('rp-custom-wrap');
+
+    if (tipo === 'hoje') {
+        de = hoje;
+        customWrap.style.display = 'none';
+    } else if (tipo === 'ontem') {
+        de = hoje - 86400000;
+        ate = hoje - 1;
+        customWrap.style.display = 'none';
+    } else if (tipo === '7d') {
+        de = hoje - 7 * 86400000;
+        customWrap.style.display = 'none';
+    } else if (tipo === '30d') {
+        de = hoje - 30 * 86400000;
+        customWrap.style.display = 'none';
+    } else if (tipo === 'mes') {
+        de = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        customWrap.style.display = 'none';
+    } else if (tipo === 'tudo') {
+        de = 0;
+        customWrap.style.display = 'none';
+    } else if (tipo === 'custom') {
+        customWrap.style.display = 'flex';
+        const deVal = document.getElementById('rp-de').value;
+        const ateVal = document.getElementById('rp-ate').value;
+        if (!deVal || !ateVal) {
+            _reportPeriod = { tipo, de: 0, ate: Date.now() };
+            document.getElementById('rp-info').innerText = 'Selecione as datas';
+            return;
+        }
+        de = new Date(deVal + 'T00:00:00').getTime();
+        ate = new Date(ateVal + 'T23:59:59').getTime();
+    }
+
+    _reportPeriod = { tipo, de, ate };
+
+    // Label
+    if (tipo === 'hoje') document.getElementById('rp-info').innerText = 'Hoje · ' + new Date(hoje).toLocaleDateString('pt-BR');
+    else if (tipo === 'ontem') document.getElementById('rp-info').innerText = 'Ontem · ' + new Date(de).toLocaleDateString('pt-BR');
+    else if (tipo === 'tudo') document.getElementById('rp-info').innerText = 'Desde o início';
+    else document.getElementById('rp-info').innerText = `${new Date(de).toLocaleDateString('pt-BR')} → ${new Date(ate).toLocaleDateString('pt-BR')}`;
+
+    renderRelatorios();
+}
+
+function inPeriod(ts) {
+    if (!ts) return false;
+    return ts >= _reportPeriod.de && ts <= _reportPeriod.ate;
+}
+
+function switchReportTab(tabId, btn) {
+    document.querySelectorAll('.reltab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-relatorios .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    renderRelatorios();
+}
+
+function renderRelatorios() {
+    renderRelGeral();
+    renderRelTorneios();
+    renderRelCash();
+    renderRelBar();
+    renderRelClientes();
+    renderRelPagamentos();
+}
+
+// ============================================================
+// COLETA DE DADOS POR PERÍODO
+// ============================================================
+function getDadosPeriodo() {
+    const torneiosPeriodo = torneios.filter(t => inPeriod(t.createdAt));
+    const cashPeriodo = cashMesas.filter(m => inPeriod(m.fechadoEm || m.abertoEm));
+    const comandasPeriodo = barComandas.filter(c => c.status === 'fechada' && inPeriod(c.fechadoEm));
+    const transacoesPeriodo = transacoes.filter(t => inPeriod(t.ts));
+
+    return { torneiosPeriodo, cashPeriodo, comandasPeriodo, transacoesPeriodo };
+}
+
+// ============================================================
+// ABA: GERAL
+// ============================================================
+function renderRelGeral() {
+    const el = document.getElementById('rel-geral');
+    if (!el || el.style.display === 'none') return;
+    const { torneiosPeriodo, cashPeriodo, comandasPeriodo } = getDadosPeriodo();
+
+    const rakeT = torneiosPeriodo.reduce((s,t) => s + getRake(t), 0);
+    const rakeC = cashPeriodo.reduce((s,m) => s + getCashRake(m), 0);
+    const vendasBar = comandasPeriodo.reduce((s,c) => s + c.total, 0);
+    const buyinsT = torneiosPeriodo.reduce((s,t) => s + t.entries.filter(e=>e.tipo!=='addon').reduce((ss,e) => ss + (e.valor||t.buyin), 0), 0);
+    const volCash = cashPeriodo.reduce((s,m) => s + m.jogadores.reduce((ss,j) => ss + j.totalInvestido, 0), 0);
+
+    document.getElementById('rg-fat').innerText = formatMoney(rakeT + rakeC + vendasBar);
+    document.getElementById('rg-rake-t').innerText = formatMoney(rakeT);
+    document.getElementById('rg-rake-c').innerText = formatMoney(rakeC);
+    document.getElementById('rg-bar').innerText = formatMoney(vendasBar);
+    document.getElementById('rg-qtd-t').innerText = torneiosPeriodo.length;
+    document.getElementById('rg-qtd-c').innerText = cashPeriodo.filter(m=>m.status==='encerrada').length;
+    document.getElementById('rg-qtd-b').innerText = comandasPeriodo.length;
+
+    renderChartMovimento();
+}
+
+function renderChartMovimento() {
+    const el = document.getElementById('rg-chart');
+    if (!el) return;
+
+    // Agrupa movimento por dia
+    const { torneiosPeriodo, cashPeriodo, comandasPeriodo } = getDadosPeriodo();
+    const porDia = {};
+
+    torneiosPeriodo.forEach(t => {
+        const d = new Date(t.createdAt).toLocaleDateString('pt-BR');
+        if (!porDia[d]) porDia[d] = { torneio:0, cash:0, bar:0 };
+        porDia[d].torneio += getRake(t);
+    });
+    cashPeriodo.forEach(m => {
+        const d = new Date(m.fechadoEm || m.abertoEm).toLocaleDateString('pt-BR');
+        if (!porDia[d]) porDia[d] = { torneio:0, cash:0, bar:0 };
+        porDia[d].cash += getCashRake(m);
+    });
+    comandasPeriodo.forEach(c => {
+        const d = new Date(c.fechadoEm).toLocaleDateString('pt-BR');
+        if (!porDia[d]) porDia[d] = { torneio:0, cash:0, bar:0 };
+        porDia[d].bar += c.total;
+    });
+
+    const dias = Object.keys(porDia).sort((a,b) => {
+        const [da,ma,ya] = a.split('/').map(Number);
+        const [db,mb,yb] = b.split('/').map(Number);
+        return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
+    });
+
+    if (!dias.length) {
+        el.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Sem dados neste período</div>';
+        return;
+    }
+
+    const maxVal = Math.max(...dias.map(d => porDia[d].torneio + porDia[d].cash + porDia[d].bar), 1);
+
+    el.innerHTML = `
+        <div style="display:flex;gap:.25rem;height:160px;align-items:flex-end;padding:0 .5rem;">
+            ${dias.map(d => {
+                const v = porDia[d];
+                const total = v.torneio + v.cash + v.bar;
+                const h = total > 0 ? (total / maxVal * 100) : 0;
+                const hT = total > 0 ? (v.torneio / total * h) : 0;
+                const hC = total > 0 ? (v.cash / total * h) : 0;
+                const hB = total > 0 ? (v.bar / total * h) : 0;
+                return `
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.25rem;min-width:0;" title="${d}: ${formatMoney(total)}">
+                    <div style="font-size:.6rem;color:#71717a;white-space:nowrap;">${formatMoney(total)}</div>
+                    <div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;max-width:40px;">
+                        <div style="background:#f97316;height:${hB}%;min-height:${v.bar>0?2:0}px;"></div>
+                        <div style="background:#22c55e;height:${hC}%;min-height:${v.cash>0?2:0}px;"></div>
+                        <div style="background:var(--gold);height:${hT}%;min-height:${v.torneio>0?2:0}px;border-radius:.2rem .2rem 0 0;"></div>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>
+        <div style="display:flex;gap:.5rem;padding:.5rem;border-top:1px solid #1e1e23;margin-top:.5rem;justify-content:space-between;">
+            <div style="font-size:.65rem;color:#52525b;">${dias[0]}</div>
+            <div style="display:flex;gap:1rem;font-size:.65rem;">
+                <span><span style="display:inline-block;width:10px;height:10px;background:var(--gold);border-radius:2px;margin-right:.25rem;"></span>Rake Torneios</span>
+                <span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;margin-right:.25rem;"></span>Rake Cash</span>
+                <span><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:2px;margin-right:.25rem;"></span>Bar</span>
+            </div>
+            <div style="font-size:.65rem;color:#52525b;">${dias[dias.length-1]}</div>
+        </div>`;
+}
+
+// ============================================================
+// ABA: TORNEIOS
+// ============================================================
+function renderRelTorneios() {
+    const el = document.getElementById('rel-torneios');
+    if (!el || el.style.display === 'none') return;
+    const { torneiosPeriodo } = getDadosPeriodo();
+
+    let buyins = 0, reentries = 0;
+    torneiosPeriodo.forEach(t => {
+        t.entries.forEach(e => {
+            if (e.tipo === 'buyin') buyins += e.valor || t.buyin;
+            else if (e.tipo === 'reentry') reentries += e.valor || t.buyin;
+            else if (e.tipo === 'rebuy_simples') buyins += e.valor || t.rebuySimples || 0;
+            else if (e.tipo === 'rebuy_duplo') buyins += e.valor || t.rebuyDuplo || 0;
+        });
+    });
+    const rake = torneiosPeriodo.reduce((s,t) => s + getRake(t), 0);
+
+    document.getElementById('rt-qtd').innerText = torneiosPeriodo.length;
+    document.getElementById('rt-buyins').innerText = formatMoney(buyins);
+    document.getElementById('rt-reentries').innerText = formatMoney(reentries);
+    document.getElementById('rt-rake').innerText = formatMoney(rake);
+
+    const lista = document.getElementById('rt-lista');
+    if (!torneiosPeriodo.length) {
+        lista.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum torneio no período</div>';
+        return;
+    }
+    lista.innerHTML = [...torneiosPeriodo].reverse().map(t => {
+        const entries = t.entries.filter(e=>e.tipo!=='addon').length;
+        const prize = getPrize(t);
+        const trake = getRake(t);
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;">
+            <div>
+                <div style="font-weight:700;">${t.nome}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(t.createdAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+            <span style="font-family:'Space Mono',monospace;color:#71717a;">${entries} ent.</span>
+            <span style="font-family:'Space Mono',monospace;color:#22c55e;">${formatMoney(prize)}</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--gold);font-weight:700;">${formatMoney(trake)}</span>
+            <span class="tag ${getStatusTag(t.status).cls}" style="font-size:.6rem;">${getStatusTag(t.status).label}</span>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// ABA: CASH
+// ============================================================
+function renderRelCash() {
+    const el = document.getElementById('rel-cash');
+    if (!el || el.style.display === 'none') return;
+    const { cashPeriodo } = getDadosPeriodo();
+
+    const volume = cashPeriodo.reduce((s,m) => s + m.jogadores.reduce((ss,j) => ss + j.totalInvestido, 0), 0);
+    const rake = cashPeriodo.reduce((s,m) => s + getCashRake(m), 0);
+    const horasTotais = cashPeriodo.reduce((s,m) => {
+        const fim = m.fechadoEm || Date.now();
+        return s + (fim - m.abertoEm) / 3600000;
+    }, 0);
+
+    document.getElementById('rc-qtd').innerText = cashPeriodo.length;
+    document.getElementById('rc-volume').innerText = formatMoney(volume);
+    document.getElementById('rc-rake').innerText = formatMoney(rake);
+    document.getElementById('rc-horas').innerText = horasTotais.toFixed(1) + 'h';
+
+    const lista = document.getElementById('rc-lista');
+    if (!cashPeriodo.length) {
+        lista.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma mesa no período</div>';
+        return;
+    }
+    lista.innerHTML = [...cashPeriodo].reverse().map(m => {
+        const vol = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
+        const mrake = getCashRake(m);
+        const dur = formatDuration((m.fechadoEm || Date.now()) - m.abertoEm);
+        let batTag = '';
+        if (typeof m.fichasDiferenca === 'number') {
+            if (Math.abs(m.fichasDiferenca) < 0.01) batTag = '<span class="tag tag-running" style="font-size:.6rem;">✓</span>';
+            else if (m.fichasDiferenca > 0) batTag = `<span class="tag tag-paused" style="font-size:.6rem;">+${formatMoney(m.fichasDiferenca)}</span>`;
+            else batTag = `<span class="tag tag-break" style="font-size:.6rem;">-${formatMoney(Math.abs(m.fichasDiferenca))}</span>`;
+        }
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;">
+            <div>
+                <div style="font-weight:700;">${m.nome} ${batTag}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(m.abertoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · SB/BB ${m.sb}/${m.bb}</div>
+            </div>
+            <span style="font-family:'Space Mono',monospace;color:#71717a;">${m.jogadores.length} jog.</span>
+            <span style="font-family:'Space Mono',monospace;color:#71717a;">${dur}</span>
+            <span style="font-family:'Space Mono',monospace;color:#22c55e;">${formatMoney(vol)}</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--gold);font-weight:700;">${formatMoney(mrake)}</span>
+            <span class="tag ${m.status==='ativa'?'tag-running':'tag-finished'}" style="font-size:.6rem;">${m.status}</span>
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// ABA: BAR
+// ============================================================
+function renderRelBar() {
+    const el = document.getElementById('rel-bar');
+    if (!el || el.style.display === 'none') return;
+    const { comandasPeriodo } = getDadosPeriodo();
+
+    const fat = comandasPeriodo.reduce((s,c) => s + c.total, 0);
+    const ticket = comandasPeriodo.length ? fat / comandasPeriodo.length : 0;
+    const itens = comandasPeriodo.reduce((s,c) => s + c.itens.reduce((ss,it) => ss + it.qtd, 0), 0);
+
+    document.getElementById('rb-qtd').innerText = comandasPeriodo.length;
+    document.getElementById('rb-fat').innerText = formatMoney(fat);
+    document.getElementById('rb-ticket').innerText = formatMoney(ticket);
+    document.getElementById('rb-itens').innerText = itens;
+
+    // Top produtos
+    const produtosVendidos = {};
+    const porGrupo = {};
+    comandasPeriodo.forEach(c => {
+        c.itens.forEach(it => {
+            const p = barProdutos.find(x => x.id === it.produtoId);
+            if (!p) return;
+            if (!produtosVendidos[it.produtoId]) produtosVendidos[it.produtoId] = { nome:p.nome, qtd:0, valor:0 };
+            produtosVendidos[it.produtoId].qtd += it.qtd;
+            produtosVendidos[it.produtoId].valor += it.subtotal;
+            porGrupo[p.grupo] = (porGrupo[p.grupo] || 0) + it.subtotal;
+        });
+    });
+
+    const topEl = document.getElementById('rb-top-produtos');
+    const topList = Object.values(produtosVendidos).sort((a,b) => b.qtd - a.qtd).slice(0, 10);
+    topEl.innerHTML = topList.length ? topList.map(p => `
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
+            <span style="font-weight:700;">${p.nome}</span>
+            <span style="font-family:'Space Mono',monospace;color:#71717a;">${p.qtd}x</span>
+            <span style="font-family:'Space Mono',monospace;color:#22c55e;font-weight:700;">${formatMoney(p.valor)}</span>
+        </div>`).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Sem vendas</div>';
+
+    const grEl = document.getElementById('rb-por-grupo');
+    const grList = Object.entries(porGrupo).sort((a,b) => b[1] - a[1]);
+    grEl.innerHTML = grList.length ? grList.map(([g,v]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
+            <span style="font-weight:700;">${g}</span>
+            <span style="font-family:'Space Mono',monospace;color:#22c55e;font-weight:700;">${formatMoney(v)}</span>
+        </div>`).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Sem vendas</div>';
+}
+
+// ============================================================
+// ABA: CLIENTES
+// ============================================================
+function renderRelClientes() {
+    const el = document.getElementById('rel-clientes');
+    if (!el || el.style.display === 'none') return;
+    const { transacoesPeriodo } = getDadosPeriodo();
+
+    // Agrupa por jogador
+    const porCliente = {};
+    transacoesPeriodo.forEach(t => {
+        if (!porCliente[t.jogadorId]) porCliente[t.jogadorId] = {
+            gasto: 0, recebido: 0,
+            torneio: 0, cash: 0, bar: 0, caixa: 0,
+            qtdTransacoes: 0,
+        };
+        const c = porCliente[t.jogadorId];
+        c.qtdTransacoes++;
+        if (t.valor < 0) {
+            c.gasto += Math.abs(t.valor);
+            if (t.origem === 'torneio') c.torneio += Math.abs(t.valor);
+            else if (t.origem === 'cash') c.cash += Math.abs(t.valor);
+            else if (t.origem === 'bar') c.bar += Math.abs(t.valor);
+        } else {
+            c.recebido += t.valor;
+        }
+    });
+
+    const busca = ((document.getElementById('rcli-busca') || {}).value || '').toLowerCase();
+    let lista = Object.entries(porCliente).map(([jid, d]) => {
+        const j = jogadores.find(x => x.id === parseInt(jid));
+        return { jogadorId: parseInt(jid), nome: j ? j.nome : '?', ...d };
+    }).sort((a,b) => b.gasto - a.gasto);
+    if (busca) lista = lista.filter(c => c.nome.toLowerCase().includes(busca));
+
+    const listaEl = document.getElementById('rcli-lista');
+    if (!lista.length) {
+        listaEl.innerHTML = '<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Sem movimentação de clientes neste período</div>';
+        return;
+    }
+    listaEl.innerHTML = lista.map((c, i) => `
+        <div onclick="abrirPagamentoJogador(${c.jogadorId})" style="display:grid;grid-template-columns:2rem 1fr auto auto auto auto auto;gap:.75rem;align-items:center;padding:.7rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
+            <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};">${i+1}º</span>
+            <div>
+                <div style="font-weight:700;">${c.nome}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${c.qtdTransacoes} transações</div>
+            </div>
+            <span style="font-family:'Space Mono',monospace;font-size:.75rem;color:var(--gold);" title="Torneios">🏆 ${formatMoney(c.torneio)}</span>
+            <span style="font-family:'Space Mono',monospace;font-size:.75rem;color:#22c55e;" title="Cash">🃏 ${formatMoney(c.cash)}</span>
+            <span style="font-family:'Space Mono',monospace;font-size:.75rem;color:#f97316;" title="Bar">🍺 ${formatMoney(c.bar)}</span>
+            <span style="font-family:'Space Mono',monospace;color:#ef4444;font-weight:700;font-size:.9rem;">Gastou ${formatMoney(c.gasto)}</span>
+            <i class="fa-solid fa-chevron-right" style="color:#3f3f46;font-size:.7rem;"></i>
+        </div>`).join('');
+}
+
+// ============================================================
+// ABA: PAGAMENTOS
+// ============================================================
+function renderRelPagamentos() {
+    const el = document.getElementById('rel-pagamentos');
+    if (!el || el.style.display === 'none') return;
+    const { transacoesPeriodo } = getDadosPeriodo();
+
+    // Agrupa recebimentos (valor > 0 com método) por forma de pagamento
+    const porMetodo = {};
+    transacoesPeriodo.forEach(t => {
+        if (t.valor > 0 && t.metodo) {
+            if (!porMetodo[t.metodo]) porMetodo[t.metodo] = { valor: 0, qtd: 0 };
+            porMetodo[t.metodo].valor += t.valor;
+            porMetodo[t.metodo].qtd++;
+        }
+    });
+
+    const totalGeral = Object.values(porMetodo).reduce((s,p) => s+p.valor, 0);
+
+    const listaEl = document.getElementById('rp-pagamentos-list');
+    const sorted = Object.entries(porMetodo).sort((a,b) => b[1].valor - a[1].valor);
+    if (!sorted.length) {
+        listaEl.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Sem recebimentos no período</div>';
+        return;
+    }
+    listaEl.innerHTML = sorted.map(([k, d]) => {
+        const m = PAYMENT_METHODS[k] || { label:k, icon:'fa-circle', color:'#71717a' };
+        const pct = totalGeral > 0 ? (d.valor / totalGeral * 100) : 0;
+        return `
+        <div style="padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
+                <span style="font-weight:700;font-size:.85rem;"><i class="fa-solid ${m.icon}" style="color:${m.color};width:18px;"></i> ${m.label}</span>
+                <div style="display:flex;gap:1rem;align-items:center;">
+                    <span style="font-size:.7rem;color:#71717a;">${d.qtd} transações</span>
+                    <span style="font-family:'Space Mono',monospace;font-weight:800;color:#22c55e;">${formatMoney(d.valor)}</span>
+                </div>
+            </div>
+            <div style="height:6px;background:#1a1a1e;border-radius:3px;overflow:hidden;">
+                <div style="height:100%;background:${m.color};width:${pct}%;transition:width .3s;"></div>
+            </div>
+            <div style="font-size:.65rem;color:#52525b;text-align:right;margin-top:.2rem;">${pct.toFixed(1)}% do total</div>
+        </div>`;
+    }).join('') + `
+        <div style="padding:.75rem 1rem;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:.5rem;margin-top:.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-weight:800;font-size:.9rem;">Total Geral Recebido</span>
+                <span style="font-family:'Space Mono',monospace;font-weight:800;color:#22c55e;font-size:1.1rem;">${formatMoney(totalGeral)}</span>
+            </div>
+        </div>`;
+}
+
+// ============================================================
+// EXPORTAÇÃO CSV
+// ============================================================
+function downloadCSV(nome, rows) {
+    const csv = rows.map(r => r.map(v => {
+        const s = String(v || '').replace(/"/g, '""');
+        return /[",;\n]/.test(s) ? `"${s}"` : s;
+    }).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${nome}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 CSV baixado!');
+}
+
+function exportRelTorneios() {
+    const { torneiosPeriodo } = getDadosPeriodo();
+    const rows = [['Data','Nome','Tipo','Entradas','Buy-in R$','Prize Pool R$','Rake R$','Status']];
+    torneiosPeriodo.forEach(t => {
+        rows.push([
+            new Date(t.createdAt).toLocaleString('pt-BR'),
+            t.nome, t.tipo || 'normal',
+            t.entries.filter(e=>e.tipo!=='addon').length,
+            t.buyin.toFixed(2),
+            getPrize(t).toFixed(2),
+            getRake(t).toFixed(2),
+            t.status
+        ]);
+    });
+    downloadCSV('torneios', rows);
+}
+
+function exportRelCash() {
+    const { cashPeriodo } = getDadosPeriodo();
+    const rows = [['Abertura','Fechamento','Nome','SB/BB','Jogadores','Volume R$','Rake R$','Diferença R$','Status']];
+    cashPeriodo.forEach(m => {
+        rows.push([
+            new Date(m.abertoEm).toLocaleString('pt-BR'),
+            m.fechadoEm ? new Date(m.fechadoEm).toLocaleString('pt-BR') : '-',
+            m.nome, `${m.sb}/${m.bb}`,
+            m.jogadores.length,
+            m.jogadores.reduce((s,j)=>s+j.totalInvestido,0).toFixed(2),
+            getCashRake(m).toFixed(2),
+            typeof m.fichasDiferenca === 'number' ? m.fichasDiferenca.toFixed(2) : '-',
+            m.status,
+        ]);
+    });
+    downloadCSV('cash_game', rows);
+}
+
+function exportRelClientes() {
+    const { transacoesPeriodo } = getDadosPeriodo();
+    const porCliente = {};
+    transacoesPeriodo.forEach(t => {
+        if (!porCliente[t.jogadorId]) porCliente[t.jogadorId] = { gasto:0, recebido:0, torneio:0, cash:0, bar:0, qtd:0 };
+        const c = porCliente[t.jogadorId];
+        c.qtd++;
+        if (t.valor < 0) {
+            c.gasto += Math.abs(t.valor);
+            if (t.origem === 'torneio') c.torneio += Math.abs(t.valor);
+            else if (t.origem === 'cash') c.cash += Math.abs(t.valor);
+            else if (t.origem === 'bar') c.bar += Math.abs(t.valor);
+        } else c.recebido += t.valor;
+    });
+
+    const rows = [['Cliente','Cidade/UF','Transações','Gasto Total','Torneios','Cash','Bar','Recebido','Saldo Final']];
+    Object.entries(porCliente).forEach(([jid, d]) => {
+        const j = jogadores.find(x => x.id === parseInt(jid));
+        if (!j) return;
+        rows.push([
+            j.nome,
+            j.cidade ? `${j.cidade}${j.uf?'/'+j.uf:''}` : '-',
+            d.qtd,
+            d.gasto.toFixed(2),
+            d.torneio.toFixed(2),
+            d.cash.toFixed(2),
+            d.bar.toFixed(2),
+            d.recebido.toFixed(2),
+            (d.recebido - d.gasto).toFixed(2),
+        ]);
+    });
+    downloadCSV('clientes', rows);
 }
 
 
