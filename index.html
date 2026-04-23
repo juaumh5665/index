@@ -143,6 +143,16 @@
 /* Logo preview */
 #cfg-logo-preview img { max-width:100%; max-height:100%; border-radius:1rem; object-fit:cover; }
 
+/* Global search */
+.busca-item { padding:.75rem 1rem; background:#0f0f12; border:1px solid transparent; border-radius:.5rem; cursor:pointer; transition:all .1s; display:flex; align-items:center; gap:.75rem; }
+.busca-item:hover, .busca-item.selected { border-color: var(--gold); background:#18181b; }
+.busca-item kbd { font-family:'Space Mono',monospace; font-size:.65rem; padding:.15rem .4rem; background:#18181b; border:1px solid #27272a; border-radius:.25rem; color:#71717a; }
+
+@keyframes undo-shrink {
+    from { width: 100%; }
+    to   { width: 0%; }
+}
+
 /* Report period buttons */
 .rp-btn { padding:.45rem .85rem; font-size:.75rem; font-weight:700; border-radius:.4rem; border:1px solid #27272a; background:#18181b; color:#a1a1aa; cursor:pointer; transition:all .15s; font-family:'Manrope',sans-serif; }
 .rp-btn:hover { border-color: var(--gold); color: var(--gold); }
@@ -272,50 +282,95 @@
 
         <main style="flex:1;overflow:auto;padding:2rem;">
 
-            <!-- DASHBOARD -->
+            <!-- DASHBOARD DO DIA -->
             <div id="page-dashboard" class="page-content fade-in">
-                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:2rem;">
-                    <div class="stat-card">
-                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Jogadores</div>
-                        <div id="dash-jogadores" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;">0</div>
+
+                <!-- Header do dia -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <div style="font-size:.7rem;color:#52525b;text-transform:uppercase;letter-spacing:.15em;font-weight:800;"><i class="fa-solid fa-calendar-day"></i> <span id="dash-dia-hoje"></span></div>
+                        <h2 style="font-size:1.75rem;font-weight:800;margin-top:.35rem;">Bom dia, <span id="dash-usuario">Operador</span>! 👋</h2>
                     </div>
-                    <div class="stat-card">
-                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Torneios Ativos</div>
-                        <div id="dash-torneios" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;">0</div>
+                    <div id="dash-relogio" style="font-family:'Space Mono',monospace;font-size:2rem;font-weight:700;color:var(--gold);"></div>
+                </div>
+
+                <!-- ALERTAS CRÍTICOS -->
+                <div id="dash-alertas" style="margin-bottom:1.5rem;"></div>
+
+                <!-- QUICK ACTIONS -->
+                <div class="stat-card" style="padding:1.25rem;margin-bottom:1.5rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;"><i class="fa-solid fa-bolt"></i> Ações Rápidas</div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem;" id="dash-quickactions"></div>
+                </div>
+
+                <!-- Visão do dia: 3 cards de módulo -->
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+
+                    <!-- CARD: TORNEIOS DO DIA -->
+                    <div class="stat-card" style="padding:1.25rem;cursor:pointer;transition:all .15s;" onclick="showPage('torneios')" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;"><i class="fa-solid fa-trophy"></i> Torneios Hoje</div>
+                            <span id="dash-torneios-badge" class="tag" style="font-size:.6rem;background:rgba(245,158,11,.15);color:var(--gold);"></span>
+                        </div>
+                        <div style="font-size:2.25rem;font-weight:800;margin-bottom:.25rem;" id="dash-torneios">0</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.75rem;">Ativos / agendados</div>
+                        <div id="dash-torneios-mini" style="display:flex;flex-direction:column;gap:.25rem;font-size:.75rem;"></div>
                     </div>
-                    <div class="stat-card">
-                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Prize Pool Total</div>
-                        <div id="dash-prize" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">R$ 0</div>
+
+                    <!-- CARD: CASH GAME -->
+                    <div class="stat-card" style="padding:1.25rem;cursor:pointer;transition:all .15s;border-color:rgba(34,197,94,.2);" onclick="showPage('cash')" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='rgba(34,197,94,.2)'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;"><i class="fa-solid fa-coins"></i> Cash Game</div>
+                            <span id="dash-cash-badge" class="tag" style="font-size:.6rem;background:rgba(34,197,94,.15);color:#22c55e;"></span>
+                        </div>
+                        <div style="font-size:2.25rem;font-weight:800;margin-bottom:.25rem;color:#22c55e;" id="dash-cash-mesas">0</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.75rem;">Mesas ativas</div>
+                        <div id="dash-cash-mini" style="display:flex;flex-direction:column;gap:.25rem;font-size:.75rem;"></div>
                     </div>
-                    <div class="stat-card">
-                        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Rake Total</div>
-                        <div id="dash-rake" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:var(--gold);">R$ 0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Faturamento Bar</div>
-                        <div id="dash-bar-vendas" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#f97316;">R$ 0,00</div>
+
+                    <!-- CARD: BAR -->
+                    <div class="stat-card" style="padding:1.25rem;cursor:pointer;transition:all .15s;border-color:rgba(249,115,22,.2);" onclick="showPage('bar')" onmouseover="this.style.borderColor='#f97316'" onmouseout="this.style.borderColor='rgba(249,115,22,.2)'">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.65rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.1em;"><i class="fa-solid fa-utensils"></i> Bar</div>
+                            <span id="dash-bar-badge" class="tag" style="font-size:.6rem;"></span>
+                        </div>
+                        <div style="font-size:2.25rem;font-weight:800;margin-bottom:.25rem;color:#f97316;" id="dash-bar-comandas">0</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.75rem;">Comandas abertas</div>
+                        <div id="dash-bar-mini" style="display:flex;flex-direction:column;gap:.25rem;font-size:.75rem;"></div>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem;">
-                    <div class="stat-card" style="border-color:rgba(34,197,94,.15);">
-                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-coins"></i> Cash Game — Mesas Ativas</div>
-                        <div id="dash-cash-mesas" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">0</div>
+
+                <!-- KPIs financeiros do dia -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                    <div class="stat-card">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Faturamento Hoje</div>
+                        <div id="dash-fat-dia" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div>
+                        <div id="dash-fat-compare" style="font-size:.7rem;color:#71717a;margin-top:.2rem;"></div>
                     </div>
-                    <div class="stat-card" style="border-color:rgba(34,197,94,.15);">
-                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-coins"></i> Cash Game — Volume Total</div>
-                        <div id="dash-cash-volume" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#22c55e;">R$ 0,00</div>
+                    <div class="stat-card">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Rake Hoje</div>
+                        <div id="dash-rake-dia" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div>
                     </div>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem;">
-                    <div class="stat-card" style="border-color:rgba(239,68,68,.15);">
-                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-hand-holding-dollar"></i> Caixa — Total a Receber</div>
-                        <div id="dash-caixa-receber" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#ef4444;">R$ 0,00</div>
+                    <div class="stat-card" style="border-color:rgba(239,68,68,.2);">
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Total a Receber</div>
+                        <div id="dash-caixa-receber" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#ef4444;">R$ 0</div>
                     </div>
                     <div class="stat-card" style="border-color:rgba(132,204,22,.15);">
-                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-wallet"></i> Caixa — Total em Crédito</div>
-                        <div id="dash-caixa-credito" style="font-size:2.5rem;font-weight:800;margin-top:.5rem;color:#84cc16;">R$ 0,00</div>
+                        <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Crédito Clientes</div>
+                        <div id="dash-caixa-credito" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#84cc16;">R$ 0</div>
                     </div>
                 </div>
+
+                <!-- Resumos numéricos antigos (mantidos para compatibilidade) -->
+                <div style="display:none;">
+                    <span id="dash-jogadores">0</span>
+                    <span id="dash-prize">R$ 0</span>
+                    <span id="dash-rake">R$ 0</span>
+                    <span id="dash-bar-vendas">R$ 0</span>
+                    <span id="dash-cash-volume">R$ 0</span>
+                </div>
+
+                <!-- Lista de torneios ativos -->
                 <div id="dash-torneios-list" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;"></div>
             </div>
 
@@ -1100,6 +1155,33 @@
             <button onclick="abrirComanda()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Abrir Comanda</button>
         </div>
     </div>
+</div>
+
+<!-- MODAL: BUSCA GLOBAL (Ctrl+K) -->
+<div id="modal-busca-global" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;width:100%;max-width:640px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid #1e1e23;display:flex;align-items:center;gap:.75rem;">
+            <i class="fa-solid fa-magnifying-glass" style="color:var(--gold);font-size:1rem;"></i>
+            <input id="busca-global-input" type="text" oninput="executarBuscaGlobal(this.value)" placeholder="Buscar jogadores, torneios, transações..." autocomplete="off" style="flex:1;background:none;border:none;outline:none;color:#e4e4e7;font-size:.95rem;font-family:'Manrope',sans-serif;">
+            <kbd style="background:#18181b;border:1px solid #27272a;border-radius:.3rem;padding:.2rem .5rem;font-size:.7rem;color:#71717a;font-family:'Space Mono',monospace;">ESC</kbd>
+        </div>
+        <div id="busca-global-resultados" style="padding:.5rem;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:.25rem;"></div>
+        <div style="padding:.5rem 1rem;border-top:1px solid #1e1e23;display:flex;gap:1rem;font-size:.65rem;color:#52525b;">
+            <span><kbd style="background:#18181b;border:1px solid #27272a;border-radius:.25rem;padding:.1rem .4rem;font-family:'Space Mono',monospace;font-size:.6rem;">↑↓</kbd> navegar</span>
+            <span><kbd style="background:#18181b;border:1px solid #27272a;border-radius:.25rem;padding:.1rem .4rem;font-family:'Space Mono',monospace;font-size:.6rem;">Enter</kbd> abrir</span>
+        </div>
+    </div>
+</div>
+
+<!-- UNDO TOAST -->
+<div id="undo-toast" style="display:none;position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:999;background:#18181b;border:1px solid var(--gold);border-radius:.75rem;padding:1rem 1.5rem;box-shadow:0 10px 40px rgba(0,0,0,.4);display:flex;align-items:center;gap:1rem;min-width:360px;">
+    <i class="fa-solid fa-rotate-left" style="color:var(--gold);font-size:1.2rem;"></i>
+    <div style="flex:1;">
+        <div id="undo-msg" style="font-size:.85rem;font-weight:700;"></div>
+        <div id="undo-timer" style="font-size:.7rem;color:#71717a;margin-top:.15rem;"></div>
+    </div>
+    <button onclick="executarUndo()" style="background:var(--gold);color:#000;border:none;border-radius:.4rem;padding:.4rem .85rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.8rem;">Desfazer</button>
+    <button onclick="descartarUndo()" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:1rem;">&times;</button>
 </div>
 
 <!-- MODAL: FECHAR COMANDA -->
@@ -2732,6 +2814,21 @@ function registrarEntrada() {
     updateModalTorneio();
     renderTorneiosList();
     renderDashboard();
+
+    // UNDO: permite desfazer entrada
+    const snapshot = JSON.stringify(t);
+    const tornIdx = torneios.indexOf(t);
+    const txsBefore = transacoes.length - ((tipo !== 'addon' && valorRS > 0) ? 1 : 0);
+    const nomeJog = getJogadorNome(jid);
+    registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
+        torneios[tornIdx] = JSON.parse(snapshot);
+        if (transacoes.length > txsBefore) transacoes = transacoes.slice(0, txsBefore);
+        saveData();
+        updateModalTorneio();
+        renderTorneiosList();
+        renderDashboard();
+    });
+
     showToast(`💰 ${tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in'} registrado!`);
 }
 
@@ -2843,7 +2940,8 @@ function confirmarEliminacao() {
     removerJogadorMesa(t, jid);
 
     const ativosFinal = ativos.length - 1;
-    if (ativosFinal === 1) {
+    const finalizado = ativosFinal === 1;
+    if (finalizado) {
         t.status = 'finished';
         t.rodando = false;
         const vencedorId = ativos.find(id => id !== jid);
@@ -2855,6 +2953,22 @@ function confirmarEliminacao() {
     closeModal('modal-eliminar');
     updateModalTorneio();
     renderTorneiosList();
+
+    // UNDO: permite desfazer eliminação
+    const snapshot = JSON.stringify(t);
+    const tornIdx = torneios.indexOf(t);
+    const nomeJog = getJogadorNome(jid);
+    registrarUndo(`💀 Eliminação de ${nomeJog} em ${posicao}º`, () => {
+        torneios[tornIdx] = JSON.parse(snapshot);
+        // Remove transações recentes de bounty (últimos 5s)
+        const agora = Date.now();
+        transacoes = transacoes.filter(tx => !(tx.refId === t.id && tx.descricao && (tx.descricao.includes('Bounty') || tx.descricao.includes('KO')) && (agora - tx.ts) < 10000));
+        saveData();
+        updateModalTorneio();
+        renderTorneiosList();
+        renderDashboard();
+    });
+
     showToast(`💀 Eliminado em ${posicao}º lugar`);
 }
 
@@ -3191,61 +3305,6 @@ setInterval(() => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-function renderDashboard() {
-    document.getElementById('dash-jogadores').innerText = jogadores.length;
-    const ativos = torneios.filter(t => t.status !== 'finished').length;
-    document.getElementById('dash-torneios').innerText = ativos;
-
-    let totalPrize = 0, totalRake = 0;
-    torneios.forEach(t => { totalPrize += getPrize(t); totalRake += getRake(t); });
-    document.getElementById('dash-prize').innerText = formatMoney(totalPrize);
-    document.getElementById('dash-rake').innerText  = formatMoney(totalRake);
-
-    // Bar revenue card (update if element exists)
-    const barVendasEl = document.getElementById('dash-bar-vendas');
-    if (barVendasEl) {
-        const totalBar = barComandas.filter(c=>c.status==='fechada').reduce((s,c)=>s+c.total,0);
-        barVendasEl.innerText = formatMoney(totalBar);
-    }
-    // Cash game volume card
-    const cashEl = document.getElementById('dash-cash-volume');
-    if (cashEl) {
-        const totalCash = cashMesas.reduce((s,m)=>s+m.jogadores.reduce((ss,j)=>ss+j.totalInvestido,0),0);
-        cashEl.innerText = formatMoney(totalCash);
-    }
-    const cashMesasEl = document.getElementById('dash-cash-mesas');
-    if (cashMesasEl) {
-        cashMesasEl.innerText = cashMesas.filter(m=>m.status==='ativa').length;
-    }
-    // Caixa stats
-    const caixaReceberEl = document.getElementById('dash-caixa-receber');
-    const caixaCreditoEl = document.getElementById('dash-caixa-credito');
-    if (caixaReceberEl && jogadores.length) {
-        const saldos = jogadores.map(j => getSaldoJogador(j.id));
-        const receber = saldos.filter(s => s < 0).reduce((s, v) => s + Math.abs(v), 0);
-        const credito = saldos.filter(s => s > 0).reduce((s, v) => s + v, 0);
-        caixaReceberEl.innerText = formatMoney(receber);
-        if (caixaCreditoEl) caixaCreditoEl.innerText = formatMoney(credito);
-    }
-
-    const dashList = document.getElementById('dash-torneios-list');
-    const recentes = torneios.filter(t => t.status !== 'finished').slice(-4);
-    dashList.innerHTML = recentes.map((t, i) => {
-        const st = getStatusTag(t.status);
-        return `
-        <div class="stat-card" style="cursor:pointer;" onclick="showPage('torneios')">
-            <div style="display:flex;justify-content:space-between;align-items:start;">
-                <div style="font-size:.9rem;font-weight:800;">${t.nome}</div>
-                <span class="tag ${st.cls}">${st.label}</span>
-            </div>
-            <div style="display:flex;gap:1.5rem;margin-top:1rem;">
-                <div><div style="font-size:.6rem;color:#52525b;">Prize Pool</div><div style="font-size:1rem;font-weight:800;color:#22c55e;">${formatMoney(getPrize(t))}</div></div>
-                <div><div style="font-size:.6rem;color:#52525b;">Jogadores</div><div style="font-size:1rem;font-weight:800;">${getAtivos(t)}</div></div>
-                <div><div style="font-size:.6rem;color:#52525b;">Timer</div><div class="mono" style="font-size:1rem;font-weight:800;color:var(--gold);">${formatTime(t.tempoRestante)}</div></div>
-            </div>
-        </div>`;
-    }).join('');
-}
 
 // ============================================================
 // HELPERS
@@ -5612,6 +5671,20 @@ function fecharComandaConfirm() {
     renderRelatorio();
     renderDashboard();
     renderCaixaAberto && renderCaixaAberto();
+
+    // UNDO: permite desfazer fechamento de comanda
+    const comandaSnapshot = JSON.stringify(c);
+    const comandaIdx = barComandas.indexOf(c);
+    const txsBefore = transacoes.length - 2; // 2 txs adicionadas (débito + pagamento)
+    registrarUndo(`✅ Acerto de ${formatMoney(pago)}`, () => {
+        barComandas[comandaIdx] = JSON.parse(comandaSnapshot);
+        transacoes = transacoes.slice(0, txsBefore);
+        saveData();
+        renderComandas();
+        renderHistorico();
+        renderDashboard();
+    });
+
     showToast(`✅ Acerto de ${formatMoney(pago)} via ${PAYMENT_METHODS[metodo].label}`);
 }
 
@@ -6952,6 +7025,576 @@ function exportRelClientes() {
     });
     downloadCSV('clientes', rows);
 }
+
+
+
+// ============================================================
+// BLOCO A — DASHBOARD DO DIA, ATALHOS, UNDO, BUSCA GLOBAL
+// ============================================================
+
+// ============================================================
+// DASHBOARD DO DIA (renderDashboard substituído)
+// ============================================================
+let _dashRelogioInterval = null;
+
+function renderDashboard() {
+    // Evita rodar se usuário não está na página do dashboard
+    const hoje = new Date();
+    const hojeInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+
+    // Data e usuário
+    const diaEl = document.getElementById('dash-dia-hoje');
+    if (diaEl) diaEl.innerText = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+    const userEl = document.getElementById('dash-usuario');
+    if (userEl && currentUser) userEl.innerText = currentUser.nome || 'Operador';
+
+    // Relógio
+    if (!_dashRelogioInterval) {
+        _dashRelogioInterval = setInterval(() => {
+            const el = document.getElementById('dash-relogio');
+            if (el) el.innerText = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        }, 1000);
+        // trigger imediato
+        const el = document.getElementById('dash-relogio');
+        if (el) el.innerText = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+
+    // --- Torneios do dia ---
+    const torneiosHoje = torneios.filter(t => t.createdAt >= hojeInicio);
+    const torneiosAtivos = torneiosHoje.filter(t => t.status !== 'finished');
+    const torneiosFinalizados = torneiosHoje.filter(t => t.status === 'finished');
+
+    const tornEl = document.getElementById('dash-torneios');
+    if (tornEl) tornEl.innerText = torneiosAtivos.length;
+    const tornBadge = document.getElementById('dash-torneios-badge');
+    if (tornBadge) tornBadge.innerText = torneiosFinalizados.length ? `${torneiosFinalizados.length} finalizados` : '';
+
+    // Mini listing dos torneios do dia
+    const tornMini = document.getElementById('dash-torneios-mini');
+    if (tornMini) {
+        if (!torneiosHoje.length) {
+            tornMini.innerHTML = '<div style="color:#3f3f46;font-size:.7rem;padding:.35rem 0;">Nenhum torneio hoje</div>';
+        } else {
+            tornMini.innerHTML = torneiosHoje.slice(0, 3).map(t => {
+                const entradas = t.entries.filter(e => e.tipo !== 'addon').length;
+                const statusTag = getStatusTag(t.status);
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:#0a0a0c;border-radius:.3rem;">
+                    <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">${t.nome}</span>
+                    <span style="color:#71717a;font-size:.7rem;">${entradas} · ${statusTag.label}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // --- Cash Game ---
+    const cashAtivas = cashMesas.filter(m => m.status === 'ativa');
+    const cashEl = document.getElementById('dash-cash-mesas');
+    if (cashEl) cashEl.innerText = cashAtivas.length;
+
+    const cashBadge = document.getElementById('dash-cash-badge');
+    if (cashBadge) {
+        const totalJogadoresCash = cashAtivas.reduce((s,m) => s + m.jogadores.filter(j=>j.status==='ativo').length, 0);
+        cashBadge.innerText = totalJogadoresCash ? `${totalJogadoresCash} jogadores` : '';
+    }
+
+    const cashMini = document.getElementById('dash-cash-mini');
+    if (cashMini) {
+        if (!cashAtivas.length) {
+            cashMini.innerHTML = '<div style="color:#3f3f46;font-size:.7rem;padding:.35rem 0;">Nenhuma mesa ativa</div>';
+        } else {
+            cashMini.innerHTML = cashAtivas.slice(0, 3).map(m => {
+                const ativos = m.jogadores.filter(j => j.status === 'ativo').length;
+                return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:#0a0a0c;border-radius:.3rem;">
+                    <span style="font-weight:600;">${m.nome}</span>
+                    <span style="color:#71717a;font-size:.7rem;">${ativos} jog · ${m.sb}/${m.bb}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // --- Bar ---
+    const comandasAbertas = barComandas.filter(c => c.status === 'aberta');
+    const comandasHoje = barComandas.filter(c => c.status === 'fechada' && c.fechadoEm >= hojeInicio);
+    const barEl = document.getElementById('dash-bar-comandas');
+    if (barEl) barEl.innerText = comandasAbertas.length;
+
+    const barBadge = document.getElementById('dash-bar-badge');
+    if (barBadge) {
+        if (barCaixa.status === 'aberto') {
+            barBadge.style.background = 'rgba(34,197,94,.15)';
+            barBadge.style.color = '#22c55e';
+            barBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size:.5rem;"></i> Aberto';
+        } else {
+            barBadge.style.background = 'rgba(239,68,68,.15)';
+            barBadge.style.color = '#ef4444';
+            barBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size:.5rem;"></i> Fechado';
+        }
+    }
+
+    const barMini = document.getElementById('dash-bar-mini');
+    if (barMini) {
+        if (!comandasAbertas.length && !comandasHoje.length) {
+            barMini.innerHTML = '<div style="color:#3f3f46;font-size:.7rem;padding:.35rem 0;">Sem movimento ainda</div>';
+        } else {
+            const faturadoHoje = comandasHoje.reduce((s,c) => s + c.total, 0);
+            barMini.innerHTML = `
+                <div style="display:flex;justify-content:space-between;padding:.35rem .5rem;background:#0a0a0c;border-radius:.3rem;">
+                    <span style="color:#71717a;">Faturado hoje</span>
+                    <span style="font-weight:700;color:#22c55e;font-family:'Space Mono',monospace;">${formatMoney(faturadoHoje)}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:.35rem .5rem;background:#0a0a0c;border-radius:.3rem;">
+                    <span style="color:#71717a;">Comandas fechadas</span>
+                    <span style="font-weight:700;">${comandasHoje.length}</span>
+                </div>`;
+        }
+    }
+
+    // --- KPIs financeiros do dia ---
+    const rakeTornHoje = torneiosHoje.reduce((s,t) => s + getRake(t), 0);
+    const rakeCashHoje = cashMesas.filter(m => (m.fechadoEm || m.abertoEm) >= hojeInicio).reduce((s,m) => s + getCashRake(m), 0);
+    const barHoje = comandasHoje.reduce((s,c) => s + c.total, 0);
+    const faturamentoHoje = rakeTornHoje + rakeCashHoje + barHoje;
+
+    // Comparação com ontem
+    const ontemInicio = hojeInicio - 86400000;
+    const torneiosOntem = torneios.filter(t => t.createdAt >= ontemInicio && t.createdAt < hojeInicio);
+    const cashOntem = cashMesas.filter(m => (m.fechadoEm || m.abertoEm) >= ontemInicio && (m.fechadoEm || m.abertoEm) < hojeInicio);
+    const comandasOntem = barComandas.filter(c => c.status === 'fechada' && c.fechadoEm >= ontemInicio && c.fechadoEm < hojeInicio);
+    const faturamentoOntem = torneiosOntem.reduce((s,t) => s + getRake(t), 0) + cashOntem.reduce((s,m) => s + getCashRake(m), 0) + comandasOntem.reduce((s,c) => s + c.total, 0);
+
+    const fatEl = document.getElementById('dash-fat-dia');
+    if (fatEl) fatEl.innerText = formatMoney(faturamentoHoje);
+    const fatCompareEl = document.getElementById('dash-fat-compare');
+    if (fatCompareEl) {
+        if (faturamentoOntem > 0) {
+            const pct = ((faturamentoHoje - faturamentoOntem) / faturamentoOntem) * 100;
+            const seta = pct >= 0 ? '↑' : '↓';
+            const cor = pct >= 0 ? '#22c55e' : '#ef4444';
+            fatCompareEl.innerHTML = `<span style="color:${cor};">${seta} ${Math.abs(pct).toFixed(0)}%</span> vs ontem (${formatMoney(faturamentoOntem)})`;
+        } else {
+            fatCompareEl.innerText = 'Sem dados de ontem para comparar';
+        }
+    }
+
+    const rakeDiaEl = document.getElementById('dash-rake-dia');
+    if (rakeDiaEl) rakeDiaEl.innerText = formatMoney(rakeTornHoje + rakeCashHoje);
+
+    // Total a receber / crédito (mesma lógica do caixa)
+    let receber = 0, credito = 0;
+    jogadores.forEach(j => {
+        const s = getSaldoJogador(j.id);
+        if (s < 0) receber += Math.abs(s);
+        else if (s > 0) credito += s;
+    });
+    const receberEl = document.getElementById('dash-caixa-receber');
+    if (receberEl) receberEl.innerText = formatMoney(receber);
+    const creditoEl = document.getElementById('dash-caixa-credito');
+    if (creditoEl) creditoEl.innerText = formatMoney(credito);
+
+    // --- ALERTAS ---
+    renderDashAlertas();
+
+    // --- QUICK ACTIONS ---
+    renderDashQuickActions();
+
+    // --- Lista de torneios ativos (mantido) ---
+    const tlist = document.getElementById('dash-torneios-list');
+    if (tlist) {
+        if (!torneiosAtivos.length) {
+            tlist.innerHTML = '';
+        } else {
+            tlist.innerHTML = torneiosAtivos.map((t, idx) => {
+                const realIdx = torneios.findIndex(x => x.id === t.id);
+                const entradas = t.entries.filter(e => e.tipo !== 'addon').length;
+                const ativos = getAtivos(t);
+                const statusTag = getStatusTag(t.status);
+                return `
+                <div class="t-card" onclick="abrirDetalhesTorneio(${realIdx})" style="padding:1rem 1.25rem;cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.5rem;">
+                        <div>
+                            <div style="font-weight:700;">${t.nome}</div>
+                            <div style="font-size:.7rem;color:#52525b;margin-top:.2rem;">${statusTag.label} &middot; Nível ${t.nivelAtual+1} &middot; ${entradas} ent. / ${ativos} ativos</div>
+                        </div>
+                        <span class="mono" style="font-size:1.1rem;font-weight:700;color:var(--gold);">${formatTime(t.tempoRestante)}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    }
+
+    // Campos legados invisíveis
+    const jogEl = document.getElementById('dash-jogadores');
+    if (jogEl) jogEl.innerText = jogadores.length;
+}
+
+function renderDashAlertas() {
+    const el = document.getElementById('dash-alertas');
+    if (!el) return;
+    const alertas = [];
+
+    // Alerta: bar fechado mas tem comandas abertas
+    if (barCaixa.status === 'fechado' && barComandas.some(c => c.status === 'aberta')) {
+        alertas.push({ tipo:'erro', icone:'fa-circle-exclamation', titulo:'Caixa do bar fechado com comandas abertas', desc:'Há comandas pendentes — abra o caixa ou feche-as', acao:() => showPage('bar'), acaoLabel:'Ir para Bar' });
+    }
+
+    // Alerta: bar fechado à noite (depois das 18h)
+    const agora = new Date();
+    if (barCaixa.status === 'fechado' && agora.getHours() >= 18 && agora.getHours() < 23) {
+        alertas.push({ tipo:'aviso', icone:'fa-door-closed', titulo:'Caixa do bar ainda está fechado', desc:'Horário de pico começando — abra o caixa para liberar comandas', acao:() => { showPage('bar'); setTimeout(abrirBarCaixa, 300); }, acaoLabel:'Abrir Caixa' });
+    }
+
+    // Alerta: Mesa cash muito longa (mais de 8h)
+    cashMesas.filter(m => m.status === 'ativa').forEach(m => {
+        const horas = (Date.now() - m.abertoEm) / 3600000;
+        if (horas > 8) alertas.push({ tipo:'aviso', icone:'fa-clock', titulo:`Mesa "${m.nome}" aberta há ${horas.toFixed(1)}h`, desc:'Considere verificar se ainda está em uso', acao:() => showPage('cash'), acaoLabel:'Ver Mesa' });
+    });
+
+    // Alerta: Torneio sem movimento há muito tempo (> 30 min rodando sem ação)
+    torneios.filter(t => t.rodando).forEach(t => {
+        const ultimaAcao = Math.max(
+            t.entries[t.entries.length-1]?.ts || 0,
+            t.eliminados[t.eliminados.length-1]?.ts || 0,
+            t.createdAt
+        );
+        const minsSem = (Date.now() - ultimaAcao) / 60000;
+        if (minsSem > 45) alertas.push({ tipo:'info', icone:'fa-pause', titulo:`"${t.nome}" sem movimento há ${Math.floor(minsSem)}min`, desc:'Verifique se o torneio está correndo normalmente' });
+    });
+
+    // Alerta: saldos muito altos a receber
+    jogadores.forEach(j => {
+        const s = getSaldoJogador(j.id);
+        if (s < -500) alertas.push({ tipo:'info', icone:'fa-hand-holding-dollar', titulo:`${j.nome} deve ${formatMoney(Math.abs(s))}`, desc:'Saldo devedor elevado' });
+    });
+
+    // Renderiza
+    if (!alertas.length) {
+        el.innerHTML = `<div style="padding:.85rem 1.25rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:.6rem;display:flex;align-items:center;gap:.75rem;">
+            <i class="fa-solid fa-check-circle" style="color:#22c55e;"></i>
+            <span style="font-size:.85rem;color:#22c55e;font-weight:600;">Tudo certo — nenhum alerta ativo</span>
+        </div>`;
+        return;
+    }
+    el.innerHTML = alertas.map((a, i) => {
+        const cores = {
+            erro:   { bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  icon:'#ef4444' },
+            aviso:  { bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.25)', icon:'var(--gold)' },
+            info:   { bg:'rgba(6,182,212,.06)',  border:'rgba(6,182,212,.2)',   icon:'#06b6d4' },
+        }[a.tipo] || {};
+        return `<div style="padding:.85rem 1.25rem;background:${cores.bg};border:1px solid ${cores.border};border-radius:.6rem;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;">
+            <div style="display:flex;align-items:center;gap:.85rem;flex:1;min-width:0;">
+                <i class="fa-solid ${a.icone}" style="color:${cores.icon};font-size:1rem;"></i>
+                <div style="min-width:0;">
+                    <div style="font-size:.85rem;font-weight:700;">${a.titulo}</div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.1rem;">${a.desc}</div>
+                </div>
+            </div>
+            ${a.acao ? `<button onclick="(${a.acao.toString()})()" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;white-space:nowrap;">${a.acaoLabel}</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function renderDashQuickActions() {
+    const el = document.getElementById('dash-quickactions');
+    if (!el) return;
+    const acoes = [];
+    if (userHasAccess('torneios')) acoes.push({ icon:'fa-trophy', cor:'var(--gold)', label:'Novo Torneio', fn:() => { showPage('torneios'); setTimeout(() => openModal('modal-novo-torneio'), 200); } });
+    if (userHasAccess('cash'))     acoes.push({ icon:'fa-coins', cor:'#22c55e', label:'Nova Mesa Cash', fn:() => { showPage('cash'); setTimeout(() => openModal('modal-nova-cash-mesa'), 200); } });
+    if (userHasAccess('bar')) {
+        if (barCaixa.status === 'fechado') acoes.push({ icon:'fa-key', cor:'#06b6d4', label:'Abrir Caixa Bar', fn:() => { showPage('bar'); setTimeout(abrirBarCaixa, 300); } });
+        else acoes.push({ icon:'fa-receipt', cor:'#f97316', label:'Nova Comanda', fn:() => { showPage('bar'); setTimeout(() => openModal('modal-nova-comanda'), 200); } });
+    }
+    if (userHasAccess('jogadores')) acoes.push({ icon:'fa-user-plus', cor:'#a78bfa', label:'Novo Jogador', fn:() => { showPage('jogadores'); setTimeout(() => openModal('modal-jogador'), 200); } });
+    if (userHasAccess('caixa'))     acoes.push({ icon:'fa-cash-register', cor:'#84cc16', label:'Ver Caixa', fn:() => showPage('caixa') });
+    if (userHasAccess('relatorios'))acoes.push({ icon:'fa-chart-line', cor:'#ec4899', label:'Relatórios', fn:() => showPage('relatorios') });
+
+    el.innerHTML = acoes.map((a, i) => `
+        <button onclick="window._qa${i}()" style="padding:.85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;transition:all .15s;color:#e4e4e7;font-family:'Manrope',sans-serif;font-weight:700;font-size:.8rem;display:flex;align-items:center;gap:.75rem;text-align:left;" onmouseover="this.style.borderColor='${a.cor}'" onmouseout="this.style.borderColor='#1e1e23'">
+            <i class="fa-solid ${a.icon}" style="color:${a.cor};font-size:1rem;"></i>
+            <span>${a.label}</span>
+        </button>`).join('');
+
+    // Registra as funções globais (para evitar escaping complexo)
+    acoes.forEach((a, i) => { window['_qa' + i] = a.fn; });
+}
+
+function userHasAccess(page) {
+    if (!currentUser) return false;
+    const role = ROLES[currentUser.role];
+    return role && role.pages.includes(page);
+}
+
+// Auto-refresh dashboard a cada 30s
+setInterval(() => {
+    if (document.getElementById('page-dashboard').style.display !== 'none') {
+        renderDashboard();
+    }
+}, 30000);
+
+// ============================================================
+// UNDO / DESFAZER
+// ============================================================
+let _undoStack = [];
+let _undoTimer = null;
+
+function registrarUndo(msg, fnDesfazer, duracaoMs = 6000) {
+    // Cancela qualquer undo pendente anterior (aplica-o implicitamente)
+    if (_undoTimer) clearTimeout(_undoTimer);
+
+    const undoAction = { msg, fnDesfazer, ts: Date.now() };
+    _undoStack.push(undoAction);
+
+    // Mostra toast
+    const toast = document.getElementById('undo-toast');
+    document.getElementById('undo-msg').innerText = msg;
+    document.getElementById('undo-timer').innerHTML = `
+        <div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:.25rem;">
+            <div style="height:3px;background:var(--gold);width:100%;animation:undo-shrink ${duracaoMs}ms linear forwards;"></div>
+        </div>`;
+    toast.style.display = 'flex';
+
+    _undoTimer = setTimeout(() => {
+        toast.style.display = 'none';
+        _undoTimer = null;
+    }, duracaoMs);
+}
+
+function executarUndo() {
+    const action = _undoStack.pop();
+    if (!action) return;
+    try {
+        action.fnDesfazer();
+        showToast('↩️ ' + action.msg.replace(/^[✅🎯💀💰🍺]\s*/, '') + ' desfeito');
+    } catch (e) {
+        showToast('⚠️ Não foi possível desfazer');
+        console.error(e);
+    }
+    descartarUndo();
+}
+
+function descartarUndo() {
+    const toast = document.getElementById('undo-toast');
+    if (toast) toast.style.display = 'none';
+    if (_undoTimer) clearTimeout(_undoTimer);
+    _undoTimer = null;
+}
+
+// ============================================================
+// BUSCA GLOBAL (Ctrl+K)
+// ============================================================
+let _buscaResultados = [];
+let _buscaSelecionado = 0;
+
+function abrirBuscaGlobal() {
+    openModal('modal-busca-global');
+    setTimeout(() => {
+        const inp = document.getElementById('busca-global-input');
+        if (inp) { inp.value = ''; inp.focus(); }
+        executarBuscaGlobal('');
+    }, 50);
+}
+
+function executarBuscaGlobal(query) {
+    const q = (query || '').toLowerCase().trim();
+    _buscaResultados = [];
+
+    if (!q) {
+        // Sugestões rápidas vazias
+        _buscaResultados = [
+            { tipo:'sugestao', titulo:'Ver Dashboard', subtitulo:'Tela inicial do dia', icon:'fa-house', cor:'var(--gold)', acao:() => showPage('dashboard') },
+            { tipo:'sugestao', titulo:'Ver Torneios', subtitulo:'Gerenciar torneios ativos', icon:'fa-trophy', cor:'var(--gold)', acao:() => showPage('torneios') },
+            { tipo:'sugestao', titulo:'Ver Caixa', subtitulo:'Saldos e transações', icon:'fa-cash-register', cor:'#84cc16', acao:() => showPage('caixa') },
+            { tipo:'sugestao', titulo:'Ver Relatórios', subtitulo:'Análises e exportações', icon:'fa-chart-line', cor:'#ec4899', acao:() => showPage('relatorios') },
+        ].filter(r => userHasAccess(r.titulo.toLowerCase().replace('ver ','')) !== false);
+    } else {
+        // Busca jogadores
+        jogadores.forEach(j => {
+            const nomeBusca = (j.nome + ' ' + (j.apelido||'') + ' ' + (j.cidade||'')).toLowerCase();
+            if (nomeBusca.includes(q)) {
+                const saldo = getSaldoJogador(j.id);
+                _buscaResultados.push({
+                    tipo:'jogador',
+                    titulo: j.nome,
+                    subtitulo: `${j.apelido ? '"'+j.apelido+'" · ' : ''}${j.cidade || 'Sem cidade'}${j.uf ? '/'+j.uf : ''} · ${formatMoney(saldo)}`,
+                    icon:'fa-user',
+                    cor:'#06b6d4',
+                    acao: () => abrirPagamentoJogador(j.id),
+                });
+            }
+        });
+
+        // Busca torneios
+        torneios.forEach(t => {
+            if (t.nome.toLowerCase().includes(q)) {
+                const idx = torneios.indexOf(t);
+                _buscaResultados.push({
+                    tipo:'torneio',
+                    titulo: t.nome,
+                    subtitulo: `${getStatusTag(t.status).label} · Nível ${t.nivelAtual+1} · ${t.entries.filter(e=>e.tipo!=='addon').length} entradas`,
+                    icon:'fa-trophy',
+                    cor:'var(--gold)',
+                    acao: () => { showPage('torneios'); setTimeout(() => abrirDetalhesTorneio(idx), 200); },
+                });
+            }
+        });
+
+        // Busca mesas cash
+        cashMesas.forEach(m => {
+            if (m.nome.toLowerCase().includes(q)) {
+                _buscaResultados.push({
+                    tipo:'cash',
+                    titulo: m.nome + ' (Cash)',
+                    subtitulo: `${m.jogadores.length} jogadores · ${m.status} · SB/BB ${m.sb}/${m.bb}`,
+                    icon:'fa-coins',
+                    cor:'#22c55e',
+                    acao: () => showPage('cash'),
+                });
+            }
+        });
+
+        // Busca produtos do bar
+        barProdutos.forEach(p => {
+            if (p.nome.toLowerCase().includes(q)) {
+                _buscaResultados.push({
+                    tipo:'produto',
+                    titulo: p.nome + ' (Produto)',
+                    subtitulo: `${p.grupo} · ${formatMoney(p.valor)} · Estoque: ${p.estoque || 0}`,
+                    icon:'fa-utensils',
+                    cor:'#f97316',
+                    acao: () => showPage('bar'),
+                });
+            }
+        });
+
+        // Navegação direta
+        const paginas = [
+            { pg:'dashboard', nome:'Dashboard', icon:'fa-house', cor:'var(--gold)' },
+            { pg:'jogadores', nome:'Jogadores', icon:'fa-users', cor:'#06b6d4' },
+            { pg:'torneios',  nome:'Torneios',  icon:'fa-trophy', cor:'var(--gold)' },
+            { pg:'cash',      nome:'Cash Game', icon:'fa-coins', cor:'#22c55e' },
+            { pg:'bar',       nome:'Bar & Vendas', icon:'fa-utensils', cor:'#f97316' },
+            { pg:'caixa',     nome:'Caixa',     icon:'fa-cash-register', cor:'#84cc16' },
+            { pg:'relatorios',nome:'Relatórios',icon:'fa-chart-line', cor:'#ec4899' },
+            { pg:'config',    nome:'Configurações', icon:'fa-gear', cor:'#a1a1aa' },
+            { pg:'usuarios',  nome:'Usuários',  icon:'fa-user-shield', cor:'#a78bfa' },
+        ];
+        paginas.forEach(p => {
+            if (p.nome.toLowerCase().includes(q) && userHasAccess(p.pg)) {
+                _buscaResultados.push({
+                    tipo:'pagina',
+                    titulo:'Ir para ' + p.nome,
+                    subtitulo:'Navegar',
+                    icon: p.icon,
+                    cor: p.cor,
+                    acao: () => showPage(p.pg),
+                });
+            }
+        });
+    }
+
+    _buscaSelecionado = 0;
+    renderBuscaResultados();
+}
+
+function renderBuscaResultados() {
+    const el = document.getElementById('busca-global-resultados');
+    if (!el) return;
+    if (!_buscaResultados.length) {
+        el.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum resultado encontrado</div>';
+        return;
+    }
+    el.innerHTML = _buscaResultados.slice(0, 12).map((r, i) => `
+        <div class="busca-item ${i === _buscaSelecionado ? 'selected' : ''}" onclick="selecionarBusca(${i})">
+            <i class="fa-solid ${r.icon}" style="color:${r.cor};font-size:.9rem;width:18px;"></i>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.titulo}</div>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.subtitulo}</div>
+            </div>
+            <kbd>${r.tipo}</kbd>
+        </div>`).join('');
+}
+
+function selecionarBusca(idx) {
+    const r = _buscaResultados[idx];
+    if (!r) return;
+    closeModal('modal-busca-global');
+    try { r.acao(); } catch(e) { console.error(e); }
+}
+
+// ============================================================
+// ATALHOS GLOBAIS DE TECLADO
+// ============================================================
+document.addEventListener('keydown', function(e) {
+    const ativo = document.activeElement;
+    const isTexto = ativo && (ativo.tagName === 'INPUT' || ativo.tagName === 'TEXTAREA' || ativo.isContentEditable);
+    const buscaAberta = document.getElementById('modal-busca-global').classList.contains('active');
+    const hasActiveModal = document.querySelector('.modal-overlay.active');
+
+    // Ctrl+K ou Cmd+K — abrir busca global
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (buscaAberta) closeModal('modal-busca-global');
+        else abrirBuscaGlobal();
+        return;
+    }
+
+    // ESC — fechar modais
+    if (e.key === 'Escape') {
+        if (buscaAberta) closeModal('modal-busca-global');
+        if (!buscaAberta && hasActiveModal) {
+            const m = document.querySelector('.modal-overlay.active');
+            if (m && m.id) closeModal(m.id);
+        }
+        return;
+    }
+
+    // Navegação na busca
+    if (buscaAberta) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); _buscaSelecionado = Math.min(_buscaResultados.length - 1, _buscaSelecionado + 1); renderBuscaResultados(); return; }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); _buscaSelecionado = Math.max(0, _buscaSelecionado - 1); renderBuscaResultados(); return; }
+        if (e.key === 'Enter')     { e.preventDefault(); selecionarBusca(_buscaSelecionado); return; }
+        return; // demais teclas não acionam nada enquanto busca aberta
+    }
+
+    // Ctrl+Z — desfazer
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !isTexto) {
+        if (_undoStack.length && _undoTimer) {
+            e.preventDefault();
+            executarUndo();
+        }
+        return;
+    }
+
+    // Ignora atalhos se digitando em texto ou modal aberto
+    if (isTexto || hasActiveModal) return;
+
+    // Atalhos de página
+    if (e.key.toLowerCase() === 'n' && userHasAccess('torneios')) {
+        // N = Nova entrada no torneio (se estiver no torneio ativo)
+        if (document.getElementById('modal-torneio').classList.contains('active')) {
+            e.preventDefault();
+            openModalEntrada(activeTorneioIdx);
+        }
+        return;
+    }
+
+    if (e.key.toLowerCase() === 'e' && userHasAccess('torneios')) {
+        // E = Eliminar jogador (dentro de modal de torneio)
+        if (document.getElementById('modal-torneio').classList.contains('active')) {
+            e.preventDefault();
+            openModalEliminar(activeTorneioIdx);
+        }
+        return;
+    }
+
+    if (e.key === ' ' && userHasAccess('torneios')) {
+        // Espaço = pausar/retomar timer
+        if (document.getElementById('modal-torneio').classList.contains('active')) {
+            e.preventDefault();
+            toggleTimer(activeTorneioIdx);
+        }
+        return;
+    }
+});
 
 
 // Init
