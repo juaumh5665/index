@@ -1169,13 +1169,51 @@
             <div style="display:flex;flex-direction:column;gap:1rem;">
                 <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Configurações</div>
                 <div><label class="inp-label">Nome do Torneio</label><input id="t-nome" class="inp" placeholder="Ex: Sunday Major"></div>
+
+                <div>
+                    <label class="inp-label">Tipo de Torneio</label>
+                    <select id="t-tipo" class="inp" onchange="onTipoTorneioChange()">
+                        <option value="normal">🏆 Normal (Freezeout / Re-entry)</option>
+                        <option value="bounty">💰 Bounty Fixo (valor fixo por eliminação)</option>
+                        <option value="pko">🎯 Progressive KO (bounty cresce a cada KO)</option>
+                        <option value="knockout">⚡ Somente KO (100% em bounties, sem premiação final)</option>
+                    </select>
+                </div>
+
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
                     <div><label class="inp-label">Buy-in R$</label><input id="t-buyin" type="number" value="100" class="inp"></div>
                     <div><label class="inp-label">Rake %</label><input id="t-rake" type="number" value="20" class="inp"></div>
                     <div><label class="inp-label">Stack Inicial</label><input id="t-stack" type="number" value="20000" class="inp"></div>
                     <div><label class="inp-label">Nível (min)</label><input id="t-tempo" type="number" value="15" class="inp"></div>
                 </div>
-                <div><label class="inp-label">Re-entry permitido até o nível</label><input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem re-entry"></div>
+
+                <!-- Configuração KO (só aparece conforme o tipo) -->
+                <div id="t-bounty-wrap" style="display:none;padding:.85rem 1rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-crosshairs"></i> Configuração KO</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                        <div><label class="inp-label">Valor Bounty R$</label><input id="t-bounty-valor" type="number" value="20" class="inp"></div>
+                        <div id="t-pko-split-wrap" style="display:none;"><label class="inp-label">% p/ cabeça</label><input id="t-pko-split" type="number" value="50" min="0" max="100" class="inp"></div>
+                    </div>
+                    <div id="t-bounty-hint" style="font-size:.7rem;color:#71717a;margin-top:.5rem;"></div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                    <div><label class="inp-label">Re-entry até nível</label><input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem"></div>
+                    <div><label class="inp-label">Add-on até nível</label><input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem"></div>
+                </div>
+
+                <!-- Rebuy simples / duplo -->
+                <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-rotate"></i> Estrutura de Rebuy</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                        <div><label class="inp-label">Rebuy Simples R$</label><input id="t-rebuy-simples" type="number" value="100" class="inp"></div>
+                        <div><label class="inp-label">Fichas (simples)</label><input id="t-rebuy-simples-fichas" type="number" value="20000" class="inp"></div>
+                        <div><label class="inp-label">Rebuy Duplo R$</label><input id="t-rebuy-duplo" type="number" value="200" class="inp" placeholder="0 = desabilita"></div>
+                        <div><label class="inp-label">Fichas (duplo)</label><input id="t-rebuy-duplo-fichas" type="number" value="50000" class="inp"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Deixe rebuy duplo = 0 para permitir apenas o simples</div>
+                </div>
+
                 <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
             </div>
             <!-- Blinds -->
@@ -1211,6 +1249,18 @@
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:.75rem;">
+                <div style="display:flex;align-items:center;gap:.4rem;padding:.35rem .5rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+                    <span style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">TV:</span>
+                    <select id="mt-tv-layout" onchange="onLayoutChange()" class="inp" style="padding:.25rem .5rem;font-size:.75rem;width:130px;">
+                        <option value="classico">Clássico</option>
+                        <option value="minimalista">Minimalista</option>
+                        <option value="feltro">Verde Feltro</option>
+                        <option value="neon">Neon</option>
+                    </select>
+                    <button onclick="togglePrizePool()" id="btn-prize-toggle" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;" title="Mostrar/ocultar prize pool na TV">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
                 <button onclick="closeModal('modal-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
             </div>
@@ -1294,6 +1344,13 @@
                         <!-- Premiação -->
                         <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Tabela de Premiação</div>
                         <div id="mt-payout" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+
+                        <!-- PAINEL DE BOUNTIES (só aparece em torneios KO) -->
+                        <div id="mt-bounties-wrap" style="display:none;margin-top:1rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-crosshairs"></i> Bounties por Jogador</div>
+                            <div id="mt-bounties-totals" style="display:flex;gap:.5rem;margin-bottom:.5rem;font-size:.75rem;"></div>
+                            <div id="mt-bounties-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:280px;overflow-y:auto;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1730,26 +1787,43 @@ function removeBlindRow(i) {
 
 function saveTournament() {
     const nome = document.getElementById('t-nome').value.trim() || 'Torneio PokerSul';
+    const tempoNivel = parseInt(document.getElementById('t-tempo').value) || 15;
+    const tipo = document.getElementById('t-tipo').value || 'normal';
     const t = {
         id:           Date.now(),
         nome,
+        tipo,                                                                    // normal | bounty | pko | knockout
         buyin:        parseFloat(document.getElementById('t-buyin').value)  || 100,
         rake:         parseFloat(document.getElementById('t-rake').value)   || 20,
-        tempoNivel:   parseInt(document.getElementById('t-tempo').value)    || 15,
+        tempoNivel,
         stack:        parseInt(document.getElementById('t-stack').value)    || 20000,
         reentryAte:   parseInt(document.getElementById('t-reentry').value)  || 0,
+        addonAte:     parseInt(document.getElementById('t-addon-nivel').value) || 0,
         addonFichas:  parseInt(document.getElementById('t-addon').value)    || 0,
+        // Rebuy structure
+        rebuySimples:       parseFloat(document.getElementById('t-rebuy-simples').value)        || 0,
+        rebuySimplesFichas: parseInt(document.getElementById('t-rebuy-simples-fichas').value)   || 0,
+        rebuyDuplo:         parseFloat(document.getElementById('t-rebuy-duplo').value)          || 0,
+        rebuyDuploFichas:   parseInt(document.getElementById('t-rebuy-duplo-fichas').value)     || 0,
+        // KO config
+        bountyValor:    parseFloat(document.getElementById('t-bounty-valor').value) || 0,
+        pkoSplit:       parseFloat(document.getElementById('t-pko-split').value) || 50,
         blinds:       JSON.parse(JSON.stringify(blindStructure)),
         nivelAtual:   0,
-        tempoRestante: (parseInt(document.getElementById('t-tempo').value) || 15) * 60,
-        tempoTotal:   (parseInt(document.getElementById('t-tempo').value) || 15) * 60,
+        tempoRestante: tempoNivel * 60,
+        tempoTotal:   tempoNivel * 60,
         rodando:      false,
         isBreak:      false,
-        status:       'waiting', // waiting | running | paused | break | finished
-        entries:      [],        // { jogadorId, tipo:'buyin'|'reentry'|'addon', ts }
-        eliminados:   [],        // { jogadorId, posicao, ts }
+        iniciadoEm:   null,       // para calcular tempo decorrido total
+        status:       'waiting',
+        entries:      [],
+        eliminados:   [],
         mesas:        [],
+        // bounties registry: { jogadorId: valorAcumulado }
+        bounties:     {},
         createdAt:    Date.now(),
+        tvLayout:     'classico', // classico | minimalista | feltro | neon
+        tvShowPrize:  true,        // mostrar ou ocultar prize pool na TV
     };
     torneios.push(t);
     saveData();
@@ -1778,8 +1852,9 @@ function renderTorneiosList() {
             <div class="t-card-header">
                 <div>
                     <div style="font-size:1rem;font-weight:800;">${t.nome}</div>
-                    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem;">
+                    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem;flex-wrap:wrap;">
                         <span class="tag ${statusTag.cls}">${statusTag.label}</span>
+                        ${t.tipo && t.tipo!=='normal' ? `<span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);">${ {bounty:'💰 Bounty',pko:'🎯 PKO',knockout:'⚡ KO'}[t.tipo] }</span>` : ''}
                         <span style="font-size:.75rem;color:#52525b;">Nível ${t.nivelAtual+1} &bull; ${t.blinds[t.nivelAtual].sb}/${t.blinds[t.nivelAtual].bb}</span>
                     </div>
                 </div>
@@ -1809,6 +1884,7 @@ function abrirDetalhesTorneio(idx) {
     document.getElementById('tab-controle').style.display = 'block';
     document.querySelector('.tab-btn').classList.add('active');
     openModal('modal-torneio');
+    setTimeout(syncTVControls, 50);
 }
 
 function updateModalTorneio() {
@@ -1822,7 +1898,13 @@ function updateModalTorneio() {
 
     document.getElementById('mt-status-tag').className = `tag ${st.cls}`;
     document.getElementById('mt-status-tag').innerText = st.label;
-    document.getElementById('mt-info').innerText = `Buy-in R$ ${t.buyin} | Rake ${t.rake}%`;
+    const tipoTag = {
+        normal: '',
+        bounty: ' | 💰 Bounty',
+        pko: ' | 🎯 Progressive KO',
+        knockout: ' | ⚡ Somente KO',
+    }[t.tipo] || '';
+    document.getElementById('mt-info').innerText = `Buy-in R$ ${t.buyin} | Rake ${t.rake}%${tipoTag}`;
 
     document.getElementById('mt-nivel-label').innerText = t.isBreak ? 'INTERVALO' : `Nível ${t.nivelAtual + 1}`;
     document.getElementById('mt-timer').innerText = formatTime(t.tempoRestante);
@@ -1866,6 +1948,44 @@ function updateModalTorneio() {
     }
 
     renderPayout(t, 'mt-payout');
+    renderBountyPanel(t);
+}
+
+function renderBountyPanel(t) {
+    const wrap = document.getElementById('mt-bounties-wrap');
+    if (!wrap) return;
+    const isKO = ['bounty','pko','knockout'].includes(t.tipo);
+    if (!isKO) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'block';
+
+    const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))]
+        .filter(id => !t.eliminados.some(e=>e.jogadorId===id));
+
+    // Totalizadores
+    const totalBountiesNaMesa = ativos.reduce((s,id) => s + (t.bounties[id]||0), 0);
+    const totalBountiesPagos = t.eliminados.filter(e=>e.bountyPago).reduce((s,e)=>s+e.bountyPago, 0);
+
+    document.getElementById('mt-bounties-totals').innerHTML = `
+        <span style="padding:.35rem .7rem;background:rgba(245,158,11,.1);border-radius:.4rem;color:var(--gold);font-weight:700;"><i class="fa-solid fa-coins"></i> Na mesa: ${formatMoney(totalBountiesNaMesa)}</span>
+        <span style="padding:.35rem .7rem;background:rgba(34,197,94,.1);border-radius:.4rem;color:#22c55e;font-weight:700;"><i class="fa-solid fa-check"></i> Pagos: ${formatMoney(totalBountiesPagos)}</span>
+    `;
+
+    // Ordena por valor do bounty decrescente
+    const ranked = ativos.map(id => ({
+        id,
+        nome: getJogadorNome(id),
+        valor: t.bounties[id] || 0,
+    })).sort((a,b) => b.valor - a.valor);
+
+    document.getElementById('mt-bounties-list').innerHTML = ranked.length ? ranked.map((r, i) => `
+        <div style="display:grid;grid-template-columns:2rem 1fr auto;gap:.75rem;align-items:center;padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;font-size:.8rem;">
+            <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':'#52525b'};">${i+1}º</span>
+            <span style="font-weight:700;">${r.nome}</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:var(--gold);">${formatMoney(r.valor)}</span>
+        </div>`).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Nenhum bounty ativo</div>';
 }
 
 // ============================================================
@@ -1979,11 +2099,22 @@ function renderTabBlinds() {
 // PAYOUT
 // ============================================================
 function renderPayout(t, containerId, full = false) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+
+    // Torneio tipo knockout não tem premiação final — todo o prize vira bounty
+    if (t.tipo === 'knockout') {
+        c.innerHTML = `
+            <div style="padding:1rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;text-align:center;">
+                <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">⚡ Somente KO</div>
+                <div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">100% do prize pool distribuído como bounties</div>
+            </div>`;
+        return;
+    }
+
     const prize = getPrize(t);
     const ativos = getAtivos(t) + t.eliminados.length; // total entrantes
     const splits = calcPayout(ativos, prize);
-    const c = document.getElementById(containerId);
-    if (!c) return;
     c.innerHTML = splits.map((s, i) => `
         <div class="payout-item">
             <div style="display:flex;align-items:center;gap:.5rem;">
@@ -2012,8 +2143,12 @@ function calcPayout(n, prize) {
 function toggleTimer(idx) {
     const t = torneios[idx];
     t.rodando = !t.rodando;
-    if (t.rodando) t.status = 'running';
-    else           t.status = 'paused';
+    if (t.rodando) {
+        t.status = 'running';
+        if (!t.iniciadoEm) t.iniciadoEm = Date.now();
+    } else {
+        t.status = 'paused';
+    }
     saveData();
     updateModalTorneio();
     renderTorneiosList();
@@ -2089,11 +2224,12 @@ function openModalEntrada(idx) {
 
     // Ajuste opções de tipo
     const tipoSel = document.getElementById('entrada-tipo');
-    tipoSel.innerHTML = `
-        <option value="buyin">Buy-in (entrada normal)</option>
-        ${t.reentryAte > 0 ? '<option value="reentry">Re-entry</option>' : ''}
-        ${t.addonFichas > 0 ? '<option value="addon">Add-on</option>' : ''}
-    `;
+    const opts = [`<option value="buyin">Buy-in (entrada normal) — R$ ${t.buyin}</option>`];
+    if (t.rebuySimples > 0) opts.push(`<option value="rebuy_simples">Rebuy Simples — R$ ${t.rebuySimples} (${(t.rebuySimplesFichas||0).toLocaleString()} fichas)</option>`);
+    if (t.rebuyDuplo > 0)   opts.push(`<option value="rebuy_duplo">Rebuy Duplo — R$ ${t.rebuyDuplo} (${(t.rebuyDuploFichas||0).toLocaleString()} fichas)</option>`);
+    if (t.reentryAte > 0)   opts.push(`<option value="reentry">Re-entry — R$ ${t.buyin}</option>`);
+    if (t.addonFichas > 0)  opts.push(`<option value="addon">Add-on (${t.addonFichas.toLocaleString()} fichas extras)</option>`);
+    tipoSel.innerHTML = opts.join('');
     openModal('modal-entrada');
 }
 
@@ -2104,29 +2240,48 @@ function registrarEntrada() {
 
     if (!jid) return showToast('⚠️ Selecione um jogador');
 
-    const jaEntrou = t.entries.some(e => e.jogadorId === jid && e.tipo !== 'addon');
+    const jaEntrou = t.entries.some(e => e.jogadorId === jid && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
     const eliminado = t.eliminados.some(e => e.jogadorId === jid);
 
-    if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Re-entry.');
+    if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Rebuy ou Re-entry.');
     if (tipo === 'reentry' && t.nivelAtual >= t.reentryAte) return showToast(`⚠️ Re-entry encerrado após nível ${t.reentryAte}`);
     if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
+    if (tipo === 'addon' && t.addonAte > 0 && t.nivelAtual >= t.addonAte) return showToast(`⚠️ Add-on encerrado após nível ${t.addonAte}`);
 
     // Se re-entry: reativar (remover da lista de eliminados)
     if (tipo === 'reentry') {
         t.eliminados = t.eliminados.filter(e => e.jogadorId !== jid);
     }
 
-    t.entries.push({ jogadorId: jid, tipo, ts: Date.now() });
+    // Determina valor em R$ com base no tipo
+    let valorRS = t.buyin;
+    if (tipo === 'rebuy_simples') valorRS = t.rebuySimples;
+    if (tipo === 'rebuy_duplo')   valorRS = t.rebuyDuplo;
+    if (tipo === 'addon')         valorRS = 0;   // add-on pode ser cortesia ou cobrado separado; mantemos sem valor em caixa
+
+    t.entries.push({ jogadorId: jid, tipo, ts: Date.now(), valor: valorRS });
     alocarJogadorMesa(t, jid);
 
+    // Para torneios KO: cada entrada paga também bounty (exceto add-on)
+    if (['bounty','pko','knockout'].includes(t.tipo) && tipo !== 'addon') {
+        // Inicializa bounty na cabeça do jogador se for PKO ou knockout
+        if (t.tipo === 'pko' || t.tipo === 'knockout') {
+            const bountyInicial = t.tipo === 'knockout' ? t.buyin * (1 - t.rake/100) : t.buyin * (t.pkoSplit/100);
+            t.bounties[jid] = (t.bounties[jid] || 0) + bountyInicial;
+        } else if (t.tipo === 'bounty') {
+            // bounty fixo é pago pela casa (já incluso no buy-in); a cabeça de cada jogador vale t.bounty.valor
+            t.bounties[jid] = t.bountyValor;
+        }
+    }
+
     // Registra transação no caixa
-    const descTipo = tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in';
-    if (tipo !== 'addon') {
+    const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on' };
+    if (tipo !== 'addon' && valorRS > 0) {
         registrarTransacao({
             jogadorId: jid,
-            tipo: tipo === 'reentry' ? 'reentry' : 'buyin',
-            valor: -t.buyin,
-            descricao: `${descTipo} · ${t.nome}`,
+            tipo: tipo === 'buyin' ? 'buyin' : 'reentry',
+            valor: -valorRS,
+            descricao: `${descMap[tipo]} · ${t.nome}`,
             origem: 'torneio',
             refId: t.id,
         });
@@ -2157,15 +2312,28 @@ function openModalEliminar(idx) {
     });
 
     const posicao = ativos.length;
-    document.getElementById('eliminar-posicao-info').innerHTML = `
+    const isKO = ['bounty','pko','knockout'].includes(t.tipo);
+
+    let html = `
         <div style="color:#71717a;font-size:.8rem;">Posição de saída: <strong style="color:#e4e4e7;">${posicao}º lugar</strong></div>
-        <div style="color:#71717a;font-size:.8rem;margin-top:.25rem;">Jogadores restantes após eliminação: <strong style="color:#e4e4e7;">${posicao - 1}</strong></div>
-    `;
-    sel.onchange = () => {
-        const pos = ativos.length;
-        document.getElementById('eliminar-posicao-info').innerHTML = `
-            <div style="color:#71717a;font-size:.8rem;">Posição de saída: <strong style="color:#e4e4e7;">${pos}º lugar</strong></div>`;
-    };
+        <div style="color:#71717a;font-size:.8rem;margin-top:.25rem;">Restantes após: <strong style="color:#e4e4e7;">${posicao - 1}</strong></div>`;
+
+    if (isKO) {
+        html += `<div style="margin-top:.85rem;padding-top:.75rem;border-top:1px solid #27272a;">
+            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;"><i class="fa-solid fa-crosshairs"></i> Quem eliminou?</div>
+            <select id="eliminador-jogador" class="inp" style="font-size:.85rem;padding:.5rem .75rem;">
+                <option value="">— Sem eliminador (blindada) —</option>
+                ${ativos.map(id => {
+                    const j = jogadores.find(j => j.id === id);
+                    return `<option value="${id}">${j ? j.nome : '?'}</option>`;
+                }).join('')}
+            </select>
+            <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Bounty será pago ao eliminador selecionado.</div>
+        </div>`;
+    }
+
+    document.getElementById('eliminar-posicao-info').innerHTML = html;
+    sel.onchange = () => openModalEliminar(idx);  // rebuild to update eliminador list
     openModal('modal-eliminar');
 }
 
@@ -2174,12 +2342,64 @@ function confirmarEliminacao() {
     const jid = parseInt(document.getElementById('eliminar-jogador').value);
     if (!jid) return;
 
+    // Para KO: pegar eliminador se selecionado
+    const eliminadorSel = document.getElementById('eliminador-jogador');
+    const eliminadorId = eliminadorSel ? parseInt(eliminadorSel.value) : null;
+
     const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
     const entriesIds    = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
     const ativos        = entriesIds.filter(id => !eliminadosIds.has(id));
     const posicao       = ativos.length;
 
-    t.eliminados.push({ jogadorId: jid, posicao, ts: Date.now() });
+    const elim = { jogadorId: jid, posicao, ts: Date.now() };
+
+    // Lógica de bounty
+    if (['bounty','pko','knockout'].includes(t.tipo) && eliminadorId && eliminadorId !== jid) {
+        const bountyEliminado = t.bounties[jid] || 0;
+        elim.eliminadorId = eliminadorId;
+        elim.bountyPago   = bountyEliminado;
+
+        if (t.tipo === 'bounty') {
+            // Bounty fixo: eliminador recebe o valor direto
+            registrarTransacao({
+                jogadorId: eliminadorId,
+                tipo: 'buyin', // abate como crédito; na prática é recebimento
+                valor: bountyEliminado,
+                descricao: `🎯 Bounty de ${getJogadorNome(jid)} · ${t.nome}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        } else if (t.tipo === 'pko') {
+            // Progressive KO: metade vai pro bolso do eliminador, metade cresce na cabeça dele
+            const paraBolso  = bountyEliminado * (t.pkoSplit/100);
+            const paraCabeca = bountyEliminado - paraBolso;
+            t.bounties[eliminadorId] = (t.bounties[eliminadorId] || 0) + paraCabeca;
+            if (paraBolso > 0) {
+                registrarTransacao({
+                    jogadorId: eliminadorId,
+                    tipo: 'buyin',
+                    valor: paraBolso,
+                    descricao: `🎯 Bounty parcial de ${getJogadorNome(jid)} · ${t.nome}`,
+                    origem: 'torneio',
+                    refId: t.id,
+                });
+            }
+        } else if (t.tipo === 'knockout') {
+            // 100% pro eliminador
+            registrarTransacao({
+                jogadorId: eliminadorId,
+                tipo: 'buyin',
+                valor: bountyEliminado,
+                descricao: `⚡ KO de ${getJogadorNome(jid)} · ${t.nome}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
+
+        delete t.bounties[jid]; // bounty do eliminado se vai
+    }
+
+    t.eliminados.push(elim);
     removerJogadorMesa(t, jid);
 
     const ativosFinal = ativos.length - 1;
@@ -2247,91 +2467,253 @@ function updateTV(idx) {
     if (!tvWindow || tvWindow.closed) return;
     const t     = torneios[idx];
     const ativos = getAtivos(t);
-    const avg    = ativos > 0 ? Math.round((ativos * t.stack) / ativos) : 0;
-    const prox   = t.blinds[t.nivelAtual + 1];
+    // Calcular fichas totais corretamente com rebuys/addons
+    const totalFichas = t.entries.reduce((s, e) => {
+        if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
+        if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
+        if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
+        return s + t.stack;  // buyin, reentry
+    }, 0);
+    const avg = ativos > 0 ? Math.round(totalFichas / ativos) : 0;
+    const prox = t.blinds[t.nivelAtual + 1];
+
+    // Tempo decorrido total desde o início
+    const elapsedMs = t.iniciadoEm ? (Date.now() - t.iniciadoEm) : 0;
+    const elapsedFormatted = formatElapsed(elapsedMs);
+
+    // Nome do clube (se configurado)
+    const clubeNome = (typeof config !== 'undefined' && config.clube && config.clube.nome) ? config.clube.nome : 'PokerSul';
+
     tvWindow.postMessage({
+        tournamentName: t.nome,
+        tipo:     t.tipo,
+        layout:   t.tvLayout || 'classico',
+        showPrize: t.tvShowPrize !== false,
         timer:    formatTime(t.tempoRestante),
         nivel:    t.nivelAtual + 1,
+        totalNiveis: t.blinds.length,
         blinds:   `${t.blinds[t.nivelAtual].sb.toLocaleString()} / ${t.blinds[t.nivelAtual].bb.toLocaleString()}`,
         ante:     t.blinds[t.nivelAtual].ante.toLocaleString(),
         players:  ativos,
+        totalEntries: t.entries.filter(e=>e.tipo!=='addon').length,
         avg:      avg.toLocaleString(),
         prize:    formatMoney(getPrize(t)),
         isBreak:  t.isBreak,
         next:     prox ? `${prox.sb.toLocaleString()}/${prox.bb.toLocaleString()}` : 'FINAL',
         pct:      (t.tempoRestante / t.tempoTotal) * 100,
+        elapsed:  elapsedFormatted,
+        clubeNome: clubeNome,
     }, '*');
+}
+
+function formatElapsed(ms) {
+    if (!ms || ms < 0) return '00:00:00';
+    const total = Math.floor(ms / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 }
 
 function abrirTV(idx) {
     tvWindow = window.open('', 'PokerTV', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
     tvWindow.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    <title>PokerSul TV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
     <style>
-        body{background:#000;color:#fff;overflow:hidden;font-family:'Manrope',sans-serif;margin:0;}
+        *{box-sizing:border-box;}
+        html,body{margin:0;padding:0;height:100vh;overflow:hidden;font-family:'Manrope',sans-serif;transition:background .4s;}
         .mono{font-family:'Space Mono',monospace;}
-        #break-screen{display:none;position:fixed;inset:0;background:#0a0000;z-index:50;align-items:center;justify-content:center;flex-direction:column;}
+
+        /* CLÁSSICO */
+        body.layout-classico{background:#000;color:#fff;}
+        body.layout-classico .timer-main{color:#f59e0b;}
+
+        /* MINIMALISTA */
+        body.layout-minimalista{background:#0f0f10;color:#e4e4e7;}
+        body.layout-minimalista .timer-main{color:#fafafa;font-weight:400;letter-spacing:-.08em;}
+        body.layout-minimalista .blinds-main{color:#a1a1aa;font-weight:400;}
+        body.layout-minimalista .hide-on-min{display:none !important;}
+        body.layout-minimalista #timer{font-size:18rem !important;}
+
+        /* FELTRO */
+        body.layout-feltro{background:radial-gradient(ellipse at center,#12553f 0%,#0a2e22 55%,#041410 100%);color:#f5e6c8;}
+        body.layout-feltro::before{content:'';position:fixed;inset:0;background:
+            radial-gradient(circle at 10% 10%,rgba(245,213,114,.08),transparent 40%),
+            radial-gradient(circle at 90% 90%,rgba(245,213,114,.06),transparent 40%);pointer-events:none;}
+        body.layout-feltro .timer-main{color:#f5d572;text-shadow:0 0 50px rgba(245,213,114,.35);}
+        body.layout-feltro .blinds-main{color:#fef3c7;}
+        body.layout-feltro .panel-bg{background:rgba(0,0,0,.3);border:1px solid rgba(245,213,114,.2);border-radius:.75rem;}
+
+        /* NEON */
+        body.layout-neon{background:#05050a;color:#fff;}
+        body.layout-neon::before{content:'';position:fixed;inset:0;background:
+            radial-gradient(circle at 20% 20%,rgba(236,72,153,.18),transparent 45%),
+            radial-gradient(circle at 80% 80%,rgba(6,182,212,.18),transparent 45%),
+            radial-gradient(circle at 50% 50%,rgba(168,85,247,.1),transparent 50%);pointer-events:none;z-index:0;}
+        body.layout-neon .timer-main{color:#ec4899;text-shadow:0 0 30px #ec4899,0 0 60px rgba(236,72,153,.5);}
+        body.layout-neon .blinds-main{color:#06b6d4;text-shadow:0 0 20px rgba(6,182,212,.6);}
+        body.layout-neon .panel-bg{background:rgba(20,20,40,.5);border:1px solid rgba(236,72,153,.3);backdrop-filter:blur(10px);border-radius:.75rem;}
+        body.layout-neon #tournament-name{background:linear-gradient(90deg,#ec4899,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+        /* BREAK */
+        #break-screen{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;flex-direction:column;background:#0a0000;}
         #break-screen.show{display:flex;}
-        .bar-bg{height:6px;background:#111;border-radius:3px;overflow:hidden;}
-        .bar-fill{height:6px;background:#f59e0b;border-radius:3px;transition:width .5s linear;}
+
+        .bar-bg{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
+        .bar-fill{height:6px;background:currentColor;border-radius:3px;transition:width .5s linear;}
+
+        .top-row{display:flex;justify-content:space-between;align-items:flex-start;}
+        .center-stack{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+        .bottom-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;padding:1.25rem;border-top:1px solid rgba(255,255,255,.08);}
+        .stat-label{font-size:.6rem;opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-weight:800;margin-bottom:.3rem;}
     </style></head>
-    <body style="height:100vh;display:flex;flex-direction:column;padding:3rem 4rem;">
+    <body class="layout-classico">
+        <!-- BREAK OVERLAY -->
         <div id="break-screen">
-            <div style="font-size:12rem;font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;">BREAK</div>
+            <div style="font-size:11rem;font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;">BREAK</div>
             <div id="break-timer" class="mono" style="font-size:6rem;color:#fff;margin-top:1rem;"></div>
             <div style="font-size:1.5rem;color:#52525b;margin-top:1rem;text-transform:uppercase;letter-spacing:.3em;">Intervalo</div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;">
-            <div style="font-size:1rem;font-weight:800;color:#27272a;text-transform:uppercase;letter-spacing:.15em;">PokerSul Pro</div>
-            <div style="display:flex;align-items:center;gap:1rem;">
-                <span style="font-size:.8rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.1em;">Próximo nível:</span>
-                <span id="next" style="font-size:1rem;font-weight:800;color:#52525b;"></span>
+
+        <div id="main-tv" style="position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;padding:2rem 2.5rem;">
+
+            <!-- TOP BAR -->
+            <div class="top-row hide-on-min">
+                <div>
+                    <div id="tournament-name" style="font-size:1.5rem;font-weight:800;letter-spacing:-.02em;"></div>
+                    <div id="tournament-type" style="font-size:.7rem;opacity:.5;text-transform:uppercase;letter-spacing:.15em;margin-top:.25rem;font-weight:700;"></div>
+                </div>
+                <div style="text-align:right;">
+                    <div id="clube-nome" style="font-size:.85rem;font-weight:800;opacity:.6;text-transform:uppercase;letter-spacing:.15em;"></div>
+                    <div style="font-size:.7rem;opacity:.5;margin-top:.3rem;"><span style="text-transform:uppercase;letter-spacing:.1em;font-weight:700;opacity:.7;">Próximo:</span> <span id="next-blinds" class="mono"></span></div>
+                </div>
+            </div>
+
+            <!-- CENTER: TIMER + BLINDS -->
+            <div class="center-stack">
+                <div class="hide-on-min" style="font-size:.8rem;opacity:.45;text-transform:uppercase;letter-spacing:.25em;font-weight:800;">Nível <span id="nivel"></span><span id="nivel-total" style="opacity:.5;"></span></div>
+                <div id="timer" class="mono timer-main" style="font-size:14rem;line-height:1;letter-spacing:-.06em;font-weight:700;margin:.5rem 0;"></div>
+                <div class="bar-bg" style="width:540px;opacity:.5;margin-bottom:1.25rem;"><div id="bar" class="bar-fill" style="width:100%;"></div></div>
+                <div id="blinds" class="blinds-main" style="font-size:5.5rem;font-weight:800;line-height:1;letter-spacing:-.03em;"></div>
+                <div id="ante" style="font-size:1.05rem;opacity:.55;margin-top:.5rem;text-transform:uppercase;letter-spacing:.2em;font-weight:700;"></div>
+            </div>
+
+            <!-- BOTTOM STATS -->
+            <div class="bottom-grid hide-on-min panel-bg">
+                <div>
+                    <div class="stat-label">Jogadores</div>
+                    <div style="display:flex;align-items:baseline;gap:.5rem;">
+                        <div id="p" class="mono" style="font-size:2.5rem;font-weight:700;"></div>
+                        <div id="p-total" class="mono" style="font-size:.9rem;opacity:.5;"></div>
+                    </div>
+                </div>
+                <div style="text-align:center;">
+                    <div class="stat-label">Avg Stack</div>
+                    <div id="a" class="mono" style="font-size:2.5rem;font-weight:700;"></div>
+                </div>
+                <div id="prize-wrap" style="text-align:center;">
+                    <div class="stat-label">Prize Pool</div>
+                    <div id="prize" class="mono" style="font-size:2.5rem;font-weight:700;color:#22c55e;"></div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="stat-label">Tempo Decorrido</div>
+                    <div id="elapsed" class="mono" style="font-size:2.5rem;font-weight:700;opacity:.85;"></div>
+                </div>
             </div>
         </div>
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6rem;">
-            <div style="text-align:center;">
-                <div style="font-size:.7rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.15em;font-weight:800;margin-bottom:.5rem;">Nível</div>
-                <div id="nivel" class="mono" style="font-size:6rem;color:#52525b;font-weight:700;"></div>
-            </div>
-            <div style="text-align:center;">
-                <div id="timer" class="mono" style="font-size:16rem;color:#f59e0b;line-height:1;letter-spacing:-.06em;"></div>
-                <div class="bar-bg" style="margin-top:1rem;width:600px;"><div id="bar" class="bar-fill" style="width:100%;"></div></div>
-            </div>
-            <div style="text-align:center;"></div>
-        </div>
-        <div style="text-align:center;margin-bottom:1.5rem;">
-            <div id="blinds" style="font-size:5rem;font-weight:800;line-height:1;"></div>
-            <div id="ante" style="font-size:1.5rem;color:#52525b;margin-top:.25rem;text-transform:uppercase;letter-spacing:.1em;"></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #111;padding-top:1.5rem;">
-            <div><div style="font-size:.6rem;color:#27272a;text-transform:uppercase;letter-spacing:.15em;font-weight:800;">Jogadores</div><div id="p" class="mono" style="font-size:4rem;font-weight:700;"></div></div>
-            <div style="text-align:center;"><div style="font-size:.6rem;color:#27272a;text-transform:uppercase;letter-spacing:.15em;font-weight:800;">Prize Pool</div><div id="prize" class="mono" style="font-size:4rem;font-weight:700;color:#22c55e;"></div></div>
-            <div style="text-align:right;"><div style="font-size:.6rem;color:#27272a;text-transform:uppercase;letter-spacing:.15em;font-weight:800;">Avg Stack</div><div id="a" class="mono" style="font-size:4rem;font-weight:700;"></div></div>
-        </div>
+
     <script>
-    window.onmessage = e => {
-        const d = e.data;
-        document.getElementById('timer').innerText = d.timer;
-        document.getElementById('nivel').innerText = d.nivel;
-        document.getElementById('blinds').innerText = d.blinds;
-        document.getElementById('ante').innerText = 'Ante ' + d.ante;
-        document.getElementById('p').innerText = d.players;
-        document.getElementById('a').innerText = d.avg;
-        document.getElementById('prize').innerText = d.prize;
-        document.getElementById('next').innerText = 'Próx: ' + d.next;
-        document.getElementById('bar').style.width = d.pct + '%';
-        document.getElementById('bar').style.background = d.pct < 20 ? '#ef4444' : '#f59e0b';
-        document.getElementById('timer').style.color = d.pct < 20 ? '#ef4444' : '#f59e0b';
-        const bs = document.getElementById('break-screen');
-        if(d.isBreak){ bs.classList.add('show'); document.getElementById('break-timer').innerText = d.timer; }
-        else bs.classList.remove('show');
+    window.onmessage=function(e){
+        const d=e.data;
+        document.body.className='layout-'+(d.layout||'classico');
+        document.getElementById('tournament-name').innerText=d.tournamentName||'';
+        document.getElementById('clube-nome').innerText=d.clubeNome||'';
+        const tipoLabels={normal:'Torneio Normal',bounty:'💰 Bounty',pko:'🎯 Progressive KO',knockout:'⚡ Somente KO'};
+        document.getElementById('tournament-type').innerText=tipoLabels[d.tipo]||'';
+        document.getElementById('timer').innerText=d.timer;
+        document.getElementById('nivel').innerText=d.nivel;
+        document.getElementById('nivel-total').innerText=' / '+d.totalNiveis;
+        document.getElementById('blinds').innerText=d.blinds;
+        document.getElementById('ante').innerText='Ante '+d.ante;
+        document.getElementById('p').innerText=d.players;
+        document.getElementById('p-total').innerText='('+d.totalEntries+' ent.)';
+        document.getElementById('a').innerText=d.avg;
+        document.getElementById('prize').innerText=d.prize;
+        document.getElementById('next-blinds').innerText=d.next;
+        document.getElementById('elapsed').innerText=d.elapsed;
+        // Prize pool visibility (layout-dependent: só esconde no wrap, não mexe no grid)
+        document.getElementById('prize-wrap').style.visibility=d.showPrize?'visible':'hidden';
+        // Progress bar + warning color
+        const bar=document.getElementById('bar');
+        bar.style.width=Math.max(0,d.pct)+'%';
+        if(d.pct<20){document.getElementById('bar').style.background='#ef4444';}
+        else{document.getElementById('bar').style.background='';}
+        const bs=document.getElementById('break-screen');
+        if(d.isBreak){bs.classList.add('show');document.getElementById('break-timer').innerText=d.timer;}
+        else{bs.classList.remove('show');}
     };
     <\/script>
     </body></html>`);
     tvWindow.document.close();
     setTimeout(() => updateTV(idx), 500);
+}
+
+// ============================================================
+// TORNEIO — HELPERS UI (layout, prize, tipo)
+// ============================================================
+function onTipoTorneioChange() {
+    const tipo = document.getElementById('t-tipo').value;
+    const wrap = document.getElementById('t-bounty-wrap');
+    const pkoWrap = document.getElementById('t-pko-split-wrap');
+    const hint = document.getElementById('t-bounty-hint');
+    if (tipo === 'normal') {
+        wrap.style.display = 'none';
+    } else {
+        wrap.style.display = 'block';
+        pkoWrap.style.display = tipo === 'pko' ? 'block' : 'none';
+        const hints = {
+            bounty: '💰 Cada eliminação paga um valor fixo ao eliminador (saído do buy-in).',
+            pko: '🎯 Parte do bounty vai ao eliminador, parte cresce na cabeça dele.',
+            knockout: '⚡ Sem premiação final — 100% do buy-in (menos rake) vira bounty.',
+        };
+        hint.innerText = hints[tipo] || '';
+    }
+}
+
+function onLayoutChange() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    t.tvLayout = document.getElementById('mt-tv-layout').value;
+    saveData();
+    updateTV(activeTorneioIdx);
+    showToast('🎨 Layout TV: ' + t.tvLayout);
+}
+
+function togglePrizePool() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    t.tvShowPrize = !t.tvShowPrize;
+    saveData();
+    updateTV(activeTorneioIdx);
+    const btn = document.getElementById('btn-prize-toggle');
+    if (btn) btn.innerHTML = t.tvShowPrize
+        ? '<i class="fa-solid fa-eye"></i>'
+        : '<i class="fa-solid fa-eye-slash"></i> Oculto';
+    showToast(t.tvShowPrize ? '💰 Prize Pool visível na TV' : '🙈 Prize Pool oculto na TV');
+}
+
+// Sync TV layout selector + prize button state when opening tournament modal
+function syncTVControls() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const sel = document.getElementById('mt-tv-layout');
+    if (sel) sel.value = t.tvLayout || 'classico';
+    const btn = document.getElementById('btn-prize-toggle');
+    if (btn) btn.innerHTML = (t.tvShowPrize !== false)
+        ? '<i class="fa-solid fa-eye"></i>'
+        : '<i class="fa-solid fa-eye-slash"></i> Oculto';
 }
 
 // ============================================================
@@ -2349,6 +2731,9 @@ setInterval(() => {
         } else if (t.rodando && t.tempoRestante <= 0 && !t.isBreak) {
             nextLevel(i);
             changed = true;
+        } else if (t.iniciadoEm && t.status !== 'finished') {
+            // Atualiza TV mesmo pausado para manter tempo decorrido em tempo real
+            updateTV(i);
         }
     });
     if (changed) saveData();
@@ -2432,8 +2817,24 @@ function getAtivos(t) {
 }
 
 function getPrize(t) {
-    const entries = t.entries.filter(e => e.tipo !== 'addon').length;
-    return entries * t.buyin * (1 - t.rake / 100);
+    // soma valores reais pagos em entradas (buy-in, rebuys, reentries)
+    const bruto = t.entries.reduce((s, e) => {
+        if (e.tipo === 'addon') return s;
+        return s + (e.valor || t.buyin);
+    }, 0);
+    const liquido = bruto * (1 - t.rake/100);
+    if (t.tipo === 'knockout') {
+        // 100% em bounties, nada no prize pool final
+        return 0;
+    } else if (t.tipo === 'bounty') {
+        // parte vai para bounty fixo (pago por entrada)
+        const totalBounties = t.entries.filter(e=>e.tipo!=='addon').length * t.bountyValor;
+        return Math.max(0, liquido - totalBounties);
+    } else if (t.tipo === 'pko') {
+        // só metade (pkoSplit) fica na cabeça, resto vai para prize pool
+        return liquido * (1 - t.pkoSplit/100);
+    }
+    return liquido;
 }
 
 function getRake(t) {
