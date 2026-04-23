@@ -504,6 +504,7 @@
                     <button class="tab-btn"        id="cfgtab-btn-preferencias" onclick="switchConfigTab('cfg-preferencias', this)"><i class="fa-solid fa-sliders"></i> Preferências</button>
                     <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this)"><i class="fa-solid fa-trophy"></i> Torneios</button>
                     <button class="tab-btn"        id="cfgtab-btn-cash"        onclick="switchConfigTab('cfg-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
+                    <button class="tab-btn"        id="cfgtab-btn-fichas"      onclick="switchConfigTab('cfg-fichas', this)"><i class="fa-solid fa-circle"></i> Fichas</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
                 </div>
@@ -633,6 +634,23 @@
                             <div style="grid-column:1/-1;"><label class="inp-label">Rake Padrão %</label><input id="cfg-cash-rake" type="number" step="0.5" class="inp" value="0"></div>
                         </div>
                         <button onclick="salvarConfigCash()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1.25rem;width:100%;">Salvar Padrões de Cash Game</button>
+                    </div>
+                </div>
+
+                <!-- ABA: FICHAS -->
+                <div id="cfg-fichas" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                            <div>
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Denominações de Fichas</div>
+                                <div style="font-size:.75rem;color:#71717a;margin-top:.2rem;">Configure as fichas usadas nas mesas de cash game</div>
+                            </div>
+                            <button onclick="addFichaDenom()" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Adicionar</button>
+                        </div>
+                        <div id="fichas-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                        <div style="margin-top:1rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;">
+                            <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Essas denominações aparecem ao abrir mesa de cash e registrar saídas de jogadores.
+                        </div>
                     </div>
                 </div>
 
@@ -1179,6 +1197,20 @@
                 <label class="inp-label">Duração prevista (horas)</label>
                 <input id="cm-duracao" type="number" step="0.5" min="0.5" value="4" class="inp">
             </div>
+
+            <!-- Contagem inicial de fichas -->
+            <div style="padding:.85rem 1rem;background:rgba(6,182,212,.04);border:1px solid rgba(6,182,212,.2);border-radius:.6rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                    <div>
+                        <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-circle"></i> Fichas Iniciais na Mesa</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Quantidade de cada ficha disponível na caixa da mesa</div>
+                    </div>
+                    <button onclick="toggleFichasContagem('cm')" type="button" id="cm-fichas-toggle" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .7rem;cursor:pointer;font-size:.7rem;font-family:'Manrope',sans-serif;">Expandir</button>
+                </div>
+                <div id="cm-fichas-wrap" style="display:none;"></div>
+                <div id="cm-fichas-total" style="display:none;margin-top:.5rem;padding:.5rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;font-weight:700;text-align:right;"></div>
+            </div>
+
             <button onclick="criarMesaCash()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;">Abrir Mesa</button>
         </div>
     </div>
@@ -1202,6 +1234,24 @@
                 <input id="acj-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 100">
             </div>
             <button onclick="confirmAddCashJogador()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Entrar na Mesa</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ENCERRAR MESA CASH (bate caixa) -->
+<div id="modal-encerrar-mesa" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-flag-checkered" style="color:var(--gold);"></i> Encerrar Mesa — Bate Caixa</h3>
+            <button onclick="closeModal('modal-encerrar-mesa')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="enc-mesa-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;"></div>
+            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Contagem Final de Fichas</div>
+            <div style="font-size:.75rem;color:#71717a;">Conte as fichas que ainda estão na caixa da mesa (depois que todos saíram):</div>
+            <div id="enc-fichas-wrap"></div>
+            <div id="enc-confere" style="padding:1rem;border-radius:.6rem;"></div>
+            <button onclick="confirmarEncerrarMesa()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Encerramento</button>
         </div>
     </div>
 </div>
@@ -1237,6 +1287,20 @@
                 <label class="inp-label">Valor com que o jogador saiu da mesa R$ *</label>
                 <input id="ret-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 250" oninput="calcResultadoPreview()">
             </div>
+
+            <!-- Contagem de fichas na saída -->
+            <div style="padding:.85rem 1rem;background:rgba(6,182,212,.04);border:1px solid rgba(6,182,212,.2);border-radius:.6rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                    <div>
+                        <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-circle"></i> Fichas Retiradas</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Contagem das fichas que o jogador levou (opcional)</div>
+                    </div>
+                    <button onclick="toggleFichasContagem('ret')" type="button" id="ret-fichas-toggle" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .7rem;cursor:pointer;font-size:.7rem;font-family:'Manrope',sans-serif;">Expandir</button>
+                </div>
+                <div id="ret-fichas-wrap" style="display:none;"></div>
+                <div id="ret-fichas-confere" style="display:none;margin-top:.5rem;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;font-weight:700;"></div>
+            </div>
+
             <div id="ret-resultado" style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;text-align:center;"></div>
             <button onclick="confirmRetirar()" style="width:100%;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
                 Confirmar Retirada
@@ -1628,6 +1692,14 @@ let transacoes = JSON.parse(localStorage.getItem('ps_transacoes'))  || [];
 let fechamentos= JSON.parse(localStorage.getItem('ps_fechamentos')) || [];
 let barCaixa   = JSON.parse(localStorage.getItem('ps_bar_caixa'))   || { status:'fechado', abertoEm:null, abertoPor:null, historico:[] };
 let rankings   = JSON.parse(localStorage.getItem('ps_rankings'))    || [];
+// Denominações de fichas padrão do clube (editável em Configurações)
+let fichasDenominacoes = JSON.parse(localStorage.getItem('ps_fichas_denom')) || [
+    { valor:25,    cor:'#22c55e', nome:'Verde'   },
+    { valor:100,   cor:'#000000', nome:'Preta'   },
+    { valor:500,   cor:'#a855f7', nome:'Roxa'    },
+    { valor:1000,  cor:'#eab308', nome:'Amarela' },
+    { valor:5000,  cor:'#ef4444', nome:'Vermelha'},
+];
 
 // Payment methods metadata
 const PAYMENT_METHODS = {
@@ -1724,6 +1796,7 @@ function saveData() {
     localStorage.setItem('ps_fechamentos', JSON.stringify(fechamentos));
     localStorage.setItem('ps_bar_caixa',   JSON.stringify(barCaixa));
     localStorage.setItem('ps_rankings',    JSON.stringify(rankings));
+    localStorage.setItem('ps_fichas_denom', JSON.stringify(fichasDenominacoes));
 }
 
 // ============================================================
@@ -3621,35 +3694,9 @@ function highlightModo(radio) {
 }
 
 function criarMesaCash() {
-    const nome = document.getElementById('cm-nome').value.trim();
-    if (!nome) return showToast('⚠️ Nome obrigatório');
-    const sb   = parseFloat(document.getElementById('cm-sb').value)   || 0;
-    const bb   = parseFloat(document.getElementById('cm-bb').value)   || 0;
-    const bmin = parseFloat(document.getElementById('cm-bmin').value) || 0;
-    const bmax = parseFloat(document.getElementById('cm-bmax').value) || 0;
-    const rake = parseFloat(document.getElementById('cm-rake').value) || 0;
-    const modo = document.querySelector('input[name="cm-modo"]:checked').value;
-    const duracao = parseFloat(document.getElementById('cm-duracao').value) || 0;
-
-    if (bmin > bmax) return showToast('⚠️ Buy-in mínimo maior que máximo');
-
-    cashMesas.push({
-        id: Date.now(),
-        nome, sb, bb, bmin, bmax, rake, modo,
-        duracaoHoras: modo === 'programado' ? duracao : 0,
-        status: 'ativa',
-        abertoEm: Date.now(),
-        fechadoEm: null,
-        jogadores: [],
-        // sessoes mantém o registro completo (jogadores saíram também)
-        sessoes: [],
-    });
-    saveData();
-    closeModal('modal-nova-cash-mesa');
-    // Reset form
-    document.getElementById('cm-nome').value = '';
-    renderCashMesas();
-    showToast(`🃏 Mesa "${nome}" aberta!`);
+    // Delegate to the wrapped version that captures fichas
+    const fichasInicio = getFichasContagem('cm');
+    _criarMesaCashOrig_wrapped(fichasInicio);
 }
 
 function renderCashMesas() {
@@ -3905,7 +3952,11 @@ function confirmRetirar() {
     j.status  = 'saiu';
     j.saiuEm  = Date.now();
     j.saiuCom = valor;
+    j.fichasRetiradas = getFichasContagem('ret');
     j.movimentos.push({ tipo: 'saida', valor, rakeCobrado: 0, ts: Date.now() });
+
+    // Reset contagem
+    _fichasContagemState.ret = {};
 
     // Registra saída no caixa (positivo — jogador recebe)
     if (valor > 0) {
@@ -3930,21 +3981,8 @@ function confirmRetirar() {
 
 // --- ENCERRAR MESA ---
 function encerrarMesaCash(mesaId) {
-    const m = cashMesas.find(x => x.id === mesaId);
-    if (!m) return;
-    const ativos = m.jogadores.filter(j => j.status === 'ativo');
-    if (ativos.length > 0) {
-        if (!confirm(`⚠️ Ainda há ${ativos.length} jogador(es) na mesa. Retire todos antes de encerrar.`)) return;
-        return showToast('⚠️ Retire os jogadores ativos antes de encerrar');
-    }
-    if (!confirm(`Encerrar mesa "${m.nome}"?`)) return;
-    m.status = 'encerrada';
-    m.fechadoEm = Date.now();
-    saveData();
-    renderCashMesas();
-    renderCashHistorico();
-    renderCashRelatorio();
-    showToast(`✅ Mesa "${m.nome}" encerrada`);
+    // Opens the modal with chip reconciliation
+    encerrarMesaCashModal(mesaId);
 }
 
 // --- HISTÓRICO ---
@@ -3960,11 +3998,19 @@ function renderCashHistorico() {
         const volume = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
         const rake   = getCashRake(m);
         const dur    = formatDuration((m.fechadoEm||Date.now()) - m.abertoEm);
+        // Bateria de caixa
+        const hasBat = typeof m.fichasDiferenca === 'number';
+        let batTag = '';
+        if (hasBat) {
+            if (Math.abs(m.fichasDiferenca) < 0.01) batTag = `<span class="tag tag-running" style="font-size:.6rem;">✓ Bate</span>`;
+            else if (m.fichasDiferenca > 0) batTag = `<span class="tag tag-paused" style="font-size:.6rem;">Sobra ${formatMoney(m.fichasDiferenca)}</span>`;
+            else batTag = `<span class="tag tag-break" style="font-size:.6rem;">Quebra ${formatMoney(Math.abs(m.fichasDiferenca))}</span>`;
+        }
         return `
         <div class="t-card" style="padding:1.25rem 1.5rem;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.75rem;">
                 <div>
-                    <div style="font-weight:800;font-size:.95rem;">${m.nome}</div>
+                    <div style="font-weight:800;font-size:.95rem;">${m.nome} ${batTag}</div>
                     <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">
                         ${new Date(m.abertoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
                         &bull; Duração ${dur}
@@ -4014,6 +4060,36 @@ function renderCashRelatorio() {
     el_rake.innerText    = formatMoney(rake);
     el_sessoes.innerText = sessoes;
 
+    // Totais de bate caixa
+    let totalSobra = 0, totalQuebra = 0, mesasBatidas = 0;
+    encerradas.forEach(m => {
+        if (typeof m.fichasDiferenca === 'number') {
+            if (Math.abs(m.fichasDiferenca) < 0.01) mesasBatidas++;
+            else if (m.fichasDiferenca > 0) totalSobra += m.fichasDiferenca;
+            else totalQuebra += Math.abs(m.fichasDiferenca);
+        }
+    });
+    // Inject a small summary at top of ranking area (reuse ranking element)
+    const rankEl = document.getElementById('cash-rel-ranking');
+    if (rankEl) {
+        const batInfo = encerradas.some(m => typeof m.fichasDiferenca === 'number') ? `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #1e1e23;">
+            <div style="padding:.6rem;background:rgba(34,197,94,.08);border-radius:.4rem;text-align:center;">
+                <div style="font-size:.6rem;color:#22c55e;font-weight:700;text-transform:uppercase;">Mesas que bateram</div>
+                <div style="font-size:1.25rem;font-weight:800;color:#22c55e;margin-top:.15rem;">${mesasBatidas}</div>
+            </div>
+            <div style="padding:.6rem;background:rgba(245,158,11,.08);border-radius:.4rem;text-align:center;">
+                <div style="font-size:.6rem;color:var(--gold);font-weight:700;text-transform:uppercase;">Sobras acumuladas</div>
+                <div style="font-size:1.25rem;font-weight:800;color:var(--gold);margin-top:.15rem;">${formatMoney(totalSobra)}</div>
+            </div>
+            <div style="padding:.6rem;background:rgba(239,68,68,.08);border-radius:.4rem;text-align:center;">
+                <div style="font-size:.6rem;color:#ef4444;font-weight:700;text-transform:uppercase;">Quebras acumuladas</div>
+                <div style="font-size:1.25rem;font-weight:800;color:#ef4444;margin-top:.15rem;">${formatMoney(totalQuebra)}</div>
+            </div>
+        </div>` : '';
+        rankEl._batInfoHtml = batInfo;
+    }
+
     // Ranking por jogador (só de mesas encerradas)
     const porJogador = {};
     encerradas.forEach(m => {
@@ -4030,7 +4106,8 @@ function renderCashRelatorio() {
         ...d,
     })).sort((a, b) => b.resultado - a.resultado);
 
-    el_rank.innerHTML = ranking.length ? ranking.map((r, i) => {
+    const batPrefix = el_rank._batInfoHtml || '';
+    el_rank.innerHTML = batPrefix + (ranking.length ? ranking.map((r, i) => {
         const jog = jogadores.find(x => x.id === r.id);
         const positivo = r.resultado >= 0;
         return `
@@ -4041,7 +4118,7 @@ function renderCashRelatorio() {
             <span style="font-family:'Space Mono',monospace;color:#71717a;font-size:.75rem;">Inv ${formatMoney(r.invest)}</span>
             <span style="font-family:'Space Mono',monospace;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(r.resultado)}</span>
         </div>`;
-    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhuma sessão encerrada ainda</div>';
+    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhuma sessão encerrada ainda</div>');
 }
 
 // --- DURATION FORMATTER ---
@@ -4244,6 +4321,7 @@ function switchConfigTab(tabId, btn) {
     document.getElementById(tabId).style.display = 'block';
     btn.classList.add('active');
     if (tabId === 'cfg-backup') renderBackupStats();
+    if (tabId === 'cfg-fichas') renderFichasConfig();
 }
 
 function renderConfig() {
@@ -4435,7 +4513,7 @@ function renderBackupStats() {
 function exportarBackup() {
     const data = {
         __meta: { sistema: 'PokerSul', versao: '1.5', exportadoEm: new Date().toISOString() },
-        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config, transacoes, fechamentos, barCaixa, rankings,
+        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config, transacoes, fechamentos, barCaixa, rankings, fichasDenominacoes,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
@@ -4473,6 +4551,7 @@ function importarBackup(event) {
             fechamentos = data.fechamentos || [];
             if (data.barCaixa) barCaixa = data.barCaixa;
             if (data.rankings) rankings = data.rankings;
+            if (data.fichasDenominacoes) fichasDenominacoes = data.fichasDenominacoes;
             if (data.config) config = mergeConfig(data.config, DEFAULT_CONFIG);
             saveData();
             showToast('✅ Backup restaurado! Recarregando...');
@@ -5891,6 +5970,311 @@ function aplicarLayoutGlobal(layout) {
     config.torneios.tvLayoutPadrao = layout;
     localStorage.setItem('ps_config', JSON.stringify(config));
     showToast(`🎨 Layout "${layout}" salvo como padrão para novos torneios`);
+}
+
+
+
+// ============================================================
+// FICHAS / DENOMINAÇÕES
+// ============================================================
+function renderFichasConfig() {
+    const el = document.getElementById('fichas-list');
+    if (!el) return;
+    if (!fichasDenominacoes.length) {
+        el.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma ficha cadastrada</div>';
+        return;
+    }
+    el.innerHTML = fichasDenominacoes.map((f, i) => `
+        <div style="display:grid;grid-template-columns:60px 100px 1fr 80px 40px;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <input type="color" value="${f.cor}" onchange="fichasDenominacoes[${i}].cor=this.value;saveData();renderFichasConfig();" style="width:36px;height:28px;border:none;border-radius:.3rem;cursor:pointer;background:transparent;">
+                <div style="width:24px;height:24px;border-radius:50%;background:${f.cor};border:2px solid #fff;box-shadow:0 0 0 1px #000;"></div>
+            </div>
+            <input type="number" value="${f.valor}" onchange="fichasDenominacoes[${i}].valor=parseFloat(this.value)||0;saveData();" class="inp" style="padding:.35rem .5rem;font-size:.85rem;font-family:'Space Mono',monospace;">
+            <input type="text" value="${f.nome}" placeholder="Nome da ficha" onchange="fichasDenominacoes[${i}].nome=this.value;saveData();" class="inp" style="padding:.35rem .5rem;font-size:.85rem;">
+            <span style="font-size:.7rem;color:#52525b;text-align:right;">#${i+1}</span>
+            <button onclick="removerFichaDenom(${i})" class="btn-danger" style="padding:.3rem .5rem;font-size:.7rem;"><i class="fa-solid fa-trash"></i></button>
+        </div>`).join('');
+}
+
+function addFichaDenom() {
+    fichasDenominacoes.push({ valor: 100, cor: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0'), nome: 'Nova' });
+    saveData();
+    renderFichasConfig();
+}
+
+function removerFichaDenom(i) {
+    if (!confirm('Remover esta denominação?')) return;
+    fichasDenominacoes.splice(i, 1);
+    saveData();
+    renderFichasConfig();
+}
+
+// ============================================================
+// CONTAGEM DE FICHAS (input UI genérico)
+// ============================================================
+// prefix: 'cm' = cash mesa init, 'ret' = retirada, 'enc' = encerrar
+let _fichasContagemState = { cm:{}, ret:{}, enc:{} };
+
+function toggleFichasContagem(prefix) {
+    const wrap = document.getElementById(prefix + '-fichas-wrap');
+    const btn  = document.getElementById(prefix + '-fichas-toggle');
+    const totEl = document.getElementById(prefix + '-fichas-total');
+    if (!wrap) return;
+    const aberto = wrap.style.display !== 'none';
+    if (aberto) {
+        wrap.style.display = 'none';
+        if (btn) btn.innerText = 'Expandir';
+        if (totEl) totEl.style.display = 'none';
+    } else {
+        renderFichasInputs(prefix);
+        wrap.style.display = 'grid';
+        wrap.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        wrap.style.gap = '.5rem';
+        if (btn) btn.innerText = 'Recolher';
+        if (totEl) totEl.style.display = 'block';
+    }
+}
+
+function renderFichasInputs(prefix) {
+    const wrap = document.getElementById(prefix + '-fichas-wrap');
+    if (!wrap) return;
+    if (!fichasDenominacoes.length) {
+        wrap.innerHTML = '<div style="grid-column:1/-1;padding:1rem;text-align:center;color:#52525b;font-size:.75rem;">Cadastre as denominações em Configurações → Fichas</div>';
+        return;
+    }
+    wrap.innerHTML = fichasDenominacoes.map((f, i) => `
+        <div style="display:flex;align-items:center;gap:.4rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;padding:.4rem .5rem;">
+            <div style="width:20px;height:20px;border-radius:50%;background:${f.cor};border:1.5px solid #fff;box-shadow:0 0 0 1px #000;flex-shrink:0;"></div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:.6rem;color:#71717a;font-family:'Space Mono',monospace;">R$ ${f.valor}</div>
+                <input type="number" min="0" value="${_fichasContagemState[prefix][i] || 0}" onchange="atualizarFichasContagem('${prefix}', ${i}, this.value)" class="inp" style="padding:.2rem .35rem;font-size:.85rem;font-family:'Space Mono',monospace;font-weight:700;" placeholder="0">
+            </div>
+        </div>`).join('');
+    calcularTotalFichas(prefix);
+}
+
+function atualizarFichasContagem(prefix, idx, valor) {
+    _fichasContagemState[prefix][idx] = parseInt(valor) || 0;
+    calcularTotalFichas(prefix);
+}
+
+function calcularTotalFichas(prefix) {
+    const estado = _fichasContagemState[prefix];
+    const total = Object.entries(estado).reduce((s, [i, qtd]) => {
+        const f = fichasDenominacoes[parseInt(i)];
+        return s + (f ? (f.valor * qtd) : 0);
+    }, 0);
+    const totalQtd = Object.values(estado).reduce((s, q) => s + q, 0);
+    const totEl = document.getElementById(prefix + '-fichas-total');
+    if (totEl) totEl.innerHTML = `<span style="color:#71717a;">${totalQtd} fichas · Total: </span><span style="color:#22c55e;font-family:'Space Mono',monospace;">${formatMoney(total)}</span>`;
+
+    // If ret (retirada), conferir com valor digitado
+    if (prefix === 'ret') {
+        const valorInformado = parseFloat(document.getElementById('ret-valor').value) || 0;
+        const confereEl = document.getElementById('ret-fichas-confere');
+        if (!confereEl) return;
+        if (totalQtd === 0) {
+            confereEl.style.display = 'none';
+            return;
+        }
+        confereEl.style.display = 'block';
+        const diff = total - valorInformado;
+        if (Math.abs(diff) < 0.01) {
+            confereEl.style.background = 'rgba(34,197,94,.08)';
+            confereEl.style.border = '1px solid rgba(34,197,94,.25)';
+            confereEl.innerHTML = `<span style="color:#22c55e;">✓ Fichas conferem: ${formatMoney(total)}</span>`;
+        } else if (diff > 0) {
+            confereEl.style.background = 'rgba(245,158,11,.08)';
+            confereEl.style.border = '1px solid rgba(245,158,11,.25)';
+            confereEl.innerHTML = `<span style="color:var(--gold);">⚠️ Fichas ${formatMoney(total)} > Valor informado ${formatMoney(valorInformado)} (diferença +${formatMoney(diff)})</span>`;
+        } else {
+            confereEl.style.background = 'rgba(239,68,68,.08)';
+            confereEl.style.border = '1px solid rgba(239,68,68,.25)';
+            confereEl.innerHTML = `<span style="color:#ef4444;">⚠️ Fichas ${formatMoney(total)} < Valor informado ${formatMoney(valorInformado)} (falta ${formatMoney(Math.abs(diff))})</span>`;
+        }
+    }
+    return total;
+}
+
+function getFichasContagem(prefix) {
+    return { ...(_fichasContagemState[prefix] || {}) };
+}
+
+function resetarFichasContagem(prefix) {
+    _fichasContagemState[prefix] = {};
+}
+
+// ============================================================
+// HOOK: CRIAÇÃO DE MESA COM FICHAS INICIAIS
+// ============================================================
+// Intercepta criarMesaCash para salvar contagem inicial
+const _criarMesaCashOrig = typeof criarMesaCash !== 'undefined' ? criarMesaCash : null;
+function criarMesaCashComFichas() {
+    // Pega a contagem inicial antes de chamar a função original
+    const fichasInicio = getFichasContagem('cm');
+    _criarMesaCashOrig_wrapped(fichasInicio);
+}
+
+function _criarMesaCashOrig_wrapped(fichasInicio) {
+    const nome = document.getElementById('cm-nome').value.trim();
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+    const sb   = parseFloat(document.getElementById('cm-sb').value)   || 0;
+    const bb   = parseFloat(document.getElementById('cm-bb').value)   || 0;
+    const bmin = parseFloat(document.getElementById('cm-bmin').value) || 0;
+    const bmax = parseFloat(document.getElementById('cm-bmax').value) || 0;
+    const rake = parseFloat(document.getElementById('cm-rake').value) || 0;
+    const modo = document.querySelector('input[name="cm-modo"]:checked').value;
+    const duracao = parseFloat(document.getElementById('cm-duracao').value) || 0;
+
+    if (bmin > bmax) return showToast('⚠️ Buy-in mínimo maior que máximo');
+
+    cashMesas.push({
+        id: Date.now(),
+        nome, sb, bb, bmin, bmax, rake, modo,
+        duracaoHoras: modo === 'programado' ? duracao : 0,
+        status: 'ativa',
+        abertoEm: Date.now(),
+        fechadoEm: null,
+        jogadores: [],
+        sessoes: [],
+        fichasInicio,
+        fichasFinal: null,
+        fichasDiferenca: null,
+    });
+
+    // Reset contagem
+    _fichasContagemState.cm = {};
+
+    saveData();
+    closeModal('modal-nova-cash-mesa');
+    document.getElementById('cm-nome').value = '';
+    renderCashMesas();
+    showToast(`🃏 Mesa "${nome}" aberta!`);
+}
+
+// ============================================================
+// ENCERRAR MESA COM BATE CAIXA
+// ============================================================
+let _mesaEncerrarIdx = null;
+
+function encerrarMesaCashModal(mesaId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+    const ativos = m.jogadores.filter(j => j.status === 'ativo');
+    if (ativos.length > 0) {
+        return showToast(`⚠️ Há ${ativos.length} jogador(es) ativos. Retire todos antes.`);
+    }
+
+    _mesaEncerrarIdx = cashMesas.findIndex(x => x.id === mesaId);
+    _fichasContagemState.enc = {};
+
+    // Info da mesa
+    const totalInvestido = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
+    const totalSaida = m.jogadores.reduce((s,j) => s + j.saiuCom, 0);
+    const rakeTotal = getCashRake(m);
+
+    // Expected chip value = totalInvestido - saídas já feitas - rake
+    // (jogadores que saíram levaram fichas que equivalem ao saiuCom)
+    const fichasInicialValor = calcTotalFichasDict(m.fichasInicio || {});
+    // Em mesa normalmente termina com valor = fichasInicialValor (os jogadores levam fichas que valiam o quanto pagaram - rake)
+    // Teoricamente: sobra = fichasInicial + investido - saíram - rake
+    const sobraEsperada = fichasInicialValor + totalInvestido - totalSaida - rakeTotal;
+
+    document.getElementById('enc-mesa-info').innerHTML = `
+        <div style="font-weight:700;margin-bottom:.5rem;">${m.nome}</div>
+        <div style="font-size:.75rem;color:#71717a;display:grid;grid-template-columns:1fr 1fr;gap:.3rem;">
+            <span>Fichas iniciais: <strong style="color:#06b6d4;">${formatMoney(fichasInicialValor)}</strong></span>
+            <span>Total investido: <strong style="color:#22c55e;">${formatMoney(totalInvestido)}</strong></span>
+            <span>Total saídas: <strong style="color:#ef4444;">${formatMoney(totalSaida)}</strong></span>
+            <span>Rake cobrado: <strong style="color:var(--gold);">${formatMoney(rakeTotal)}</strong></span>
+            <span style="grid-column:1/-1;padding-top:.35rem;border-top:1px solid #1e1e23;">Esperado na caixa: <strong style="color:#e4e4e7;">${formatMoney(sobraEsperada)}</strong></span>
+        </div>
+    `;
+
+    renderFichasInputsEncerrar();
+    openModal('modal-encerrar-mesa');
+}
+
+function renderFichasInputsEncerrar() {
+    const wrap = document.getElementById('enc-fichas-wrap');
+    if (!fichasDenominacoes.length) {
+        wrap.innerHTML = '<div style="padding:1rem;text-align:center;color:#52525b;font-size:.8rem;">Cadastre denominações em Configurações → Fichas</div>';
+        return;
+    }
+    wrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;">` +
+        fichasDenominacoes.map((f, i) => `
+        <div style="display:flex;align-items:center;gap:.4rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;padding:.4rem .5rem;">
+            <div style="width:20px;height:20px;border-radius:50%;background:${f.cor};border:1.5px solid #fff;box-shadow:0 0 0 1px #000;flex-shrink:0;"></div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:.6rem;color:#71717a;font-family:'Space Mono',monospace;">R$ ${f.valor}</div>
+                <input type="number" min="0" value="0" onchange="_fichasContagemState.enc[${i}]=parseInt(this.value)||0;conferirEncerramento()" class="inp" style="padding:.2rem .35rem;font-size:.85rem;font-family:'Space Mono',monospace;font-weight:700;">
+            </div>
+        </div>`).join('') + '</div>';
+}
+
+function conferirEncerramento() {
+    const m = cashMesas[_mesaEncerrarIdx];
+    if (!m) return;
+    const totalFinal = calcTotalFichasDict(_fichasContagemState.enc);
+    const fichasInicialValor = calcTotalFichasDict(m.fichasInicio || {});
+    const totalInvestido = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
+    const totalSaida = m.jogadores.reduce((s,j) => s + j.saiuCom, 0);
+    const rakeTotal = getCashRake(m);
+    const esperado = fichasInicialValor + totalInvestido - totalSaida - rakeTotal;
+    const diff = totalFinal - esperado;
+
+    const confEl = document.getElementById('enc-confere');
+    if (Math.abs(diff) < 0.01) {
+        confEl.style.background = 'rgba(34,197,94,.08)';
+        confEl.style.border = '1px solid rgba(34,197,94,.25)';
+        confEl.innerHTML = `<div style="color:#22c55e;font-weight:700;">✓ Caixa BATE!</div><div style="font-size:.75rem;color:#71717a;margin-top:.25rem;">Fichas finais ${formatMoney(totalFinal)} = Esperado ${formatMoney(esperado)}</div>`;
+    } else if (diff > 0) {
+        confEl.style.background = 'rgba(245,158,11,.08)';
+        confEl.style.border = '1px solid rgba(245,158,11,.25)';
+        confEl.innerHTML = `<div style="color:var(--gold);font-weight:700;">⚠️ SOBRA de ${formatMoney(diff)}</div><div style="font-size:.75rem;color:#71717a;margin-top:.25rem;">Contagem ${formatMoney(totalFinal)} > Esperado ${formatMoney(esperado)}</div>`;
+    } else {
+        confEl.style.background = 'rgba(239,68,68,.08)';
+        confEl.style.border = '1px solid rgba(239,68,68,.25)';
+        confEl.innerHTML = `<div style="color:#ef4444;font-weight:700;">⚠️ QUEBRA de ${formatMoney(Math.abs(diff))}</div><div style="font-size:.75rem;color:#71717a;margin-top:.25rem;">Contagem ${formatMoney(totalFinal)} < Esperado ${formatMoney(esperado)}</div>`;
+    }
+}
+
+function confirmarEncerrarMesa() {
+    const m = cashMesas[_mesaEncerrarIdx];
+    if (!m) return;
+    const totalFinal = calcTotalFichasDict(_fichasContagemState.enc);
+    const fichasInicialValor = calcTotalFichasDict(m.fichasInicio || {});
+    const totalInvestido = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
+    const totalSaida = m.jogadores.reduce((s,j) => s + j.saiuCom, 0);
+    const rakeTotal = getCashRake(m);
+    const esperado = fichasInicialValor + totalInvestido - totalSaida - rakeTotal;
+    const diff = totalFinal - esperado;
+
+    m.status = 'encerrada';
+    m.fechadoEm = Date.now();
+    m.fichasFinal = { ..._fichasContagemState.enc };
+    m.fichasFinalValor = totalFinal;
+    m.fichasEsperado = esperado;
+    m.fichasDiferenca = diff;
+
+    _fichasContagemState.enc = {};
+    saveData();
+    closeModal('modal-encerrar-mesa');
+    renderCashMesas();
+    renderCashHistorico();
+    renderCashRelatorio();
+
+    if (Math.abs(diff) < 0.01) showToast(`✅ Mesa "${m.nome}" encerrada — Caixa bate!`);
+    else if (diff > 0) showToast(`⚠️ Mesa encerrada com SOBRA de ${formatMoney(diff)}`);
+    else showToast(`⚠️ Mesa encerrada com QUEBRA de ${formatMoney(Math.abs(diff))}`);
+}
+
+function calcTotalFichasDict(dict) {
+    return Object.entries(dict || {}).reduce((s, [i, qtd]) => {
+        const f = fichasDenominacoes[parseInt(i)];
+        return s + (f ? (f.valor * qtd) : 0);
+    }, 0);
 }
 
 
