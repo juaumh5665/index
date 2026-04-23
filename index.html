@@ -336,15 +336,46 @@
 
             <!-- TORNEIOS -->
             <div id="page-torneios" class="page-content fade-in" style="display:none;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-                    <h3 style="font-size:1.1rem;font-weight:800;">Torneios</h3>
-                    <button onclick="openModal('modal-novo-torneio')" class="btn-gold">+ Novo Torneio</button>
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
+                    <button class="tab-btn active" id="torntab-btn-ativos"   onclick="switchTornTab('torn-ativos', this)"><i class="fa-solid fa-play"></i> Torneios</button>
+                    <button class="tab-btn"        id="torntab-btn-series"   onclick="switchTornTab('torn-series', this)"><i class="fa-solid fa-calendar-days"></i> Séries (Multi-dias)</button>
+                    <button class="tab-btn"        id="torntab-btn-rankings" onclick="switchTornTab('torn-rankings', this)"><i class="fa-solid fa-ranking-star"></i> Rankings</button>
+                    <button class="tab-btn"        id="torntab-btn-tvconfig" onclick="switchTornTab('torn-tvconfig', this)"><i class="fa-solid fa-tv"></i> Configuração TV</button>
                 </div>
-                <div id="torneios-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
-                <div id="sem-torneios" style="text-align:center;padding:4rem;color:#3f3f46;">
-                    <i class="fa-solid fa-trophy" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
-                    <div style="font-weight:700;">Nenhum torneio criado</div>
-                    <div style="font-size:.8rem;margin-top:.25rem;">Clique em "+ Novo Torneio" para começar</div>
+
+                <!-- SUBTAB: ATIVOS -->
+                <div id="torn-ativos" class="torntab-content">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                        <h3 style="font-size:1.1rem;font-weight:800;">Torneios</h3>
+                        <button onclick="openModal('modal-novo-torneio')" class="btn-gold">+ Novo Torneio</button>
+                    </div>
+                    <div id="torneios-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
+                    <div id="sem-torneios" style="text-align:center;padding:4rem;color:#3f3f46;">
+                        <i class="fa-solid fa-trophy" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
+                        <div style="font-weight:700;">Nenhum torneio criado</div>
+                        <div style="font-size:.8rem;margin-top:.25rem;">Clique em "+ Novo Torneio" para começar</div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB: SÉRIES (multi-dias) -->
+                <div id="torn-series" class="torntab-content" style="display:none;">
+                    <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Séries de Torneios Multi-dias</div>
+                    <div id="series-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
+                </div>
+
+                <!-- SUBTAB: RANKINGS -->
+                <div id="torn-rankings" class="torntab-content" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                        <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Rankings de Torneios</div>
+                        <button onclick="openModalRanking()" class="btn-gold" style="font-size:.85rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Novo Ranking</button>
+                    </div>
+                    <div id="rankings-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
+                </div>
+
+                <!-- SUBTAB: CONFIG TV -->
+                <div id="torn-tvconfig" class="torntab-content" style="display:none;">
+                    <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Selecione um layout para previsualizar</div>
+                    <div id="tv-layouts-gallery" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;"></div>
                 </div>
             </div>
 
@@ -1055,6 +1086,64 @@
     </div>
 </div>
 
+<!-- MODAL: RANKING -->
+<div id="modal-ranking" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 id="modal-ranking-titulo" style="font-weight:800;font-size:1.1rem;">Novo Ranking</h3>
+            <button onclick="closeModal('modal-ranking')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <input type="hidden" id="rk-edit-id">
+            <div><label class="inp-label">Nome do Ranking *</label><input id="rk-nome" class="inp" placeholder="Ex: Sunday Ranking Maio/2026"></div>
+            <div><label class="inp-label">Descrição</label><input id="rk-descricao" class="inp" placeholder="Opcional"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div><label class="inp-label">Data Início</label><input id="rk-inicio" type="date" class="inp"></div>
+                <div><label class="inp-label">Data Fim</label><input id="rk-fim" type="date" class="inp"></div>
+            </div>
+            <div>
+                <label class="inp-label">Fórmula de Pontuação *</label>
+                <select id="rk-formula" class="inp" onchange="onRankingFormulaChange()">
+                    <option value="posicao_fixa">Pontos fixos por posição (1º=100, 2º=80, 3º=60, 4º=50, 5º=40, 6º=30, 7º=20, 8º=10)</option>
+                    <option value="log">Fórmula logarítmica (10 × √N / √pos × log(1+buyin))</option>
+                    <option value="percent">Percentual (pontos = % do prize pool ganho × 100)</option>
+                    <option value="custom">Customizada (tabela personalizada de posições)</option>
+                </select>
+            </div>
+            <div id="rk-custom-wrap" style="display:none;">
+                <label class="inp-label">Pontos por posição (um valor por linha)</label>
+                <textarea id="rk-custom-pontos" class="inp" rows="5" style="font-family:inherit;resize:vertical;" placeholder="100&#10;80&#10;60&#10;50&#10;40"></textarea>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.35rem;">Linhas indicam 1º, 2º, 3º... Ignorar posições além do informado.</div>
+            </div>
+            <div style="padding:.85rem 1rem;background:rgba(132,204,22,.04);border:1px solid rgba(132,204,22,.15);border-radius:.6rem;">
+                <div style="font-size:.65rem;color:#84cc16;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-sack-dollar"></i> Premiação Acumulada</div>
+                <div style="font-size:.7rem;color:#71717a;margin-bottom:.5rem;">% do rake de cada torneio é acumulada neste ranking. Valor definido no torneio.</div>
+                <label class="inp-label">Distribuição (linha = posição, valor em %)</label>
+                <textarea id="rk-premios-pct" class="inp" rows="5" style="font-family:inherit;resize:vertical;" placeholder="50&#10;30&#10;20"></textarea>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.35rem;">Somando as linhas deve dar 100%. Ex: 50/30/20 divide entre top 3.</div>
+            </div>
+            <button onclick="salvarRanking()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;">Salvar Ranking</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: JACKPOT / FICHAS EXTRAS -->
+<div id="modal-jackpot" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-gem" style="color:var(--gold);"></i> Comprar Jackpot</h3>
+            <button onclick="closeModal('modal-jackpot')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="jackpot-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
+            <div><label class="inp-label">Jogador *</label><select id="jackpot-jogador" class="inp"></select></div>
+            <div><label class="inp-label">Quantidade de compras</label><input id="jackpot-qtd" type="number" min="1" value="1" class="inp"></div>
+            <div id="jackpot-total" style="padding:.85rem 1rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;font-size:.95rem;font-weight:700;color:var(--gold);text-align:center;"></div>
+            <button onclick="confirmarJackpot()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Compra</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: NOVA MESA CASH -->
 <div id="modal-nova-cash-mesa" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
@@ -1196,6 +1285,59 @@
                         <option value="pko">🎯 Progressive KO (bounty cresce a cada KO)</option>
                         <option value="knockout">⚡ Somente KO (100% em bounties, sem premiação final)</option>
                     </select>
+                </div>
+
+                <!-- FORMATO (multi-dias) -->
+                <div>
+                    <label class="inp-label">Formato / Estrutura</label>
+                    <select id="t-formato" class="inp" onchange="onFormatoChange()">
+                        <option value="unico">Único dia</option>
+                        <option value="dia1">Dia 1 de série (ex: 1A, 1B, 1C)</option>
+                        <option value="dia2">Dia 2 / Final (continuação de série)</option>
+                    </select>
+                </div>
+
+                <div id="t-dia1-wrap" style="display:none;padding:.85rem 1rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-calendar-days"></i> Série / Dia</div>
+                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:.5rem;">
+                        <div><label class="inp-label">Rótulo</label><input id="t-dia-label" class="inp" placeholder="1A"></div>
+                        <div><label class="inp-label">Série (nome)</label><input id="t-series-nome" class="inp" placeholder="Ex: Sunday Challenge Mai/26"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">O primeiro Dia 1 cria a série; os demais podem ser vinculados pelo mesmo nome.</div>
+                </div>
+
+                <div id="t-dia2-wrap" style="display:none;padding:.85rem 1rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-trophy"></i> Continuação de Série</div>
+                    <div><label class="inp-label">Série de origem</label>
+                        <select id="t-series-id" class="inp">
+                            <option value="">Selecione a série...</option>
+                        </select>
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Ao criar, os stacks finais dos Dia 1s serão importados automaticamente (melhor stack de cada jogador).</div>
+                </div>
+
+                <!-- JACKPOT -->
+                <div style="padding:.85rem 1rem;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-gem"></i> Jackpot (fichas extras opcionais)</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                        <div><label class="inp-label">Valor R$</label><input id="t-jackpot-valor" type="number" value="0" class="inp" placeholder="0 = sem jackpot"></div>
+                        <div><label class="inp-label">Fichas entregues</label><input id="t-jackpot-fichas" type="number" value="0" class="inp"></div>
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Jogador paga R$ X e recebe Y fichas extras. Pode ser comprado múltiplas vezes.</div>
+                </div>
+
+                <!-- RANKING -->
+                <div style="padding:.85rem 1rem;background:rgba(132,204,22,.04);border:1px solid rgba(132,204,22,.15);border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:#84cc16;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-ranking-star"></i> Ranking Mensal</div>
+                    <div>
+                        <label class="inp-label">Vincular a ranking</label>
+                        <select id="t-ranking-id" class="inp">
+                            <option value="">Sem ranking</option>
+                        </select>
+                    </div>
+                    <div style="margin-top:.5rem;"><label class="inp-label">% do rake que vai para premiação do ranking</label>
+                        <input id="t-ranking-rake-pct" type="number" value="0" step="0.5" min="0" max="100" class="inp" placeholder="0 = sem repasse">
+                    </div>
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
@@ -1358,6 +1500,9 @@
                             <button onclick="openModalEliminar(activeTorneioIdx)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">
                                 <i class="fa-solid fa-skull"></i> Eliminar Jogador
                             </button>
+                            <button onclick="abrirJackpot(activeTorneioIdx)" id="btn-jackpot" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
+                                <i class="fa-solid fa-gem"></i> Comprar Jackpot
+                            </button>
                         </div>
                         <!-- Premiação -->
                         <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Tabela de Premiação</div>
@@ -1482,6 +1627,7 @@ let config     = JSON.parse(localStorage.getItem('ps_config'))      || {};
 let transacoes = JSON.parse(localStorage.getItem('ps_transacoes'))  || [];
 let fechamentos= JSON.parse(localStorage.getItem('ps_fechamentos')) || [];
 let barCaixa   = JSON.parse(localStorage.getItem('ps_bar_caixa'))   || { status:'fechado', abertoEm:null, abertoPor:null, historico:[] };
+let rankings   = JSON.parse(localStorage.getItem('ps_rankings'))    || [];
 
 // Payment methods metadata
 const PAYMENT_METHODS = {
@@ -1577,6 +1723,7 @@ function saveData() {
     localStorage.setItem('ps_transacoes',  JSON.stringify(transacoes));
     localStorage.setItem('ps_fechamentos', JSON.stringify(fechamentos));
     localStorage.setItem('ps_bar_caixa',   JSON.stringify(barCaixa));
+    localStorage.setItem('ps_rankings',    JSON.stringify(rankings));
 }
 
 // ============================================================
@@ -1679,7 +1826,12 @@ function showPage(page) {
     if (nav) { nav.classList.add('nav-active'); nav.style.color = ''; }
     document.getElementById('page-title').innerText = page.charAt(0).toUpperCase() + page.slice(1);
     if (page === 'jogadores') renderJogadores();
-    if (page === 'torneios')  renderTorneiosList();
+    if (page === 'torneios')  {
+        renderTorneiosList();
+        // Garantir subtab ativo correto
+        const ativaBtn = document.querySelector('#torntab-btn-ativos');
+        if (ativaBtn && !ativaBtn.classList.contains('active')) switchTornTab('torn-ativos', ativaBtn);
+    }
     if (page === 'dashboard') renderDashboard();
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
@@ -1814,10 +1966,25 @@ function saveTournament() {
     const nome = document.getElementById('t-nome').value.trim() || 'Torneio PokerSul';
     const tempoNivel = parseInt(document.getElementById('t-tempo').value) || 15;
     const tipo = document.getElementById('t-tipo').value || 'normal';
+    const formato = document.getElementById('t-formato') ? document.getElementById('t-formato').value : 'unico';
+    const diaLabel = document.getElementById('t-dia-label') ? document.getElementById('t-dia-label').value.trim() : '';
+    const seriesId = document.getElementById('t-series-id') ? document.getElementById('t-series-id').value : '';
+    const jackpotValor  = document.getElementById('t-jackpot-valor')  ? parseFloat(document.getElementById('t-jackpot-valor').value)  || 0 : 0;
+    const jackpotFichas = document.getElementById('t-jackpot-fichas') ? parseInt(document.getElementById('t-jackpot-fichas').value)   || 0 : 0;
+    const rankingId = document.getElementById('t-ranking-id') ? document.getElementById('t-ranking-id').value : '';
+    const rankingRakePct = document.getElementById('t-ranking-rake-pct') ? parseFloat(document.getElementById('t-ranking-rake-pct').value) || 0 : 0;
+
     const t = {
         id:           Date.now(),
         nome,
         tipo,                                                                    // normal | bounty | pko | knockout
+        formato,                                                                 // unico | dia1 | dia2 (parte de uma série)
+        diaLabel,                                                                // ex: "1A", "1B", "2", "Final"
+        seriesId,                                                                // liga todos os dias de um torneio
+        jackpotValor,                                                            // R$ pago por cada fichas extras (jackpot)
+        jackpotFichas,                                                           // quantas fichas o jackpot entrega
+        rankingId,                                                               // vincula a um ranking
+        rankingRakePct,                                                          // % do rake que vai para premiação do ranking
         buyin:        parseFloat(document.getElementById('t-buyin').value)  || 100,
         rake:         parseFloat(document.getElementById('t-rake').value)   || 20,
         tempoNivel,
@@ -1846,11 +2013,25 @@ function saveTournament() {
         mesas:        [],
         // bounties registry: { jogadorId: valorAcumulado }
         bounties:     {},
+        jackpotCompras: [],        // [{jogadorId, valor, fichas, ts}]
+        stacksImportados: {},      // Day 2: {jogadorId: fichas} - melhor stack dos Day 1s
         createdAt:    Date.now(),
-        tvLayout:     'classico', // classico | minimalista | feltro | neon
-        tvShowPrize:  true,        // mostrar ou ocultar prize pool na TV
+        tvLayout:     (config && config.torneios && config.torneios.tvLayoutPadrao) || 'classico',
+        tvShowPrize:  true,
     };
+
+    // Se é dia 1, grava seriesNome se fornecido
+    if (t.formato === 'dia1') {
+        const seriesNome = document.getElementById('t-series-nome').value.trim();
+        t.seriesNome = seriesNome || t.nome;
+    }
+
     torneios.push(t);
+
+    // Se é Dia 1 e tem série vinculada mas series não existe, cria série
+    if (t.formato === 'dia1' && !t.seriesId) {
+        t.seriesId = 'series_' + t.id;
+    }
     saveData();
     closeModal('modal-novo-torneio');
     renderTorneiosList();
@@ -1974,6 +2155,19 @@ function updateModalTorneio() {
 
     renderPayout(t, 'mt-payout');
     renderBountyPanel(t);
+
+    // Mostrar botão de jackpot se configurado
+    const btnJack = document.getElementById('btn-jackpot');
+    if (btnJack) btnJack.style.display = (t.jackpotValor > 0 && t.jackpotFichas > 0) ? 'block' : 'none';
+
+    // Info extra: dia/série
+    if (t.formato === 'dia1' || t.formato === 'dia2') {
+        const infoEl = document.getElementById('mt-info');
+        const diaTag = t.formato === 'dia1' ? `📅 Dia ${t.diaLabel || '1'}` : '🏆 Dia Final';
+        if (infoEl && !infoEl.innerHTML.includes(diaTag)) {
+            infoEl.innerHTML += ` <span class="tag" style="background:rgba(6,182,212,.12);color:#06b6d4;margin-left:.3rem;">${diaTag}</span>`;
+        }
+    }
 }
 
 function renderBountyPanel(t) {
@@ -2909,6 +3103,15 @@ function openModal(id) {
             document.getElementById('t-reentry').value = config.torneios.reentryAte;
             document.getElementById('t-addon').value   = config.torneios.addonFichas;
         }
+        // Populate rankings dropdown
+        const rankSel = document.getElementById('t-ranking-id');
+        if (rankSel) {
+            rankSel.innerHTML = '<option value="">Sem ranking</option>' +
+                rankings.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+        }
+        // Reset formato/dia fields
+        const formatoSel = document.getElementById('t-formato');
+        if (formatoSel) { formatoSel.value = 'unico'; onFormatoChange(); }
     }
     if (id === 'modal-nova-cash-mesa') {
         if (config && config.cash) {
@@ -4232,7 +4435,7 @@ function renderBackupStats() {
 function exportarBackup() {
     const data = {
         __meta: { sistema: 'PokerSul', versao: '1.5', exportadoEm: new Date().toISOString() },
-        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config, transacoes, fechamentos, barCaixa,
+        jogadores, torneios, cashMesas, barGrupos, barProdutos, barComandas, usuarios, config, transacoes, fechamentos, barCaixa, rankings,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url  = URL.createObjectURL(blob);
@@ -4269,6 +4472,7 @@ function importarBackup(event) {
             transacoes  = data.transacoes  || [];
             fechamentos = data.fechamentos || [];
             if (data.barCaixa) barCaixa = data.barCaixa;
+            if (data.rankings) rankings = data.rankings;
             if (data.config) config = mergeConfig(data.config, DEFAULT_CONFIG);
             saveData();
             showToast('✅ Backup restaurado! Recarregando...');
@@ -5186,6 +5390,509 @@ function fecharComandaConfirm() {
 
 // Interceptador: bloqueia abrir nova comanda se caixa fechado
 function _abrirComandaOriginal() {}
+
+
+// ============================================================
+// TORNEIOS — SUBTABS & NOVIDADES (multi-day, ranking, jackpot, tvconfig)
+// ============================================================
+function switchTornTab(tabId, btn) {
+    document.querySelectorAll('.torntab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-torneios .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    btn.classList.add('active');
+    if (tabId === 'torn-ativos')   renderTorneiosList();
+    if (tabId === 'torn-series')   renderSeriesList();
+    if (tabId === 'torn-rankings') renderRankingsList();
+    if (tabId === 'torn-tvconfig') renderTVGallery();
+}
+
+// ============================================================
+// FORMATO (multi-dias)
+// ============================================================
+function onFormatoChange() {
+    const f = document.getElementById('t-formato').value;
+    const wrap1 = document.getElementById('t-dia1-wrap');
+    const wrap2 = document.getElementById('t-dia2-wrap');
+    wrap1.style.display = f === 'dia1' ? 'block' : 'none';
+    wrap2.style.display = f === 'dia2' ? 'block' : 'none';
+    if (f === 'dia2') {
+        // Popula lista de séries existentes
+        const sel = document.getElementById('t-series-id');
+        const seriesAtivas = getSeries();
+        sel.innerHTML = '<option value="">Selecione...</option>' +
+            seriesAtivas.map(s => `<option value="${s.seriesId}">${s.nome} · ${s.dias.length} dia(s)</option>`).join('');
+    }
+}
+
+function getSeries() {
+    // Agrupa torneios tipo "dia1" pelo seriesId
+    const map = {};
+    torneios.forEach(t => {
+        if (t.formato === 'dia1' && t.seriesId) {
+            if (!map[t.seriesId]) map[t.seriesId] = { seriesId: t.seriesId, nome: t.seriesNome || t.nome, dias: [] };
+            map[t.seriesId].dias.push(t);
+        }
+    });
+    return Object.values(map);
+}
+
+function renderSeriesList() {
+    const el = document.getElementById('series-list');
+    if (!el) return;
+    const series = getSeries();
+    if (!series.length) {
+        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;">
+            <i class="fa-solid fa-calendar-days" style="font-size:2.5rem;margin-bottom:1rem;display:block;"></i>
+            <div style="font-weight:700;">Nenhuma série criada</div>
+            <div style="font-size:.8rem;margin-top:.25rem;">Crie um torneio com formato "Dia 1 de série"</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = series.map(s => {
+        const totalEntries = s.dias.reduce((sum, t) => sum + t.entries.filter(e=>e.tipo!=='addon').length, 0);
+        const classificados = getClassificadosDaSerie(s.seriesId);
+        return `
+        <div class="t-card" style="padding:1.25rem 1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.75rem;">
+                <div>
+                    <div style="font-weight:800;font-size:1rem;">${s.nome}</div>
+                    <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">Série #${s.seriesId.slice(-6)}</div>
+                </div>
+                <div style="display:flex;gap:.75rem;">
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Dias 1</div><div style="font-size:1rem;font-weight:800;">${s.dias.length}</div></div>
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Entradas</div><div style="font-size:1rem;font-weight:800;">${totalEntries}</div></div>
+                    <div style="text-align:right;"><div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Classificados</div><div style="font-size:1rem;font-weight:800;color:#22c55e;">${classificados.length}</div></div>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.75rem;">
+                ${s.dias.map((t, i) => {
+                    const idx = torneios.findIndex(x => x.id === t.id);
+                    return `
+                    <div onclick="abrirDetalhesTorneio(${idx})" style="display:grid;grid-template-columns:auto 1fr auto auto;gap:.75rem;align-items:center;padding:.55rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;font-size:.85rem;">
+                        <span style="font-weight:700;color:#06b6d4;">Dia ${t.diaLabel || (i+1)}</span>
+                        <span>${t.nome}</span>
+                        <span style="font-size:.75rem;color:#71717a;">${t.entries.filter(e=>e.tipo!=='addon').length} entradas</span>
+                        <span class="tag ${getStatusTag(t.status).cls}" style="font-size:.6rem;">${getStatusTag(t.status).label}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+            <button onclick="criarDia2DaSerie('${s.seriesId}')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;width:100%;">
+                <i class="fa-solid fa-forward"></i> Criar Dia 2 / Final com ${classificados.length} classificado(s)
+            </button>
+        </div>`;
+    }).join('');
+}
+
+function getClassificadosDaSerie(seriesId) {
+    // Jogadores que sobreviveram em algum dia 1 da série
+    // Como não rastreamos stack final nos torneios atuais, usamos jogadores ativos (não eliminados)
+    const dias = torneios.filter(t => t.seriesId === seriesId && t.formato === 'dia1');
+    const melhorStackPorJogador = {};
+
+    dias.forEach(t => {
+        const entradas = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+        entradas.forEach(jid => {
+            const foiEliminado = t.eliminados.some(e => e.jogadorId === jid);
+            if (!foiEliminado) {
+                // Estimativa de stack: stack inicial × (número de rebuys + 1) + add-ons
+                const entriesJog = t.entries.filter(e => e.jogadorId === jid);
+                let fichas = 0;
+                entriesJog.forEach(e => {
+                    if (e.tipo === 'buyin' || e.tipo === 'reentry') fichas += t.stack;
+                    else if (e.tipo === 'rebuy_simples') fichas += t.rebuySimplesFichas || t.stack;
+                    else if (e.tipo === 'rebuy_duplo')   fichas += t.rebuyDuploFichas || (t.stack*2);
+                    else if (e.tipo === 'addon')         fichas += t.addonFichas || 0;
+                });
+                // Jackpot adiciona fichas
+                (t.jackpotCompras || []).filter(j => j.jogadorId === jid).forEach(j => { fichas += j.fichas; });
+
+                if (!melhorStackPorJogador[jid] || fichas > melhorStackPorJogador[jid].fichas) {
+                    melhorStackPorJogador[jid] = { jogadorId: jid, fichas, dia: t.diaLabel || '?' };
+                }
+            }
+        });
+    });
+
+    return Object.values(melhorStackPorJogador);
+}
+
+function criarDia2DaSerie(seriesId) {
+    const classificados = getClassificadosDaSerie(seriesId);
+    if (!classificados.length) return showToast('⚠️ Nenhum classificado nesta série');
+    const seriesInfo = getSeries().find(s => s.seriesId === seriesId);
+
+    if (!confirm(`Criar Dia 2 da série "${seriesInfo.nome}" com ${classificados.length} classificado(s)?`)) return;
+
+    // Cria um torneio dia2 clonando config do primeiro dia1
+    const base = seriesInfo.dias[0];
+    const t = {
+        ...JSON.parse(JSON.stringify(base)),
+        id: Date.now(),
+        nome: (base.seriesNome || base.nome) + ' — Dia Final',
+        formato: 'dia2',
+        diaLabel: 'Final',
+        seriesId,
+        entries: [],
+        eliminados: [],
+        mesas: [],
+        bounties: {},
+        jackpotCompras: [],
+        nivelAtual: 0,
+        tempoRestante: base.tempoNivel * 60,
+        tempoTotal: base.tempoNivel * 60,
+        rodando: false,
+        isBreak: false,
+        status: 'waiting',
+        iniciadoEm: null,
+        createdAt: Date.now(),
+        stacksImportados: {},
+    };
+
+    // Importa fichas dos classificados como buyin + adiciona stack customizado
+    classificados.forEach(c => {
+        t.entries.push({ jogadorId: c.jogadorId, tipo: 'buyin', ts: Date.now(), valor: 0 });  // valor 0 porque já pagou no dia 1
+        t.stacksImportados[c.jogadorId] = c.fichas;
+        alocarJogadorMesa(t, c.jogadorId);
+    });
+
+    torneios.push(t);
+    saveData();
+    showToast(`✅ Dia 2 criado com ${classificados.length} classificado(s)!`);
+    renderSeriesList();
+    renderTorneiosList();
+    const novoIdx = torneios.length - 1;
+    abrirDetalhesTorneio(novoIdx);
+}
+
+// ============================================================
+// RANKINGS
+// ============================================================
+function onRankingFormulaChange() {
+    const formula = document.getElementById('rk-formula').value;
+    const wrap = document.getElementById('rk-custom-wrap');
+    wrap.style.display = formula === 'custom' ? 'block' : 'none';
+}
+
+function openModalRanking() {
+    document.getElementById('modal-ranking-titulo').innerText = 'Novo Ranking';
+    document.getElementById('rk-edit-id').value = '';
+    document.getElementById('rk-nome').value = '';
+    document.getElementById('rk-descricao').value = '';
+    document.getElementById('rk-inicio').value = '';
+    document.getElementById('rk-fim').value = '';
+    document.getElementById('rk-formula').value = 'posicao_fixa';
+    document.getElementById('rk-custom-pontos').value = '100\n80\n60\n50\n40\n30\n20\n10';
+    document.getElementById('rk-premios-pct').value = '50\n30\n20';
+    onRankingFormulaChange();
+    openModal('modal-ranking');
+}
+
+function salvarRanking() {
+    const nome = document.getElementById('rk-nome').value.trim();
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+    const editId = document.getElementById('rk-edit-id').value;
+    const dados = {
+        nome,
+        descricao: document.getElementById('rk-descricao').value.trim(),
+        inicio:    document.getElementById('rk-inicio').value,
+        fim:       document.getElementById('rk-fim').value,
+        formula:   document.getElementById('rk-formula').value,
+        customPontos: document.getElementById('rk-custom-pontos').value.split('\n').map(s => parseInt(s.trim())).filter(n => !isNaN(n)),
+        premiosPct: document.getElementById('rk-premios-pct').value.split('\n').map(s => parseFloat(s.trim())).filter(n => !isNaN(n)),
+    };
+
+    if (editId) {
+        const r = rankings.find(x => x.id === parseInt(editId));
+        if (r) Object.assign(r, dados);
+        showToast('✅ Ranking atualizado');
+    } else {
+        rankings.push({ id: Date.now(), ...dados, criadoEm: Date.now() });
+        showToast('✅ Ranking criado');
+    }
+    saveData();
+    closeModal('modal-ranking');
+    renderRankingsList();
+}
+
+function editarRanking(id) {
+    const r = rankings.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('modal-ranking-titulo').innerText = 'Editar Ranking';
+    document.getElementById('rk-edit-id').value = r.id;
+    document.getElementById('rk-nome').value = r.nome;
+    document.getElementById('rk-descricao').value = r.descricao || '';
+    document.getElementById('rk-inicio').value = r.inicio || '';
+    document.getElementById('rk-fim').value = r.fim || '';
+    document.getElementById('rk-formula').value = r.formula;
+    document.getElementById('rk-custom-pontos').value = (r.customPontos || []).join('\n');
+    document.getElementById('rk-premios-pct').value = (r.premiosPct || []).join('\n');
+    onRankingFormulaChange();
+    openModal('modal-ranking');
+}
+
+function removerRanking(id) {
+    if (!confirm('Remover este ranking?')) return;
+    rankings = rankings.filter(r => r.id !== id);
+    saveData();
+    renderRankingsList();
+    showToast('🗑️ Ranking removido');
+}
+
+function renderRankingsList() {
+    const el = document.getElementById('rankings-list');
+    if (!el) return;
+    if (!rankings.length) {
+        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;">
+            <i class="fa-solid fa-ranking-star" style="font-size:2.5rem;margin-bottom:1rem;display:block;"></i>
+            <div style="font-weight:700;">Nenhum ranking criado</div>
+            <div style="font-size:.8rem;margin-top:.25rem;">Crie um ranking e vincule torneios a ele</div>
+        </div>`;
+        return;
+    }
+    el.innerHTML = rankings.map(r => {
+        const torneiosVinculados = torneios.filter(t => t.rankingId == r.id);
+        const pontuacoes = calcularPontuacoesRanking(r);
+        const premioAcumulado = torneiosVinculados.reduce((s, t) => {
+            return s + getRake(t) * (t.rankingRakePct || 0) / 100;
+        }, 0);
+        const top3 = pontuacoes.slice(0, 3);
+        return `
+        <div class="t-card" style="padding:1.25rem 1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.75rem;">
+                <div>
+                    <div style="font-weight:800;font-size:1rem;">${r.nome}</div>
+                    <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">${r.descricao || ''}</div>
+                    ${r.inicio ? `<div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">📅 ${r.inicio} → ${r.fim||'—'}</div>` : ''}
+                </div>
+                <div style="display:flex;gap:.4rem;">
+                    <button onclick="editarRanking(${r.id})" class="btn-ghost" style="padding:.35rem .65rem;font-size:.75rem;"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="removerRanking(${r.id})" class="btn-danger" style="padding:.35rem .65rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem;">
+                <div style="padding:.6rem;background:#0f0f12;border-radius:.4rem;text-align:center;">
+                    <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Torneios</div>
+                    <div style="font-size:1.1rem;font-weight:800;margin-top:.15rem;">${torneiosVinculados.length}</div>
+                </div>
+                <div style="padding:.6rem;background:#0f0f12;border-radius:.4rem;text-align:center;">
+                    <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Participantes</div>
+                    <div style="font-size:1.1rem;font-weight:800;margin-top:.15rem;">${pontuacoes.length}</div>
+                </div>
+                <div style="padding:.6rem;background:#0f0f12;border-radius:.4rem;text-align:center;">
+                    <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;">Premiação</div>
+                    <div style="font-size:1.1rem;font-weight:800;margin-top:.15rem;color:#84cc16;">${formatMoney(premioAcumulado)}</div>
+                </div>
+            </div>
+            ${pontuacoes.length ? `
+            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Top 3</div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.75rem;">
+                ${top3.map((p, i) => {
+                    const premioJogador = (r.premiosPct && r.premiosPct[i]) ? (premioAcumulado * r.premiosPct[i] / 100) : 0;
+                    return `
+                    <div style="display:grid;grid-template-columns:2rem 1fr auto auto;gap:.75rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.85rem;">
+                        <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':'#92610a'};">${i===0?'🥇':i===1?'🥈':'🥉'}</span>
+                        <span style="font-weight:700;">${p.nome}</span>
+                        <span style="font-family:'Space Mono',monospace;color:var(--gold);font-weight:800;">${p.pontos.toFixed(0)} pts</span>
+                        ${premioJogador > 0 ? `<span style="font-family:'Space Mono',monospace;color:#22c55e;font-weight:800;font-size:.8rem;">${formatMoney(premioJogador)}</span>` : '<span></span>'}
+                    </div>`;
+                }).join('')}
+            </div>` : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem 0;">Sem participantes ainda</div>'}
+            ${pontuacoes.length > 3 ? `<button onclick="abrirRankingCompleto(${r.id})" class="btn-ghost" style="width:100%;font-size:.75rem;padding:.4rem;">Ver ranking completo (${pontuacoes.length} jogadores)</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function calcularPontuacoesRanking(r) {
+    const torneiosDoRank = torneios.filter(t => t.rankingId == r.id);
+    const pontos = {}; // jogadorId -> { pontos, nome, torneios:[] }
+
+    torneiosDoRank.forEach(t => {
+        const total = t.entries.filter(e=>e.tipo!=='addon').length;
+        // Posições: eliminados em ordem inversa + vencedor
+        const eliminadosOrdenados = [...t.eliminados].sort((a,b) => a.posicao - b.posicao); // do maior pra menor posição
+        const vencedorId = getVencedorTorneio(t);
+        const resultados = [];
+        if (vencedorId) resultados.push({ jogadorId: vencedorId, posicao: 1 });
+        eliminadosOrdenados.forEach(e => resultados.push({ jogadorId: e.jogadorId, posicao: e.posicao }));
+
+        resultados.forEach(res => {
+            const p = calcularPontosParaPosicao(r, res.posicao, total, t.buyin);
+            if (p <= 0) return;
+            if (!pontos[res.jogadorId]) pontos[res.jogadorId] = { pontos: 0, torneios: 0 };
+            pontos[res.jogadorId].pontos += p;
+            pontos[res.jogadorId].torneios += 1;
+        });
+    });
+
+    return Object.entries(pontos).map(([jid, v]) => ({
+        jogadorId: parseInt(jid),
+        nome: getJogadorNome(parseInt(jid)),
+        pontos: v.pontos,
+        torneios: v.torneios,
+    })).sort((a, b) => b.pontos - a.pontos);
+}
+
+function getVencedorTorneio(t) {
+    if (t.status !== 'finished') return null;
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const entradas = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+    return entradas.find(id => !eliminadosIds.has(id));
+}
+
+function calcularPontosParaPosicao(r, pos, total, buyin) {
+    if (r.formula === 'posicao_fixa') {
+        const defaults = [100, 80, 60, 50, 40, 30, 20, 10];
+        return defaults[pos - 1] || 0;
+    }
+    if (r.formula === 'log') {
+        // Fórmula Poker Stars style: 10 × √(N/pos) × log(1+buyin)
+        return 10 * Math.sqrt(total / pos) * Math.log10(1 + buyin);
+    }
+    if (r.formula === 'percent') {
+        // % do prize pool (aproximado via tabela)
+        const percs = [0.5, 0.3, 0.2, 0.15, 0.12, 0.1, 0.08, 0.06, 0.05, 0.04];
+        const pct = percs[pos - 1] || 0;
+        return pct * 100;  // converte em pontos
+    }
+    if (r.formula === 'custom') {
+        return (r.customPontos && r.customPontos[pos - 1]) || 0;
+    }
+    return 0;
+}
+
+function abrirRankingCompleto(rankId) {
+    const r = rankings.find(x => x.id === rankId);
+    if (!r) return;
+    const pontuacoes = calcularPontuacoesRanking(r);
+    const torneiosVinc = torneios.filter(t => t.rankingId == r.id);
+    const premio = torneiosVinc.reduce((s,t) => s + getRake(t) * (t.rankingRakePct||0) / 100, 0);
+
+    const lista = pontuacoes.map((p, i) => {
+        const prem = (r.premiosPct && r.premiosPct[i]) ? (premio * r.premiosPct[i] / 100) : 0;
+        return `${i+1}º  ${p.nome.padEnd(25,' ')}  ${p.pontos.toFixed(0).padStart(5,' ')} pts  (${p.torneios} torn.)${prem>0?'  💰 '+formatMoney(prem):''}`;
+    }).join('\n');
+    alert(`RANKING: ${r.nome}\nPremiação acumulada: ${formatMoney(premio)}\n\n${lista}`);
+}
+
+// ============================================================
+// JACKPOT
+// ============================================================
+function abrirJackpot(idx) {
+    const t = torneios[idx];
+    if (!t || !t.jackpotValor || !t.jackpotFichas) return showToast('⚠️ Torneio sem jackpot configurado');
+    activeTorneioIdx = idx;
+    document.getElementById('jackpot-info').innerHTML = `
+        <div style="color:#71717a;font-size:.75rem;">Torneio: <strong style="color:#e4e4e7;">${t.nome}</strong></div>
+        <div style="color:#71717a;font-size:.75rem;margin-top:.25rem;">Cada compra: <strong style="color:var(--gold);">${formatMoney(t.jackpotValor)}</strong> → <strong style="color:#22c55e;">${t.jackpotFichas.toLocaleString()} fichas</strong></div>
+    `;
+    // Populate players (ativos)
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))].filter(id => !eliminadosIds.has(id));
+    const sel = document.getElementById('jackpot-jogador');
+    sel.innerHTML = ativos.length
+        ? ativos.map(id => `<option value="${id}">${getJogadorNome(id)}</option>`).join('')
+        : '<option value="">Nenhum jogador ativo</option>';
+    document.getElementById('jackpot-qtd').value = 1;
+    atualizarTotalJackpot();
+    document.getElementById('jackpot-qtd').oninput = atualizarTotalJackpot;
+    openModal('modal-jackpot');
+}
+
+function atualizarTotalJackpot() {
+    const t = torneios[activeTorneioIdx];
+    const qtd = parseInt(document.getElementById('jackpot-qtd').value) || 1;
+    const total = qtd * (t.jackpotValor || 0);
+    const totalFichas = qtd * (t.jackpotFichas || 0);
+    document.getElementById('jackpot-total').innerHTML = `
+        Total: ${formatMoney(total)}<br>
+        <span style="font-weight:400;color:#71717a;font-size:.8rem;">→ ${totalFichas.toLocaleString()} fichas extras</span>
+    `;
+}
+
+function confirmarJackpot() {
+    const t = torneios[activeTorneioIdx];
+    const jid = parseInt(document.getElementById('jackpot-jogador').value);
+    const qtd = parseInt(document.getElementById('jackpot-qtd').value) || 1;
+    if (!jid) return showToast('⚠️ Selecione um jogador');
+
+    const total = qtd * t.jackpotValor;
+    const totalFichas = qtd * t.jackpotFichas;
+
+    t.jackpotCompras.push({
+        jogadorId: jid, qtd, valor: total, fichas: totalFichas, ts: Date.now(),
+    });
+
+    // Registra transação no caixa (débito)
+    registrarTransacao({
+        jogadorId: jid,
+        tipo: 'buyin',
+        valor: -total,
+        descricao: `Jackpot (${qtd}x) · ${t.nome} · ${totalFichas.toLocaleString()} fichas`,
+        origem: 'torneio',
+        refId: t.id,
+    });
+
+    saveData();
+    closeModal('modal-jackpot');
+    updateModalTorneio();
+    showToast(`💎 ${qtd}x Jackpot comprado por ${getJogadorNome(jid)}`);
+}
+
+// ============================================================
+// TV GALLERY (miniaturas de layouts)
+// ============================================================
+function renderTVGallery() {
+    const el = document.getElementById('tv-layouts-gallery');
+    if (!el) return;
+    const layouts = [
+        { key: 'classico',    nome: 'Clássico',       desc: 'Fundo preto, timer laranja, estilo tradicional' },
+        { key: 'minimalista', nome: 'Minimalista',    desc: 'Só timer e blinds, sem distrações' },
+        { key: 'feltro',      nome: 'Verde Feltro',   desc: 'Inspirado no feltro da mesa de poker' },
+        { key: 'neon',        nome: 'Neon',           desc: 'Cores vibrantes estilo streaming' },
+    ];
+    el.innerHTML = layouts.map(l => `
+        <div class="stat-card" style="padding:0;overflow:hidden;">
+            ${renderMiniTV(l.key)}
+            <div style="padding:1rem 1.25rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-weight:800;font-size:.95rem;">${l.nome}</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-top:.15rem;">${l.desc}</div>
+                    </div>
+                    <button onclick="aplicarLayoutGlobal('${l.key}')" class="btn-ghost" style="font-size:.75rem;padding:.4rem .75rem;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Padrão
+                    </button>
+                </div>
+            </div>
+        </div>`).join('');
+}
+
+function renderMiniTV(layout) {
+    const palettes = {
+        classico:    { bg:'#000',                                              timer:'#f59e0b', blinds:'#fff', label:'#555' },
+        minimalista: { bg:'#0f0f10',                                           timer:'#fafafa', blinds:'#a1a1aa', label:'#3f3f46' },
+        feltro:      { bg:'radial-gradient(ellipse,#12553f,#0a2e22 70%)',       timer:'#f5d572', blinds:'#fef3c7', label:'#7a6a40' },
+        neon:        { bg:'linear-gradient(135deg,#1a0a2e,#05050a,#0a1a2e)',   timer:'#ec4899', blinds:'#06b6d4', label:'#52525b' },
+    };
+    const p = palettes[layout] || palettes.classico;
+    return `
+        <div style="height:180px;background:${p.bg};padding:1.25rem 1.5rem;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;">
+            <div style="font-size:.55rem;color:${p.label};letter-spacing:.2em;text-transform:uppercase;font-weight:700;position:absolute;top:.75rem;left:1rem;">PokerSul</div>
+            <div style="font-size:.55rem;color:${p.label};letter-spacing:.2em;text-transform:uppercase;font-weight:700;position:absolute;top:.75rem;right:1rem;">Nível 3</div>
+            <div class="mono" style="font-size:3.5rem;font-weight:700;color:${p.timer};line-height:1;letter-spacing:-.04em;${layout==='neon'?'text-shadow:0 0 15px '+p.timer:''}${layout==='feltro'?'text-shadow:0 0 20px rgba(245,213,114,.4)':''}">12:34</div>
+            <div style="font-size:1.5rem;font-weight:800;color:${p.blinds};margin-top:.5rem;${layout==='neon'?'text-shadow:0 0 10px '+p.blinds:''}">500 / 1000</div>
+            <div style="font-size:.55rem;color:${p.label};margin-top:.5rem;letter-spacing:.15em;text-transform:uppercase;font-weight:700;">Ante 1000</div>
+        </div>`;
+}
+
+function aplicarLayoutGlobal(layout) {
+    if (!config) return;
+    if (!config.torneios) config.torneios = {};
+    config.torneios.tvLayoutPadrao = layout;
+    localStorage.setItem('ps_config', JSON.stringify(config));
+    showToast(`🎨 Layout "${layout}" salvo como padrão para novos torneios`);
+}
+
 
 // Init
 window.onload = () => {
