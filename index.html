@@ -523,6 +523,11 @@
                             <button onclick="openModalDepositoRapido()" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-plus-circle"></i> Depósito</button>
                         </div>
                     </div>
+                    <!-- Comandas abertas do bar para acerto pelo caixa -->
+                    <div id="caixa-comandas-abertas-wrap" style="display:none;margin-bottom:1rem;">
+                        <div style="font-size:.65rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-receipt"></i> Comandas Abertas do Bar (acertar aqui)</div>
+                        <div id="caixa-comandas-abertas" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:1rem;"></div>
+                    </div>
                     <div id="caixa-aberto-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                 </div>
 
@@ -1165,6 +1170,79 @@
             </div>
             <button onclick="abrirComanda()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Abrir Comanda</button>
         </div>
+    </div>
+</div>
+
+<!-- MODAL: PAGAMENTO POSITIVO CASH -->
+<div id="modal-pagamento-positivo" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-hand-holding-dollar" style="color:#22c55e;"></i> Pagamento ao Jogador</h3>
+            <button onclick="closeModal('modal-pagamento-positivo')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="pp-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;"></div>
+            <div>
+                <label class="inp-label">Valor a pagar R$</label>
+                <input id="pp-valor" type="number" step="0.01" class="inp">
+            </div>
+            <div>
+                <label class="inp-label">Forma de Pagamento</label>
+                <div id="pp-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
+            </div>
+            <button onclick="confirmarPagamentoPositivo()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Pagamento</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: STACK FINAL DIA 1 -->
+<div id="modal-stack-dia1" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-layer-group" style="color:#06b6d4;"></i> Stacks Finais — Dia 1</h3>
+            <button onclick="closeModal('modal-stack-dia1')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="font-size:.75rem;color:#71717a;margin-bottom:.5rem;">Torneio: <strong id="stack-d1-torneio-nome" style="color:#e4e4e7;"></strong></div>
+        <div style="padding:.7rem .85rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.2);border-radius:.5rem;margin-bottom:1rem;font-size:.75rem;color:#71717a;">
+            <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i> Informe o stack final real de cada jogador classificado. Esse valor será levado para o Dia Final.
+        </div>
+        <div id="stack-d1-lista" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem;"></div>
+        <button onclick="salvarStacksFinaisDia1()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;width:100%;">Salvar Stacks e Fechar</button>
+    </div>
+</div>
+
+<!-- MODAL: EDITOR DE BLINDS DURANTE TORNEIO -->
+<div id="modal-editor-blinds-andamento" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-sliders" style="color:var(--gold);"></i> Editar Blinds do Torneio</h3>
+            <button onclick="closeModal('modal-editor-blinds-andamento')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="font-size:.75rem;color:#71717a;margin-bottom:.35rem;">Torneio: <strong id="eba-torneio-nome" style="color:#e4e4e7;"></strong></div>
+        <div id="eba-info" style="font-size:.75rem;color:#71717a;margin-bottom:1rem;"></div>
+
+        <!-- Aplicar tempo em massa -->
+        <div style="padding:.75rem .85rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;margin-bottom:1rem;">
+            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-clock"></i> Aplicar Tempo em Massa</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
+                <div><label class="inp-label">A partir do nível</label><input id="eba-partir-nivel" type="number" min="1" value="11" class="inp" style="padding:.35rem .5rem;font-size:.8rem;"></div>
+                <div><label class="inp-label">Novo tempo (min)</label><input id="eba-novo-tempo" type="number" min="1" value="20" class="inp" style="padding:.35rem .5rem;font-size:.8rem;"></div>
+                <button onclick="aplicarTempoEmMassa()" class="btn-ghost" style="padding:.5rem .85rem;font-size:.75rem;">Aplicar</button>
+            </div>
+            <div style="font-size:.7rem;color:#71717a;margin-top:.4rem;">Ex: a partir do nível 11 fica com 20min.</div>
+        </div>
+
+        <!-- Headers -->
+        <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr;gap:.4rem;padding:0 .6rem;margin-bottom:.35rem;">
+            <span style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;min-width:30px;">Nv</span>
+            <span style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">SB</span>
+            <span style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">BB</span>
+            <span style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">Ante</span>
+            <span style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">Min</span>
+        </div>
+        <div id="eba-lista" style="display:flex;flex-direction:column;gap:.25rem;max-height:50vh;overflow-y:auto;margin-bottom:1rem;"></div>
+
+        <button onclick="salvarBlindsAndamento()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;width:100%;">Salvar Alterações</button>
     </div>
 </div>
 
@@ -1837,6 +1915,15 @@
                         <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Tabela de Premiação</div>
                         <div id="mt-payout" style="display:flex;flex-direction:column;gap:.4rem;"></div>
 
+                        <!-- CAIXA DO TORNEIO -->
+                        <div id="mt-caixa-torneio" style="margin-top:1rem;"></div>
+
+                        <!-- AÇÕES AVANÇADAS -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.75rem;">
+                            <button onclick="abrirEditorBlindsAndamento(activeTorneioIdx)" class="btn-ghost" style="padding:.55rem;font-size:.75rem;"><i class="fa-solid fa-sliders"></i> Editar Blinds</button>
+                            <button id="btn-stacks-dia1" onclick="abrirStackFinalDia1(activeTorneioIdx)" class="btn-ghost" style="display:none;padding:.55rem;font-size:.75rem;"><i class="fa-solid fa-layer-group"></i> Stacks Finais (Dia 1)</button>
+                        </div>
+
                         <!-- PAINEL DE BOUNTIES (só aparece em torneios KO) -->
                         <div id="mt-bounties-wrap" style="display:none;margin-top:1rem;">
                             <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-crosshairs"></i> Bounties por Jogador</div>
@@ -1896,6 +1983,29 @@
     </div>
 </div>
 
+<!-- MODAL: CADASTRO RÁPIDO (atalho dentro do torneio) -->
+<div id="modal-cadastro-rapido" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-user-plus" style="color:var(--gold);"></i> Cadastro Rápido</h3>
+            <button onclick="closeModal('modal-cadastro-rapido')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.85rem;">
+            <div><label class="inp-label">Nome *</label><input id="qr-nome" class="inp" placeholder="Nome completo" autofocus></div>
+            <div><label class="inp-label">Apelido</label><input id="qr-apelido" class="inp" placeholder="Opcional"></div>
+            <div><label class="inp-label">WhatsApp</label><input id="qr-whatsapp" class="inp" placeholder="(46) 9 9999-9999"></div>
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:.5rem;">
+                <div><label class="inp-label">Cidade</label><input id="qr-cidade" class="inp"></div>
+                <div><label class="inp-label">UF</label><input id="qr-uf" class="inp" maxlength="2" style="text-transform:uppercase;"></div>
+            </div>
+            <div style="padding:.6rem .85rem;background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:.5rem;font-size:.7rem;color:#71717a;">
+                <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i> Após cadastrar, jogador será selecionado automaticamente na entrada.
+            </div>
+            <button onclick="salvarCadastroRapido()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Cadastrar e Selecionar</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: ENTRADA -->
 <div id="modal-entrada" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
@@ -1905,7 +2015,10 @@
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div>
-                <label class="inp-label">Jogador</label>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem;">
+                    <label class="inp-label" style="margin:0;">Jogador</label>
+                    <button type="button" onclick="abrirCadastroRapido()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-user-plus"></i> Novo jogador</button>
+                </div>
                 <select id="entrada-jogador" class="inp">
                     <option value="">Selecionar jogador...</option>
                 </select>
@@ -2528,6 +2641,13 @@ function updateModalTorneio() {
     // Mostrar botão de jackpot se configurado
     const btnJack = document.getElementById('btn-jackpot');
     if (btnJack) btnJack.style.display = (t.jackpotValor > 0 && t.jackpotFichas > 0) ? 'block' : 'none';
+
+    // Render Caixa do Torneio
+    renderCaixaTorneio(t);
+
+    // Mostra botão stacks dia1 só se for formato dia1
+    const btnStk = document.getElementById('btn-stacks-dia1');
+    if (btnStk) btnStk.style.display = t.formato === 'dia1' ? 'block' : 'none';
 
     // Card do jackpot no resumo financeiro
     const jpCard = document.getElementById('mt-jackpot-card');
@@ -4270,6 +4390,18 @@ function confirmRetirar() {
     const resultado = valor - j.totalInvestido;
     const jog = jogadores.find(x => x.id === j.jogadorId);
     showToast(`🚪 ${jog?jog.nome:'Jogador'} saiu com ${formatMoney(valor)} (${resultado>=0?'+':''}${formatMoney(resultado)})`);
+
+    // Se o saldo do jogador está positivo, oferece pagar agora com forma de pagamento
+    setTimeout(() => {
+        const saldoAtual = getSaldoJogador(j.jogadorId);
+        if (saldoAtual > 0) {
+            if (confirm(`${jog?jog.nome:'Jogador'} tem saldo positivo de ${formatMoney(saldoAtual)}.
+
+Deseja registrar o pagamento agora (escolhendo forma de pagamento)?`)) {
+                abrirPagamentoPositivoCash(j.jogadorId, saldoAtual);
+            }
+        }
+    }, 300);
 }
 
 // --- ENCERRAR MESA ---
@@ -4988,6 +5120,9 @@ function renderCaixa() {
 }
 
 function renderCaixaAberto() {
+    // Render comandas abertas do bar
+    renderComandasAbertasCaixa();
+
     const filtro = (document.getElementById('caixa-filtro') || {}).value || 'devedor';
     const saldos = jogadores.map(j => ({
         jogador: j,
@@ -5028,19 +5163,56 @@ function renderCaixaAberto() {
         const credito = saldo > 0;
         const zerado  = saldo === 0;
         return `
-        <div onclick="abrirPagamentoJogador(${jogador.id})" style="display:grid;grid-template-columns:auto 1fr auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
-            <div style="width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
-            <div>
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
+            <div onclick="abrirPagamentoJogador(${jogador.id})" style="cursor:pointer;width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
+            <div onclick="abrirPagamentoJogador(${jogador.id})" style="cursor:pointer;">
                 <div style="font-weight:700;font-size:.9rem;">${jogador.nome}</div>
                 ${jogador.apelido ? `<div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">${jogador.apelido}</div>` : ''}
             </div>
-            <div style="text-align:right;">
+            <div onclick="abrirPagamentoJogador(${jogador.id})" style="cursor:pointer;text-align:right;">
                 <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Deve':credito?'Crédito':'Saldo'}</div>
                 <div style="font-family:'Space Mono',monospace;font-weight:800;color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};font-size:1rem;">${zerado?formatMoney(0):(devedor?'-':'+')+formatMoney(Math.abs(saldo))}</div>
             </div>
+            ${credito ? `<button onclick="event.stopPropagation();abrirPagamentoPositivoCash(${jogador.id}, ${saldo})" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.4rem .7rem;cursor:pointer;font-weight:700;font-size:.7rem;font-family:'Manrope',sans-serif;" title="Pagar valor ao jogador"><i class="fa-solid fa-hand-holding-dollar"></i> Pagar</button>` : '<span></span>'}
             <i class="fa-solid fa-chevron-right" style="color:#3f3f46;"></i>
         </div>`;
     }).join('');
+}
+
+function renderComandasAbertasCaixa() {
+    const wrap = document.getElementById('caixa-comandas-abertas-wrap');
+    const lista = document.getElementById('caixa-comandas-abertas');
+    if (!wrap || !lista) return;
+    const abertas = barComandas.filter(c => c.status === 'aberta');
+    if (!abertas.length) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'block';
+    lista.innerHTML = abertas.map(c => {
+        const j = jogadores.find(x => x.id === c.jogadorId);
+        const total = calcTotalComanda(c);
+        return `
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:.75rem;align-items:center;padding:.6rem .85rem;background:rgba(249,115,22,.04);border:1px solid rgba(249,115,22,.18);border-radius:.5rem;">
+            <i class="fa-solid fa-receipt" style="color:#f97316;"></i>
+            <div>
+                <div style="font-weight:700;font-size:.85rem;">${j ? j.nome : '?'}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${c.itens.length} iten${c.itens.length>1?'s':''} · aberta ${timeAgo(c.abertoEm || c.createdAt || Date.now())}</div>
+            </div>
+            <span style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(total)}</span>
+            <button onclick="acertarComandaDoCaixa(${c.id})" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .7rem;cursor:pointer;font-weight:700;font-size:.7rem;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-hand-holding-dollar"></i> Acertar</button>
+        </div>`;
+    }).join('');
+}
+
+function timeAgo(ts) {
+    if (!ts) return '';
+    const mins = Math.floor((Date.now() - ts) / 60000);
+    if (mins < 1) return 'agora';
+    if (mins < 60) return `há ${mins}min`;
+    const h = Math.floor(mins / 60);
+    if (h < 24) return `há ${h}h`;
+    return `há ${Math.floor(h/24)}d`;
 }
 
 // ============================================================
@@ -7112,6 +7284,400 @@ function exportRelClientes() {
     downloadCSV('clientes', rows);
 }
 
+
+
+
+// ============================================================
+// BLOCO 2 — FUNCIONALIDADES NOVAS
+// ============================================================
+
+// ============================================================
+// ITEM 1: CADASTRO RÁPIDO DE JOGADOR DENTRO DO TORNEIO
+// ============================================================
+function abrirCadastroRapido() {
+    // Limpa campos e abre modal sobre o modal de entrada
+    ['qr-nome','qr-apelido','qr-whatsapp','qr-cidade','qr-uf'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    openModal('modal-cadastro-rapido');
+    setTimeout(() => {
+        const n = document.getElementById('qr-nome');
+        if (n) n.focus();
+    }, 100);
+}
+
+function salvarCadastroRapido() {
+    const nome = document.getElementById('qr-nome').value.trim();
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+
+    const novoJog = {
+        id: Date.now(),
+        nome,
+        apelido:  document.getElementById('qr-apelido').value.trim(),
+        whatsapp: document.getElementById('qr-whatsapp').value.trim(),
+        cidade:   document.getElementById('qr-cidade').value.trim(),
+        uf:       document.getElementById('qr-uf').value.trim().toUpperCase(),
+    };
+    jogadores.push(novoJog);
+    saveData();
+
+    // Re-renderiza o dropdown do modal de entrada com o novo jogador
+    closeModal('modal-cadastro-rapido');
+
+    // Se está dentro de torneio, repopula o select e já seleciona o novo
+    const sel = document.getElementById('entrada-jogador');
+    if (sel) {
+        openModalEntrada(activeTorneioIdx);  // repopula lista
+        setTimeout(() => {
+            const newSel = document.getElementById('entrada-jogador');
+            if (newSel) newSel.value = novoJog.id;
+        }, 50);
+    }
+    renderJogadores();
+    renderDashboard();
+    showToast(`✅ ${nome} cadastrado e pronto para entrada`);
+}
+
+// ============================================================
+// ITEM 2: CAIXA POR TORNEIO
+// ============================================================
+// O torneio.caixaTorneio guarda as movimentações específicas:
+// { status: 'fechado'|'aberto', abertoEm, fechadoEm, abertoPor, fechadoPor,
+//   resumo: { buyins, reentries, rebuys, addons, jackpots, bounties, total } }
+//
+// Este caixa é um "espelho" das transações do torneio para fins de controle operacional.
+
+function getCaixaTorneio(t) {
+    if (!t.caixaTorneio) {
+        t.caixaTorneio = { status: 'fechado', abertoEm: null, fechadoEm: null, abertoPor: null, fechadoPor: null };
+    }
+    return t.caixaTorneio;
+}
+
+function abrirCaixaTorneio(idx) {
+    const t = torneios[idx];
+    if (!t) return;
+    const c = getCaixaTorneio(t);
+    if (c.status === 'aberto') return showToast('⚠️ Caixa do torneio já aberto');
+    c.status = 'aberto';
+    c.abertoEm = Date.now();
+    c.abertoPor = currentUser ? currentUser.nome : 'Sistema';
+    c.fechadoEm = null;
+    c.fechadoPor = null;
+    saveData();
+    updateModalTorneio();
+    showToast(`🔓 Caixa do torneio aberto`);
+}
+
+function fecharCaixaTorneio(idx) {
+    const t = torneios[idx];
+    if (!t) return;
+    const c = getCaixaTorneio(t);
+    if (c.status !== 'aberto') return showToast('⚠️ Caixa já está fechado');
+    const resumo = calcularResumoCaixaTorneio(t);
+    if (!confirm(`Fechar caixa deste torneio?\n\nEntradas: ${resumo.entradas}\nTotal arrecadado: ${formatMoney(resumo.total)}\nBounties pagos: ${formatMoney(resumo.bounties)}`)) return;
+    c.status = 'fechado';
+    c.fechadoEm = Date.now();
+    c.fechadoPor = currentUser ? currentUser.nome : 'Sistema';
+    c.resumoFinal = resumo;
+    saveData();
+    updateModalTorneio();
+    showToast(`🔒 Caixa do torneio fechado. Total: ${formatMoney(resumo.total)}`);
+}
+
+function calcularResumoCaixaTorneio(t) {
+    let buyins = 0, reentries = 0, rebuys = 0, addons = 0;
+    let buyinsQtd = 0, reentriesQtd = 0, rebuysQtd = 0, addonsQtd = 0;
+    t.entries.forEach(e => {
+        const v = e.valor || t.buyin;
+        if (e.tipo === 'buyin')         { buyins += v;    buyinsQtd++; }
+        else if (e.tipo === 'reentry')  { reentries += v; reentriesQtd++; }
+        else if (e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo') { rebuys += v; rebuysQtd++; }
+        else if (e.tipo === 'addon')    { addons += (e.valor || 0); addonsQtd++; }
+    });
+    const jackpots = (t.jackpotCompras || []).reduce((s,j) => s + j.valor, 0);
+    const jackpotsQtd = (t.jackpotCompras || []).reduce((s,j) => s + (j.qtd||1), 0);
+
+    // bounties pagos (saem do caixa do torneio)
+    const bountiesPagos = (t.eliminados || []).reduce((s,e) => s + (e.bountyPago || 0), 0);
+
+    const total = buyins + reentries + rebuys + addons + jackpots;
+    return { buyins, reentries, rebuys, addons, jackpots, bounties: bountiesPagos,
+             buyinsQtd, reentriesQtd, rebuysQtd, addonsQtd, jackpotsQtd,
+             entradas: buyinsQtd + reentriesQtd,
+             total };
+}
+
+function renderCaixaTorneio(t) {
+    const wrap = document.getElementById('mt-caixa-torneio');
+    if (!wrap) return;
+    const c = getCaixaTorneio(t);
+    const resumo = calcularResumoCaixaTorneio(t);
+
+    const aberto = c.status === 'aberto';
+    const dataAbertura = c.abertoEm ? new Date(c.abertoEm).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+
+    wrap.innerHTML = `
+        <div style="padding:.85rem 1rem;background:${aberto?'rgba(34,197,94,.08)':'rgba(239,68,68,.06)'};border:1px solid ${aberto?'rgba(34,197,94,.25)':'rgba(239,68,68,.2)'};border-radius:.6rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                <div>
+                    <div style="font-size:.65rem;color:${aberto?'#22c55e':'#ef4444'};font-weight:700;text-transform:uppercase;letter-spacing:.1em;">
+                        <i class="fa-solid fa-${aberto?'door-open':'door-closed'}"></i> Caixa do Torneio ${aberto?'Aberto':'Fechado'}
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">${aberto?`Desde ${dataAbertura} por ${c.abertoPor||'?'}`:'Sem caixa ativo'}</div>
+                </div>
+                <button onclick="${aberto?`fecharCaixaTorneio(${torneios.indexOf(t)})`:`abrirCaixaTorneio(${torneios.indexOf(t)})`}" class="btn-ghost" style="font-size:.75rem;padding:.4rem .85rem;">
+                    <i class="fa-solid fa-${aberto?'lock':'key'}"></i> ${aberto?'Fechar':'Abrir'}
+                </button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;font-size:.75rem;">
+                <div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Buy-ins</div><div style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.buyins)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.buyinsQtd}x</div></div>
+                <div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Re-entries</div><div style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.reentries)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.reentriesQtd}x</div></div>
+                <div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Rebuys</div><div style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.rebuys)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.rebuysQtd}x</div></div>
+                ${resumo.jackpots > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Jackpots</div><div style="font-family:'Space Mono',monospace;font-weight:700;color:var(--gold);margin-top:.1rem;">${formatMoney(resumo.jackpots)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.jackpotsQtd}x</div></div>` : ''}
+                ${resumo.bounties > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Bounties Pagos</div><div style="font-family:'Space Mono',monospace;font-weight:700;color:#ef4444;margin-top:.1rem;">-${formatMoney(resumo.bounties)}</div></div>` : ''}
+                <div style="padding:.4rem .55rem;background:#0f0f12;border:1px solid var(--gold);border-radius:.35rem;grid-column:span 3;display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--gold);font-size:.65rem;text-transform:uppercase;font-weight:700;">TOTAL NO CAIXA</span><span style="font-family:'Space Mono',monospace;font-weight:800;color:var(--gold);font-size:.95rem;">${formatMoney(resumo.total - resumo.bounties)}</span></div>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================
+// ITEM 3: PAGAMENTO A JOGADOR POSITIVO DO CASH
+// ============================================================
+let _pagPositivoCtx = { jogadorId: null, valor: 0 };
+
+function abrirPagamentoPositivoCash(jogadorId, valor) {
+    _pagPositivoCtx = { jogadorId, valor };
+    const j = jogadores.find(x => x.id === jogadorId);
+    document.getElementById('pp-info').innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:.4rem;">
+            <span style="color:#71717a;font-size:.8rem;">Jogador</span>
+            <span style="font-weight:700;">${j ? j.nome : '?'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+            <span style="color:#71717a;font-size:.8rem;">Valor a pagar</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;color:#22c55e;font-size:1.1rem;">${formatMoney(valor)}</span>
+        </div>
+    `;
+    document.getElementById('pp-valor').value = valor.toFixed(2);
+    renderMetodosPagamento('pp-metodos', 'pp', false);
+    openModal('modal-pagamento-positivo');
+}
+
+function confirmarPagamentoPositivo() {
+    const { jogadorId, valor } = _pagPositivoCtx;
+    const valorPago = parseFloat(document.getElementById('pp-valor').value) || 0;
+    const metodoSel = document.querySelector('input[name="metodo-pp"]:checked');
+    const metodo = metodoSel ? metodoSel.value : 'dinheiro';
+
+    if (valorPago <= 0) return showToast('⚠️ Valor inválido');
+    if (valorPago > valor) return showToast('⚠️ Valor maior que o devido ao jogador');
+
+    registrarTransacao({
+        jogadorId,
+        tipo: 'pagamento_cash',
+        valor: -valorPago,  // clube paga ao jogador → saída no caixa do clube = débito na conta do jogador
+        descricao: `Pagamento (Cash) via ${PAYMENT_METHODS[metodo].label}`,
+        metodo,
+        origem: 'cash',
+    });
+
+    saveData();
+    closeModal('modal-pagamento-positivo');
+    renderCaixa();
+    renderCashMesas();
+    renderDashboard();
+    showToast(`💰 ${formatMoney(valorPago)} pagos via ${PAYMENT_METHODS[metodo].label}`);
+}
+
+// ============================================================
+// ITEM 4: ACERTAR COMANDA ABERTA NO CAIXA
+// ============================================================
+// Permite fechar uma comanda do bar diretamente no menu caixa, mesmo sem passar pelo bar.
+// Reutiliza o modal de fechamento, mas abre pelo caminho do caixa.
+function acertarComandaDoCaixa(comandaId) {
+    const c = barComandas.find(c => c.id === comandaId);
+    if (!c) return showToast('⚠️ Comanda não encontrada');
+    if (c.status !== 'aberta') return showToast('⚠️ Comanda não está aberta');
+
+    // Define como comanda ativa e abre modal existente do bar
+    activeComandaId = comandaId;
+    openFecharComanda();
+    showToast('🔄 Fechando comanda diretamente pelo caixa...');
+}
+
+// ============================================================
+// ITEM 5: STACK MANUAL AO FINALIZAR DIA 1
+// ============================================================
+function abrirStackFinalDia1(idx) {
+    const t = torneios[idx];
+    if (!t || t.formato !== 'dia1') return showToast('⚠️ Este torneio não é Dia 1 de série');
+
+    // Lista dos jogadores ativos (que sobraram)
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))]
+        .filter(id => !eliminadosIds.has(id));
+
+    if (!ativos.length) return showToast('⚠️ Nenhum jogador restante');
+
+    // Inicializa stacksFinaisDia1 se não existe
+    if (!t.stacksFinaisDia1) t.stacksFinaisDia1 = {};
+
+    activeTorneioIdx = idx;
+    const wrap = document.getElementById('stack-d1-lista');
+    wrap.innerHTML = ativos.map(jid => {
+        const j = jogadores.find(x => x.id === jid);
+        const stackAtual = estimarStackJogador(t, jid);
+        const stackInformado = t.stacksFinaisDia1[jid] || stackAtual;
+        return `
+            <div style="display:grid;grid-template-columns:1fr auto;gap:.75rem;align-items:center;padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;">
+                <div>
+                    <div style="font-weight:700;font-size:.85rem;">${j ? j.nome : '?'}</div>
+                    <div style="font-size:.7rem;color:#52525b;">Estimado: ${stackAtual.toLocaleString()} fichas</div>
+                </div>
+                <input type="number" data-jid="${jid}" value="${stackInformado}" min="0" step="100" class="inp stack-d1-inp" style="width:160px;padding:.4rem .6rem;font-family:'Space Mono',monospace;text-align:right;font-weight:700;">
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('stack-d1-torneio-nome').innerText = t.nome;
+    openModal('modal-stack-dia1');
+}
+
+function estimarStackJogador(t, jid) {
+    const entriesJog = t.entries.filter(e => e.jogadorId === jid);
+    let fichas = 0;
+    entriesJog.forEach(e => {
+        if (e.tipo === 'buyin' || e.tipo === 'reentry') fichas += t.stack;
+        else if (e.tipo === 'rebuy_simples') fichas += t.rebuySimplesFichas || t.stack;
+        else if (e.tipo === 'rebuy_duplo')   fichas += t.rebuyDuploFichas || (t.stack*2);
+        else if (e.tipo === 'addon')         fichas += t.addonFichas || 0;
+    });
+    (t.jackpotCompras || []).filter(j => j.jogadorId === jid).forEach(j => { fichas += j.fichas; });
+    return fichas;
+}
+
+function salvarStacksFinaisDia1() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const inputs = document.querySelectorAll('.stack-d1-inp');
+    if (!t.stacksFinaisDia1) t.stacksFinaisDia1 = {};
+    let salvos = 0;
+    inputs.forEach(inp => {
+        const jid = parseInt(inp.dataset.jid);
+        const v = parseInt(inp.value) || 0;
+        if (v > 0) {
+            t.stacksFinaisDia1[jid] = v;
+            salvos++;
+        }
+    });
+    saveData();
+    closeModal('modal-stack-dia1');
+    showToast(`✅ ${salvos} stacks registrados. Serão importados no Dia Final.`);
+}
+
+// Atualiza getClassificadosDaSerie para usar stacksFinaisDia1 quando disponível
+// (mantém retrocompatibilidade — se operador não preencheu, usa estimativa)
+if (typeof getClassificadosDaSerie === 'function') {
+    const _origGetClassificados = getClassificadosDaSerie;
+    window.getClassificadosDaSerie = function(seriesId) {
+        const dias = torneios.filter(t => t.seriesId === seriesId && t.formato === 'dia1');
+        const melhorStackPorJogador = {};
+        dias.forEach(t => {
+            const entradas = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
+            entradas.forEach(jid => {
+                const foiEliminado = t.eliminados.some(e => e.jogadorId === jid);
+                if (!foiEliminado) {
+                    // Se operador preencheu stack manual, usa; senão estima
+                    const fichas = (t.stacksFinaisDia1 && t.stacksFinaisDia1[jid]) || estimarStackJogador(t, jid);
+                    if (!melhorStackPorJogador[jid] || fichas > melhorStackPorJogador[jid].fichas) {
+                        melhorStackPorJogador[jid] = { jogadorId: jid, fichas, dia: t.diaLabel || '?' };
+                    }
+                }
+            });
+        });
+        return Object.values(melhorStackPorJogador);
+    };
+}
+
+// ============================================================
+// ITEM 6: EDITAR BLINDS DURANTE TORNEIO EM ANDAMENTO
+// ============================================================
+function abrirEditorBlindsAndamento(idx) {
+    const t = torneios[idx];
+    if (!t) return;
+    activeTorneioIdx = idx;
+
+    const wrap = document.getElementById('eba-lista');
+    wrap.innerHTML = t.blinds.map((b, i) => {
+        const isAtual = i === t.nivelAtual;
+        const jaPassou = i < t.nivelAtual;
+        return `
+            <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr;gap:.4rem;align-items:center;padding:.4rem .6rem;background:${isAtual?'rgba(245,158,11,.08)':jaPassou?'#0a0a0c':'#0f0f12'};border:1px solid ${isAtual?'var(--gold)':'#1e1e23'};border-radius:.35rem;opacity:${jaPassou?'.45':'1'};">
+                <span style="font-weight:700;color:${isAtual?'var(--gold)':'#71717a'};font-size:.75rem;min-width:30px;">${i+1}${isAtual?' ◀':''}</span>
+                <input type="number" data-idx="${i}" data-field="sb" value="${b.sb}" ${jaPassou?'disabled':''} class="inp eba-inp" style="padding:.3rem .5rem;font-family:'Space Mono',monospace;font-size:.8rem;">
+                <input type="number" data-idx="${i}" data-field="bb" value="${b.bb}" ${jaPassou?'disabled':''} class="inp eba-inp" style="padding:.3rem .5rem;font-family:'Space Mono',monospace;font-size:.8rem;">
+                <input type="number" data-idx="${i}" data-field="ante" value="${b.ante}" ${jaPassou?'disabled':''} class="inp eba-inp" style="padding:.3rem .5rem;font-family:'Space Mono',monospace;font-size:.8rem;">
+                <input type="number" data-idx="${i}" data-field="tempo" value="${b.tempo || t.tempoNivel || 15}" ${jaPassou?'disabled':''} class="inp eba-inp" style="padding:.3rem .5rem;font-family:'Space Mono',monospace;font-size:.8rem;">
+            </div>
+        `;
+    }).join('');
+
+    // Controle: aplicar tempo X a partir do nível Y
+    document.getElementById('eba-torneio-nome').innerText = t.nome;
+    document.getElementById('eba-info').innerHTML = `Nível atual: <strong style="color:var(--gold);">${t.nivelAtual+1}</strong> de ${t.blinds.length}. Níveis que já passaram ficam bloqueados.`;
+
+    openModal('modal-editor-blinds-andamento');
+}
+
+function aplicarTempoEmMassa() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const partirDe = parseInt(document.getElementById('eba-partir-nivel').value) || 1;
+    const novoTempo = parseInt(document.getElementById('eba-novo-tempo').value) || 15;
+    if (partirDe < 1 || partirDe > t.blinds.length) return showToast('⚠️ Nível inválido');
+
+    for (let i = partirDe - 1; i < t.blinds.length; i++) {
+        const inp = document.querySelector(`.eba-inp[data-idx="${i}"][data-field="tempo"]`);
+        if (inp && !inp.disabled) inp.value = novoTempo;
+    }
+    showToast(`✓ Tempo ${novoTempo}min aplicado a partir do nível ${partirDe}`);
+}
+
+function salvarBlindsAndamento() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    if (!confirm('⚠️ Edição de blinds em torneio em andamento é uma operação crítica.\n\nConfirma as alterações?')) return;
+
+    const inputs = document.querySelectorAll('.eba-inp');
+    inputs.forEach(inp => {
+        if (inp.disabled) return;
+        const idx = parseInt(inp.dataset.idx);
+        const field = inp.dataset.field;
+        const v = parseInt(inp.value) || 0;
+        if (!t.blinds[idx]) t.blinds[idx] = { sb:0, bb:0, ante:0, tempo: t.tempoNivel };
+        t.blinds[idx][field] = v;
+    });
+
+    // Se mudou o tempo do nível atual, atualiza tempoTotal e tempoRestante (proporcionalmente)
+    const nivelAtual = t.blinds[t.nivelAtual];
+    if (nivelAtual && nivelAtual.tempo) {
+        const novoTempoTotal = nivelAtual.tempo * 60;
+        // Proporção do tempo restante
+        const pct = t.tempoRestante / t.tempoTotal;
+        t.tempoTotal = novoTempoTotal;
+        t.tempoRestante = Math.floor(novoTempoTotal * pct);
+    }
+
+    saveData();
+    closeModal('modal-editor-blinds-andamento');
+    updateModalTorneio();
+    renderTorneiosList();
+    updateTV(activeTorneioIdx);
+    showToast('✅ Blinds atualizados');
+}
 
 
 // ============================================================
