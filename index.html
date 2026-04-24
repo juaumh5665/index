@@ -720,6 +720,7 @@
                     <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this)"><i class="fa-solid fa-trophy"></i> Torneios</button>
                     <button class="tab-btn"        id="cfgtab-btn-cash"        onclick="switchConfigTab('cfg-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
                     <button class="tab-btn"        id="cfgtab-btn-fichas"      onclick="switchConfigTab('cfg-fichas', this)"><i class="fa-solid fa-circle"></i> Fichas</button>
+                    <button class="tab-btn"        id="cfgtab-btn-financeiro"  onclick="switchConfigTab('cfg-financeiro', this)"><i class="fa-solid fa-sack-dollar"></i> Financeiro</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
                 </div>
@@ -866,6 +867,39 @@
                         <div style="margin-top:1rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;">
                             <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Essas denominações aparecem ao abrir mesa de cash e registrar saídas de jogadores.
                         </div>
+                    </div>
+                </div>
+
+                <!-- ABA: FINANCEIRO -->
+                <div id="cfg-financeiro" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-percent"></i> Taxas por Forma de Pagamento</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">Configure o % de taxa cobrado do cliente em cada forma de pagamento. Quando configurado, o sistema pergunta se quer aplicar a taxa no ato do recebimento.</div>
+
+                        <div style="display:flex;flex-direction:column;gap:.5rem;" id="cfg-taxas-lista">
+                            <!-- renderizado via JS -->
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="padding:1.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-gear"></i> Comportamento</div>
+                        <div style="display:flex;flex-direction:column;gap:.75rem;">
+                            <label style="display:flex;align-items:center;gap:.75rem;cursor:pointer;padding:.75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+                                <input type="checkbox" id="cfg-taxa-auto" style="accent-color:var(--gold);">
+                                <div>
+                                    <div style="font-weight:700;font-size:.85rem;">Aplicar taxa automaticamente</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Se marcado, soma a taxa ao valor sem perguntar. Se desmarcado, pergunta a cada pagamento.</div>
+                                </div>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.75rem;cursor:pointer;padding:.75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+                                <input type="checkbox" id="cfg-taxa-mostrar" checked style="accent-color:var(--gold);">
+                                <div>
+                                    <div style="font-weight:700;font-size:.85rem;">Mostrar taxa separada no recibo</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Exibe "Subtotal + Taxa X% = Total" no histórico de transações.</div>
+                                </div>
+                            </label>
+                        </div>
+                        <button onclick="salvarConfigFinanceiro()" class="btn-gold" style="padding:.75rem 1.25rem;border-radius:.5rem;margin-top:1rem;">Salvar Configurações</button>
                     </div>
                 </div>
 
@@ -1819,6 +1853,7 @@
                     </button>
                 </div>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
+                <button onclick="ativarKioskTV()" class="btn-ghost" style="font-size:.8rem;" title="Modo apresentação (fullscreen)"><i class="fa-solid fa-expand"></i> Kiosk</button>
                 <button onclick="closeModal('modal-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
             </div>
         </div>
@@ -2563,6 +2598,8 @@ function renderTorneiosList() {
 // ============================================================
 function abrirDetalhesTorneio(idx) {
     activeTorneioIdx = idx;
+    // Pede permissão de notificações na primeira vez que abre torneio
+    pedirPermissaoNotificacoes();
     const t = torneios[idx];
     document.getElementById('mt-nome').innerText = t.nome;
     updateModalTorneio();
@@ -3319,12 +3356,28 @@ function abrirTV(idx) {
         .bar-bg{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
         .bar-fill{height:6px;background:currentColor;border-radius:3px;transition:width .5s linear;}
 
+        /* Modo Kiosk */
+        body.kiosk-mode { cursor: none !important; }
+        body.kiosk-mode * { cursor: none !important; }
+        body.kiosk-mode::selection { background: transparent; }
+
+        /* Recovery overlay */
+        #kiosk-recover { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.95); align-items:center; justify-content:center; flex-direction:column; }
+        #kiosk-recover.show { display:flex; }
+
         .top-row{display:flex;justify-content:space-between;align-items:flex-start;}
         .center-stack{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
         .bottom-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;padding:1.25rem;border-top:1px solid rgba(255,255,255,.08);}
         .stat-label{font-size:.6rem;opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-weight:800;margin-bottom:.3rem;}
     </style></head>
     <body class="layout-classico">
+        <!-- KIOSK RECOVER OVERLAY -->
+        <div id="kiosk-recover">
+            <div style="font-size:3rem;margin-bottom:1rem;">🔌</div>
+            <div style="font-size:1.5rem;font-weight:700;color:#f59e0b;margin-bottom:.5rem;">Conexão perdida</div>
+            <div style="font-size:.9rem;color:#71717a;">Abra o torneio novamente no painel de controle</div>
+        </div>
+
         <!-- BREAK OVERLAY -->
         <div id="break-screen">
             <div style="font-size:11rem;font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;">BREAK</div>
@@ -3380,8 +3433,41 @@ function abrirTV(idx) {
         </div>
 
     <script>
+    // Modo kiosk helpers
+    function enterKiosk() {
+        document.documentElement.style.cursor = 'none';
+        document.body.style.cursor = 'none';
+        try {
+            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+            else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
+        } catch(e) {}
+        // Esconde elementos não essenciais
+        document.body.classList.add('kiosk-mode');
+    }
+    function exitKiosk() {
+        document.documentElement.style.cursor = '';
+        document.body.style.cursor = '';
+        try {
+            if (document.exitFullscreen) document.exitFullscreen();
+        } catch(e) {}
+        document.body.classList.remove('kiosk-mode');
+    }
+
+    // Auto-recovery: mantém conexão com pai; se pai fechou, tenta reabrir
+    setInterval(() => {
+        if (!window.opener || window.opener.closed) {
+            // Pai fechou — mostra mensagem de reconexão
+            const recoverEl = document.getElementById('kiosk-recover');
+            if (recoverEl) recoverEl.style.display = 'flex';
+        }
+    }, 5000);
+
     window.onmessage=function(e){
         const d=e.data;
+        // Kiosk mode toggle
+        if (d && d.__kiosk === true)  { enterKiosk(); return; }
+        if (d && d.__kiosk === false) { exitKiosk(); return; }
+        if (!d || !d.timer) return;  // ignora mensagens sem dados de torneio
         document.body.className='layout-'+(d.layout||'classico');
         document.getElementById('tournament-name').innerText=d.tournamentName||'';
         document.getElementById('clube-nome').innerText=d.clubeNome||'';
@@ -3482,6 +3568,7 @@ setInterval(() => {
             changed = true;
             if (activeTorneioIdx === i) updateModalTorneio();
             updateTV(i);
+            checarAlertasTorneio(t);
             if (t.tempoRestante % 30 === 0) renderTorneiosList();
         } else if (t.rodando && t.tempoRestante <= 0 && !t.isBreak) {
             nextLevel(i);
@@ -4747,6 +4834,7 @@ function switchConfigTab(tabId, btn) {
     btn.classList.add('active');
     if (tabId === 'cfg-backup') renderBackupStats();
     if (tabId === 'cfg-fichas') renderFichasConfig();
+    if (tabId === 'cfg-financeiro') renderConfigFinanceiro();
 }
 
 function renderConfig() {
@@ -5360,18 +5448,47 @@ function validarValorPagamento() {
 }
 
 function confirmarPagamentoConta() {
-    const valor = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
-    if (valor <= 0) return showToast('⚠️ Valor inválido');
+    const valorBase = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
+    if (valorBase <= 0) return showToast('⚠️ Valor inválido');
     const metodo = (document.querySelector('input[name="metodo-pagar"]:checked') || {}).value;
     if (!metodo) return showToast('⚠️ Selecione a forma de pagamento');
     const obs = document.getElementById('pj-pagar-obs').value.trim();
     const j = jogadores.find(x => x.id === pagamentoJogadorId);
 
+    // Aplicar taxa se configurado
+    const taxaInfo = calcularTaxa(valorBase, metodo);
+    const cfgFin = getConfigFinanceiro();
+    let valor = valorBase;
+    let taxaAplicada = 0;
+    if (taxaInfo.pct > 0) {
+        if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[metodo].label} tem taxa de ${taxaInfo.pct}%.
+
+Valor: ${formatMoney(valorBase)}
+Taxa: ${formatMoney(taxaInfo.taxa)}
+Total a cobrar: ${formatMoney(taxaInfo.total)}
+
+Aplicar taxa?`)) {
+            valor = taxaInfo.total;
+            taxaAplicada = taxaInfo.taxa;
+        }
+    }
+
+    // Registra taxa como débito separado (se aplicada)
+    if (taxaAplicada > 0) {
+        registrarTransacao({
+            jogadorId: pagamentoJogadorId,
+            tipo: 'taxa',
+            valor: -taxaAplicada,
+            descricao: `Taxa ${PAYMENT_METHODS[metodo].label} ${taxaInfo.pct}%`,
+            origem: 'caixa',
+        });
+    }
+
     registrarTransacao({
         jogadorId: pagamentoJogadorId,
         tipo: 'pagamento',
-        valor: valor,   // positivo — abate dívida
-        descricao: `Pagamento via ${PAYMENT_METHODS[metodo].label}${obs?' — '+obs:''}`,
+        valor: valor,
+        descricao: `Pagamento via ${PAYMENT_METHODS[metodo].label}${obs?' — '+obs:''}${taxaAplicada>0?' (c/ taxa)':''}`,
         metodo: metodo,
         origem: 'caixa',
     });
@@ -5882,10 +5999,28 @@ function validarValorAcerto() {
 function fecharComandaConfirm() {
     const c = _fcEstadoAcerto.comanda;
     if (!c) return;
-    const pago = parseFloat(document.getElementById('fc-valor-pago').value) || 0;
+    let pago = parseFloat(document.getElementById('fc-valor-pago').value) || 0;
     const incluirPend = (document.getElementById('fc-incluir-pendencias') || {}).checked !== false;
     const metodoSel = document.querySelector('input[name="metodo-fc"]:checked');
     const metodo = metodoSel ? metodoSel.value : 'dinheiro';
+
+    // Aplica taxa, se configurado
+    const taxaInfo = calcularTaxa(pago, metodo);
+    const cfgFin = getConfigFinanceiro();
+    let valorCobrado = pago;
+    let taxaAplicada = 0;
+    if (taxaInfo.pct > 0) {
+        if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[metodo].label} tem taxa de ${taxaInfo.pct}%.
+
+Valor: ${formatMoney(pago)}
+Taxa: ${formatMoney(taxaInfo.taxa)}
+Total: ${formatMoney(taxaInfo.total)}
+
+Aplicar taxa ao jogador?`)) {
+            valorCobrado = taxaInfo.total;
+            taxaAplicada = taxaInfo.taxa;
+        }
+    }
 
     // 1) Registrar débito da comanda (débito normal)
     registrarTransacao({
@@ -5897,13 +6032,25 @@ function fecharComandaConfirm() {
         refId: c.id,
     });
 
+    // 1.5) Taxa extra se houver
+    if (taxaAplicada > 0) {
+        registrarTransacao({
+            jogadorId: c.jogadorId,
+            tipo: 'taxa',
+            valor: -taxaAplicada,
+            descricao: `Taxa ${PAYMENT_METHODS[metodo].label} ${taxaInfo.pct}%`,
+            origem: 'bar',
+            refId: c.id,
+        });
+    }
+
     // 2) Registrar pagamento (positivo) — quita o total escolhido
-    if (pago > 0) {
+    if (valorCobrado > 0) {
         registrarTransacao({
             jogadorId: c.jogadorId,
             tipo: 'pagamento',
-            valor: pago,
-            descricao: `Acerto bar via ${PAYMENT_METHODS[metodo].label}${incluirPend && _fcEstadoAcerto.pendencias>0 ? ' (c/ pendências)' : ''}`,
+            valor: valorCobrado,
+            descricao: `Acerto bar via ${PAYMENT_METHODS[metodo].label}${incluirPend && _fcEstadoAcerto.pendencias>0 ? ' (c/ pendências)' : ''}${taxaAplicada > 0 ? ' (c/ taxa)' : ''}`,
             metodo,
             origem: 'bar',
             refId: c.id,
@@ -7287,6 +7434,275 @@ function exportRelClientes() {
 
 
 
+
+// ============================================================
+// BLOCO 3 — FINANCEIRO, TV KIOSK, NOTIFICAÇÕES
+// ============================================================
+
+// ============================================================
+// ITEM 1: CONFIGURAÇÕES FINANCEIRAS (taxas por forma de pagamento)
+// ============================================================
+function getConfigFinanceiro() {
+    if (!config.financeiro) {
+        config.financeiro = {
+            taxas: {
+                dinheiro: 0,
+                pix: 0,
+                debito: 2.0,
+                credito: 3.5,
+                cheque: 1.0,
+                credito_sistema: 0,
+            },
+            aplicarAuto: false,
+            mostrarSeparado: true,
+        };
+    }
+    return config.financeiro;
+}
+
+function renderConfigFinanceiro() {
+    const cfg = getConfigFinanceiro();
+    const lista = document.getElementById('cfg-taxas-lista');
+    if (!lista) return;
+
+    lista.innerHTML = Object.keys(PAYMENT_METHODS).map(k => {
+        const m = PAYMENT_METHODS[k];
+        const taxa = cfg.taxas[k] || 0;
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto;gap:.75rem;align-items:center;padding:.7rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <i class="fa-solid ${m.icon}" style="color:${m.color};width:20px;"></i>
+                <div>
+                    <div style="font-weight:700;font-size:.85rem;">${m.label}</div>
+                    <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${k}</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <input type="number" step="0.1" min="0" max="20" value="${taxa}" data-metodo="${k}" class="inp cfg-taxa-inp" style="width:80px;padding:.4rem .6rem;font-family:'Space Mono',monospace;font-weight:700;text-align:right;font-size:.85rem;">
+                <span style="color:#71717a;font-size:.8rem;">%</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Carrega outros checkboxes
+    document.getElementById('cfg-taxa-auto').checked = cfg.aplicarAuto;
+    document.getElementById('cfg-taxa-mostrar').checked = cfg.mostrarSeparado;
+}
+
+function salvarConfigFinanceiro() {
+    const cfg = getConfigFinanceiro();
+    document.querySelectorAll('.cfg-taxa-inp').forEach(inp => {
+        const m = inp.dataset.metodo;
+        cfg.taxas[m] = parseFloat(inp.value) || 0;
+    });
+    cfg.aplicarAuto = document.getElementById('cfg-taxa-auto').checked;
+    cfg.mostrarSeparado = document.getElementById('cfg-taxa-mostrar').checked;
+    saveData();
+    showToast('✅ Configurações financeiras salvas');
+}
+
+// Calcula taxa aplicável a um valor para dado método
+function calcularTaxa(valor, metodo) {
+    const cfg = getConfigFinanceiro();
+    const pct = cfg.taxas[metodo] || 0;
+    if (pct <= 0) return { pct: 0, taxa: 0, total: valor };
+    const taxa = valor * pct / 100;
+    return { pct, taxa, total: valor + taxa };
+}
+
+// ============================================================
+// ITEM 2: MODO KIOSK TV
+// ============================================================
+// Aproveita o fato da TV ser uma window separada; enviamos mensagem
+// para ela entrar em modo kiosk (fullscreen + esconder cursor + auto-recover).
+function ativarKioskTV() {
+    if (!tvWindow || tvWindow.closed) return showToast('⚠️ Abra a TV primeiro');
+    try {
+        tvWindow.postMessage({ __kiosk: true }, '*');
+        showToast('🖥️ Modo kiosk ativado na TV');
+    } catch (e) {
+        showToast('⚠️ Não foi possível ativar kiosk');
+    }
+}
+
+function desativarKioskTV() {
+    if (!tvWindow || tvWindow.closed) return;
+    try {
+        tvWindow.postMessage({ __kiosk: false }, '*');
+        showToast('🖥️ Modo kiosk desativado');
+    } catch (e) {}
+}
+
+// ============================================================
+// ITEM 3: NOTIFICAÇÕES (SONORAS + DESKTOP)
+// ============================================================
+let _audioCtx = null;
+let _lastNotifSec = {}; // torneioId -> último segundo em que notificou
+
+function getAudioCtx() {
+    if (!_audioCtx) {
+        try {
+            _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) { return null; }
+    }
+    return _audioCtx;
+}
+
+// Toca um beep simples via Web Audio API (sem precisar de arquivo)
+function tocarBeep(frequencia = 880, duracao = 200, volume = 0.3) {
+    if (!isSomAtivo()) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = frequencia;
+        osc.type = 'sine';
+        gain.gain.value = volume;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        // Fade out
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duracao/1000);
+        osc.stop(ctx.currentTime + duracao/1000);
+    } catch (e) { console.warn('Beep falhou', e); }
+}
+
+function tocarSequencia(notas) {
+    // notas = [{freq, dur, delay}, ...]
+    notas.forEach(n => {
+        setTimeout(() => tocarBeep(n.freq, n.dur, n.vol || 0.3), n.delay);
+    });
+}
+
+function isSomAtivo() {
+    return config && config.preferencias && config.preferencias.somOn !== false;
+}
+
+function isNotificacaoAtiva() {
+    return config && config.preferencias && config.preferencias.alertaNivel !== false;
+}
+
+// Sons específicos
+function somAlerta60s() {
+    // 2 beeps suaves: "attention"
+    tocarSequencia([
+        { freq: 800, dur: 120, delay: 0 },
+        { freq: 800, dur: 120, delay: 180 },
+    ]);
+}
+
+function somFimNivel() {
+    // 3 beeps ascendentes
+    tocarSequencia([
+        { freq: 600, dur: 150, delay: 0 },
+        { freq: 800, dur: 150, delay: 180 },
+        { freq: 1000, dur: 300, delay: 360, vol: 0.4 },
+    ]);
+}
+
+function somBreak() {
+    // Acorde descendente para break
+    tocarSequencia([
+        { freq: 900, dur: 200, delay: 0 },
+        { freq: 700, dur: 200, delay: 220 },
+        { freq: 500, dur: 400, delay: 440 },
+    ]);
+}
+
+function somSucesso() {
+    tocarSequencia([
+        { freq: 700, dur: 100, delay: 0 },
+        { freq: 1000, dur: 200, delay: 120 },
+    ]);
+}
+
+function somErro() {
+    tocarSequencia([
+        { freq: 400, dur: 200, delay: 0 },
+        { freq: 300, dur: 300, delay: 220 },
+    ]);
+}
+
+// Notificação desktop
+function notificarDesktop(titulo, corpo, icone) {
+    if (!isNotificacaoAtiva()) return;
+    if (!('Notification' in window)) return;
+
+    const fazer = () => {
+        try {
+            new Notification(titulo, {
+                body: corpo,
+                icon: icone || '/favicon.ico',
+                silent: true, // som já tocamos separadamente
+                tag: 'pokersul',
+            });
+        } catch (e) { console.warn('Notify falhou', e); }
+    };
+
+    if (Notification.permission === 'granted') {
+        fazer();
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => {
+            if (p === 'granted') fazer();
+        });
+    }
+}
+
+// Hook no tick do timer para disparar alertas
+function checarAlertasTorneio(t) {
+    if (!t || !t.rodando || !isNotificacaoAtiva()) return;
+    const key = t.id;
+    if (!_lastNotifSec[key]) _lastNotifSec[key] = {};
+
+    // Alerta aos 60s restantes
+    if (t.tempoRestante === 60 && _lastNotifSec[key].sec60 !== t.nivelAtual) {
+        _lastNotifSec[key].sec60 = t.nivelAtual;
+        somAlerta60s();
+        notificarDesktop(`⏰ 1 minuto — ${t.nome}`, `Nível ${t.nivelAtual + 1} terminando em 60 segundos`);
+    }
+
+    // Alerta aos 30s
+    if (t.tempoRestante === 30 && _lastNotifSec[key].sec30 !== t.nivelAtual) {
+        _lastNotifSec[key].sec30 = t.nivelAtual;
+        somAlerta60s();
+    }
+
+    // Fim do nível (tempo zerou)
+    if (t.tempoRestante === 0 && _lastNotifSec[key].fim !== t.nivelAtual) {
+        _lastNotifSec[key].fim = t.nivelAtual;
+        if (t.isBreak) {
+            somFimNivel();
+            notificarDesktop(`▶️ Intervalo acabou — ${t.nome}`, `Voltando ao jogo!`);
+        } else {
+            const prox = t.blinds[t.nivelAtual + 1];
+            if (prox) {
+                somFimNivel();
+                notificarDesktop(`🔔 Nível ${t.nivelAtual + 1} terminou — ${t.nome}`, `Próximo: ${prox.sb}/${prox.bb}`);
+            }
+        }
+    }
+}
+
+function pedirPermissaoNotificacoes() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+// Ativar contexto de áudio na primeira interação do usuário (necessário para autoplay)
+let _audioUnlocked = false;
+function unlockAudio() {
+    if (_audioUnlocked) return;
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    _audioUnlocked = true;
+}
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('keydown', unlockAudio, { once: true });
+
+
 // ============================================================
 // BLOCO 2 — FUNCIONALIDADES NOVAS
 // ============================================================
@@ -7475,10 +7891,13 @@ function confirmarPagamentoPositivo() {
     if (valorPago <= 0) return showToast('⚠️ Valor inválido');
     if (valorPago > valor) return showToast('⚠️ Valor maior que o devido ao jogador');
 
+    // Taxas não se aplicam a pagamento ao jogador (clube paga o jogador), mas se for necessário descontar
+    // (operador pode optar), isso pode ser implementado aqui. Por padrão, pagamento sai integral.
+
     registrarTransacao({
         jogadorId,
         tipo: 'pagamento_cash',
-        valor: -valorPago,  // clube paga ao jogador → saída no caixa do clube = débito na conta do jogador
+        valor: -valorPago,
         descricao: `Pagamento (Cash) via ${PAYMENT_METHODS[metodo].label}`,
         metodo,
         origem: 'cash',
