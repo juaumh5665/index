@@ -746,8 +746,8 @@
                             <div style="display:flex;flex-direction:column;gap:1rem;">
                                 <div><label class="inp-label">Nome do Clube</label><input id="cfg-clube-nome" class="inp" placeholder="Ex: PokerSul Pato Branco"></div>
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                                    <div><label class="inp-label">CNPJ</label><input id="cfg-clube-cnpj" class="inp" placeholder="00.000.000/0000-00"></div>
-                                    <div><label class="inp-label">Telefone</label><input id="cfg-clube-fone" class="inp" placeholder="(46) 9 0000-0000"></div>
+                                    <div><label class="inp-label">CNPJ</label><input id="cfg-clube-cnpj" class="inp" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)" inputmode="numeric"></div>
+                                    <div><label class="inp-label">Telefone</label><input id="cfg-clube-fone" class="inp" placeholder="(46) 9 0000-0000" maxlength="16" oninput="maskFone(this)" inputmode="numeric"></div>
                                 </div>
                                 <div><label class="inp-label">Endereço</label><input id="cfg-clube-endereco" class="inp" placeholder="Rua, número, bairro"></div>
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
@@ -1067,16 +1067,26 @@
                     <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;align-items:start;">
                         <!-- Lista de produtos por grupo -->
                         <div>
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                                <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Catálogo de Produtos</div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+                                <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Catálogo de Produtos <span id="bar-produtos-count" style="color:#71717a;">(0)</span></div>
                                 <div style="display:flex;gap:.5rem;align-items:center;">
-                                    <select id="bar-filtro-grupo" class="inp" style="width:160px;padding:.4rem .75rem;font-size:.8rem;" onchange="renderProdutos()">
+                                    <select id="bar-filtro-grupo" class="inp" style="width:140px;padding:.4rem .75rem;font-size:.8rem;" onchange="renderProdutos()">
                                         <option value="">Todos os grupos</option>
                                     </select>
                                     <button onclick="openModal('modal-produto')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Produto</button>
                                 </div>
                             </div>
+                            <div style="display:flex;gap:.5rem;margin-bottom:.75rem;align-items:center;">
+                                <input id="bar-produtos-busca" oninput="renderProdutos()" placeholder="Buscar produto por nome..." class="inp" style="flex:1;padding:.5rem .75rem;font-size:.85rem;">
+                                <select id="bar-produtos-limite" onchange="renderProdutos()" class="inp" style="padding:.5rem .75rem;font-size:.8rem;width:130px;">
+                                    <option value="10">10 por página</option>
+                                    <option value="20">20 por página</option>
+                                    <option value="50">50 por página</option>
+                                    <option value="999">Todos</option>
+                                </select>
+                            </div>
                             <div id="bar-produtos-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                            <div id="bar-produtos-pager" style="display:none;margin-top:.75rem;justify-content:space-between;align-items:center;padding:.5rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;"></div>
                         </div>
                         <!-- Painel de grupos -->
                         <div class="stat-card" style="padding:1.25rem;">
@@ -1153,23 +1163,53 @@
                     <div id="bar-historico-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
                 </div>
 
-                <!-- SUBTAB: RELATÓRIO -->
+<!-- SUBTAB: RELATÓRIO -->
                 <div id="bar-relatorio" class="bartab-content" style="display:none;">
-                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+
+                    <!-- Filtros de período -->
+                    <div style="display:flex;gap:.5rem;align-items:flex-end;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid #1e1e23;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:280px;">
+                            <label class="inp-label">Período</label>
+                            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+                                <button onclick="setBarRelPeriodo('hoje')" id="brp-hoje" class="rp-btn rp-active">Hoje</button>
+                                <button onclick="setBarRelPeriodo('ontem')" id="brp-ontem" class="rp-btn">Ontem</button>
+                                <button onclick="setBarRelPeriodo('7d')" id="brp-7d" class="rp-btn">7 dias</button>
+                                <button onclick="setBarRelPeriodo('30d')" id="brp-30d" class="rp-btn">30 dias</button>
+                                <button onclick="setBarRelPeriodo('mes')" id="brp-mes" class="rp-btn">Este mês</button>
+                                <button onclick="setBarRelPeriodo('tudo')" id="brp-tudo" class="rp-btn">Tudo</button>
+                                <button onclick="setBarRelPeriodo('custom')" id="brp-custom" class="rp-btn">Personalizado</button>
+                            </div>
+                        </div>
+                        <div id="brp-custom-wrap" style="display:none;gap:.5rem;align-items:flex-end;">
+                            <div><label class="inp-label">De</label><input id="brp-de" type="date" class="inp" onchange="setBarRelPeriodo('custom')"></div>
+                            <div><label class="inp-label">Até</label><input id="brp-ate" type="date" class="inp" onchange="setBarRelPeriodo('custom')"></div>
+                        </div>
+                        <div>
+                            <button onclick="exportRelBarCSV()" class="btn-gold" style="font-size:.8rem;padding:.6rem 1rem;"><i class="fa-solid fa-file-excel"></i> Exportar Excel/CSV</button>
+                        </div>
+                    </div>
+
+                    <!-- KPIs principais -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
                         <div class="stat-card">
                             <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Faturamento Total</div>
-                            <div id="rel-total" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0,00</div>
+                            <div id="rel-total" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0,00</div>
                         </div>
                         <div class="stat-card">
                             <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Comandas Fechadas</div>
-                            <div id="rel-qtd" style="font-size:2rem;font-weight:800;margin-top:.4rem;">0</div>
+                            <div id="rel-qtd" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Itens Vendidos</div>
+                            <div id="rel-itens" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div>
                         </div>
                         <div class="stat-card">
                             <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Ticket Médio</div>
-                            <div id="rel-ticket" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0,00</div>
+                            <div id="rel-ticket" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0,00</div>
                         </div>
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
                         <div class="stat-card" style="padding:1.25rem;">
                             <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Vendas por Grupo</div>
                             <div id="rel-grupos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
@@ -1179,6 +1219,22 @@
                             <div id="rel-pagamentos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                         </div>
                     </div>
+
+                    <!-- Top produtos -->
+                    <div class="stat-card" style="padding:1.25rem;margin-bottom:1.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;"><i class="fa-solid fa-trophy"></i> Top Produtos Vendidos</div>
+                        <div id="rel-top-produtos" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                    </div>
+
+                    <!-- Detalhamento de comandas -->
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comandas do Período</div>
+                            <span id="rel-comandas-count" style="font-size:.7rem;color:#71717a;"></span>
+                        </div>
+                        <div id="rel-comandas-lista" style="display:flex;flex-direction:column;gap:.35rem;max-height:500px;overflow-y:auto;"></div>
+                    </div>
+
                 </div>
 
             </div>
@@ -1303,6 +1359,21 @@
     </div>
 </div>
 
+<!-- MODAL: CONFIG STATS TV POKERWEB -->
+<div id="modal-config-stats-tv" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-sliders" style="color:var(--gold);"></i> Estatísticas da TV</h3>
+            <button onclick="closeModal('modal-config-stats-tv')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;">
+            <div style="font-size:.75rem;color:#71717a;margin-bottom:.5rem;">Escolha quais estatísticas aparecem na linha inferior da TV (layout PokerWeb):</div>
+            <div id="stats-tv-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+            <button onclick="salvarConfigStatsTV()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.5rem;">Aplicar</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: DETALHES CLIENTE (somente leitura) -->
 <div id="modal-detalhes-cliente" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;">
@@ -1338,7 +1409,7 @@
 </div>
 
 <!-- UNDO TOAST -->
-<div id="undo-toast" style="display:none;position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:999;background:#18181b;border:1px solid var(--gold);border-radius:.75rem;padding:1rem 1.5rem;box-shadow:0 10px 40px rgba(0,0,0,.4);display:flex;align-items:center;gap:1rem;min-width:360px;">
+<div id="undo-toast" style="display:none;position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);z-index:999;background:#18181b;border:1px solid var(--gold);border-radius:.75rem;padding:1rem 1.5rem;box-shadow:0 10px 40px rgba(0,0,0,.4);align-items:center;gap:1rem;min-width:360px;">
     <i class="fa-solid fa-rotate-left" style="color:var(--gold);font-size:1.2rem;"></i>
     <div style="flex:1;">
         <div id="undo-msg" style="font-size:.85rem;font-weight:700;"></div>
@@ -1708,7 +1779,7 @@
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div><label class="inp-label">Nome Completo *</label><input id="j-nome" class="inp" placeholder="Ex: João da Silva"></div>
             <div><label class="inp-label">Apelido</label><input id="j-apelido" class="inp" placeholder="Ex: JoãoAce"></div>
-            <div><label class="inp-label">WhatsApp</label><input id="j-whatsapp" class="inp" placeholder="(46) 9 9999-9999"></div>
+            <div><label class="inp-label">WhatsApp</label><input id="j-whatsapp" class="inp" placeholder="(46) 9 9999-9999" maxlength="16" oninput="maskFone(this)" inputmode="numeric"></div>
             <div style="display:grid;grid-template-columns:2fr 1fr;gap:.5rem;">
                 <div><label class="inp-label">Cidade</label><input id="j-cidade" class="inp" placeholder="Ex: Pato Branco"></div>
                 <div><label class="inp-label">UF</label><input id="j-uf" class="inp" placeholder="PR" maxlength="2" style="text-transform:uppercase;"></div>
@@ -1871,9 +1942,13 @@
                         <option value="minimalista">Minimalista</option>
                         <option value="feltro">Verde Feltro</option>
                         <option value="neon">Neon</option>
+                        <option value="pokerweb">PokerWeb ⭐</option>
                     </select>
                     <button onclick="togglePrizePool()" id="btn-prize-toggle" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;" title="Mostrar/ocultar prize pool na TV">
                         <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button onclick="abrirConfigStatsTV()" id="btn-config-stats-tv" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;" title="Configurar stats do layout PokerWeb">
+                        <i class="fa-solid fa-sliders"></i>
                     </button>
                 </div>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
@@ -2062,7 +2137,7 @@
         <div style="display:flex;flex-direction:column;gap:.85rem;">
             <div><label class="inp-label">Nome *</label><input id="qr-nome" class="inp" placeholder="Nome completo" autofocus></div>
             <div><label class="inp-label">Apelido</label><input id="qr-apelido" class="inp" placeholder="Opcional"></div>
-            <div><label class="inp-label">WhatsApp</label><input id="qr-whatsapp" class="inp" placeholder="(46) 9 9999-9999"></div>
+            <div><label class="inp-label">WhatsApp</label><input id="qr-whatsapp" class="inp" placeholder="(46) 9 9999-9999" maxlength="16" oninput="maskFone(this)" inputmode="numeric"></div>
             <div style="display:grid;grid-template-columns:2fr 1fr;gap:.5rem;">
                 <div><label class="inp-label">Cidade</label><input id="qr-cidade" class="inp"></div>
                 <div><label class="inp-label">UF</label><input id="qr-uf" class="inp" maxlength="2" style="text-transform:uppercase;"></div>
@@ -3366,10 +3441,42 @@ function updateTV(idx) {
     // Contadores de entradas por tipo
     const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
     const reentriesQtd = t.entries.filter(e => e.tipo === 'reentry').length;
-    const rebuysQtd = t.entries.filter(e => e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo').length;
+    const rebuysSimplesQtd = t.entries.filter(e => e.tipo === 'rebuy_simples').length;
+    const rebuysDuplosQtd = t.entries.filter(e => e.tipo === 'rebuy_duplo').length;
+    const rebuysQtd = rebuysSimplesQtd + rebuysDuplosQtd;
     const addonsQtd = t.entries.filter(e => e.tipo === 'addon').length;
+    const jackpotsQtd = (t.jackpotCompras || []).reduce((s, j) => s + (j.qtd || 1), 0);
+
+    // Stats strip do layout PokerWeb (configuração por torneio)
+    // Se t.pwStatsVisiveis não for definido, mostra todos que > 0
+    const pwVis = t.pwStatsVisiveis || {};
+    const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true; // padrão: visível
+    const statsStrip = [];
+    if (defVis('buyin'))     statsStrip.push({ label:'BUY IN',   value:buyinsQtd });
+    if (defVis('reentry') && reentriesQtd) statsStrip.push({ label:'RE-ENTRY', value:reentriesQtd });
+    if (defVis('jackpot') && (t.jackpotValor > 0)) statsStrip.push({ label:'JACKPOT', value:jackpotsQtd });
+    if (defVis('rebuy_simples') && t.rebuySimples > 0) statsStrip.push({ label:'REBUY '+t.rebuySimples,  value:rebuysSimplesQtd });
+    if (defVis('rebuy_duplo')   && t.rebuyDuplo   > 0) statsStrip.push({ label:'REBUY '+t.rebuyDuplo+' (DUPLO)', value:rebuysDuplosQtd });
+    if (defVis('addon') && (t.addonFichas > 0))        statsStrip.push({ label:'ADD-ON', value:addonsQtd });
 
     const prox = t.blinds[t.nivelAtual + 1];
+
+    // Calcular "Intervalo em" (próximo break)
+    let breakIn = '—';
+    if (t.blinds && t.blinds.length > t.nivelAtual) {
+        let secsAteBreak = t.tempoRestante;
+        let achouBreak = false;
+        for (let i = t.nivelAtual + 1; i < t.blinds.length; i++) {
+            if (t.blinds[i].isBreak) { achouBreak = true; break; }
+            secsAteBreak += (t.blinds[i].tempo || t.tempoNivel) * 60;
+        }
+        if (achouBreak) {
+            const h = Math.floor(secsAteBreak / 3600);
+            const m = Math.floor((secsAteBreak % 3600) / 60);
+            const s = secsAteBreak % 60;
+            breakIn = (h > 0 ? h + ':' : '') + m.toString().padStart(h > 0 ? 2 : 1, '0') + ':' + s.toString().padStart(2, '0');
+        }
+    }
 
     // Tempo decorrido total desde o início
     const elapsedMs = t.iniciadoEm ? (Date.now() - t.iniciadoEm) : 0;
@@ -3397,6 +3504,10 @@ function updateTV(idx) {
         reentriesQtd,
         rebuysQtd,
         addonsQtd,
+        jackpotsQtd,
+        statsStrip,
+        breakIn,
+        nextAnte: prox ? prox.ante.toLocaleString() : '',
         prize:    formatMoney(getPrize(t)),
         isBreak:  t.isBreak,
         next:     prox ? `${prox.sb.toLocaleString()}/${prox.bb.toLocaleString()}` : 'FINAL',
@@ -3457,6 +3568,204 @@ function abrirTV(idx) {
         body.layout-neon .panel-bg{background:rgba(20,20,40,.5);border:1px solid rgba(236,72,153,.3);backdrop-filter:blur(10px);border-radius:.75rem;}
         body.layout-neon #tournament-name{background:linear-gradient(90deg,#ec4899,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 
+        /* === POKERWEB (profissional verde com brilho e grid de stats) === */
+        body.layout-pokerweb {
+            background:
+                radial-gradient(ellipse at 50% 50%, #1a6b4f 0%, #0d3d2e 40%, #062018 90%);
+            color:#f5e6c8;
+            overflow:hidden;
+        }
+        body.layout-pokerweb::before {
+            content:'';position:fixed;inset:0;pointer-events:none;
+            background:
+                repeating-linear-gradient(60deg, rgba(255,255,255,.02) 0 2px, transparent 2px 14px),
+                radial-gradient(circle at 20% 30%, rgba(245,213,114,.12), transparent 55%),
+                radial-gradient(circle at 80% 70%, rgba(34,197,94,.08), transparent 55%);
+            z-index:0;
+        }
+        body.layout-pokerweb::after {
+            content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;pointer-events:none;z-index:0;
+            background:
+                linear-gradient(45deg, transparent 40%, rgba(34,197,94,.04) 50%, transparent 60%);
+            animation: pw-shine 8s ease-in-out infinite;
+        }
+        @keyframes pw-shine {
+            0%, 100% { transform: translate(-25%, -25%); opacity: .4; }
+            50% { transform: translate(25%, 25%); opacity: .8; }
+        }
+        body.layout-pokerweb.pw-layout-active #main-tv { display:none !important; }
+        body.layout-pokerweb #pw-screen { display:flex !important; }
+
+        /* PokerWeb screen (só visível quando layout-pokerweb) */
+        #pw-screen {
+            display:none; position:relative; z-index:1;
+            height:100vh; width:100vw;
+            flex-direction:column;
+            padding: 1.5rem 2rem 0;
+            font-family: 'Manrope', sans-serif;
+        }
+        #pw-screen * { box-sizing:border-box; }
+
+        /* Title bar: tournament name */
+        .pw-title {
+            text-align:center;
+            font-size: clamp(1.8rem, 3.5vw, 3.2rem);
+            font-weight: 800;
+            color: #f5d572;
+            letter-spacing: .04em;
+            margin-bottom: .25rem;
+            text-shadow: 0 0 25px rgba(245,213,114,.5), 0 2px 4px rgba(0,0,0,.4);
+        }
+        .pw-title-divider {
+            height:2px;
+            background: linear-gradient(90deg, transparent, rgba(245,213,114,.6), transparent);
+            margin: 0 auto .5rem;
+            width: 90%;
+        }
+
+        /* Main area: 3 columns grid */
+        .pw-main-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 2.2fr 1fr;
+            gap: 1.5rem;
+            align-items: center;
+            min-height: 0;
+        }
+
+        /* Left column: Nível, Jogadores, Média */
+        .pw-col-left {
+            display:flex; flex-direction:column; gap: 1.5rem;
+            padding-left: 1rem;
+        }
+        .pw-stat-block {
+            display: flex;
+            flex-direction: column;
+            gap: .2rem;
+        }
+        .pw-stat-label {
+            font-size: clamp(.75rem, 1.2vw, 1.1rem);
+            font-weight: 700;
+            color: #f5d572;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            display:flex; align-items:center; gap:.5rem;
+        }
+        .pw-stat-label i { color:#f5d572; font-size:.85em; }
+        .pw-stat-value {
+            font-size: clamp(1.8rem, 3.2vw, 3rem);
+            font-weight: 800;
+            color: #fef3c7;
+            font-family: 'Manrope', sans-serif;
+            letter-spacing: -.01em;
+            line-height: 1;
+        }
+
+        /* Center column: Level, Timer, Blinds */
+        .pw-col-center {
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            height:100%;
+        }
+        .pw-level {
+            font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+            font-weight: 800;
+            color: #fef3c7;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            margin-bottom: .5rem;
+            opacity: .9;
+        }
+        .pw-timer {
+            font-size: clamp(6rem, 14vw, 13rem);
+            font-weight: 800;
+            color: #f5d572;
+            font-family: 'Space Mono', 'Manrope', monospace;
+            letter-spacing: -.03em;
+            line-height: .9;
+            text-shadow:
+                0 0 30px rgba(245,213,114,.6),
+                0 0 60px rgba(245,213,114,.3),
+                0 4px 8px rgba(0,0,0,.4);
+            margin-bottom: .3rem;
+        }
+        .pw-bar-bg { width: 70%; height: 4px; background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; margin: .5rem auto 1rem; }
+        .pw-bar-fill { height:100%; background: linear-gradient(90deg, #f5d572, #22c55e); border-radius: 2px; transition: width .5s linear; }
+
+        .pw-blinds {
+            font-size: clamp(2.2rem, 5vw, 4.5rem);
+            font-weight: 800;
+            color: #fef3c7;
+            text-shadow: 0 2px 6px rgba(0,0,0,.4);
+            letter-spacing: -.01em;
+            display: flex; align-items: baseline; gap: 1.2rem;
+        }
+        .pw-ante-label {
+            font-size: clamp(.85rem, 1.2vw, 1.2rem);
+            color: #f5d572;
+            font-weight: 700;
+            opacity: .85;
+            text-transform:uppercase; letter-spacing:.08em;
+            margin-bottom: .2em;
+        }
+        .pw-ante-value {
+            font-size: clamp(2rem, 4.5vw, 4rem);
+            font-weight: 800;
+            color: #fef3c7;
+        }
+        .pw-blinds-next {
+            font-size: clamp(.9rem, 1.4vw, 1.3rem);
+            color: rgba(254,243,199,.6);
+            margin-top: .25rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-align: center;
+        }
+
+        /* Right column: Tempo, Intervalo, Chipcount */
+        .pw-col-right {
+            display:flex; flex-direction:column; gap: 1.5rem;
+            align-items:flex-end; padding-right: 1rem;
+            text-align: right;
+        }
+        .pw-col-right .pw-stat-block { align-items:flex-end; }
+
+        /* Bottom strip: stats */
+        .pw-bottom-strip {
+            background: rgba(0,0,0,.35);
+            border-top: 2px solid rgba(245,213,114,.3);
+            backdrop-filter: blur(8px);
+            padding: 1rem 1.5rem;
+            margin: 1rem -2rem 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            gap: 1rem;
+            align-items: center;
+        }
+        .pw-stat-pill {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .15rem;
+            min-width: 70px;
+        }
+        .pw-pill-label {
+            font-size: clamp(.7rem, 1vw, .95rem);
+            font-weight: 700;
+            color: rgba(254,243,199,.75);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+        .pw-pill-value {
+            font-size: clamp(1rem, 1.5vw, 1.4rem);
+            font-weight: 800;
+            color: #f5d572;
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* When break active in pokerweb, use the BREAK overlay */
+
         /* BREAK */
         #break-screen{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;flex-direction:column;background:#0a0000;}
         #break-screen.show{display:flex;}
@@ -3491,6 +3800,67 @@ function abrirTV(idx) {
             <div style="font-size:11rem;font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;">BREAK</div>
             <div id="break-timer" class="mono" style="font-size:6rem;color:#fff;margin-top:1rem;"></div>
             <div style="font-size:1.5rem;color:#52525b;margin-top:1rem;text-transform:uppercase;letter-spacing:.3em;">Intervalo</div>
+        </div>
+
+        <!-- POKERWEB LAYOUT (só visível com body.layout-pokerweb) -->
+        <div id="pw-screen">
+            <!-- Title -->
+            <div class="pw-title" id="pw-title">TORNEIO</div>
+            <div class="pw-title-divider"></div>
+
+            <!-- Main 3-col grid -->
+            <div class="pw-main-grid">
+                <!-- LEFT COLUMN -->
+                <div class="pw-col-left">
+                    <div class="pw-stat-block">
+                        <div class="pw-stat-label"><i class="fa-solid fa-circle-info"></i> NÍVEL <span id="pw-level-num">1</span></div>
+                    </div>
+                    <div class="pw-stat-block">
+                        <div class="pw-stat-label"><i class="fa-solid fa-users"></i> JOGADORES</div>
+                        <div class="pw-stat-value"><span id="pw-players">0</span> DE <span id="pw-total">0</span></div>
+                    </div>
+                    <div class="pw-stat-block">
+                        <div class="pw-stat-label"><i class="fa-solid fa-layer-group"></i> MÉDIA</div>
+                        <div class="pw-stat-value" id="pw-avg">0</div>
+                    </div>
+                </div>
+
+                <!-- CENTER -->
+                <div class="pw-col-center">
+                    <div class="pw-timer" id="pw-timer">00:00</div>
+                    <div class="pw-bar-bg"><div class="pw-bar-fill" id="pw-bar" style="width:100%;"></div></div>
+
+                    <div class="pw-blinds">
+                        <span id="pw-blinds-main">0 / 0</span>
+                        <div style="display:flex;flex-direction:column;align-items:flex-start;">
+                            <span class="pw-ante-label">Big-Ante</span>
+                            <span class="pw-ante-value" id="pw-ante">0</span>
+                        </div>
+                    </div>
+                    <div class="pw-blinds-next"><span id="pw-blinds-next"></span></div>
+                </div>
+
+                <!-- RIGHT COLUMN -->
+                <div class="pw-col-right">
+                    <div class="pw-stat-block">
+                        <div class="pw-stat-label"><i class="fa-regular fa-clock"></i> TEMPO DE JOGO</div>
+                        <div class="pw-stat-value" id="pw-elapsed">00:00:00</div>
+                    </div>
+                    <div class="pw-stat-block">
+                        <div class="pw-stat-label"><i class="fa-regular fa-clock"></i> INTERVALO EM</div>
+                        <div class="pw-stat-value" id="pw-break-in">—</div>
+                    </div>
+                    <div class="pw-stat-block">
+                        <div class="pw-stat-label"><i class="fa-solid fa-coins"></i> CHIPCOUNT</div>
+                        <div class="pw-stat-value" id="pw-chipcount">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTTOM STRIP -->
+            <div class="pw-bottom-strip" id="pw-bottom-strip">
+                <!-- pills rendered dynamically -->
+            </div>
         </div>
 
         <div id="main-tv" style="position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;padding:2rem 2.5rem;">
@@ -3579,7 +3949,68 @@ function abrirTV(idx) {
         if (d && d.__kiosk === true)  { enterKiosk(); return; }
         if (d && d.__kiosk === false) { exitKiosk(); return; }
         if (!d || !d.timer) return;  // ignora mensagens sem dados de torneio
-        document.body.className='layout-'+(d.layout||'classico');
+        const layout = d.layout || 'classico';
+        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '');
+
+        // ===== POKERWEB LAYOUT =====
+        if (layout === 'pokerweb') {
+            // Title
+            const pwTitle = document.getElementById('pw-title');
+            if (pwTitle) pwTitle.innerText = (d.tournamentName || 'TORNEIO').toUpperCase();
+            // Level
+            const pwLevel = document.getElementById('pw-level-num');
+            if (pwLevel) pwLevel.innerText = d.nivel;
+            // Timer
+            const pwTimer = document.getElementById('pw-timer');
+            if (pwTimer) pwTimer.innerText = d.timer;
+            // Players
+            const pwPlayers = document.getElementById('pw-players');
+            const pwTotal = document.getElementById('pw-total');
+            if (pwPlayers) pwPlayers.innerText = d.players;
+            if (pwTotal)   pwTotal.innerText = d.totalEntries;
+            // Avg
+            const pwAvg = document.getElementById('pw-avg');
+            if (pwAvg) pwAvg.innerText = d.avg;
+            // Blinds
+            const pwBlinds = document.getElementById('pw-blinds-main');
+            if (pwBlinds) pwBlinds.innerText = d.blinds;
+            const pwAnte = document.getElementById('pw-ante');
+            if (pwAnte) pwAnte.innerText = d.ante;
+            // Next
+            const pwNext = document.getElementById('pw-blinds-next');
+            if (pwNext) pwNext.innerText = d.next && d.next !== 'FINAL' ? ('Próximo: ' + d.next + (d.nextAnte ? '  (Ante ' + d.nextAnte + ')' : '')) : (d.next || '');
+            // Elapsed
+            const pwElapsed = document.getElementById('pw-elapsed');
+            if (pwElapsed) pwElapsed.innerText = d.elapsed || '00:00:00';
+            // Break in (next break in X time)
+            const pwBreakIn = document.getElementById('pw-break-in');
+            if (pwBreakIn) pwBreakIn.innerText = d.breakIn || '—';
+            // Chipcount
+            const pwChip = document.getElementById('pw-chipcount');
+            if (pwChip) pwChip.innerText = d.chipCount || '0';
+            // Progress bar
+            const pwBar = document.getElementById('pw-bar');
+            if (pwBar) pwBar.style.width = Math.max(0, d.pct) + '%';
+
+            // Bottom strip stats
+            const strip = document.getElementById('pw-bottom-strip');
+            if (strip && d.statsStrip) {
+                strip.innerHTML = d.statsStrip.map(function(s) {
+                    return '<div class="pw-stat-pill">' +
+                           '<div class="pw-pill-label">' + s.label + '</div>' +
+                           '<div class="pw-pill-value">' + s.value + '</div>' +
+                           '</div>';
+                }).join('');
+            }
+
+            // Break overlay still works
+            const bs = document.getElementById('break-screen');
+            if (d.isBreak) { bs.classList.add('show'); document.getElementById('break-timer').innerText = d.timer; }
+            else bs.classList.remove('show');
+            return;
+        }
+
+        // ===== DEMAIS LAYOUTS (classico, minimalista, feltro, neon) =====
         document.getElementById('tournament-name').innerText=d.tournamentName||'';
         document.getElementById('clube-nome').innerText=d.clubeNome||'';
         const tipoLabels={normal:'Torneio Normal',bounty:'💰 Bounty',pko:'🎯 Progressive KO',knockout:'⚡ Somente KO'};
@@ -3654,6 +4085,9 @@ function onLayoutChange() {
     t.tvLayout = document.getElementById('mt-tv-layout').value;
     saveData();
     updateTV(activeTorneioIdx);
+    // Mostra/oculta botão de config de stats (só para PokerWeb)
+    const btnStats = document.getElementById('btn-config-stats-tv');
+    if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     showToast('🎨 Layout TV: ' + t.tvLayout);
 }
 
@@ -3680,6 +4114,58 @@ function syncTVControls() {
     if (btn) btn.innerHTML = (t.tvShowPrize !== false)
         ? '<i class="fa-solid fa-eye"></i>'
         : '<i class="fa-solid fa-eye-slash"></i> Oculto';
+    // Mostra/oculta botão de stats config (só para PokerWeb)
+    const btnStats = document.getElementById('btn-config-stats-tv');
+    if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
+}
+
+// ============================================================
+// CONFIG STATS TV POKERWEB
+// ============================================================
+function abrirConfigStatsTV() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    if (!t.pwStatsVisiveis) t.pwStatsVisiveis = { buyin:true, reentry:true, jackpot:true, rebuy_simples:true, rebuy_duplo:true, addon:true };
+
+    const stats = [
+        { key:'buyin',          label:'Buy-in',                         icon:'fa-ticket' },
+        { key:'reentry',        label:'Re-entries',                     icon:'fa-rotate-left' },
+        { key:'jackpot',        label:'Jackpot',                        icon:'fa-gem',  cond: () => t.jackpotValor > 0 },
+        { key:'rebuy_simples',  label: t.rebuySimples > 0 ? `Rebuy ${t.rebuySimples}` : 'Rebuy Simples', icon:'fa-coins', cond: () => t.rebuySimples > 0 },
+        { key:'rebuy_duplo',    label: t.rebuyDuplo > 0 ? `Rebuy ${t.rebuyDuplo} (Duplo)` : 'Rebuy Duplo',  icon:'fa-coins', cond: () => t.rebuyDuplo > 0 },
+        { key:'addon',          label:'Add-on',                         icon:'fa-plus',  cond: () => t.addonFichas > 0 },
+    ];
+
+    const lista = document.getElementById('stats-tv-list');
+    lista.innerHTML = stats.map(s => {
+        const aplicavel = !s.cond || s.cond();
+        const checked = t.pwStatsVisiveis[s.key] !== false && aplicavel;
+        const disabled = !aplicavel;
+        return `
+        <label style="display:flex;align-items:center;gap:.75rem;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:${disabled?'not-allowed':'pointer'};opacity:${disabled?.5:1};">
+            <input type="checkbox" data-key="${s.key}" ${checked?'checked':''} ${disabled?'disabled':''} style="accent-color:var(--gold);">
+            <i class="fa-solid ${s.icon}" style="color:var(--gold);width:16px;"></i>
+            <div style="flex:1;">
+                <div style="font-weight:700;font-size:.85rem;">${s.label}</div>
+                ${disabled ? '<div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">Não configurado neste torneio</div>' : ''}
+            </div>
+        </label>`;
+    }).join('');
+
+    openModal('modal-config-stats-tv');
+}
+
+function salvarConfigStatsTV() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    if (!t.pwStatsVisiveis) t.pwStatsVisiveis = {};
+    document.querySelectorAll('#stats-tv-list input[type=checkbox]').forEach(cb => {
+        t.pwStatsVisiveis[cb.dataset.key] = cb.checked;
+    });
+    saveData();
+    closeModal('modal-config-stats-tv');
+    updateTV(activeTorneioIdx);
+    showToast('✅ Stats da TV atualizadas');
 }
 
 // ============================================================
@@ -3946,18 +4432,37 @@ function removerGrupo(i) {
 function renderProdutos() {
     const el = document.getElementById('bar-produtos-list');
     if (!el) return;
-    const filtro = (document.getElementById('bar-filtro-grupo') || {}).value || '';
-    const lista = filtro ? barProdutos.filter(p => p.grupo === filtro) : barProdutos;
+    const pager = document.getElementById('bar-produtos-pager');
+    const countEl = document.getElementById('bar-produtos-count');
+    const filtroGrupo = (document.getElementById('bar-filtro-grupo') || {}).value || '';
+    const busca = ((document.getElementById('bar-produtos-busca') || {}).value || '').toLowerCase().trim();
+
+    let lista = filtroGrupo ? barProdutos.filter(p => p.grupo === filtroGrupo) : [...barProdutos];
+    if (busca) lista = lista.filter(p =>
+        (p.nome || '').toLowerCase().includes(busca) ||
+        (p.descricao || '').toLowerCase().includes(busca)
+    );
+
+    if (countEl) countEl.innerText = `(${lista.length})`;
 
     if (!lista.length) {
         el.innerHTML = `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">
-            ${filtro ? `Nenhum produto no grupo "${filtro}"` : 'Nenhum produto cadastrado'}</div>`;
+            ${busca ? 'Nenhum produto encontrado para "'+busca+'"' : (filtroGrupo ? `Nenhum produto no grupo "${filtroGrupo}"` : 'Nenhum produto cadastrado')}</div>`;
+        if (pager) pager.style.display = 'none';
         return;
     }
 
-    // Agrupa por grupo
+    // Paginação
+    const limite = parseInt((document.getElementById('bar-produtos-limite') || {}).value) || 10;
+    const totalPaginas = Math.ceil(lista.length / limite);
+    if (_produtosPagina > totalPaginas) _produtosPagina = 1;
+    const inicio = (_produtosPagina - 1) * limite;
+    const fim = inicio + limite;
+    const visiveis = lista.slice(inicio, fim);
+
+    // Agrupa por grupo (só os visíveis)
     const porGrupo = {};
-    lista.forEach(p => { (porGrupo[p.grupo] = porGrupo[p.grupo]||[]).push(p); });
+    visiveis.forEach(p => { (porGrupo[p.grupo] = porGrupo[p.grupo]||[]).push(p); });
 
     el.innerHTML = Object.entries(porGrupo).map(([grp, prods]) => `
         <div style="margin-bottom:1rem;">
@@ -3981,6 +4486,28 @@ function renderProdutos() {
             `).join('')}
         </div>
     `).join('');
+
+    // Pager
+    if (pager) {
+        if (totalPaginas > 1) {
+            pager.style.display = 'flex';
+            pager.innerHTML = `
+                <div style="font-size:.75rem;color:#71717a;">Mostrando ${inicio + 1}–${Math.min(fim, lista.length)} de ${lista.length}</div>
+                <div style="display:flex;gap:.3rem;align-items:center;">
+                    <button onclick="mudarPaginaProdutos(-1)" ${_produtosPagina <= 1 ? 'disabled' : ''} class="btn-ghost" style="padding:.3rem .6rem;font-size:.75rem;${_produtosPagina <= 1 ? 'opacity:.3;cursor:not-allowed;' : ''}"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span style="font-size:.75rem;color:#a1a1aa;padding:0 .5rem;font-weight:700;">${_produtosPagina} / ${totalPaginas}</span>
+                    <button onclick="mudarPaginaProdutos(1)" ${_produtosPagina >= totalPaginas ? 'disabled' : ''} class="btn-ghost" style="padding:.3rem .6rem;font-size:.75rem;${_produtosPagina >= totalPaginas ? 'opacity:.3;cursor:not-allowed;' : ''}"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>`;
+        } else {
+            pager.style.display = 'none';
+        }
+    }
+}
+
+let _produtosPagina = 1;
+function mudarPaginaProdutos(delta) {
+    _produtosPagina = Math.max(1, _produtosPagina + delta);
+    renderProdutos();
 }
 
 function renderBarProdutos() {
@@ -4313,19 +4840,62 @@ function renderHistorico() {
 }
 
 // --- RELATÓRIO ---
+// Estado de período do relatório do bar
+let _barRelPeriodo = { tipo:'hoje', de:null, ate:null };
+
+function setBarRelPeriodo(tipo) {
+    const now = new Date();
+    const hoje = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    let de, ate = Date.now();
+
+    document.querySelectorAll('#bar-relatorio .rp-btn').forEach(b => b.classList.remove('rp-active'));
+    const btn = document.getElementById('brp-' + tipo);
+    if (btn) btn.classList.add('rp-active');
+    const customWrap = document.getElementById('brp-custom-wrap');
+
+    if (tipo === 'hoje') { de = hoje; customWrap.style.display='none'; }
+    else if (tipo === 'ontem') { de = hoje - 86400000; ate = hoje - 1; customWrap.style.display='none'; }
+    else if (tipo === '7d') { de = hoje - 7*86400000; customWrap.style.display='none'; }
+    else if (tipo === '30d') { de = hoje - 30*86400000; customWrap.style.display='none'; }
+    else if (tipo === 'mes') { de = new Date(now.getFullYear(), now.getMonth(), 1).getTime(); customWrap.style.display='none'; }
+    else if (tipo === 'tudo') { de = 0; customWrap.style.display='none'; }
+    else if (tipo === 'custom') {
+        customWrap.style.display = 'flex';
+        const deVal = document.getElementById('brp-de').value;
+        const ateVal = document.getElementById('brp-ate').value;
+        if (!deVal || !ateVal) { _barRelPeriodo = { tipo, de: 0, ate: Date.now() }; return; }
+        de = new Date(deVal + 'T00:00:00').getTime();
+        ate = new Date(ateVal + 'T23:59:59').getTime();
+    }
+
+    _barRelPeriodo = { tipo, de, ate };
+    renderRelatorio();
+}
+
+function getComandasPeriodoBar() {
+    return barComandas.filter(c => c.status === 'fechada' && c.fechadoEm >= _barRelPeriodo.de && c.fechadoEm <= _barRelPeriodo.ate);
+}
+
 function renderRelatorio() {
-    const el_total   = document.getElementById('rel-total');
-    const el_qtd     = document.getElementById('rel-qtd');
-    const el_ticket  = document.getElementById('rel-ticket');
-    const el_grupos  = document.getElementById('rel-grupos');
-    const el_pgtos   = document.getElementById('rel-pagamentos');
+    const el_total    = document.getElementById('rel-total');
+    const el_qtd      = document.getElementById('rel-qtd');
+    const el_itens    = document.getElementById('rel-itens');
+    const el_ticket   = document.getElementById('rel-ticket');
+    const el_grupos   = document.getElementById('rel-grupos');
+    const el_pgtos    = document.getElementById('rel-pagamentos');
+    const el_topp     = document.getElementById('rel-top-produtos');
+    const el_coms     = document.getElementById('rel-comandas-lista');
+    const el_comsCnt  = document.getElementById('rel-comandas-count');
     if (!el_total) return;
 
-    const fechadas = barComandas.filter(c => c.status === 'fechada');
+    const fechadas = getComandasPeriodoBar();
     const totalPendenciasIncluidas = fechadas.reduce((s,c)=>s+(c.pendenciasValor||0), 0);
     const total = fechadas.reduce((s, c) => s + c.total, 0);
+    const totalItens = fechadas.reduce((s, c) => s + c.itens.reduce((ss, it) => ss + it.qtd, 0), 0);
+
     el_total.innerText  = formatMoney(total);
     el_qtd.innerText    = fechadas.length;
+    if (el_itens) el_itens.innerText = totalItens;
     el_ticket.innerText = fechadas.length ? formatMoney(total / fechadas.length) : 'R$ 0,00';
 
     // Por grupo
@@ -4348,13 +4918,92 @@ function renderRelatorio() {
     // Por pagamento
     const porPgto = {};
     fechadas.forEach(c => { porPgto[c.pagamento] = (porPgto[c.pagamento]||0) + c.total; });
-    const pgtoLabel = { dinheiro:'💵 Dinheiro', pix:'⚡ PIX', cartao:'💳 Cartão' };
-    el_pgtos.innerHTML = Object.entries(porPgto).sort((a,b)=>b[1]-a[1]).map(([p, v]) => `
+    el_pgtos.innerHTML = Object.entries(porPgto).sort((a,b)=>b[1]-a[1]).map(([p, v]) => {
+        const m = (typeof PAYMENT_METHODS !== 'undefined' && PAYMENT_METHODS[p]) ? PAYMENT_METHODS[p] : { label: p, icon:'fa-circle', color:'#71717a' };
+        return `
         <div class="payout-item">
-            <span style="font-size:.8rem;font-weight:700;">${pgtoLabel[p]||p}</span>
+            <span style="font-size:.8rem;font-weight:700;"><i class="fa-solid ${m.icon}" style="color:${m.color};margin-right:.35rem;"></i>${m.label}</span>
             <span style="font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--gold);">${formatMoney(v)}</span>
-        </div>
-    `).join('') || '<div style="color:#3f3f46;font-size:.8rem;">Sem dados</div>';
+        </div>`;
+    }).join('') || '<div style="color:#3f3f46;font-size:.8rem;">Sem dados</div>';
+
+    // Top produtos
+    if (el_topp) {
+        const produtosV = {};
+        fechadas.forEach(c => {
+            c.itens.forEach(it => {
+                const prod = barProdutos.find(p => p.id === it.produtoId);
+                if (!prod) return;
+                if (!produtosV[it.produtoId]) produtosV[it.produtoId] = { nome: prod.nome, grupo: prod.grupo, qtd: 0, valor: 0 };
+                produtosV[it.produtoId].qtd += it.qtd;
+                produtosV[it.produtoId].valor += it.subtotal;
+            });
+        });
+        const top = Object.values(produtosV).sort((a,b) => b.qtd - a.qtd).slice(0, 15);
+        el_topp.innerHTML = top.length ? top.map(p => `
+            <div style="display:grid;grid-template-columns:1fr auto auto;gap:.75rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;font-size:.8rem;">
+                <div><div style="font-weight:700;">${p.nome}</div><div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${p.grupo}</div></div>
+                <span style="font-family:'Space Mono',monospace;color:#71717a;">${p.qtd}x</span>
+                <span style="font-family:'Space Mono',monospace;color:#22c55e;font-weight:700;">${formatMoney(p.valor)}</span>
+            </div>`).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Sem vendas</div>';
+    }
+
+    // Lista de comandas do período
+    if (el_coms) {
+        if (el_comsCnt) el_comsCnt.innerText = `${fechadas.length} comanda${fechadas.length>1?'s':''}`;
+        if (!fechadas.length) {
+            el_coms.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#3f3f46;font-size:.8rem;">Nenhuma comanda no período</div>';
+        } else {
+            el_coms.innerHTML = [...fechadas].sort((a,b) => b.fechadoEm - a.fechadoEm).map(c => {
+                const j = jogadores.find(x => x.id === c.jogadorId);
+                const m = (typeof PAYMENT_METHODS !== 'undefined' && PAYMENT_METHODS[c.pagamento]) ? PAYMENT_METHODS[c.pagamento] : { label: c.pagamento, icon:'fa-circle' };
+                return `
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.75rem;align-items:center;padding:.55rem .8rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;font-size:.8rem;">
+                    <div>
+                        <div style="font-weight:700;">${j ? j.nome : '?'}</div>
+                        <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(c.fechadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${c.itens.length} item(ns)</div>
+                    </div>
+                    <span class="tag" style="font-size:.6rem;background:#18181b;color:#a1a1aa;"><i class="fa-solid ${m.icon}"></i> ${m.label}</span>
+                    ${c.incluiuPendencias ? `<span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--gold);" title="Incluiu pendência">+${formatMoney(c.pendenciasValor)}</span>` : '<span></span>'}
+                    <span style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;">${formatMoney(c.total)}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+}
+
+function exportRelBarCSV() {
+    const fechadas = getComandasPeriodoBar();
+    if (!fechadas.length) return showToast('⚠️ Nenhuma comanda no período selecionado');
+
+    // CSV linha-a-item (cada linha = 1 item consumido)
+    const rows = [['Data', 'Hora', 'Cliente', 'Cidade', 'Produto', 'Grupo', 'Qtd', 'Valor Unit', 'Subtotal', 'Forma Pagto', 'Valor Total Comanda', 'Pendências Inclusas']];
+    fechadas.forEach(c => {
+        const j = jogadores.find(x => x.id === c.jogadorId);
+        const nomeCliente = j ? j.nome : '?';
+        const cidade = j && j.cidade ? (j.cidade + (j.uf?'/'+j.uf:'')) : '';
+        const data = new Date(c.fechadoEm);
+        const dataStr = data.toLocaleDateString('pt-BR');
+        const horaStr = data.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+        const metLabel = (typeof PAYMENT_METHODS !== 'undefined' && PAYMENT_METHODS[c.pagamento]) ? PAYMENT_METHODS[c.pagamento].label : c.pagamento;
+
+        c.itens.forEach(it => {
+            const prod = barProdutos.find(p => p.id === it.produtoId);
+            rows.push([
+                dataStr, horaStr, nomeCliente, cidade,
+                prod ? prod.nome : '?',
+                prod ? prod.grupo : '?',
+                it.qtd,
+                (it.valorUnit || 0).toFixed(2).replace('.',','),
+                it.subtotal.toFixed(2).replace('.',','),
+                metLabel,
+                c.total.toFixed(2).replace('.',','),
+                c.incluiuPendencias ? (c.pendenciasValor || 0).toFixed(2).replace('.',',') : '0,00',
+            ]);
+        });
+    });
+
+    downloadCSV('bar_consumo', rows);
 }
 
 // --- BAR SUBTAB SWITCH ---
@@ -4366,7 +5015,7 @@ function switchBarTab(tabId, btn) {
     if (tabId === 'bar-produtos')  { renderGrupos(); renderProdutos(); }
     if (tabId === 'bar-comandas')  { renderComandas(); if(activeComandaId) renderDetalheComanda(); }
     if (tabId === 'bar-historico') renderHistorico();
-    if (tabId === 'bar-relatorio') renderRelatorio();
+    if (tabId === 'bar-relatorio') { setBarRelPeriodo(_barRelPeriodo.tipo || 'hoje'); }
 }
 
 // Bar modal pre-fill hooks - called from openModal
@@ -5075,6 +5724,9 @@ function renderConfig() {
     document.getElementById('cfg-clube-nome').value     = config.clube.nome || '';
     document.getElementById('cfg-clube-cnpj').value     = config.clube.cnpj || '';
     document.getElementById('cfg-clube-fone').value     = config.clube.fone || '';
+    // Re-aplica máscaras após carregar
+    if (config.clube.cnpj) maskCNPJ(document.getElementById('cfg-clube-cnpj'));
+    if (config.clube.fone) maskFone(document.getElementById('cfg-clube-fone'));
     document.getElementById('cfg-clube-endereco').value = config.clube.endereco || '';
     document.getElementById('cfg-clube-cidade').value   = config.clube.cidade || '';
     document.getElementById('cfg-clube-uf').value       = config.clube.uf || '';
@@ -6840,6 +7492,7 @@ function renderTVGallery() {
         { key: 'minimalista', nome: 'Minimalista',    desc: 'Só timer e blinds, sem distrações' },
         { key: 'feltro',      nome: 'Verde Feltro',   desc: 'Inspirado no feltro da mesa de poker' },
         { key: 'neon',        nome: 'Neon',           desc: 'Cores vibrantes estilo streaming' },
+        { key: 'pokerweb',    nome: 'PokerWeb ⭐',     desc: 'Profissional com stats detalhadas e brilho dourado' },
     ];
     el.innerHTML = layouts.map(l => `
         <div class="stat-card" style="padding:0;overflow:hidden;">
@@ -6859,6 +7512,40 @@ function renderTVGallery() {
 }
 
 function renderMiniTV(layout) {
+    // Preview customizado para PokerWeb
+    if (layout === 'pokerweb') {
+        return `
+        <div style="height:200px;background:radial-gradient(ellipse at center,#1a6b4f 0%,#0d3d2e 50%,#062018 100%);padding:.75rem 1rem;position:relative;overflow:hidden;">
+            <div style="text-align:center;font-size:.7rem;font-weight:800;color:#f5d572;letter-spacing:.08em;text-shadow:0 0 8px rgba(245,213,114,.5);">QUINTA DINNER</div>
+            <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(245,213,114,.5),transparent);margin:.3rem auto .5rem;width:80%;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:.3rem;align-items:center;margin-bottom:.5rem;">
+                <div style="font-size:.5rem;">
+                    <div style="color:#f5d572;font-weight:700;">NÍVEL 21</div>
+                    <div style="color:#f5d572;font-weight:700;margin-top:.2rem;">JOGADORES</div>
+                    <div style="color:#fef3c7;font-weight:800;font-size:.7rem;">3 DE 13</div>
+                    <div style="color:#f5d572;font-weight:700;margin-top:.2rem;">MÉDIA</div>
+                    <div style="color:#fef3c7;font-weight:800;font-size:.7rem;">893.333</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-family:'Space Mono',monospace;font-size:2rem;font-weight:800;color:#f5d572;text-shadow:0 0 15px rgba(245,213,114,.7);line-height:1;">03:47</div>
+                    <div style="font-size:.65rem;font-weight:800;color:#fef3c7;margin-top:.3rem;">25.000/50.000 <span style="color:#f5d572;">50.000</span></div>
+                </div>
+                <div style="font-size:.5rem;text-align:right;">
+                    <div style="color:#f5d572;font-weight:700;">TEMPO</div>
+                    <div style="color:#fef3c7;font-weight:800;font-size:.7rem;">06:24:30</div>
+                    <div style="color:#f5d572;font-weight:700;margin-top:.2rem;">CHIPCOUNT</div>
+                    <div style="color:#fef3c7;font-weight:800;font-size:.7rem;">2.680.000</div>
+                </div>
+            </div>
+            <div style="background:rgba(0,0,0,.4);border-top:1px solid rgba(245,213,114,.3);padding:.3rem;display:flex;justify-content:space-around;font-size:.45rem;margin:.25rem -1rem -.75rem;">
+                <span style="color:rgba(254,243,199,.7);">BUY IN <span style="color:#f5d572;font-weight:800;font-family:'Space Mono',monospace;">12</span></span>
+                <span style="color:rgba(254,243,199,.7);">JACKPOT <span style="color:#f5d572;font-weight:800;font-family:'Space Mono',monospace;">12</span></span>
+                <span style="color:rgba(254,243,199,.7);">REBUY <span style="color:#f5d572;font-weight:800;font-family:'Space Mono',monospace;">36</span></span>
+                <span style="color:rgba(254,243,199,.7);">ADD-ON <span style="color:#f5d572;font-weight:800;font-family:'Space Mono',monospace;">8</span></span>
+            </div>
+        </div>`;
+    }
+
     const palettes = {
         classico:    { bg:'#000',                                              timer:'#f59e0b', blinds:'#fff', label:'#555' },
         minimalista: { bg:'#0f0f10',                                           timer:'#fafafa', blinds:'#a1a1aa', label:'#3f3f46' },
@@ -6867,7 +7554,7 @@ function renderMiniTV(layout) {
     };
     const p = palettes[layout] || palettes.classico;
     return `
-        <div style="height:180px;background:${p.bg};padding:1.25rem 1.5rem;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;">
+        <div style="height:200px;background:${p.bg};padding:1.25rem 1.5rem;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;">
             <div style="font-size:.55rem;color:${p.label};letter-spacing:.2em;text-transform:uppercase;font-weight:700;position:absolute;top:.75rem;left:1rem;">PokerSul</div>
             <div style="font-size:.55rem;color:${p.label};letter-spacing:.2em;text-transform:uppercase;font-weight:700;position:absolute;top:.75rem;right:1rem;">Nível 3</div>
             <div class="mono" style="font-size:3.5rem;font-weight:700;color:${p.timer};line-height:1;letter-spacing:-.04em;${layout==='neon'?'text-shadow:0 0 15px '+p.timer:''}${layout==='feltro'?'text-shadow:0 0 20px rgba(245,213,114,.4)':''}">12:34</div>
@@ -7719,6 +8406,56 @@ function exportRelClientes() {
 
 
 
+
+
+
+// ============================================================
+// MÁSCARAS DE INPUT (CNPJ e Telefone)
+// ============================================================
+function maskCNPJ(input) {
+    // Remove tudo que não é dígito
+    let v = input.value.replace(/\D/g, '');
+    // Limita a 14 dígitos
+    v = v.slice(0, 14);
+    // Aplica máscara 00.000.000/0000-00
+    if (v.length > 12) v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, '$1.$2.$3/$4-$5');
+    else if (v.length > 8) v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{0,4})/, '$1.$2.$3/$4');
+    else if (v.length > 5) v = v.replace(/(\d{2})(\d{3})(\d{0,3})/, '$1.$2.$3');
+    else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,3})/, '$1.$2');
+    input.value = v;
+}
+
+function maskFone(input) {
+    // Remove não-dígitos
+    let v = input.value.replace(/\D/g, '');
+    // Limita a 11 dígitos (celular com 9)
+    v = v.slice(0, 11);
+    // Aplica máscara (XX) 9 XXXX-XXXX ou (XX) XXXX-XXXX
+    if (v.length === 11) {
+        // Celular: (46) 9 9999-9999
+        v = v.replace(/(\d{2})(\d{1})(\d{4})(\d{4})/, '($1) $2 $3-$4');
+    } else if (v.length === 10) {
+        // Fixo: (46) 9999-9999
+        v = v.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    } else if (v.length > 6) {
+        v = v.replace(/(\d{2})(\d{1,5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    } else if (v.length > 2) {
+        v = v.replace(/(\d{2})(\d{0,5})/, '($1) $2').replace(/\s$/, '');
+    } else if (v.length > 0) {
+        v = '(' + v;
+    }
+    input.value = v;
+}
+
+function validarCNPJ(cnpj) {
+    const digits = (cnpj || '').replace(/\D/g, '');
+    return digits.length === 14;
+}
+
+function validarFone(fone) {
+    const digits = (fone || '').replace(/\D/g, '');
+    return digits.length === 10 || digits.length === 11;
+}
 
 
 // ============================================================
