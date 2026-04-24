@@ -104,6 +104,7 @@
         .tag-break { background: rgba(239,68,68,.12); color: #ef4444; }
         .tag-waiting { background: rgba(82,82,91,.18); color: #71717a; }
         .tag-finished { background: rgba(139,92,246,.12); color: #a78bfa; }
+        .tag-encerrado { background: rgba(100,100,100,.2); color: #a1a1aa; border: 1px dashed #71717a; }
 
         /* Mesas grid */
         .mesa-card { background: #0f0f12; border: 1px solid #1e1e23; border-radius: .75rem; padding: 1rem; }
@@ -525,8 +526,20 @@
                     </div>
                     <!-- Comandas abertas do bar para acerto pelo caixa -->
                     <div id="caixa-comandas-abertas-wrap" style="display:none;margin-bottom:1rem;">
-                        <div style="font-size:.65rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-receipt"></i> Comandas Abertas do Bar (acertar aqui)</div>
-                        <div id="caixa-comandas-abertas" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:1rem;"></div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
+                            <div style="font-size:.65rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comandas Abertas do Bar <span id="caixa-comandas-count" style="color:#71717a;">(0)</span></div>
+                            <div style="display:flex;gap:.4rem;align-items:center;">
+                                <input id="caixa-comandas-busca" oninput="renderComandasAbertasCaixa()" placeholder="Buscar jogador..." class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:180px;">
+                                <select id="caixa-comandas-limite" onchange="renderComandasAbertasCaixa()" class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:110px;">
+                                    <option value="10">10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="999">Todas</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="caixa-comandas-abertas" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.5rem;"></div>
+                        <div id="caixa-comandas-pager" style="display:none;justify-content:space-between;align-items:center;padding:.4rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;margin-bottom:1rem;"></div>
                     </div>
                     <div id="caixa-aberto-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                 </div>
@@ -1083,10 +1096,20 @@
                         <!-- Lista de comandas abertas -->
                         <div>
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                                <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Comandas Abertas</div>
+                                <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Comandas Abertas <span id="bar-comandas-count" style="color:#71717a;font-weight:700;">(0)</span></div>
                                 <button onclick="openModal('modal-nova-comanda')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Nova Comanda</button>
                             </div>
+                            <div style="display:flex;gap:.5rem;margin-bottom:.75rem;align-items:center;">
+                                <input id="bar-comandas-busca" oninput="renderComandas()" placeholder="Buscar por nome ou apelido..." class="inp" style="flex:1;padding:.5rem .75rem;font-size:.85rem;">
+                                <select id="bar-comandas-limite" onchange="renderComandas()" class="inp" style="padding:.5rem .75rem;font-size:.8rem;width:130px;">
+                                    <option value="10">10 por página</option>
+                                    <option value="20">20 por página</option>
+                                    <option value="50">50 por página</option>
+                                    <option value="999">Todas</option>
+                                </select>
+                            </div>
                             <div id="bar-comandas-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                            <div id="bar-comandas-pager" style="display:none;margin-top:.75rem;justify-content:space-between;align-items:center;padding:.5rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;"></div>
                         </div>
                         <!-- Detalhe comanda selecionada -->
                         <div id="bar-comanda-detalhe" style="display:none;">
@@ -1679,7 +1702,7 @@
 <div id="modal-jogador" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-            <h3 style="font-weight:800;font-size:1.1rem;">Cadastrar Jogador</h3>
+            <h3 id="j-modal-titulo" style="font-weight:800;font-size:1.1rem;">Cadastrar Jogador</h3>
             <button onclick="closeModal('modal-jogador')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
@@ -1690,7 +1713,8 @@
                 <div><label class="inp-label">Cidade</label><input id="j-cidade" class="inp" placeholder="Ex: Pato Branco"></div>
                 <div><label class="inp-label">UF</label><input id="j-uf" class="inp" placeholder="PR" maxlength="2" style="text-transform:uppercase;"></div>
             </div>
-            <button onclick="addJogador()" class="btn-gold" style="padding:.85rem;font-size:.95rem;border-radius:.6rem;margin-top:.5rem;">Cadastrar</button>
+            <input type="hidden" id="j-edit-id" value="">
+            <button onclick="salvarJogador()" id="j-submit-btn" class="btn-gold" style="padding:.85rem;font-size:.95rem;border-radius:.6rem;margin-top:.5rem;">Cadastrar</button>
         </div>
     </div>
 </div>
@@ -1957,6 +1981,16 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.75rem;">
                             <button onclick="abrirEditorBlindsAndamento(activeTorneioIdx)" class="btn-ghost" style="padding:.55rem;font-size:.75rem;"><i class="fa-solid fa-sliders"></i> Editar Blinds</button>
                             <button id="btn-stacks-dia1" onclick="abrirStackFinalDia1(activeTorneioIdx)" class="btn-ghost" style="display:none;padding:.55rem;font-size:.75rem;"><i class="fa-solid fa-layer-group"></i> Stacks Finais (Dia 1)</button>
+                        </div>
+                        <div id="btn-encerrar-torneio-wrap" style="margin-top:.4rem;">
+                            <button onclick="encerrarTorneio(activeTorneioIdx)" style="width:100%;background:rgba(100,100,100,.1);border:1px dashed #71717a;color:#a1a1aa;border-radius:.5rem;padding:.55rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.75rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(100,100,100,.25)';this.style.color='#e4e4e7'" onmouseout="this.style.background='rgba(100,100,100,.1)';this.style.color='#a1a1aa'">
+                                <i class="fa-solid fa-lock"></i> Encerrar Torneio
+                            </button>
+                        </div>
+                        <div id="btn-reabrir-torneio-wrap" style="display:none;margin-top:.4rem;">
+                            <button onclick="reabrirTorneio(activeTorneioIdx)" style="width:100%;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.5rem;padding:.55rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.75rem;cursor:pointer;">
+                                <i class="fa-solid fa-lock-open"></i> Reabrir Torneio
+                            </button>
                         </div>
 
                         <!-- PAINEL DE BOUNTIES (só aparece em torneios KO) -->
@@ -2247,6 +2281,7 @@ function login() {
 
 function logout() {
     if (!confirm('Deseja sair do sistema?')) return;
+    descartarUndo();  // limpar toast pendente
     sessionStorage.removeItem('ps_current_user');
     currentUser = null;
     document.getElementById('main-app').style.display = 'none';
@@ -2375,7 +2410,7 @@ function renderJogadores(data = jogadores) {
                 <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Devedor':credito?'Crédito':'Zerado'}</div>
             </td>
             <td style="padding:.9rem 1.5rem;text-align:right;">
-                <button onclick="abrirPagamentoJogador(${j.id})" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;margin-right:.3rem;" title="Pagamentos e extrato"><i class="fa-solid fa-wallet"></i> Conta</button>
+                <button onclick="editarJogador(${j.id})" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;margin-right:.3rem;" title="Editar informações cadastrais"><i class="fa-solid fa-pen"></i> Editar</button>
                 <button onclick="removerJogador(${j.id})" class="btn-danger"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>`;
@@ -2386,27 +2421,65 @@ function contarTorneiosJogador(id) {
     return torneios.filter(t => t.entries.some(e => e.jogadorId === id)).length + ' torneio(s)';
 }
 
-function addJogador() {
+function salvarJogador() {
     const nome = document.getElementById('j-nome').value.trim();
     if (!nome) return showToast('⚠️ Nome obrigatório');
-    jogadores.push({
-        id: Date.now(),
+    const editId = document.getElementById('j-edit-id').value;
+    const dados = {
         nome,
         apelido:  document.getElementById('j-apelido').value.trim(),
         whatsapp: document.getElementById('j-whatsapp').value.trim(),
         cidade:   document.getElementById('j-cidade').value.trim(),
         uf:       document.getElementById('j-uf').value.trim().toUpperCase(),
-    });
+    };
+
+    if (editId) {
+        // Modo edição
+        const j = jogadores.find(x => x.id === parseInt(editId));
+        if (!j) return showToast('⚠️ Jogador não encontrado');
+        Object.assign(j, dados);
+        showToast(`✅ ${nome} atualizado!`);
+    } else {
+        // Modo cadastro
+        jogadores.push({ id: Date.now(), ...dados });
+        showToast(`✅ ${nome} cadastrado!`);
+    }
+
     saveData();
     closeModal('modal-jogador');
+    limparFormularioJogador();
+    renderJogadores();
+    renderDashboard();
+}
+
+// Alias para compatibilidade com código existente
+function addJogador() { salvarJogador(); }
+
+function limparFormularioJogador() {
     document.getElementById('j-nome').value = '';
     document.getElementById('j-apelido').value = '';
     document.getElementById('j-whatsapp').value = '';
     document.getElementById('j-cidade').value = '';
     document.getElementById('j-uf').value = '';
-    renderJogadores();
-    renderDashboard();
-    showToast('✅ Jogador cadastrado!');
+    document.getElementById('j-edit-id').value = '';
+    document.getElementById('j-modal-titulo').innerText = 'Cadastrar Jogador';
+    document.getElementById('j-submit-btn').innerText = 'Cadastrar';
+}
+
+function editarJogador(jogadorId) {
+    const j = jogadores.find(x => x.id === jogadorId);
+    if (!j) return showToast('⚠️ Jogador não encontrado');
+
+    document.getElementById('j-edit-id').value = j.id;
+    document.getElementById('j-nome').value = j.nome || '';
+    document.getElementById('j-apelido').value = j.apelido || '';
+    document.getElementById('j-whatsapp').value = j.whatsapp || '';
+    document.getElementById('j-cidade').value = j.cidade || '';
+    document.getElementById('j-uf').value = j.uf || '';
+    document.getElementById('j-modal-titulo').innerText = 'Editar Jogador';
+    document.getElementById('j-submit-btn').innerText = 'Salvar Alterações';
+
+    openModal('modal-jogador');
 }
 
 function removerJogador(id) {
@@ -2685,6 +2758,19 @@ function updateModalTorneio() {
     // Mostra botão stacks dia1 só se for formato dia1
     const btnStk = document.getElementById('btn-stacks-dia1');
     if (btnStk) btnStk.style.display = t.formato === 'dia1' ? 'block' : 'none';
+
+    // Toggle Encerrar/Reabrir baseado em status
+    const encWrap = document.getElementById('btn-encerrar-torneio-wrap');
+    const reaWrap = document.getElementById('btn-reabrir-torneio-wrap');
+    if (encWrap && reaWrap) {
+        if (t.status === 'encerrado') {
+            encWrap.style.display = 'none';
+            reaWrap.style.display = 'block';
+        } else {
+            encWrap.style.display = 'block';
+            reaWrap.style.display = 'none';
+        }
+    }
 
     // Card do jackpot no resumo financeiro
     const jpCard = document.getElementById('mt-jackpot-card');
@@ -3259,14 +3345,30 @@ function updateTV(idx) {
     if (!tvWindow || tvWindow.closed) return;
     const t     = torneios[idx];
     const ativos = getAtivos(t);
-    // Calcular fichas totais corretamente com rebuys/addons
+
+    // Calcular fichas totais corretamente com rebuys/addons + jackpots
     const totalFichas = t.entries.reduce((s, e) => {
         if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
         return s + t.stack;  // buyin, reentry
     }, 0);
-    const avg = ativos > 0 ? Math.round(totalFichas / ativos) : 0;
+    // Adiciona jackpot chips
+    const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
+    const chipCount = totalFichas + jackpotFichas;
+
+    const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
+
+    // Avg em BBs (útil para jogadores verem pressão)
+    const bbAtual = t.blinds[t.nivelAtual] ? t.blinds[t.nivelAtual].bb : 1;
+    const avgBBs = bbAtual > 0 ? Math.round(avg / bbAtual) : 0;
+
+    // Contadores de entradas por tipo
+    const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
+    const reentriesQtd = t.entries.filter(e => e.tipo === 'reentry').length;
+    const rebuysQtd = t.entries.filter(e => e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo').length;
+    const addonsQtd = t.entries.filter(e => e.tipo === 'addon').length;
+
     const prox = t.blinds[t.nivelAtual + 1];
 
     // Tempo decorrido total desde o início
@@ -3289,6 +3391,12 @@ function updateTV(idx) {
         players:  ativos,
         totalEntries: t.entries.filter(e=>e.tipo!=='addon').length,
         avg:      avg.toLocaleString(),
+        avgBBs:   avgBBs,
+        chipCount: chipCount.toLocaleString(),
+        buyinsQtd,
+        reentriesQtd,
+        rebuysQtd,
+        addonsQtd,
         prize:    formatMoney(getPrize(t)),
         isBreak:  t.isBreak,
         next:     prox ? `${prox.sb.toLocaleString()}/${prox.bb.toLocaleString()}` : 'FINAL',
@@ -3413,21 +3521,24 @@ function abrirTV(idx) {
                 <div>
                     <div class="stat-label">Jogadores</div>
                     <div style="display:flex;align-items:baseline;gap:.5rem;">
-                        <div id="p" class="mono" style="font-size:2.5rem;font-weight:700;"></div>
-                        <div id="p-total" class="mono" style="font-size:.9rem;opacity:.5;"></div>
+                        <div id="p" class="mono" style="font-size:2.2rem;font-weight:700;"></div>
+                        <div id="p-total" class="mono" style="font-size:.85rem;opacity:.5;"></div>
                     </div>
+                    <div id="entries-detail" class="mono" style="font-size:.65rem;opacity:.55;margin-top:.2rem;letter-spacing:.05em;"></div>
                 </div>
                 <div style="text-align:center;">
                     <div class="stat-label">Avg Stack</div>
-                    <div id="a" class="mono" style="font-size:2.5rem;font-weight:700;"></div>
+                    <div id="a" class="mono" style="font-size:2.2rem;font-weight:700;"></div>
+                    <div id="a-bb" class="mono" style="font-size:.7rem;opacity:.55;margin-top:.2rem;"></div>
                 </div>
                 <div id="prize-wrap" style="text-align:center;">
                     <div class="stat-label">Prize Pool</div>
-                    <div id="prize" class="mono" style="font-size:2.5rem;font-weight:700;color:#22c55e;"></div>
+                    <div id="prize" class="mono" style="font-size:2.2rem;font-weight:700;color:#22c55e;"></div>
+                    <div id="chipcount" class="mono" style="font-size:.7rem;opacity:.55;margin-top:.2rem;"></div>
                 </div>
                 <div style="text-align:right;">
                     <div class="stat-label">Tempo Decorrido</div>
-                    <div id="elapsed" class="mono" style="font-size:2.5rem;font-weight:700;opacity:.85;"></div>
+                    <div id="elapsed" class="mono" style="font-size:2.2rem;font-weight:700;opacity:.85;"></div>
                 </div>
             </div>
         </div>
@@ -3480,8 +3591,22 @@ function abrirTV(idx) {
         document.getElementById('ante').innerText='Ante '+d.ante;
         document.getElementById('p').innerText=d.players;
         document.getElementById('p-total').innerText='('+d.totalEntries+' ent.)';
+        // Detalhe de entradas
+        const entriesDetail = document.getElementById('entries-detail');
+        if (entriesDetail) {
+            const parts = [];
+            if (d.buyinsQtd) parts.push(d.buyinsQtd+' BI');
+            if (d.reentriesQtd) parts.push(d.reentriesQtd+' RE');
+            if (d.rebuysQtd) parts.push(d.rebuysQtd+' RB');
+            if (d.addonsQtd) parts.push(d.addonsQtd+' AD');
+            entriesDetail.innerText = parts.join(' · ');
+        }
         document.getElementById('a').innerText=d.avg;
+        const aBB = document.getElementById('a-bb');
+        if (aBB) aBB.innerText = d.avgBBs ? d.avgBBs+' BBs' : '';
         document.getElementById('prize').innerText=d.prize;
+        const chipCountEl = document.getElementById('chipcount');
+        if (chipCountEl) chipCountEl.innerText = d.chipCount ? 'Total: '+d.chipCount+' chips' : '';
         document.getElementById('next-blinds').innerText=d.next;
         document.getElementById('elapsed').innerText=d.elapsed;
         // Prize pool visibility (layout-dependent: só esconde no wrap, não mexe no grid)
@@ -3643,8 +3768,54 @@ function getStatusTag(status) {
         paused:   { cls:'tag-paused',   label:'Pausado' },
         break:    { cls:'tag-break',    label:'Break' },
         finished: { cls:'tag-finished', label:'Finalizado' },
+        encerrado:{ cls:'tag-encerrado',label:'Encerrado' },
     };
     return map[status] || map.waiting;
+}
+
+function encerrarTorneio(idx) {
+    const t = torneios[idx];
+    if (!t) return;
+    if (t.status === 'encerrado') return showToast('⚠️ Torneio já está encerrado');
+    if (!confirm(`Encerrar definitivamente o torneio "${t.nome}"?
+
+Isso parará o timer, fechará o caixa do torneio e marcará como encerrado.
+O histórico permanece acessível.`)) return;
+
+    // Fecha caixa do torneio se estiver aberto
+    if (t.caixaTorneio && t.caixaTorneio.status === 'aberto') {
+        t.caixaTorneio.status = 'fechado';
+        t.caixaTorneio.fechadoEm = Date.now();
+        t.caixaTorneio.fechadoPor = currentUser ? currentUser.nome : 'Sistema';
+        t.caixaTorneio.resumoFinal = calcularResumoCaixaTorneio(t);
+    }
+
+    t.status = 'encerrado';
+    t.rodando = false;
+    t.encerradoEm = Date.now();
+    t.encerradoPor = currentUser ? currentUser.nome : 'Sistema';
+
+    saveData();
+    updateModalTorneio && updateModalTorneio();
+    renderTorneiosList();
+    renderDashboard();
+    showToast(`🔒 Torneio "${t.nome}" encerrado`);
+}
+
+function reabrirTorneio(idx) {
+    const t = torneios[idx];
+    if (!t) return;
+    if (t.status !== 'encerrado') return;
+    if (!confirm(`Reabrir torneio "${t.nome}"?
+
+Ele voltará ao status pausado.`)) return;
+    t.status = 'paused';
+    t.encerradoEm = null;
+    t.encerradoPor = null;
+    saveData();
+    updateModalTorneio && updateModalTorneio();
+    renderTorneiosList();
+    showToast(`🔓 Torneio reaberto`);
 }
 
 function formatTime(s) {
@@ -3661,6 +3832,14 @@ function formatMoney(v) {
 function openModal(id) {
     barPreFillModal(id);
     const el = document.getElementById(id);
+    // Reset formulário de jogador se for o modal de novo cadastro (e não foi pré-preenchido para edição)
+    if (id === 'modal-jogador') {
+        const editId = document.getElementById('j-edit-id');
+        if (editId && !editId.value) {
+            // Só limpa se não está em modo edição (se editId tem valor, já foi preparado por editarJogador)
+            limparFormularioJogador && limparFormularioJogador();
+        }
+    }
     // Se já houver modal aberto, empilha este acima
     const abertosAntes = document.querySelectorAll('.modal-overlay.open').length;
     el.style.zIndex = 100 + (abertosAntes * 10);
@@ -3891,22 +4070,51 @@ function limparFormProduto() {
 }
 
 // --- COMANDAS ---
+let _barComandasPagina = 1;
+
 function renderComandas() {
     const el = document.getElementById('bar-comandas-list');
+    const pager = document.getElementById('bar-comandas-pager');
+    const countEl = document.getElementById('bar-comandas-count');
     if (!el) return;
-    const abertas = barComandas.filter(c => c.status === 'aberta');
+
+    let abertas = barComandas.filter(c => c.status === 'aberta');
+
+    // Filtro por busca
+    const busca = ((document.getElementById('bar-comandas-busca') || {}).value || '').toLowerCase().trim();
+    if (busca) {
+        abertas = abertas.filter(c => {
+            const j = jogadores.find(x => x.id === c.jogadorId);
+            if (!j) return false;
+            const texto = `${j.nome} ${j.apelido || ''}`.toLowerCase();
+            return texto.includes(busca);
+        });
+    }
+
+    if (countEl) countEl.innerText = `(${abertas.length})`;
+
     if (!abertas.length) {
-        el.innerHTML = `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma comanda aberta</div>`;
+        el.innerHTML = `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">${busca ? 'Nenhuma comanda encontrada para "'+busca+'"' : 'Nenhuma comanda aberta'}</div>`;
+        if (pager) pager.style.display = 'none';
         return;
     }
-    el.innerHTML = abertas.map(c => {
+
+    // Paginação
+    const limite = parseInt((document.getElementById('bar-comandas-limite') || {}).value) || 10;
+    const totalPaginas = Math.ceil(abertas.length / limite);
+    if (_barComandasPagina > totalPaginas) _barComandasPagina = 1;
+    const inicio = (_barComandasPagina - 1) * limite;
+    const fim = inicio + limite;
+    const visiveis = abertas.slice(inicio, fim);
+
+    el.innerHTML = visiveis.map(c => {
         const j = jogadores.find(j => j.id === c.jogadorId);
         const total = calcTotalComanda(c);
         const ativa = c.id === activeComandaId;
         return `
         <div onclick="selecionarComanda(${c.id})" style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:${ativa?'#1a1a1e':'#0f0f12'};border:1px solid ${ativa?'var(--gold)':'#1e1e23'};border-radius:.6rem;cursor:pointer;transition:all .15s;">
             <div>
-                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}</div>
+                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}${j && j.apelido ? ` <span style="color:#52525b;font-weight:400;">(${j.apelido})</span>` : ''}</div>
                 <div style="font-size:.75rem;color:#52525b;margin-top:.15rem;">${c.itens.length} item(s)</div>
             </div>
             <div style="text-align:right;">
@@ -3915,6 +4123,30 @@ function renderComandas() {
             </div>
         </div>`;
     }).join('');
+
+    // Renderiza paginação
+    if (pager) {
+        if (totalPaginas > 1) {
+            pager.style.display = 'flex';
+            pager.innerHTML = `
+                <div style="font-size:.75rem;color:#71717a;">
+                    Mostrando ${inicio + 1}–${Math.min(fim, abertas.length)} de ${abertas.length}
+                </div>
+                <div style="display:flex;gap:.3rem;align-items:center;">
+                    <button onclick="mudarPaginaComandas(-1)" ${_barComandasPagina <= 1 ? 'disabled' : ''} class="btn-ghost" style="padding:.3rem .6rem;font-size:.75rem;${_barComandasPagina <= 1 ? 'opacity:.3;cursor:not-allowed;' : ''}"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span style="font-size:.75rem;color:#a1a1aa;padding:0 .5rem;font-weight:700;">${_barComandasPagina} / ${totalPaginas}</span>
+                    <button onclick="mudarPaginaComandas(1)" ${_barComandasPagina >= totalPaginas ? 'disabled' : ''} class="btn-ghost" style="padding:.3rem .6rem;font-size:.75rem;${_barComandasPagina >= totalPaginas ? 'opacity:.3;cursor:not-allowed;' : ''}"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            `;
+        } else {
+            pager.style.display = 'none';
+        }
+    }
+}
+
+function mudarPaginaComandas(delta) {
+    _barComandasPagina = Math.max(1, _barComandasPagina + delta);
+    renderComandas();
 }
 
 function selecionarComanda(id) {
@@ -5267,17 +5499,50 @@ function renderCaixaAberto() {
     }).join('');
 }
 
+let _caixaComandasPagina = 1;
+
 function renderComandasAbertasCaixa() {
     const wrap = document.getElementById('caixa-comandas-abertas-wrap');
     const lista = document.getElementById('caixa-comandas-abertas');
+    const pager = document.getElementById('caixa-comandas-pager');
+    const countEl = document.getElementById('caixa-comandas-count');
     if (!wrap || !lista) return;
-    const abertas = barComandas.filter(c => c.status === 'aberta');
+
+    let abertas = barComandas.filter(c => c.status === 'aberta');
     if (!abertas.length) {
         wrap.style.display = 'none';
         return;
     }
     wrap.style.display = 'block';
-    lista.innerHTML = abertas.map(c => {
+
+    // Filtro
+    const busca = ((document.getElementById('caixa-comandas-busca') || {}).value || '').toLowerCase().trim();
+    if (busca) {
+        abertas = abertas.filter(c => {
+            const j = jogadores.find(x => x.id === c.jogadorId);
+            if (!j) return false;
+            const texto = `${j.nome} ${j.apelido || ''}`.toLowerCase();
+            return texto.includes(busca);
+        });
+    }
+
+    if (countEl) countEl.innerText = `(${abertas.length})`;
+
+    if (!abertas.length) {
+        lista.innerHTML = `<div style="padding:1rem;text-align:center;color:#3f3f46;font-size:.8rem;">Nenhuma comanda para "${busca}"</div>`;
+        if (pager) pager.style.display = 'none';
+        return;
+    }
+
+    // Paginação
+    const limite = parseInt((document.getElementById('caixa-comandas-limite') || {}).value) || 10;
+    const totalPaginas = Math.ceil(abertas.length / limite);
+    if (_caixaComandasPagina > totalPaginas) _caixaComandasPagina = 1;
+    const inicio = (_caixaComandasPagina - 1) * limite;
+    const fim = inicio + limite;
+    const visiveis = abertas.slice(inicio, fim);
+
+    lista.innerHTML = visiveis.map(c => {
         const j = jogadores.find(x => x.id === c.jogadorId);
         const total = calcTotalComanda(c);
         return `
@@ -5291,6 +5556,27 @@ function renderComandasAbertasCaixa() {
             <button onclick="acertarComandaDoCaixa(${c.id})" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .7rem;cursor:pointer;font-weight:700;font-size:.7rem;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-hand-holding-dollar"></i> Acertar</button>
         </div>`;
     }).join('');
+
+    // Renderiza paginação
+    if (pager) {
+        if (totalPaginas > 1) {
+            pager.style.display = 'flex';
+            pager.innerHTML = `
+                <div style="font-size:.7rem;color:#71717a;">Mostrando ${inicio + 1}–${Math.min(fim, abertas.length)} de ${abertas.length}</div>
+                <div style="display:flex;gap:.3rem;align-items:center;">
+                    <button onclick="mudarPaginaCaixaComandas(-1)" ${_caixaComandasPagina <= 1 ? 'disabled' : ''} class="btn-ghost" style="padding:.25rem .55rem;font-size:.7rem;${_caixaComandasPagina <= 1 ? 'opacity:.3;cursor:not-allowed;' : ''}"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span style="font-size:.7rem;color:#a1a1aa;padding:0 .4rem;font-weight:700;">${_caixaComandasPagina} / ${totalPaginas}</span>
+                    <button onclick="mudarPaginaCaixaComandas(1)" ${_caixaComandasPagina >= totalPaginas ? 'disabled' : ''} class="btn-ghost" style="padding:.25rem .55rem;font-size:.7rem;${_caixaComandasPagina >= totalPaginas ? 'opacity:.3;cursor:not-allowed;' : ''}"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>`;
+        } else {
+            pager.style.display = 'none';
+        }
+    }
+}
+
+function mudarPaginaCaixaComandas(delta) {
+    _caixaComandasPagina = Math.max(1, _caixaComandasPagina + delta);
+    renderComandasAbertasCaixa();
 }
 
 function timeAgo(ts) {
@@ -8493,6 +8779,8 @@ let _undoStack = [];
 let _undoTimer = null;
 
 function registrarUndo(msg, fnDesfazer, duracaoMs = 6000) {
+    // Não mostrar undo se não está logado (tela de login)
+    if (!currentUser) return;
     // Cancela qualquer undo pendente anterior (aplica-o implicitamente)
     if (_undoTimer) clearTimeout(_undoTimer);
 
