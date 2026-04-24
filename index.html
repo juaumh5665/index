@@ -820,6 +820,15 @@
                                     <label class="switch"><input type="checkbox" id="cfg-alerta-nivel" checked><span class="slider"></span></label>
                                 </div>
                                 <div>
+                                    <label class="inp-label">Acerto no Caixa após Eliminação</label>
+                                    <select id="cfg-acerto-elim" class="inp">
+                                        <option value="perguntar">Perguntar (confirmar antes de abrir)</option>
+                                        <option value="auto">Automático (abrir caixa direto)</option>
+                                        <option value="off">Desligado (não sugerir)</option>
+                                    </select>
+                                    <div style="font-size:.7rem;color:#52525b;margin-top:.3rem;">Quando um jogador é eliminado com saldo devedor, o sistema pode sugerir abrir o caixa para fazer o acerto.</div>
+                                </div>
+                                <div>
                                     <label class="inp-label">Idioma</label>
                                     <select id="cfg-idioma" class="inp">
                                         <option value="pt-BR">🇧🇷 Português (Brasil)</option>
@@ -1359,7 +1368,7 @@
     </div>
 </div>
 
-<!-- MODAL: CONFIG STATS TV POKERWEB -->
+<!-- MODAL: CONFIG STATS TV PRO LIVE -->
 <div id="modal-config-stats-tv" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
@@ -1367,7 +1376,7 @@
             <button onclick="closeModal('modal-config-stats-tv')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:.5rem;">
-            <div style="font-size:.75rem;color:#71717a;margin-bottom:.5rem;">Escolha quais estatísticas aparecem na linha inferior da TV (layout PokerWeb):</div>
+            <div style="font-size:.75rem;color:#71717a;margin-bottom:.5rem;">Escolha quais estatísticas aparecem na linha inferior da TV (layout Pro Live):</div>
             <div id="stats-tv-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
             <button onclick="salvarConfigStatsTV()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.5rem;">Aplicar</button>
         </div>
@@ -1904,15 +1913,19 @@
             </div>
             <!-- Blinds -->
             <div style="display:flex;flex-direction:column;gap:.75rem;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
                     <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de Blinds</div>
-                    <button onclick="addBlindRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;">+ Nível</button>
+                    <div style="display:flex;gap:.35rem;">
+                        <button onclick="addBlindRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;">+ Nível</button>
+                        <button onclick="addIntervaloRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;color:#06b6d4;border-color:rgba(6,182,212,.3);"><i class="fa-solid fa-pause"></i> + Intervalo</button>
+                    </div>
                 </div>
-                <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 2rem;gap:.35rem;padding:0 .5rem;">
+                <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;padding:0 .5rem;">
                     <span></span>
                     <span style="font-size:.6rem;color:#52525b;text-align:center;">SB</span>
                     <span style="font-size:.6rem;color:#52525b;text-align:center;">BB</span>
                     <span style="font-size:.6rem;color:#52525b;text-align:center;">Ante</span>
+                    <span style="font-size:.6rem;color:#52525b;text-align:center;">Min</span>
                     <span></span>
                 </div>
                 <div id="blinds-setup" style="display:flex;flex-direction:column;gap:.3rem;max-height:280px;overflow-y:auto;padding-right:.25rem;"></div>
@@ -1942,12 +1955,12 @@
                         <option value="minimalista">Minimalista</option>
                         <option value="feltro">Verde Feltro</option>
                         <option value="neon">Neon</option>
-                        <option value="pokerweb">PokerWeb ⭐</option>
+                        <option value="pokerweb">Pro Live ⭐</option>
                     </select>
                     <button onclick="togglePrizePool()" id="btn-prize-toggle" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;" title="Mostrar/ocultar prize pool na TV">
                         <i class="fa-solid fa-eye"></i>
                     </button>
-                    <button onclick="abrirConfigStatsTV()" id="btn-config-stats-tv" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;" title="Configurar stats do layout PokerWeb">
+                    <button onclick="abrirConfigStatsTV()" id="btn-config-stats-tv" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;" title="Configurar stats do layout Pro Live">
                         <i class="fa-solid fa-sliders"></i>
                     </button>
                 </div>
@@ -2577,20 +2590,45 @@ function filtrarJogadores(val) {
 // ============================================================
 function renderBlindsInputs() {
     const c = document.getElementById('blinds-setup');
-    c.innerHTML = blindStructure.map((b, i) => `
-        <div class="blind-row" id="blindrow-${i}">
-            <span style="font-size:.7rem;color:#52525b;font-weight:700;">${i+1}</span>
+    // Numeração só conta níveis "normais" (não intervalos)
+    let numNivel = 0;
+    c.innerHTML = blindStructure.map((b, i) => {
+        if (b.isBreak) {
+            // Linha de intervalo
+            return `
+            <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:2rem 1fr 3rem 2rem;gap:.35rem;background:rgba(6,182,212,.08);border:1px dashed rgba(6,182,212,.35);padding:.4rem .5rem;border-radius:.35rem;">
+                <span style="font-size:.75rem;color:#06b6d4;font-weight:800;"><i class="fa-solid fa-pause"></i></span>
+                <span style="font-size:.75rem;color:#06b6d4;font-weight:700;align-self:center;">INTERVALO</span>
+                <input type="number" value="${b.tempo || 10}" min="1" onchange="blindStructure[${i}].tempo=parseInt(this.value)||10" style="padding:.25rem .4rem;font-size:.8rem;font-family:'Space Mono',monospace;text-align:center;background:#0f0f12;border:1px solid rgba(6,182,212,.3);border-radius:.3rem;color:#06b6d4;font-weight:700;" title="Tempo em minutos">
+                <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
+            </div>`;
+        }
+        numNivel++;
+        return `
+        <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;">
+            <span style="font-size:.7rem;color:#52525b;font-weight:700;">${numNivel}</span>
             <input type="number" value="${b.sb}"   onchange="blindStructure[${i}].sb=parseInt(this.value)||0">
             <input type="number" value="${b.bb}"   onchange="blindStructure[${i}].bb=parseInt(this.value)||0">
             <input type="number" value="${b.ante}" onchange="blindStructure[${i}].ante=parseInt(this.value)||0">
+            <input type="number" value="${b.tempo || ''}" placeholder="—" onchange="blindStructure[${i}].tempo=parseInt(this.value)||null" style="text-align:center;" title="Tempo personalizado em min (vazio = usar padrão)">
             <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 function addBlindRow() {
-    const last = blindStructure[blindStructure.length - 1];
-    blindStructure.push({ sb: last.sb*2, bb: last.bb*2, ante: last.ante*2 });
+    // Pegar último nível normal (não intervalo) como referência
+    const lastNormal = [...blindStructure].reverse().find(b => !b.isBreak);
+    if (lastNormal) {
+        blindStructure.push({ sb: lastNormal.sb*2, bb: lastNormal.bb*2, ante: lastNormal.ante*2 });
+    } else {
+        blindStructure.push({ sb: 100, bb: 200, ante: 0 });
+    }
+    renderBlindsInputs();
+}
+
+function addIntervaloRow() {
+    blindStructure.push({ isBreak: true, tempo: 10, sb: 0, bb: 0, ante: 0 });
     renderBlindsInputs();
 }
 
@@ -3086,7 +3124,7 @@ function prevLevel(idx) {
     const t = torneios[idx];
     if (t.nivelAtual > 0) {
         t.nivelAtual--;
-        t.tempoRestante = t.tempoTotal;
+        aplicarTempoNivel(t);
         saveData();
         updateModalTorneio();
         updateTV(idx);
@@ -3097,14 +3135,40 @@ function nextLevel(idx) {
     const t = torneios[idx];
     if (t.nivelAtual < t.blinds.length - 1) {
         t.nivelAtual++;
-        t.tempoRestante = t.tempoTotal;
+        aplicarTempoNivel(t);
+
+        const b = t.blinds[t.nivelAtual];
+        if (b.isBreak) {
+            // Entrou em um nível de intervalo - ativa break automaticamente
+            t.isBreak = true;
+            t.status = t.rodando ? 'break' : 'paused';
+            somBreak && somBreak();
+            showToast(`⏸️ INTERVALO: ${b.tempo || 10} min`);
+        } else {
+            // Nível normal — se estava em break, sai
+            if (t.isBreak) {
+                t.isBreak = false;
+                t.status = t.rodando ? 'running' : 'paused';
+            }
+            showToast(`⬆️ Nível: ${b.sb}/${b.bb}${b.ante?' (ante '+b.ante+')':''}`);
+        }
         saveData();
         updateModalTorneio();
         updateTV(idx);
-        showToast(`⬆️ Nível ${t.nivelAtual + 1}: ${t.blinds[t.nivelAtual].sb}/${t.blinds[t.nivelAtual].bb}`);
     } else {
         showToast('⚠️ Último nível atingido');
     }
+}
+
+// Define tempoTotal/tempoRestante conforme o tipo de nível
+function aplicarTempoNivel(t) {
+    const b = t.blinds[t.nivelAtual];
+    if (!b) return;
+    // Se nível tem tempo customizado, usa. Se é break, usa o tempo do break.
+    // Caso contrário, usa o tempoNivel padrão do torneio.
+    const minutos = b.tempo || t.tempoNivel || 15;
+    t.tempoTotal = minutos * 60;
+    t.tempoRestante = t.tempoTotal;
 }
 
 function toggleBreak(idx) {
@@ -3158,6 +3222,12 @@ function registrarEntrada() {
     const t   = torneios[activeTorneioIdx];
     const jid = parseInt(document.getElementById('entrada-jogador').value);
     const tipo = document.getElementById('entrada-tipo').value;
+
+    // REGRA: bloquear entrada se o caixa do torneio estiver fechado
+    const caixa = getCaixaTorneio(t);
+    if (caixa.status !== 'aberto') {
+        return showToast('🔒 Abra o caixa do torneio primeiro (aba Controle → Caixa do Torneio)');
+    }
 
     if (!jid) return showToast('⚠️ Selecione um jogador');
 
@@ -3353,6 +3423,9 @@ function confirmarEliminacao() {
     updateModalTorneio();
     renderTorneiosList();
 
+    // Sugerir acerto no caixa (depende da preferência do operador)
+    sugerirAcertoNoCaixa(jid);
+
     // UNDO: permite desfazer eliminação
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
@@ -3447,7 +3520,7 @@ function updateTV(idx) {
     const addonsQtd = t.entries.filter(e => e.tipo === 'addon').length;
     const jackpotsQtd = (t.jackpotCompras || []).reduce((s, j) => s + (j.qtd || 1), 0);
 
-    // Stats strip do layout PokerWeb (configuração por torneio)
+    // Stats strip do layout Pro Live (configuração por torneio)
     // Se t.pwStatsVisiveis não for definido, mostra todos que > 0
     const pwVis = t.pwStatsVisiveis || {};
     const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true; // padrão: visível
@@ -3460,6 +3533,13 @@ function updateTV(idx) {
     if (defVis('addon') && (t.addonFichas > 0))        statsStrip.push({ label:'ADD-ON', value:addonsQtd });
 
     const prox = t.blinds[t.nivelAtual + 1];
+
+    // Proximo nivel NAO-break (para mostrar na tela de intervalo)
+    let proxNaoBreak = null;
+    for (let i = t.nivelAtual + 1; i < t.blinds.length; i++) {
+        if (!t.blinds[i].isBreak) { proxNaoBreak = t.blinds[i]; break; }
+    }
+    const nextBlinds = proxNaoBreak ? (proxNaoBreak.sb.toLocaleString() + ' / ' + proxNaoBreak.bb.toLocaleString() + (proxNaoBreak.ante ? ' (ante ' + proxNaoBreak.ante.toLocaleString() + ')' : '')) : '';
 
     // Calcular "Intervalo em" (próximo break)
     let breakIn = '—';
@@ -3514,6 +3594,8 @@ function updateTV(idx) {
         pct:      (t.tempoRestante / t.tempoTotal) * 100,
         elapsed:  elapsedFormatted,
         clubeNome: clubeNome,
+        clubeLogo: (typeof config !== 'undefined' && config.clube && config.clube.logo) ? config.clube.logo : '',
+        nextBlinds,
     }, '*');
 }
 
@@ -3568,7 +3650,7 @@ function abrirTV(idx) {
         body.layout-neon .panel-bg{background:rgba(20,20,40,.5);border:1px solid rgba(236,72,153,.3);backdrop-filter:blur(10px);border-radius:.75rem;}
         body.layout-neon #tournament-name{background:linear-gradient(90deg,#ec4899,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 
-        /* === POKERWEB (profissional verde com brilho e grid de stats) === */
+        /* === PRO LIVE (profissional verde com brilho e grid de stats) === */
         body.layout-pokerweb {
             background:
                 radial-gradient(ellipse at 50% 50%, #1a6b4f 0%, #0d3d2e 40%, #062018 90%);
@@ -3596,7 +3678,7 @@ function abrirTV(idx) {
         body.layout-pokerweb.pw-layout-active #main-tv { display:none !important; }
         body.layout-pokerweb #pw-screen { display:flex !important; }
 
-        /* PokerWeb screen (só visível quando layout-pokerweb) */
+        /* Pro Live screen (só visível quando layout-pokerweb) */
         #pw-screen {
             display:none; position:relative; z-index:1;
             height:100vh; width:100vw;
@@ -3766,9 +3848,30 @@ function abrirTV(idx) {
 
         /* When break active in pokerweb, use the BREAK overlay */
 
-        /* BREAK */
-        #break-screen{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;flex-direction:column;background:#0a0000;}
+        /* BREAK SCREEN - beautiful with logo */
+        #break-screen{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;flex-direction:column;
+            background: radial-gradient(ellipse at center, #2a0505 0%, #0a0000 70%);
+            color: #fff;
+        }
+        #break-screen::before{content:'';position:absolute;inset:0;
+            background:
+                repeating-linear-gradient(45deg, rgba(239,68,68,.02) 0 2px, transparent 2px 20px),
+                radial-gradient(circle at 20% 30%, rgba(239,68,68,.15), transparent 60%),
+                radial-gradient(circle at 80% 70%, rgba(245,158,11,.1), transparent 60%);
+            pointer-events:none;
+        }
         #break-screen.show{display:flex;}
+        #break-screen > * { position: relative; z-index: 1; }
+
+        .bs-logo{max-height:140px;max-width:280px;margin-bottom:1.5rem;filter:drop-shadow(0 4px 20px rgba(245,158,11,.4));}
+        .bs-clube-nome{font-size:clamp(1.2rem, 2.5vw, 2rem);font-weight:800;color:#f59e0b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2rem;text-shadow:0 0 30px rgba(245,158,11,.4);}
+        .bs-label-cima{font-size:clamp(.9rem, 1.4vw, 1.3rem);color:#f59e0b;letter-spacing:.4em;text-transform:uppercase;margin-bottom:.5rem;font-weight:700;opacity:.8;}
+        .bs-break-text{font-size:clamp(5rem, 11vw, 11rem);font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;text-shadow: 0 0 60px rgba(239,68,68,.5), 0 4px 10px rgba(0,0,0,.4);}
+        .bs-timer{font-family:'Space Mono',monospace;font-size:clamp(3.5rem, 7vw, 7rem);color:#fff;margin-top:1rem;font-weight:700;text-shadow:0 0 40px rgba(255,255,255,.3);}
+        .bs-label-baixo{font-size:clamp(1rem, 1.5vw, 1.4rem);color:#a1a1aa;margin-top:1rem;text-transform:uppercase;letter-spacing:.35em;font-weight:600;}
+        .bs-proxnivel{margin-top:2.5rem;padding:1rem 2rem;background:rgba(255,255,255,.05);border:1px solid rgba(245,158,11,.25);border-radius:1rem;backdrop-filter:blur(10px);}
+        .bs-proxnivel-label{font-size:.75rem;color:#f59e0b;text-transform:uppercase;letter-spacing:.2em;font-weight:700;margin-bottom:.4rem;text-align:center;}
+        .bs-proxnivel-blinds{font-family:'Space Mono',monospace;font-size:clamp(1.5rem, 2.5vw, 2.2rem);color:#fff;font-weight:700;text-align:center;}
 
         .bar-bg{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
         .bar-fill{height:6px;background:currentColor;border-radius:3px;transition:width .5s linear;}
@@ -3795,14 +3898,21 @@ function abrirTV(idx) {
             <div style="font-size:.9rem;color:#71717a;">Abra o torneio novamente no painel de controle</div>
         </div>
 
-        <!-- BREAK OVERLAY -->
+        <!-- BREAK OVERLAY - com logo do clube + contagem regressiva -->
         <div id="break-screen">
-            <div style="font-size:11rem;font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;">BREAK</div>
-            <div id="break-timer" class="mono" style="font-size:6rem;color:#fff;margin-top:1rem;"></div>
-            <div style="font-size:1.5rem;color:#52525b;margin-top:1rem;text-transform:uppercase;letter-spacing:.3em;">Intervalo</div>
+            <img id="bs-logo" class="bs-logo" style="display:none;" alt="">
+            <div id="bs-clube-nome" class="bs-clube-nome"></div>
+            <div class="bs-label-cima">Intervalo</div>
+            <div class="bs-break-text">BREAK</div>
+            <div id="break-timer" class="bs-timer">--:--</div>
+            <div class="bs-label-baixo">Tempo Restante</div>
+            <div id="bs-proxnivel-wrap" class="bs-proxnivel" style="display:none;">
+                <div class="bs-proxnivel-label">Próximo nível</div>
+                <div id="bs-proxnivel-blinds" class="bs-proxnivel-blinds">—</div>
+            </div>
         </div>
 
-        <!-- POKERWEB LAYOUT (só visível com body.layout-pokerweb) -->
+        <!-- PRO LIVE LAYOUT (só visível com body.layout-pokerweb) -->
         <div id="pw-screen">
             <!-- Title -->
             <div class="pw-title" id="pw-title">TORNEIO</div>
@@ -3914,6 +4024,31 @@ function abrirTV(idx) {
         </div>
 
     <script>
+    // Break screen helper - usa data-url de logo armazenada em background via postMessage
+    function atualizarBreakScreen(d) {
+        const bs = document.getElementById('break-screen');
+        if (!d.isBreak) { bs.classList.remove('show'); return; }
+        bs.classList.add('show');
+        document.getElementById('break-timer').innerText = d.timer || '--:--';
+        // Clube name
+        const cn = document.getElementById('bs-clube-nome');
+        if (cn) cn.innerText = d.clubeNome || '';
+        // Logo
+        const logo = document.getElementById('bs-logo');
+        if (logo) {
+            if (d.clubeLogo) { logo.src = d.clubeLogo; logo.style.display = 'block'; }
+            else logo.style.display = 'none';
+        }
+        // Proximo nivel (skipa níveis isBreak)
+        const wrap = document.getElementById('bs-proxnivel-wrap');
+        if (wrap) {
+            if (d.nextBlinds) {
+                wrap.style.display = 'block';
+                document.getElementById('bs-proxnivel-blinds').innerText = d.nextBlinds;
+            } else wrap.style.display = 'none';
+        }
+    }
+
     // Modo kiosk helpers
     function enterKiosk() {
         document.documentElement.style.cursor = 'none';
@@ -3952,7 +4087,7 @@ function abrirTV(idx) {
         const layout = d.layout || 'classico';
         document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '');
 
-        // ===== POKERWEB LAYOUT =====
+        // ===== PRO LIVE LAYOUT =====
         if (layout === 'pokerweb') {
             // Title
             const pwTitle = document.getElementById('pw-title');
@@ -4004,9 +4139,7 @@ function abrirTV(idx) {
             }
 
             // Break overlay still works
-            const bs = document.getElementById('break-screen');
-            if (d.isBreak) { bs.classList.add('show'); document.getElementById('break-timer').innerText = d.timer; }
-            else bs.classList.remove('show');
+            atualizarBreakScreen(d);
             return;
         }
 
@@ -4047,9 +4180,7 @@ function abrirTV(idx) {
         bar.style.width=Math.max(0,d.pct)+'%';
         if(d.pct<20){document.getElementById('bar').style.background='#ef4444';}
         else{document.getElementById('bar').style.background='';}
-        const bs=document.getElementById('break-screen');
-        if(d.isBreak){bs.classList.add('show');document.getElementById('break-timer').innerText=d.timer;}
-        else{bs.classList.remove('show');}
+        atualizarBreakScreen(d);
     };
     <\/script>
     </body></html>`);
@@ -4085,7 +4216,7 @@ function onLayoutChange() {
     t.tvLayout = document.getElementById('mt-tv-layout').value;
     saveData();
     updateTV(activeTorneioIdx);
-    // Mostra/oculta botão de config de stats (só para PokerWeb)
+    // Mostra/oculta botão de config de stats (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     showToast('🎨 Layout TV: ' + t.tvLayout);
@@ -4114,13 +4245,13 @@ function syncTVControls() {
     if (btn) btn.innerHTML = (t.tvShowPrize !== false)
         ? '<i class="fa-solid fa-eye"></i>'
         : '<i class="fa-solid fa-eye-slash"></i> Oculto';
-    // Mostra/oculta botão de stats config (só para PokerWeb)
+    // Mostra/oculta botão de stats config (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
 }
 
 // ============================================================
-// CONFIG STATS TV POKERWEB
+// CONFIG STATS TV PRO LIVE
 // ============================================================
 function abrirConfigStatsTV() {
     const t = torneios[activeTorneioIdx];
@@ -4181,7 +4312,8 @@ setInterval(() => {
             updateTV(i);
             checarAlertasTorneio(t);
             if (t.tempoRestante % 30 === 0) renderTorneiosList();
-        } else if (t.rodando && t.tempoRestante <= 0 && !t.isBreak) {
+        } else if (t.rodando && t.tempoRestante <= 0) {
+            // Quando tempo esgota, avança - se era break, o próximo é nível normal
             nextLevel(i);
             changed = true;
         } else if (t.iniciadoEm && t.status !== 'finished') {
@@ -4741,8 +4873,9 @@ function addItemComanda() {
 
     document.getElementById('cd-qtd').value = 1;
     saveData();
-    renderDetalheComanda();
-    renderProdutos(); // atualiza estoque exibido
+    renderDetalheComanda();   // atualiza o detalhe da comanda (itens + total)
+    renderComandas();          // atualiza o card da comanda na lista (total novo)
+    renderProdutos();          // atualiza estoque exibido
     showToast(`🛒 ${qtd}x ${prod.nome} adicionado`);
 }
 
@@ -5736,6 +5869,8 @@ function renderConfig() {
     // Preferências
     document.getElementById('cfg-som-on').checked       = config.preferencias.somOn;
     document.getElementById('cfg-alerta-nivel').checked = config.preferencias.alertaNivel;
+    const acEl = document.getElementById('cfg-acerto-elim');
+    if (acEl) acEl.value = config.preferencias.acertoAposEliminacao || 'perguntar';
     document.getElementById('cfg-idioma').value         = config.preferencias.idioma;
     setTemaUI(config.preferencias.tema);
     setAccentUI(config.preferencias.accent);
@@ -5857,6 +5992,7 @@ function salvarPreferencias() {
         ...config.preferencias,
         somOn:       document.getElementById('cfg-som-on').checked,
         alertaNivel: document.getElementById('cfg-alerta-nivel').checked,
+        acertoAposEliminacao: (document.getElementById('cfg-acerto-elim') || {}).value || 'perguntar',
         idioma:      document.getElementById('cfg-idioma').value,
     };
     salvarConfig();
@@ -6341,7 +6477,12 @@ function renderPagarConta() {
     const saldo = getSaldoJogador(pagamentoJogadorId);
     const el = document.getElementById('pj-pagar-content');
     if (!el) return;
-    if (saldo >= 0) {
+
+    // Verifica se tem comandas abertas do jogador
+    const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
+    const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+
+    if (saldo >= 0 && !comandasAbertas.length) {
         el.innerHTML = `
             <div style="padding:2.5rem;text-align:center;color:#52525b;">
                 <i class="fa-solid fa-circle-check" style="font-size:2.5rem;color:#22c55e;margin-bottom:.75rem;display:block;"></i>
@@ -6350,14 +6491,51 @@ function renderPagarConta() {
             </div>`;
         return;
     }
-    const divida = Math.abs(saldo);
+
+    const divida = Math.max(0, -saldo);
+    const totalSugerido = divida + totalComandas;
+
+    // Card de comandas abertas (se houver)
+    let comandasHtml = '';
+    if (comandasAbertas.length > 0) {
+        comandasHtml = `
+        <div style="padding:.75rem 1rem;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.25);border-radius:.6rem;margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem;">
+                <div>
+                    <div style="font-size:.7rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comandas Abertas no Bar</div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">${comandasAbertas.length} comanda${comandasAbertas.length>1?'s':''} · ${comandasAbertas.reduce((s,c)=>s+c.itens.length,0)} iten${comandasAbertas.reduce((s,c)=>s+c.itens.length,0)>1?'s':''}</div>
+                </div>
+                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;white-space:nowrap;">
+                    <input type="checkbox" id="pj-incluir-comandas" checked onchange="atualizarTotalComComandas()" style="accent-color:#f97316;">
+                    <span style="font-size:.75rem;font-weight:700;color:#f97316;">Incluir no acerto</span>
+                </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:.4rem;border-top:1px dashed rgba(249,115,22,.2);">
+                <span style="font-size:.8rem;font-weight:700;">Total das comandas</span>
+                <span style="font-family:'Space Mono',monospace;font-weight:800;color:#f97316;font-size:1rem;">${formatMoney(totalComandas)}</span>
+            </div>
+        </div>`;
+    }
+
     el.innerHTML = `
+        ${comandasHtml}
         <div style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:1rem;">
-            <div style="font-size:.7rem;color:#71717a;">Valor a pagar:</div>
-            <div style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.5rem;color:#ef4444;margin-top:.2rem;">${formatMoney(divida)}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
+                <span style="font-size:.7rem;color:#71717a;">Saldo devedor</span>
+                <span style="font-family:'Space Mono',monospace;font-weight:700;color:${divida>0?'#ef4444':'#71717a'};">${divida>0?'-':''}${formatMoney(divida)}</span>
+            </div>
+            ${comandasAbertas.length > 0 ? `
+            <div id="pj-linha-comandas" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
+                <span style="font-size:.7rem;color:#71717a;">+ Comandas abertas</span>
+                <span style="font-family:'Space Mono',monospace;font-weight:700;color:#f97316;">${formatMoney(totalComandas)}</span>
+            </div>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:.4rem;border-top:1px solid #1e1e23;margin-top:.35rem;">
+                <span style="font-size:.8rem;font-weight:700;">Total a pagar</span>
+                <span id="pj-total-display" style="font-family:'Space Mono',monospace;font-weight:800;color:#ef4444;font-size:1.5rem;">${formatMoney(totalSugerido)}</span>
+            </div>
         </div>
         <label class="inp-label">Valor do Pagamento R$</label>
-        <input id="pj-pagar-valor" type="number" step="0.01" min="0" max="${divida}" value="${divida}" class="inp" oninput="validarValorPagamento()">
+        <input id="pj-pagar-valor" type="number" step="0.01" min="0" value="${totalSugerido}" class="inp" oninput="validarValorPagamento()">
         <div id="pj-pagar-aviso" style="font-size:.7rem;color:#71717a;margin-top:.35rem;"></div>
         <label class="inp-label" style="margin-top:1rem;">Forma de Pagamento</label>
         <div id="pj-pagar-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
@@ -6367,6 +6545,27 @@ function renderPagarConta() {
             <i class="fa-solid fa-check"></i> Confirmar Pagamento
         </button>`;
     renderMetodosPagamento('pj-pagar-metodos', 'pagar', true);
+}
+
+// Atualiza total quando toggle "incluir comandas" muda
+function atualizarTotalComComandas() {
+    const saldo = getSaldoJogador(pagamentoJogadorId);
+    const divida = Math.max(0, -saldo);
+    const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
+    const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+
+    const incluir = (document.getElementById('pj-incluir-comandas') || {}).checked;
+    const total = divida + (incluir ? totalComandas : 0);
+
+    const inp = document.getElementById('pj-pagar-valor');
+    if (inp) inp.value = total.toFixed(2);
+
+    const disp = document.getElementById('pj-total-display');
+    if (disp) disp.innerText = formatMoney(total);
+
+    // Mostra/oculta linha de comandas
+    const linha = document.getElementById('pj-linha-comandas');
+    if (linha) linha.style.opacity = incluir ? '1' : '.4';
 }
 
 function validarValorPagamento() {
@@ -6431,7 +6630,37 @@ Aplicar taxa?`)) {
         origem: 'caixa',
     });
 
+    // Se o operador marcou "incluir comandas" e existe checkbox marcada, fecha as comandas abertas
+    const incCheckbox = document.getElementById('pj-incluir-comandas');
+    if (incCheckbox && incCheckbox.checked) {
+        const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
+        let comandasFechadas = 0;
+        comandasAbertas.forEach(c => {
+            const totalC = calcTotalComanda(c);
+            // Registra débito da comanda (consumo)
+            registrarTransacao({
+                jogadorId: pagamentoJogadorId,
+                tipo: 'bar',
+                valor: -totalC,
+                descricao: `Comanda bar (${c.itens.length} iten${c.itens.length>1?'s':''}) · fechada no caixa`,
+                origem: 'bar',
+                refId: c.id,
+            });
+            // Marca como fechada
+            c.status = 'fechada';
+            c.fechadoEm = Date.now();
+            c.pagamento = metodo;
+            c.total = totalC;
+            c.fechadaPeloCaixa = true;
+            comandasFechadas++;
+        });
+        if (comandasFechadas > 0) {
+            showToast(`🧾 ${comandasFechadas} comanda${comandasFechadas>1?'s':''} fechada${comandasFechadas>1?'s':''} automaticamente`);
+        }
+    }
+
     showToast(`✅ Pagamento de ${formatMoney(valor)} registrado para ${j.nome}`);
+    saveData();
     renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
     renderPagarConta();
     renderExtratoJogador();
@@ -7458,6 +7687,12 @@ function confirmarJackpot() {
     const qtd = parseInt(document.getElementById('jackpot-qtd').value) || 1;
     if (!jid) return showToast('⚠️ Selecione um jogador');
 
+    // Bloqueio: caixa do torneio precisa estar aberto
+    const caixa = getCaixaTorneio(t);
+    if (caixa.status !== 'aberto') {
+        return showToast('🔒 Abra o caixa do torneio primeiro');
+    }
+
     const total = qtd * t.jackpotValor;
     const totalFichas = qtd * t.jackpotFichas;
 
@@ -7492,7 +7727,7 @@ function renderTVGallery() {
         { key: 'minimalista', nome: 'Minimalista',    desc: 'Só timer e blinds, sem distrações' },
         { key: 'feltro',      nome: 'Verde Feltro',   desc: 'Inspirado no feltro da mesa de poker' },
         { key: 'neon',        nome: 'Neon',           desc: 'Cores vibrantes estilo streaming' },
-        { key: 'pokerweb',    nome: 'PokerWeb ⭐',     desc: 'Profissional com stats detalhadas e brilho dourado' },
+        { key: 'pokerweb',    nome: 'Pro Live ⭐',     desc: 'Profissional com stats detalhadas e brilho dourado' },
     ];
     el.innerHTML = layouts.map(l => `
         <div class="stat-card" style="padding:0;overflow:hidden;">
@@ -7512,7 +7747,7 @@ function renderTVGallery() {
 }
 
 function renderMiniTV(layout) {
-    // Preview customizado para PokerWeb
+    // Preview customizado para Pro Live
     if (layout === 'pokerweb') {
         return `
         <div style="height:200px;background:radial-gradient(ellipse at center,#1a6b4f 0%,#0d3d2e 50%,#062018 100%);padding:.75rem 1rem;position:relative;overflow:hidden;">
@@ -8725,6 +8960,44 @@ function unlockAudio() {
 document.addEventListener('click', unlockAudio, { once: true });
 document.addEventListener('keydown', unlockAudio, { once: true });
 
+
+
+// ============================================================
+// SUGESTÃO DE ACERTO NO CAIXA APÓS ELIMINAÇÃO
+// ============================================================
+function getPrefAcertoElim() {
+    if (!config) return 'perguntar';
+    if (!config.preferencias) config.preferencias = {};
+    return config.preferencias.acertoAposEliminacao || 'perguntar'; // 'perguntar' | 'auto' | 'off'
+}
+
+function sugerirAcertoNoCaixa(jogadorId) {
+    const pref = getPrefAcertoElim();
+    if (pref === 'off') return;
+
+    const j = jogadores.find(x => x.id === jogadorId);
+    if (!j) return;
+    const saldo = getSaldoJogador(jogadorId);
+    if (saldo >= 0) return; // só sugere se está devendo (saldo negativo)
+
+    const devedor = Math.abs(saldo);
+
+    if (pref === 'auto') {
+        // Abre modal do caixa direto
+        setTimeout(() => {
+            showToast(`💰 Acerto: ${j.nome} deve ${formatMoney(devedor)}`);
+            abrirPagamentoJogador && abrirPagamentoJogador(jogadorId);
+        }, 400);
+        return;
+    }
+
+    // Modo perguntar: confirmação simples (aguarda pouco pra não atropelar undo toast)
+    setTimeout(() => {
+        if (confirm(`${j.nome} foi eliminado e deve ${formatMoney(devedor)}.\n\nAbrir o caixa agora para fazer o acerto financeiro?`)) {
+            abrirPagamentoJogador && abrirPagamentoJogador(jogadorId);
+        }
+    }, 500);
+}
 
 // ============================================================
 // BLOCO 2 — FUNCIONALIDADES NOVAS
