@@ -734,6 +734,7 @@
                     <button class="tab-btn"        id="cfgtab-btn-cash"        onclick="switchConfigTab('cfg-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
                     <button class="tab-btn"        id="cfgtab-btn-fichas"      onclick="switchConfigTab('cfg-fichas', this)"><i class="fa-solid fa-circle"></i> Fichas</button>
                     <button class="tab-btn"        id="cfgtab-btn-financeiro"  onclick="switchConfigTab('cfg-financeiro', this)"><i class="fa-solid fa-sack-dollar"></i> Financeiro</button>
+                    <button class="tab-btn"        id="cfgtab-btn-seguranca"   onclick="switchConfigTab('cfg-seguranca', this)"><i class="fa-solid fa-shield-halved"></i> Segurança</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
                 </div>
@@ -922,6 +923,29 @@
                             </label>
                         </div>
                         <button onclick="salvarConfigFinanceiro()" class="btn-gold" style="padding:.75rem 1.25rem;border-radius:.5rem;margin-top:1rem;">Salvar Configurações</button>
+                    </div>
+                </div>
+
+                <!-- ABA: SEGURANÇA -->
+                <div id="cfg-seguranca" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-shield-halved"></i> Auditoria & Logs</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">Histórico completo de todas as ações do sistema. Use para investigar discrepâncias, auditar operadores e rastrear movimentações financeiras.</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                            <button onclick="abrirModalAuditoria()" class="btn-gold" style="padding:.85rem;border-radius:.5rem;"><i class="fa-solid fa-list-ul"></i> Ver Logs</button>
+                            <button onclick="exportAuditoriaCSV()" class="btn-ghost" style="padding:.85rem;border-radius:.5rem;"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+                        </div>
+                        <div id="cfg-audit-stats" style="margin-top:1rem;padding:.75rem;background:#0f0f12;border-radius:.5rem;font-size:.8rem;color:#71717a;"></div>
+                    </div>
+
+                    <div class="stat-card" style="padding:1.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-floppy-disk"></i> Backups Automáticos</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">O sistema cria backups automaticamente a cada 30 minutos. Você pode restaurar um estado anterior em caso de problemas.</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                            <button onclick="abrirModalBackups()" class="btn-gold" style="padding:.85rem;border-radius:.5rem;"><i class="fa-solid fa-clock-rotate-left"></i> Ver Backups</button>
+                            <button onclick="fazerBackupAutomatico();showToast('💾 Backup criado')" class="btn-ghost" style="padding:.85rem;border-radius:.5rem;"><i class="fa-solid fa-floppy-disk"></i> Backup Agora</button>
+                        </div>
+                        <div id="cfg-backup-stats" style="margin-top:1rem;padding:.75rem;background:#0f0f12;border-radius:.5rem;font-size:.8rem;color:#71717a;"></div>
                     </div>
                 </div>
 
@@ -1439,6 +1463,82 @@
             </label>
             <button onclick="salvarPremiacaoProjetada()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Salvar e Aplicar</button>
         </div>
+    </div>
+</div>
+
+<!-- MODAL: AUDITORIA / LOGS DO SISTEMA -->
+<div id="modal-auditoria" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:1100px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-shield-halved" style="color:var(--gold);"></i> Logs de Auditoria <span id="audit-total" style="color:#71717a;font-size:.75rem;font-weight:400;margin-left:.5rem;"></span></h3>
+            <button onclick="closeModal('modal-auditoria')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+
+        <!-- Filtros -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto auto;gap:.5rem;margin-bottom:1rem;align-items:end;">
+            <div>
+                <label class="inp-label">Período</label>
+                <select id="audit-filt-periodo" class="inp" onchange="_filtroAuditoria.periodo=this.value;renderAuditoria()">
+                    <option value="1h">Última hora</option>
+                    <option value="24h" selected>Últimas 24h</option>
+                    <option value="7d">Últimos 7 dias</option>
+                    <option value="30d">Últimos 30 dias</option>
+                    <option value="tudo">Tudo</option>
+                </select>
+            </div>
+            <div>
+                <label class="inp-label">Categoria</label>
+                <select id="audit-filt-cat" class="inp" onchange="_filtroAuditoria.categoria=this.value;renderAuditoria()">
+                    <option value="">Todas</option>
+                    <option value="LOGIN">Login</option>
+                    <option value="LOGOUT">Logout</option>
+                    <option value="JOGADOR_CRIA">Jogador Criado</option>
+                    <option value="JOGADOR_EDITA">Jogador Editado</option>
+                    <option value="ENTRADA">Entrada Torneio</option>
+                    <option value="ELIMINACAO">Eliminação</option>
+                    <option value="JACKPOT">Jackpot</option>
+                    <option value="TORNEIO_ENCERRA">Torneio Encerrado</option>
+                    <option value="TORNEIO_REABRE">Torneio Reaberto</option>
+                    <option value="CAIXA_TORNEIO_ABRE">Caixa Torneio Abre</option>
+                    <option value="CAIXA_TORNEIO_FECHA">Caixa Torneio Fecha</option>
+                    <option value="PAGAMENTO">Pagamento</option>
+                    <option value="DEPOSITO">Depósito</option>
+                    <option value="CONFIG_EDITA">Config Editada</option>
+                    <option value="BACKUP_AUTO">Backup Automático</option>
+                    <option value="RESTORE">Restauração</option>
+                </select>
+            </div>
+            <div>
+                <label class="inp-label">Usuário</label>
+                <input id="audit-filt-user" class="inp" placeholder="Filtrar por nome..." oninput="_filtroAuditoria.usuario=this.value;renderAuditoria()">
+            </div>
+            <div>
+                <label class="inp-label">Buscar</label>
+                <input id="audit-filt-busca" class="inp" placeholder="Buscar texto..." oninput="_filtroAuditoria.busca=this.value;renderAuditoria()">
+            </div>
+            <button onclick="exportAuditoriaCSV()" class="btn-ghost" style="font-size:.75rem;padding:.55rem .85rem;"><i class="fa-solid fa-file-csv"></i> CSV</button>
+            <button onclick="limparAuditoriaAntiga()" class="btn-ghost" style="font-size:.75rem;padding:.55rem .85rem;color:#ef4444;"><i class="fa-solid fa-broom"></i> Limpar +30d</button>
+        </div>
+
+        <!-- Lista -->
+        <div id="audit-lista" style="display:flex;flex-direction:column;gap:.3rem;max-height:60vh;overflow-y:auto;"></div>
+    </div>
+</div>
+
+<!-- MODAL: BACKUPS AUTOMÁTICOS -->
+<div id="modal-backups" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-floppy-disk" style="color:var(--gold);"></i> Backups Automáticos</h3>
+            <button onclick="closeModal('modal-backups')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">
+            <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i> Backups são criados automaticamente a cada 30 minutos. Mantemos os 3 mais recentes.
+        </div>
+        <div id="backups-lista" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;"></div>
+        <button onclick="fazerBackupAutomatico();renderBackupsLista();showToast('💾 Backup criado')" class="btn-gold" style="padding:.7rem;border-radius:.5rem;width:100%;">
+            <i class="fa-solid fa-floppy-disk"></i> Criar Backup Agora
+        </button>
     </div>
 </div>
 
@@ -2304,6 +2404,7 @@ let transacoes = JSON.parse(localStorage.getItem('ps_transacoes'))  || [];
 let fechamentos= JSON.parse(localStorage.getItem('ps_fechamentos')) || [];
 let barCaixa   = JSON.parse(localStorage.getItem('ps_bar_caixa'))   || { status:'fechado', abertoEm:null, abertoPor:null, historico:[] };
 let rankings   = JSON.parse(localStorage.getItem('ps_rankings'))    || [];
+let auditoria  = (function(){ try { return JSON.parse(localStorage.getItem('ps_auditoria')) || []; } catch(e){ return []; } })();
 // Denominações de fichas padrão do clube (editável em Configurações)
 let fichasDenominacoes = JSON.parse(localStorage.getItem('ps_fichas_denom')) || [
     { valor:25,    cor:'#22c55e', nome:'Verde'   },
@@ -2431,7 +2532,7 @@ function login() {
         return;
     }
 
-    currentUser = { id: user.id, nome: user.nome, email: user.email, role: user.role };
+    currentUser = { id: user.id, nome: user.nome, email: user.email, role: user.role, papel: user.role };
     sessionStorage.setItem('ps_current_user', JSON.stringify(currentUser));
     errEl.style.display = 'none';
 
@@ -2441,11 +2542,488 @@ function login() {
     applyPermissions();
     renderDashboard();
     iniciarRelogio();
+    logAudit('LOGIN', `Login: ${currentUser.nome}`);
+    iniciarBackupAutomatico();
     showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}!`);
+}
+
+
+
+// ============================================================
+// UTILS DE VALIDAÇÃO + ANTI-RACE-CONDITION
+// ============================================================
+
+// Lock para impedir cliques múltiplos rápidos em botões críticos
+const _opLocks = new Set();
+
+function comLock(key, fn, msgOcupado) {
+    if (_opLocks.has(key)) {
+        if (msgOcupado) showToast(msgOcupado);
+        return;
+    }
+    _opLocks.add(key);
+    try {
+        const result = fn();
+        // Se retornou Promise, aguarda
+        if (result && typeof result.then === 'function') {
+            result.finally(() => setTimeout(() => _opLocks.delete(key), 500));
+        } else {
+            setTimeout(() => _opLocks.delete(key), 500);
+        }
+        return result;
+    } catch (e) {
+        _opLocks.delete(key);
+        throw e;
+    }
+}
+
+// Validação genérica - retorna { ok, erros: [] }
+function validarCampos(specs) {
+    // specs = [{ id, nome, obrigatorio, tipo, min, max, validador }]
+    const erros = [];
+    for (const s of specs) {
+        const el = document.getElementById(s.id);
+        if (!el) continue;
+        const valor = el.value.trim();
+
+        // Limpar estilo de erro anterior
+        el.style.borderColor = '';
+
+        if (s.obrigatorio && !valor) {
+            erros.push(`${s.nome} é obrigatório`);
+            el.style.borderColor = '#ef4444';
+            continue;
+        }
+
+        if (valor && s.tipo === 'number') {
+            const n = parseFloat(valor);
+            if (isNaN(n)) {
+                erros.push(`${s.nome} deve ser um número`);
+                el.style.borderColor = '#ef4444';
+                continue;
+            }
+            if (s.min != null && n < s.min) {
+                erros.push(`${s.nome} deve ser ≥ ${s.min}`);
+                el.style.borderColor = '#ef4444';
+                continue;
+            }
+            if (s.max != null && n > s.max) {
+                erros.push(`${s.nome} deve ser ≤ ${s.max}`);
+                el.style.borderColor = '#ef4444';
+                continue;
+            }
+        }
+
+        if (valor && s.tipo === 'integer') {
+            const n = parseInt(valor);
+            if (isNaN(n) || !/^\d+$/.test(valor.replace(/[\.\,]/g, ''))) {
+                erros.push(`${s.nome} deve ser um número inteiro`);
+                el.style.borderColor = '#ef4444';
+                continue;
+            }
+        }
+
+        if (valor && s.tipo === 'cnpj' && !validarCNPJ(valor)) {
+            erros.push(`${s.nome} inválido (deve ter 14 dígitos)`);
+            el.style.borderColor = '#ef4444';
+            continue;
+        }
+
+        if (valor && s.tipo === 'fone' && !validarFone(valor)) {
+            erros.push(`${s.nome} inválido (10 ou 11 dígitos)`);
+            el.style.borderColor = '#ef4444';
+            continue;
+        }
+
+        if (valor && s.tipo === 'email') {
+            const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
+            if (!emailOk) {
+                erros.push(`${s.nome} email inválido`);
+                el.style.borderColor = '#ef4444';
+                continue;
+            }
+        }
+
+        if (valor && s.tipo === 'uf' && valor.length !== 2) {
+            erros.push(`${s.nome} deve ter 2 letras (sigla do estado)`);
+            el.style.borderColor = '#ef4444';
+            continue;
+        }
+
+        if (valor && s.minLength != null && valor.length < s.minLength) {
+            erros.push(`${s.nome} deve ter no mínimo ${s.minLength} caracteres`);
+            el.style.borderColor = '#ef4444';
+            continue;
+        }
+
+        if (s.validador) {
+            const erro = s.validador(valor);
+            if (erro) {
+                erros.push(erro);
+                el.style.borderColor = '#ef4444';
+                continue;
+            }
+        }
+    }
+    return { ok: erros.length === 0, erros };
+}
+
+function exibirErrosValidacao(erros) {
+    if (!erros.length) return;
+    // Mostra primeiros 3 erros no toast (limite visual)
+    const msg = erros.slice(0, 3).join(' · ');
+    const extra = erros.length > 3 ? ` (+${erros.length - 3})` : '';
+    showToast('⚠️ ' + msg + extra);
+}
+
+// Confirmação dupla genérica
+function confirmarOperacaoCritica(titulo, mensagem, opcoes) {
+    opcoes = opcoes || {};
+    // Texto a digitar para confirmar (opcional)
+    const textoConfirma = opcoes.textoConfirma;
+    if (textoConfirma) {
+        const resp = prompt(`${titulo}\n\n${mensagem}\n\nDigite "${textoConfirma}" para confirmar:`);
+        return resp && resp.trim().toUpperCase() === textoConfirma.toUpperCase();
+    }
+    return confirm(`${titulo}\n\n${mensagem}`);
+}
+
+
+// ============================================================
+// SISTEMA DE AUDITORIA + BACKUP AUTOMÁTICO
+// ============================================================
+
+// Storage key separado para não bagunçar o backup principal
+const AUDIT_KEY = 'ps_auditoria';
+const BACKUP_KEY = 'ps_backup_auto';
+const MAX_AUDIT_LOGS = 5000;  // mantém últimos 5000 logs
+const MAX_BACKUPS = 3;         // mantém últimos 3 backups automáticos
+
+// auditoria já declarada no topo, função apenas recarrega
+function carregarAuditoria() {
+    try {
+        const raw = localStorage.getItem(AUDIT_KEY);
+        auditoria = raw ? JSON.parse(raw) : [];
+    } catch (e) { auditoria = []; }
+}
+
+function salvarAuditoria() {
+    try {
+        // Truncar se exceder limite
+        if (auditoria.length > MAX_AUDIT_LOGS) {
+            auditoria = auditoria.slice(-MAX_AUDIT_LOGS);
+        }
+        localStorage.setItem(AUDIT_KEY, JSON.stringify(auditoria));
+    } catch (e) {
+        // Storage cheio - remove logs mais antigos
+        auditoria = auditoria.slice(-Math.floor(MAX_AUDIT_LOGS / 2));
+        try { localStorage.setItem(AUDIT_KEY, JSON.stringify(auditoria)); } catch (e2) {}
+    }
+}
+
+// Categorias de ações:
+// - ENTRADA, ELIMINACAO, JACKPOT, REBUY (torneio)
+// - COMANDA_ABRE, COMANDA_FECHA, ITEM_ADD, ITEM_REMOVE (bar)
+// - PAGAMENTO, DEPOSITO (caixa)
+// - JOGADOR_CRIA, JOGADOR_EDITA (cadastros)
+// - TORNEIO_CRIA, TORNEIO_INICIA, TORNEIO_PAUSA, TORNEIO_ENCERRA, BLINDS_EDITA
+// - CAIXA_TORNEIO_ABRE, CAIXA_TORNEIO_FECHA, CAIXA_BAR_ABRE, CAIXA_BAR_FECHA
+// - LOGIN, LOGOUT, CONFIG_EDITA, USUARIO_CRIA, USUARIO_EDITA
+// - BACKUP_AUTO, RESTORE
+// - DELETE_* (qualquer deleção)
+function logAudit(categoria, descricao, detalhes) {
+    try {
+        const log = {
+            id: Date.now() + Math.random(),
+            ts: Date.now(),
+            usuario: currentUser ? (currentUser.nome || currentUser.email || 'Operador') : 'Sistema',
+            usuarioId: currentUser ? currentUser.id : null,
+            papel: currentUser ? currentUser.papel : null,
+            categoria,
+            descricao,
+            detalhes: detalhes || null,
+        };
+        auditoria.push(log);
+        salvarAuditoria();
+    } catch (e) {
+        console.warn('logAudit falhou:', e);
+    }
+}
+
+// ============================================================
+// BACKUP AUTOMÁTICO
+// ============================================================
+let _backupTimer = null;
+
+function fazerBackupAutomatico() {
+    try {
+        const snapshot = {
+            ts: Date.now(),
+            data: {
+                jogadores, torneios, cashMesas: typeof cashMesas !== 'undefined' ? cashMesas : [],
+                barGrupos, barProdutos, barComandas,
+                usuarios, config, transacoes, fechamentos: typeof fechamentos !== 'undefined' ? fechamentos : [],
+                barCaixa, rankings: typeof rankings !== 'undefined' ? rankings : [],
+                fichasDenom: typeof fichasDenom !== 'undefined' ? fichasDenom : [],
+            },
+            versao: '1.0',
+            usuario: currentUser ? currentUser.nome : 'Sistema',
+        };
+
+        // Carrega backups existentes
+        let backups = [];
+        try {
+            const raw = localStorage.getItem(BACKUP_KEY);
+            backups = raw ? JSON.parse(raw) : [];
+        } catch (e) { backups = []; }
+
+        backups.push(snapshot);
+        // Manter só os últimos N
+        if (backups.length > MAX_BACKUPS) backups = backups.slice(-MAX_BACKUPS);
+
+        try {
+            localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
+            logAudit('BACKUP_AUTO', `Backup automático criado (${backups.length}/${MAX_BACKUPS})`);
+            return true;
+        } catch (e) {
+            // Storage cheio: remove backups mais antigos e tenta de novo
+            backups = backups.slice(-1);
+            try {
+                localStorage.setItem(BACKUP_KEY, JSON.stringify(backups));
+                console.warn('Backup salvo com truncamento (storage cheio)');
+                return true;
+            } catch (e2) {
+                console.error('Não foi possível salvar backup automático:', e2);
+                return false;
+            }
+        }
+    } catch (e) {
+        console.error('fazerBackupAutomatico falhou:', e);
+        return false;
+    }
+}
+
+function iniciarBackupAutomatico() {
+    if (_backupTimer) clearInterval(_backupTimer);
+    // Backup a cada 30 minutos
+    _backupTimer = setInterval(fazerBackupAutomatico, 30 * 60 * 1000);
+    // Faz um backup logo ao iniciar (após 1 min de uso)
+    setTimeout(fazerBackupAutomatico, 60 * 1000);
+}
+
+function listarBackupsAutomaticos() {
+    try {
+        const raw = localStorage.getItem(BACKUP_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+}
+
+function restaurarBackupAutomatico(timestamp) {
+    const backups = listarBackupsAutomaticos();
+    const b = backups.find(x => x.ts === timestamp);
+    if (!b) return showToast('⚠️ Backup não encontrado');
+    if (!confirm(`Restaurar backup de ${new Date(b.ts).toLocaleString('pt-BR')}?\n\nTODOS os dados atuais serão substituídos. Esta ação NÃO pode ser desfeita.`)) return;
+
+    // Cria backup do estado atual antes de restaurar (segurança)
+    fazerBackupAutomatico();
+
+    const d = b.data;
+    if (d.jogadores)   jogadores   = d.jogadores;
+    if (d.torneios)    torneios    = d.torneios;
+    if (d.barGrupos)   barGrupos   = d.barGrupos;
+    if (d.barProdutos) barProdutos = d.barProdutos;
+    if (d.barComandas) barComandas = d.barComandas;
+    if (d.usuarios)    usuarios    = d.usuarios;
+    if (d.config)      config      = d.config;
+    if (d.transacoes)  transacoes  = d.transacoes;
+    if (d.barCaixa)    barCaixa    = d.barCaixa;
+    if (d.cashMesas && typeof cashMesas !== 'undefined')   cashMesas   = d.cashMesas;
+    if (d.fechamentos && typeof fechamentos !== 'undefined') fechamentos = d.fechamentos;
+    if (d.rankings && typeof rankings !== 'undefined')     rankings    = d.rankings;
+    if (d.fichasDenom && typeof fichasDenom !== 'undefined') fichasDenom = d.fichasDenom;
+
+    saveData();
+    logAudit('RESTORE', `Restaurado backup de ${new Date(b.ts).toLocaleString('pt-BR')}`);
+    showToast('✅ Backup restaurado. Recarregando...');
+    setTimeout(() => location.reload(), 1500);
+}
+
+// ============================================================
+// VISUALIZAÇÃO DE LOGS (modal de auditoria)
+// ============================================================
+let _filtroAuditoria = { categoria: '', usuario: '', periodo: '24h', busca: '' };
+
+function abrirModalAuditoria() {
+    if (!currentUser || (currentUser.papel !== 'admin' && currentUser.papel !== 'administrador')) {
+        return showToast('🔒 Apenas administradores');
+    }
+    renderAuditoria();
+    openModal('modal-auditoria');
+}
+
+function renderAuditoria() {
+    const lista = document.getElementById('audit-lista');
+    const totEl = document.getElementById('audit-total');
+    if (!lista) return;
+
+    let filtrados = [...auditoria];
+
+    // Filtro por período
+    const agora = Date.now();
+    const periodos = { '1h': 3600000, '24h': 86400000, '7d': 7*86400000, '30d': 30*86400000 };
+    if (_filtroAuditoria.periodo && _filtroAuditoria.periodo !== 'tudo') {
+        const ms = periodos[_filtroAuditoria.periodo] || 86400000;
+        filtrados = filtrados.filter(l => agora - l.ts <= ms);
+    }
+
+    // Filtro por categoria
+    if (_filtroAuditoria.categoria) {
+        filtrados = filtrados.filter(l => l.categoria === _filtroAuditoria.categoria);
+    }
+
+    // Filtro por usuário
+    if (_filtroAuditoria.usuario) {
+        filtrados = filtrados.filter(l => (l.usuario || '').toLowerCase().includes(_filtroAuditoria.usuario.toLowerCase()));
+    }
+
+    // Filtro por busca
+    if (_filtroAuditoria.busca) {
+        const b = _filtroAuditoria.busca.toLowerCase();
+        filtrados = filtrados.filter(l =>
+            (l.descricao || '').toLowerCase().includes(b) ||
+            (l.categoria || '').toLowerCase().includes(b) ||
+            (l.usuario || '').toLowerCase().includes(b)
+        );
+    }
+
+    // Mais recentes primeiro
+    filtrados.reverse();
+
+    if (totEl) totEl.innerText = `${filtrados.length} registros`;
+
+    if (!filtrados.length) {
+        lista.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;">Nenhum log encontrado</div>';
+        return;
+    }
+
+    // Limita a 500 para não travar
+    const visiveis = filtrados.slice(0, 500);
+    const corCat = (cat) => {
+        if (cat.includes('DELETE')) return '#ef4444';
+        if (cat.includes('PAGAMENTO') || cat.includes('DEPOSITO')) return '#22c55e';
+        if (cat.includes('TORNEIO') || cat.includes('JACKPOT')) return 'var(--gold)';
+        if (cat.includes('LOGIN') || cat.includes('LOGOUT')) return '#06b6d4';
+        if (cat.includes('BACKUP') || cat.includes('RESTORE')) return '#8b5cf6';
+        return '#71717a';
+    };
+
+    lista.innerHTML = visiveis.map(l => {
+        const dt = new Date(l.ts);
+        const dataFmt = dt.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        return `
+        <div style="display:grid;grid-template-columns:auto auto 1fr auto;gap:.6rem;align-items:center;padding:.45rem .7rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;font-size:.8rem;">
+            <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:#52525b;white-space:nowrap;">${dataFmt}</span>
+            <span style="font-size:.65rem;font-weight:700;color:${corCat(l.categoria)};text-transform:uppercase;letter-spacing:.05em;background:rgba(255,255,255,.03);padding:.15rem .45rem;border-radius:.25rem;border:1px solid ${corCat(l.categoria)}33;white-space:nowrap;">${l.categoria}</span>
+            <span style="color:#e4e4e7;">${l.descricao}</span>
+            <span style="font-size:.7rem;color:#71717a;white-space:nowrap;">${l.usuario}</span>
+        </div>`;
+    }).join('') + (filtrados.length > 500 ? `<div style="padding:.5rem;text-align:center;color:#52525b;font-size:.75rem;">Mostrando 500 de ${filtrados.length} (refine os filtros)</div>` : '');
+}
+
+function exportAuditoriaCSV() {
+    if (!auditoria.length) return showToast('⚠️ Nada para exportar');
+    const rows = [['Data', 'Hora', 'Categoria', 'Descrição', 'Usuário', 'Papel']];
+    auditoria.forEach(l => {
+        const dt = new Date(l.ts);
+        rows.push([
+            dt.toLocaleDateString('pt-BR'),
+            dt.toLocaleTimeString('pt-BR'),
+            l.categoria,
+            l.descricao,
+            l.usuario,
+            l.papel || '',
+        ]);
+    });
+    downloadCSV('auditoria', rows);
+    logAudit('EXPORT', 'Auditoria exportada para CSV');
+}
+
+function limparAuditoriaAntiga() {
+    if (!confirm(`Esta ação removerá logs com mais de 30 dias.\n\nLogs atuais: ${auditoria.length}\n\nContinuar?`)) return;
+    const limite = Date.now() - 30 * 86400000;
+    const antes = auditoria.length;
+    auditoria = auditoria.filter(l => l.ts >= limite);
+    salvarAuditoria();
+    logAudit('LIMPEZA_LOGS', `${antes - auditoria.length} logs antigos removidos`);
+    renderAuditoria();
+    showToast(`🗑️ ${antes - auditoria.length} logs removidos`);
+}
+
+
+
+function renderBackupsLista() {
+    const lista = document.getElementById('backups-lista');
+    if (!lista) return;
+    const backups = listarBackupsAutomaticos();
+    if (!backups.length) {
+        lista.innerHTML = '<div style="padding:1rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum backup automático ainda</div>';
+        return;
+    }
+    lista.innerHTML = [...backups].reverse().map(b => {
+        const dt = new Date(b.ts);
+        const sizeKB = (JSON.stringify(b.data).length / 1024).toFixed(1);
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:.6rem;align-items:center;padding:.7rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+            <div>
+                <div style="font-weight:700;font-size:.85rem;">${dt.toLocaleString('pt-BR')}</div>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">por ${b.usuario || 'Sistema'} · ${sizeKB} KB</div>
+            </div>
+            <button onclick="restaurarBackupAutomatico(${b.ts})" class="btn-ghost" style="font-size:.75rem;padding:.4rem .75rem;color:#06b6d4;"><i class="fa-solid fa-rotate-left"></i> Restaurar</button>
+        </div>`;
+    }).join('');
+}
+
+function abrirModalBackups() {
+    if (!currentUser || (currentUser.papel !== 'admin' && currentUser.papel !== 'administrador' && currentUser.role !== 'admin' && currentUser.role !== 'administrador')) {
+        return showToast('🔒 Apenas administradores');
+    }
+    renderBackupsLista();
+    openModal('modal-backups');
+}
+
+
+
+function renderSegurancaStats() {
+    const auditStatsEl = document.getElementById('cfg-audit-stats');
+    if (auditStatsEl) {
+        const total = auditoria.length;
+        const hoje = auditoria.filter(l => Date.now() - l.ts <= 86400000).length;
+        const ultimoLog = auditoria.length ? new Date(auditoria[auditoria.length-1].ts).toLocaleString('pt-BR') : '—';
+        auditStatsEl.innerHTML = `
+            <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;"><span>Total de logs:</span><strong style="color:#e4e4e7;">${total}</strong></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;"><span>Logs últimas 24h:</span><strong style="color:#e4e4e7;">${hoje}</strong></div>
+            <div style="display:flex;justify-content:space-between;"><span>Último registro:</span><strong style="color:#e4e4e7;">${ultimoLog}</strong></div>
+        `;
+    }
+    const backupStatsEl = document.getElementById('cfg-backup-stats');
+    if (backupStatsEl) {
+        const backups = listarBackupsAutomaticos();
+        if (!backups.length) {
+            backupStatsEl.innerHTML = '<div style="text-align:center;">Nenhum backup ainda. Aguarde 1 minuto após login para o primeiro.</div>';
+        } else {
+            const ultimo = backups[backups.length - 1];
+            backupStatsEl.innerHTML = `
+                <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;"><span>Backups guardados:</span><strong style="color:#e4e4e7;">${backups.length} / 3</strong></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:.3rem;"><span>Último backup:</span><strong style="color:#e4e4e7;">${new Date(ultimo.ts).toLocaleString('pt-BR')}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span>Próximo backup em:</span><strong style="color:#e4e4e7;">~30 min</strong></div>
+            `;
+        }
+    }
 }
 
 function logout() {
     if (!confirm('Deseja sair do sistema?')) return;
+    logAudit('LOGOUT', 'Logout do sistema');
     descartarUndo();  // limpar toast pendente
     sessionStorage.removeItem('ps_current_user');
     currentUser = null;
@@ -2587,8 +3165,15 @@ function contarTorneiosJogador(id) {
 }
 
 function salvarJogador() {
+    // Validação completa
+    const v = validarCampos([
+        { id:'j-nome',     nome:'Nome',     obrigatorio:true, minLength:2 },
+        { id:'j-whatsapp', nome:'WhatsApp', obrigatorio:false, tipo:'fone' },
+        { id:'j-uf',       nome:'UF',       obrigatorio:false, tipo:'uf' },
+    ]);
+    if (!v.ok) return exibirErrosValidacao(v.erros);
+
     const nome = document.getElementById('j-nome').value.trim();
-    if (!nome) return showToast('⚠️ Nome obrigatório');
     const editId = document.getElementById('j-edit-id').value;
     const dados = {
         nome,
@@ -2603,10 +3188,13 @@ function salvarJogador() {
         const j = jogadores.find(x => x.id === parseInt(editId));
         if (!j) return showToast('⚠️ Jogador não encontrado');
         Object.assign(j, dados);
+        logAudit('JOGADOR_EDITA', `Editado: ${nome}`, { id: j.id, dados });
         showToast(`✅ ${nome} atualizado!`);
     } else {
         // Modo cadastro
-        jogadores.push({ id: Date.now(), ...dados });
+        const novoId = Date.now();
+        jogadores.push({ id: novoId, ...dados });
+        logAudit('JOGADOR_CRIA', `Cadastrado: ${nome}`, { id: novoId, dados });
         showToast(`✅ ${nome} cadastrado!`);
     }
 
@@ -3296,6 +3884,12 @@ function openModalEntrada(idx) {
 }
 
 function registrarEntrada() {
+    return comLock('registrarEntrada', function() {
+        return _registrarEntradaImpl();
+    }, '⏳ Processando entrada, aguarde...');
+}
+
+function _registrarEntradaImpl() {
     const t   = torneios[activeTorneioIdx];
     const jid = parseInt(document.getElementById('entrada-jogador').value);
     const tipo = document.getElementById('entrada-tipo').value;
@@ -3421,6 +4015,12 @@ function openModalEliminar(idx) {
 }
 
 function confirmarEliminacao() {
+    return comLock('confirmarEliminacao', function() {
+        return _confirmarEliminacaoImpl();
+    }, '⏳ Processando eliminação, aguarde...');
+}
+
+function _confirmarEliminacaoImpl() {
     const t   = torneios[activeTorneioIdx];
     const jid = parseInt(document.getElementById('eliminar-jogador').value);
     if (!jid) return;
@@ -3495,6 +4095,7 @@ function confirmarEliminacao() {
         showToast(`🏆 Torneio finalizado! Campeão: ${venc ? venc.nome : 'Desconhecido'}`);
     }
 
+    logAudit('ELIMINACAO', `Eliminado: ${getJogadorNome(jid)} em ${posicao}º · ${t.nome}`, { jogadorId: jid, posicao, torneioId: t.id });
     saveData();
     closeModal('modal-eliminar');
     updateModalTorneio();
@@ -4972,10 +5573,17 @@ function encerrarTorneio(idx) {
     const t = torneios[idx];
     if (!t) return;
     if (t.status === 'encerrado') return showToast('⚠️ Torneio já está encerrado');
-    if (!confirm(`Encerrar definitivamente o torneio "${t.nome}"?
 
-Isso parará o timer, fechará o caixa do torneio e marcará como encerrado.
-O histórico permanece acessível.`)) return;
+    const numEntradas = (t.entries || []).filter(e => e.tipo !== 'addon').length;
+    const msg = `Encerrar definitivamente o torneio "${t.nome}"?\n\n` +
+                `Entradas: ${numEntradas}\nStatus atual: ${t.status}\n\n` +
+                `Isso parará o timer, fechará o caixa do torneio e marcará como encerrado.\nO histórico permanece acessível.`;
+
+    if (!confirm(msg)) return;
+    // Confirmação extra para torneios com muitas entradas (operação irreversível)
+    if (numEntradas >= 5) {
+        if (!confirm(`⚠️ ATENÇÃO: Este torneio tem ${numEntradas} entradas registradas.\n\nTem CERTEZA que deseja encerrar?`)) return;
+    }
 
     // Fecha caixa do torneio se estiver aberto
     if (t.caixaTorneio && t.caixaTorneio.status === 'aberto') {
@@ -4990,6 +5598,7 @@ O histórico permanece acessível.`)) return;
     t.encerradoEm = Date.now();
     t.encerradoPor = currentUser ? currentUser.nome : 'Sistema';
 
+    logAudit('TORNEIO_ENCERRA', `Torneio "${t.nome}" encerrado`, { id: t.id, entradas: t.entries.length });
     saveData();
     updateModalTorneio && updateModalTorneio();
     renderTorneiosList();
@@ -5007,6 +5616,7 @@ Ele voltará ao status pausado.`)) return;
     t.status = 'paused';
     t.encerradoEm = null;
     t.encerradoPor = null;
+    logAudit('TORNEIO_REABRE', `Torneio "${t.nome}" reaberto`);
     saveData();
     updateModalTorneio && updateModalTorneio();
     renderTorneiosList();
@@ -6426,6 +7036,7 @@ function switchConfigTab(tabId, btn) {
     if (tabId === 'cfg-backup') renderBackupStats();
     if (tabId === 'cfg-fichas') renderFichasConfig();
     if (tabId === 'cfg-financeiro') renderConfigFinanceiro();
+    if (tabId === 'cfg-seguranca') renderSegurancaStats();
 }
 
 function renderConfig() {
@@ -6487,6 +7098,7 @@ function salvarConfigClube() {
         uf:       document.getElementById('cfg-clube-uf').value.trim().toUpperCase(),
         email:    document.getElementById('cfg-clube-email').value.trim(),
     };
+    logAudit('CONFIG_EDITA', 'Dados do clube editados');
     salvarConfig();
     aplicarNomeClube();
     showToast('✅ Dados do clube salvos!');
@@ -6572,6 +7184,7 @@ function salvarPreferencias() {
         acertoAposEliminacao: (document.getElementById('cfg-acerto-elim') || {}).value || 'perguntar',
         idioma:      document.getElementById('cfg-idioma').value,
     };
+    logAudit('CONFIG_EDITA', 'Preferências editadas');
     salvarConfig();
     showToast('✅ Preferências salvas!');
 }
@@ -6586,6 +7199,7 @@ function salvarConfigTorneios() {
         reentryAte:  parseInt(document.getElementById('cfg-torn-reentry').value)   || 0,
         addonFichas: parseInt(document.getElementById('cfg-torn-addon').value)     || 0,
     };
+    logAudit('CONFIG_EDITA', 'Padrões de torneio editados');
     salvarConfig();
     showToast('✅ Padrões de torneio salvos!');
 }
@@ -6599,6 +7213,7 @@ function salvarConfigCash() {
         bmax:  parseFloat(document.getElementById('cfg-cash-bmax').value) || 200,
         rake:  parseFloat(document.getElementById('cfg-cash-rake').value) || 0,
     };
+    logAudit('CONFIG_EDITA', 'Padrões de cash game editados');
     salvarConfig();
     showToast('✅ Padrões de cash game salvos!');
 }
@@ -7162,6 +7777,12 @@ function validarValorPagamento() {
 }
 
 function confirmarPagamentoConta() {
+    return comLock('confirmarPagamentoConta', function() {
+        return _confirmarPagamentoContaImpl();
+    }, '⏳ Processando pagamento, aguarde...');
+}
+
+function _confirmarPagamentoContaImpl() {
     const valorBase = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
     if (valorBase <= 0) return showToast('⚠️ Valor inválido');
     const metodo = (document.querySelector('input[name="metodo-pagar"]:checked') || {}).value;
@@ -7251,6 +7872,7 @@ Aplicar taxa?`)) {
         }
     }
 
+    logAudit('PAGAMENTO', `Pagamento de ${formatMoney(valor)} · ${j.nome} via ${PAYMENT_METHODS[metodo].label}`, { jogadorId: pagamentoJogadorId, valor, metodo });
     showToast(`✅ Pagamento de ${formatMoney(valor)} registrado para ${j.nome}`);
     saveData();
 
@@ -9600,6 +10222,7 @@ function salvarConfigFinanceiro() {
     });
     cfg.aplicarAuto = document.getElementById('cfg-taxa-auto').checked;
     cfg.mostrarSeparado = document.getElementById('cfg-taxa-mostrar').checked;
+    logAudit('CONFIG_EDITA', 'Configurações financeiras editadas');
     saveData();
     showToast('✅ Configurações financeiras salvas');
 }
@@ -9865,8 +10488,14 @@ function abrirCadastroRapido() {
 }
 
 function salvarCadastroRapido() {
+    const v = validarCampos([
+        { id:'qr-nome',     nome:'Nome',     obrigatorio:true, minLength:2 },
+        { id:'qr-whatsapp', nome:'WhatsApp', obrigatorio:false, tipo:'fone' },
+        { id:'qr-uf',       nome:'UF',       obrigatorio:false, tipo:'uf' },
+    ]);
+    if (!v.ok) return exibirErrosValidacao(v.erros);
+
     const nome = document.getElementById('qr-nome').value.trim();
-    if (!nome) return showToast('⚠️ Nome obrigatório');
 
     const novoJog = {
         id: Date.now(),
@@ -9922,12 +10551,19 @@ function abrirCaixaTorneio(idx) {
     c.abertoPor = currentUser ? currentUser.nome : 'Sistema';
     c.fechadoEm = null;
     c.fechadoPor = null;
+    logAudit('CAIXA_TORNEIO_ABRE', `Caixa do torneio "${t.nome}" aberto`);
     saveData();
     updateModalTorneio();
     showToast(`🔓 Caixa do torneio aberto`);
 }
 
 function fecharCaixaTorneio(idx) {
+    return comLock('fecharCaixaTorneio_' + idx, function() {
+        return _fecharCaixaTorneioImpl(idx);
+    });
+}
+
+function _fecharCaixaTorneioImpl(idx) {
     const t = torneios[idx];
     if (!t) return;
     const c = getCaixaTorneio(t);
@@ -9938,6 +10574,7 @@ function fecharCaixaTorneio(idx) {
     c.fechadoEm = Date.now();
     c.fechadoPor = currentUser ? currentUser.nome : 'Sistema';
     c.resumoFinal = resumo;
+    logAudit('CAIXA_TORNEIO_FECHA', `Caixa do torneio "${t.nome}" fechado · Total: ${formatMoney(resumo.total)}`, resumo);
     saveData();
     updateModalTorneio();
     showToast(`🔒 Caixa do torneio fechado. Total: ${formatMoney(resumo.total)}`);
