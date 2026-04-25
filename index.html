@@ -3817,16 +3817,19 @@ function abrirTV(idx) {
         .pw-main-grid {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 2.2fr 1fr;
+            grid-template-columns: 1fr 2.4fr 1fr;
             gap: 1.5rem;
-            align-items: center;
+            align-items: start;        /* Laterais sobem para o TOPO */
             min-height: 0;
+            padding-top: .5rem;
         }
 
-        /* Left column: Nível, Jogadores, Média */
+        /* Left column: Nível, Jogadores, Média - alinhado ao TOPO */
         .pw-col-left {
-            display:flex; flex-direction:column; gap: 1.5rem;
+            display:flex; flex-direction:column; gap: 1.4rem;
             padding-left: 1rem;
+            align-self: start;          /* TOPO */
+            padding-top: 1rem;
         }
         .pw-stat-block {
             display: flex;
@@ -3851,11 +3854,13 @@ function abrirTV(idx) {
             line-height: 1;
         }
 
-        /* Center column: Level, Timer, Blinds */
+        /* Center column: Timer + Blinds - centralizado verticalmente */
         .pw-col-center {
             display:flex; flex-direction:column;
             align-items:center; justify-content:center;
             height:100%;
+            align-self: stretch;        /* preenche toda altura */
+            padding: 1rem 0;
         }
         .pw-level {
             font-size: clamp(1.1rem, 1.8vw, 1.5rem);
@@ -3882,94 +3887,77 @@ function abrirTV(idx) {
         .pw-bar-bg { width: 70%; height: 4px; background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; margin: .5rem auto 1rem; }
         .pw-bar-fill { height:100%; background: linear-gradient(90deg, #f5d572, #22c55e); border-radius: 2px; transition: width .5s linear; }
 
-        /* Bloco de blinds + ante — SB/BB em destaque, ante discreto */
+        /* Bloco de blinds — estilo limpo (similar ao Clássico), centralizado com timer */
         .pw-blinds-wrap {
             width: 100%;
             max-width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: .4rem;
-            margin-top: .5rem;
+            gap: .5rem;
+            margin-top: 1rem;
         }
-        .pw-blinds-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: nowrap;
-            max-width: 98%;
+        /* SB / BB grandes, em uma linha só */
+        .pw-blinds-main {
+            font-size: clamp(2.5rem, 6.5vw, 6rem);
             font-weight: 800;
             color: #fef3c7;
-            text-shadow: 0 2px 8px rgba(0,0,0,.5);
-            letter-spacing: -.015em;
-            line-height: 1;
-            gap: clamp(.8rem, 1.5vw, 1.6rem);
-        }
-        /* Destaque principal: SB / BB */
-        .pw-blinds-main {
-            font-size: clamp(2.2rem, 6vw, 5.5rem);
-            white-space: nowrap;
             font-variant-numeric: tabular-nums;
             font-family: 'Space Mono', 'Manrope', monospace;
-            color: #fef3c7;
             text-shadow:
-                0 0 30px rgba(245,213,114,.3),
+                0 0 30px rgba(245,213,114,.25),
                 0 2px 8px rgba(0,0,0,.5);
+            letter-spacing: -.02em;
+            line-height: 1;
+            white-space: nowrap;
+            text-align: center;
         }
-        /* Ante - discreto, agrupado ao lado */
-        .pw-ante-block {
-            display: inline-flex;
-            align-items: baseline;
-            gap: .5rem;
-            padding-left: .9rem;
-            border-left: 2px solid rgba(245,213,114,.3);
-            opacity: .85;
-        }
-        .pw-ante-label {
-            font-size: clamp(.55rem, .85vw, .85rem);
-            color: #f5d572;
+        /* Ante - discreto abaixo, estilo "Ante 50.000" maiúsculo */
+        .pw-ante-line {
+            font-size: clamp(.7rem, 1.1vw, 1.05rem);
+            color: rgba(254,243,199,.55);
             font-weight: 700;
-            opacity: .8;
             text-transform: uppercase;
-            letter-spacing: .1em;
+            letter-spacing: .25em;
             line-height: 1;
             white-space: nowrap;
         }
-        .pw-ante-value {
-            font-size: clamp(.9rem, 1.7vw, 1.6rem);
-            font-weight: 700;
-            color: #fef3c7;
-            font-variant-numeric: tabular-nums;
-            font-family: 'Space Mono', 'Manrope', monospace;
-            line-height: 1;
-            white-space: nowrap;
-            opacity: .9;
+        .pw-ante-line strong {
+            color: #f5d572;
+            font-weight: 800;
+            margin-left: .35rem;
+            font-family: 'Space Mono', monospace;
+            letter-spacing: -.01em;
         }
+        /* Próximo blind - bem discreto */
         .pw-blinds-next {
-            font-size: clamp(.7rem, 1.1vw, 1.1rem);
-            color: rgba(254,243,199,.5);
-            font-weight: 700;
-            letter-spacing: .05em;
+            font-size: clamp(.65rem, .95vw, .95rem);
+            color: rgba(254,243,199,.4);
+            font-weight: 600;
+            letter-spacing: .12em;
+            text-transform: uppercase;
             text-align: center;
             white-space: nowrap;
+            margin-top: .15rem;
         }
+        /* Hidden legacy classes (compatibilidade) */
+        .pw-blinds-row, .pw-ante-block, .pw-ante-label, .pw-ante-value { display: none !important; }
 
-        /* Quebra quando valores muito grandes — viewport estreita */
+        /* Adapta para viewports estreitas */
         @media (max-width: 1200px) {
-            .pw-blinds-main { font-size: clamp(1.8rem, 4.5vw, 4rem); }
-            .pw-ante-value { font-size: clamp(.85rem, 1.5vw, 1.4rem); }
+            .pw-blinds-main { font-size: clamp(2rem, 5vw, 4.5rem); }
         }
-        /* Quando altura reduzida, compacta mais */
         @media (max-height: 700px) {
-            .pw-blinds-main { font-size: clamp(1.7rem, 4vw, 3.8rem); }
-            .pw-ante-value { font-size: clamp(.8rem, 1.3vw, 1.3rem); }
+            .pw-blinds-main { font-size: clamp(1.8rem, 4.5vw, 4rem); }
         }
 
         /* Right column: Tempo, Intervalo, Chipcount */
         .pw-col-right {
-            display:flex; flex-direction:column; gap: 1.5rem;
+            display:flex; flex-direction:column; gap: 1.4rem;
             align-items:flex-end; padding-right: 1rem;
             text-align: right;
+            align-self: start;          /* TOPO */
+            padding-top: 1rem;
         }
         .pw-col-right .pw-stat-block { align-items:flex-end; }
 
@@ -4015,19 +4003,24 @@ function abrirTV(idx) {
             left: 0;
             display: flex;
             align-items: center;
-            gap: clamp(1.5rem, 3vw, 3.5rem);
-            padding-left: 100%; /* começa fora da tela, à direita */
+            /* SEM gap aqui - usamos margin-right nos itens para controle preciso */
             height: 100%;
             white-space: nowrap;
             will-change: transform;
-            animation: pw-ticker-scroll 30s linear infinite;
+            animation: pw-ticker-scroll 40s linear infinite;
         }
         .pw-prize-carousel:hover .pw-prize-strip { animation-play-state: paused; }
 
+        /* Loop perfeito: conteúdo duplicado, anima de 0 a -50%
+           Como cada conjunto é idêntico (mesmos items + mesmas margens),
+           translateX(-50%) cai exatamente na posição inicial do conjunto 2,
+           que é visualmente idêntica ao conjunto 1 → loop sem corte */
         @keyframes pw-ticker-scroll {
-            0%   { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
+            0%   { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(var(--ticker-end, -50%), 0, 0); }
         }
+        /* Cada item tem espaçamento à direita constante (inclusive o último) */
+        .pw-prize-item { margin-right: clamp(1.5rem, 3vw, 3.5rem); }
 
         .pw-prize-item {
             display: inline-flex;
@@ -4151,6 +4144,104 @@ function abrirTV(idx) {
         #kiosk-recover { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.95); align-items:center; justify-content:center; flex-direction:column; }
         #kiosk-recover.show { display:flex; }
 
+        /* Ticker de premiação para layouts não-Pro Live (Clássico/Minimalista/Feltro/Neon) */
+        .global-prize-ticker {
+            display: none;  /* só aparece quando ativo */
+            padding: .65rem 0 .55rem;
+            margin: 0 -2.5rem;
+            background: linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.7) 70%);
+            border-top: 1px solid rgba(255,255,255,.12);
+            border-bottom: 1px solid rgba(255,255,255,.12);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .global-prize-ticker.show { display: block; }
+        .gt-header {
+            display: flex; align-items: center; justify-content: center;
+            gap: .6rem;
+            font-size: clamp(.6rem, .8vw, .85rem);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .22em;
+            margin-bottom: .35rem;
+            opacity: .7;
+        }
+        .gt-track {
+            position: relative; overflow: hidden; height: 2.3rem;
+            mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+        }
+        .gt-strip {
+            position: absolute; top: 0; left: 0;
+            display: flex; align-items: center;
+            height: 100%;
+            white-space: nowrap;
+            will-change: transform;
+            animation: pw-ticker-scroll 40s linear infinite;
+        }
+        .gt-item { margin-right: clamp(1.5rem, 3vw, 3.5rem); }
+        .global-prize-ticker:hover .gt-strip { animation-play-state: paused; }
+        .gt-item {
+            display: inline-flex; align-items: center; gap: .55rem;
+            font-family: 'Space Mono', monospace;
+            flex-shrink: 0;
+        }
+        .gt-pos {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 2rem; height: 2rem; padding: 0 .5rem;
+            border-radius: 1rem;
+            font-size: clamp(.8rem, 1vw, 1rem);
+            font-weight: 800;
+            border: 2px solid currentColor;
+            flex-shrink: 0;
+        }
+        .gt-label {
+            font-size: clamp(.6rem, .8vw, .8rem);
+            opacity: .55;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+        }
+        .gt-value {
+            font-size: clamp(.95rem, 1.3vw, 1.25rem);
+            font-weight: 800;
+        }
+        .gt-sep { width: 5px; height: 5px; border-radius: 50%; opacity: .35; flex-shrink: 0; }
+
+        /* Cores específicas por layout */
+        .layout-classico .global-prize-ticker { background: linear-gradient(180deg, rgba(245,158,11,.08), rgba(0,0,0,.85) 70%); border-color: rgba(245,158,11,.25); }
+        .layout-classico .gt-header { color: #f59e0b; }
+        .layout-classico .gt-pos { color: #f59e0b; background: rgba(245,158,11,.08); }
+        .layout-classico .gt-pos.gold { color: #fbbf24; box-shadow: 0 0 15px rgba(251,191,36,.3); }
+        .layout-classico .gt-pos.silver { color: #d4d4d8; }
+        .layout-classico .gt-pos.bronze { color: #c68d1e; }
+        .layout-classico .gt-value { color: #fbbf24; }
+        .layout-classico .gt-sep { background: #f59e0b; }
+
+        .layout-minimalista .global-prize-ticker { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.7) 70%); border-color: rgba(255,255,255,.1); }
+        .layout-minimalista .gt-header { color: #d4d4d8; }
+        .layout-minimalista .gt-pos { color: #fafafa; background: rgba(255,255,255,.06); }
+        .layout-minimalista .gt-value { color: #fafafa; }
+        .layout-minimalista .gt-sep { background: #71717a; }
+
+        .layout-feltro .global-prize-ticker { background: linear-gradient(180deg, rgba(20,80,55,.4), rgba(5,30,20,.85) 70%); border-color: rgba(245,213,114,.3); }
+        .layout-feltro .gt-header { color: #f5d572; }
+        .layout-feltro .gt-pos { color: #f5d572; background: rgba(245,213,114,.08); }
+        .layout-feltro .gt-pos.gold { color: #fef3c7; box-shadow: 0 0 18px rgba(245,213,114,.5); }
+        .layout-feltro .gt-pos.silver { color: #d4d4d8; }
+        .layout-feltro .gt-pos.bronze { color: #c68d1e; }
+        .layout-feltro .gt-value { color: #f5d572; text-shadow: 0 0 10px rgba(245,213,114,.3); }
+        .layout-feltro .gt-sep { background: #f5d572; }
+
+        .layout-neon .global-prize-ticker { background: linear-gradient(180deg, rgba(20,5,40,.6), rgba(5,5,20,.9) 70%); border-color: rgba(236,72,153,.3); }
+        .layout-neon .gt-header { background: linear-gradient(90deg, #ec4899, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .layout-neon .gt-pos { color: #ec4899; background: rgba(236,72,153,.08); box-shadow: 0 0 12px rgba(236,72,153,.3); }
+        .layout-neon .gt-pos.gold { color: #fbbf24; }
+        .layout-neon .gt-pos.silver { color: #d4d4d8; }
+        .layout-neon .gt-pos.bronze { color: #c68d1e; }
+        .layout-neon .gt-value { color: #06b6d4; text-shadow: 0 0 12px rgba(6,182,212,.4); }
+        .layout-neon .gt-sep { background: #ec4899; }
+
         .top-row{display:flex;justify-content:space-between;align-items:flex-start;}
         .center-stack{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
         .bottom-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.5rem;padding:1.25rem;border-top:1px solid rgba(255,255,255,.08);}
@@ -4207,14 +4298,9 @@ function abrirTV(idx) {
                     <div class="pw-bar-bg"><div class="pw-bar-fill" id="pw-bar" style="width:100%;"></div></div>
 
                     <div class="pw-blinds-wrap">
-                        <div class="pw-blinds-row">
-                            <span class="pw-blinds-main" id="pw-blinds-main">0 / 0</span>
-                            <div class="pw-ante-block">
-                                <span class="pw-ante-label">Big-Ante</span>
-                                <span class="pw-ante-value" id="pw-ante">0</span>
-                            </div>
-                        </div>
-                        <div class="pw-blinds-next"><span id="pw-blinds-next"></span></div>
+                        <div class="pw-blinds-main" id="pw-blinds-main">0 / 0</div>
+                        <div class="pw-ante-line">Big-Ante <strong id="pw-ante">0</strong></div>
+                        <div class="pw-blinds-next" id="pw-blinds-next-wrap"><span id="pw-blinds-next"></span></div>
                     </div>
                 </div>
 
@@ -4308,6 +4394,16 @@ function abrirTV(idx) {
                     <div id="elapsed" class="mono" style="font-size:2.2rem;font-weight:700;opacity:.85;"></div>
                 </div>
             </div>
+
+            <!-- TICKER DE PREMIAÇÃO (layouts: Clássico, Minimalista, Feltro, Neon) -->
+            <div id="global-prize-ticker" class="global-prize-ticker">
+                <div class="gt-header"><i class="fa-solid fa-trophy"></i> Premiação</div>
+                <div class="gt-track">
+                    <div class="gt-strip" id="gt-strip">
+                        <!-- itens criados dinamicamente -->
+                    </div>
+                </div>
+            </div>
         </div>
 
     <script>
@@ -4348,13 +4444,7 @@ function abrirTV(idx) {
         return item;
     }
 
-    function criarSeparadorTicker() {
-        var sep = document.createElement('div');
-        sep.className = 'pw-prize-sep';
-        return sep;
-    }
-
-    function montarCarouselPremiacao(d) {
+function montarCarouselPremiacao(d) {
         var carousel = document.getElementById('prize-carousel');
         var strip = document.getElementById('prize-strip');
         if (!carousel || !strip) return;
@@ -4379,20 +4469,23 @@ function abrirTV(idx) {
         _prizeTicker.dataKey = dataKey;
         strip.innerHTML = '';
 
-        // Monta 2 conjuntos da lista seguidos para loop contínuo
-        for (var pass = 0; pass < 2; pass++) {
+        // Monta vários conjuntos IDÊNTICOS para loop sem cortes
+        // Mais conjuntos = strip mais larga, garantindo que sempre haja itens
+        // cobrindo a viewport durante a animação (sem o gap visível no reinício)
+        // Para poucos itens (≤6), triplicamos para 6 conjuntos. Para muitos, 3 conjuntos.
+        var conjuntos = pp.valores.length <= 4 ? 8 : (pp.valores.length <= 6 ? 6 : 4);
+        for (var pass = 0; pass < conjuntos; pass++) {
             for (var i = 0; i < pp.valores.length; i++) {
                 strip.appendChild(criarItemTicker(i, pp.valores[i]));
-                // Separador entre itens (exceto no último do segundo conjunto)
-                if (!(pass === 1 && i === pp.valores.length - 1)) {
-                    strip.appendChild(criarSeparadorTicker());
-                }
             }
         }
 
-        // Ajusta duração da animação proporcional à quantidade de itens
-        // (~2s por item para ficar legível)
-        var segundos = Math.max(12, pp.valores.length * 2.5);
+        // Animação anda exatamente 1/conjuntos da largura para casar perfeitamente
+        var pctTranslate = (100 / conjuntos);
+        strip.style.setProperty('--ticker-end', '-' + pctTranslate + '%');
+
+        // Duração proporcional
+        var segundos = Math.max(20, pp.valores.length * conjuntos * 0.8);
         strip.style.animationDuration = segundos + 's';
 
         carousel.classList.add('show');
@@ -4402,74 +4495,101 @@ function abrirTV(idx) {
         // CSS animation é auto-gerenciada; função mantida para compatibilidade
     }
 
-    // === OVERLAY LATERAL (para layouts não-Pro Live) ===
-    function atualizarPrizeOverlayLateral(d) {
+    // === TICKER GLOBAL (layouts Clássico, Minimalista, Feltro, Neon) ===
+    var _globalTicker = { dataKey: null };
+
+    function montarTickerGlobal(d) {
         try {
-            var ov = document.getElementById('prize-overlay');
-            if (!ov) return;
-            if (!d || !d.premiacaoProjetada || !d.premiacaoProjetada.valores || !d.premiacaoProjetada.valores.length) {
-                ov.style.display = 'none';
+            var ticker = document.getElementById('global-prize-ticker');
+            var strip = document.getElementById('gt-strip');
+            if (!ticker || !strip) return;
+
+            var pp = d && d.premiacaoProjetada;
+            if (!pp || !pp.valores || !pp.valores.length) {
+                ticker.classList.remove('show');
                 return;
             }
-            ov.style.display = 'block';
-            var pp = d.premiacaoProjetada;
-            var list = document.getElementById('prize-list');
-            if (!list) return;
 
-            list.innerHTML = '';
-            for (var i = 0; i < pp.valores.length; i++) {
-                var cor = '#71717a';
-                var bg = 'transparent';
-                if (i === 0)      { cor = '#f5d572'; bg = 'rgba(245,213,114,.1)'; }
-                else if (i === 1) { cor = '#d4d4d8'; bg = 'rgba(161,161,170,.06)'; }
-                else if (i === 2) { cor = '#c68d1e'; bg = 'rgba(146,97,10,.08)'; }
-                var valorFmt = 'R$ ' + (pp.valores[i] || 0).toLocaleString('pt-BR');
-                var pctFmt = (pp.percentuais && pp.percentuais[i] != null) ? pp.percentuais[i].toFixed(1) : '0.0';
+            // Esconde também o overlay lateral antigo (caso esteja visível)
+            var ov = document.getElementById('prize-overlay');
+            if (ov) ov.style.display = 'none';
 
-                var row = document.createElement('div');
-                row.style.cssText = 'display:grid;grid-template-columns:2.2rem 1fr auto;gap:.4rem;align-items:center;padding:.3rem .5rem;background:' + bg + ';border-radius:.3rem;font-size:clamp(.7rem, .9vw, 1rem);';
-
-                var sp1 = document.createElement('span');
-                sp1.style.cssText = 'font-weight:800;color:' + cor + ';';
-                sp1.textContent = (i+1) + 'º';
-                row.appendChild(sp1);
-
-                var sp2 = document.createElement('span');
-                sp2.style.cssText = 'color:rgba(254,243,199,.5);font-size:.7em;';
-                sp2.textContent = pctFmt + '%';
-                row.appendChild(sp2);
-
-                var sp3 = document.createElement('span');
-                sp3.style.cssText = 'font-family:Space Mono,monospace;font-weight:800;color:' + cor + ';text-align:right;white-space:nowrap;';
-                sp3.textContent = valorFmt;
-                row.appendChild(sp3);
-
-                list.appendChild(row);
+            // Verifica mudanças
+            var dataKey = JSON.stringify(pp.valores);
+            if (_globalTicker.dataKey === dataKey && strip.children.length > 0) {
+                if (!ticker.classList.contains('show')) ticker.classList.add('show');
+                return;
             }
+            _globalTicker.dataKey = dataKey;
+            strip.innerHTML = '';
+
+            // Múltiplos conjuntos para loop sem corte
+            var conjuntos = pp.valores.length <= 4 ? 8 : (pp.valores.length <= 6 ? 6 : 4);
+            for (var pass = 0; pass < conjuntos; pass++) {
+                for (var i = 0; i < pp.valores.length; i++) {
+                    var classe = '';
+                    if (i === 0)      classe = 'gold';
+                    else if (i === 1) classe = 'silver';
+                    else if (i === 2) classe = 'bronze';
+
+                    var item = document.createElement('div');
+                    item.className = 'gt-item';
+
+                    var pos = document.createElement('span');
+                    pos.className = 'gt-pos ' + classe;
+                    pos.textContent = (i + 1) + 'º';
+                    item.appendChild(pos);
+
+                    var lab = document.createElement('span');
+                    lab.className = 'gt-label';
+                    lab.textContent = 'Lugar';
+                    item.appendChild(lab);
+
+                    var val = document.createElement('span');
+                    val.className = 'gt-value';
+                    val.textContent = 'R$ ' + (pp.valores[i] || 0).toLocaleString('pt-BR');
+                    item.appendChild(val);
+
+                    strip.appendChild(item);
+                }
+            }
+
+            // Translação correspondente: anda 1/conjuntos da largura
+            var pctTranslate = (100 / conjuntos);
+            strip.style.setProperty('--ticker-end', '-' + pctTranslate + '%');
+
+            // Duração proporcional
+            var seg = Math.max(20, pp.valores.length * conjuntos * 0.8);
+            strip.style.animationDuration = seg + 's';
+
+            ticker.classList.add('show');
         } catch (e) {
-            console.error('atualizarPrizeOverlayLateral erro:', e);
+            console.error('montarTickerGlobal erro:', e);
         }
     }
 
-    // === ROTEADOR: decide entre carousel (Pro Live) ou overlay lateral (outros) ===
+    // === ROTEADOR: decide entre carousel Pro Live ou ticker global ===
     function atualizarPrizeOverlay(d) {
         try {
-            // Determina layout atual
             var isProLive = d && d.layout === 'pokerweb';
 
+            // Esconde overlay lateral antigo sempre (substituído pelos tickers)
+            var ov = document.getElementById('prize-overlay');
+            if (ov) ov.style.display = 'none';
+
             if (isProLive) {
-                // Esconde overlay lateral
-                var ov = document.getElementById('prize-overlay');
-                if (ov) ov.style.display = 'none';
-                // Usa carousel
+                // Esconde ticker global
+                var gt = document.getElementById('global-prize-ticker');
+                if (gt) gt.classList.remove('show');
+                // Usa carousel Pro Live
                 montarCarouselPremiacao(d);
             } else {
-                // Esconde carousel
+                // Esconde carousel Pro Live
                 var car = document.getElementById('prize-carousel');
                 if (car) car.classList.remove('show');
                 pararCarouselPremiacao();
-                // Usa overlay lateral
-                atualizarPrizeOverlayLateral(d);
+                // Usa ticker global
+                montarTickerGlobal(d);
             }
         } catch (e) {
             console.error('atualizarPrizeOverlay erro:', e);
