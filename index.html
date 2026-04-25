@@ -1368,6 +1368,80 @@
     </div>
 </div>
 
+<!-- MODAL: PREMIAÇÃO PROJETADA -->
+<div id="modal-premiacao-proj" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-trophy" style="color:var(--gold);"></i> Premiação Projetada</h3>
+            <button onclick="closeModal('modal-premiacao-proj')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+
+        <!-- Resumo -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem;">
+            <div style="padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;">
+                <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">Prize Pool</div>
+                <div id="prm-prize-pool" style="font-family:'Space Mono',monospace;font-weight:800;color:#22c55e;font-size:.95rem;margin-top:.15rem;">R$ 0</div>
+            </div>
+            <div style="padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;">
+                <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">Entradas</div>
+                <div id="prm-entradas" style="font-family:'Space Mono',monospace;font-weight:800;color:#e4e4e7;font-size:.95rem;margin-top:.15rem;">0</div>
+            </div>
+            <div style="padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;">
+                <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;font-weight:700;">Ativos</div>
+                <div id="prm-ativos" style="font-family:'Space Mono',monospace;font-weight:800;color:var(--gold);font-size:.95rem;margin-top:.15rem;">0</div>
+            </div>
+        </div>
+
+        <!-- Controles -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem;align-items:end;">
+            <div>
+                <label class="inp-label">Qtd. Premiados</label>
+                <input id="prm-qtd" type="number" min="1" max="100" value="6" class="inp" oninput="recalcularPayoutDist()">
+            </div>
+            <div>
+                <label class="inp-label">Modelo</label>
+                <select id="prm-modelo" class="inp" onchange="recalcularPayoutDist()">
+                    <option value="smart">Inteligente (padrão)</option>
+                    <option value="flat">Plano (igual)</option>
+                    <option value="top-heavy">Foco no top 1</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:.4rem;">
+                <button onclick="recalcularPayoutDist(true)" class="btn-ghost" style="padding:.55rem .75rem;font-size:.75rem;width:100%;" title="Recalcular distribuição">
+                    <i class="fa-solid fa-rotate"></i> Recalcular
+                </button>
+            </div>
+        </div>
+
+        <!-- Lista editável -->
+        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Distribuição</div>
+        <div style="padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;margin-bottom:.5rem;display:grid;grid-template-columns:3rem 1fr 1fr;gap:.5rem;font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">
+            <span>Pos</span>
+            <span style="text-align:center;">% Prize</span>
+            <span style="text-align:right;">R$ Premiação</span>
+        </div>
+        <div id="prm-payout-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:40vh;overflow-y:auto;margin-bottom:1rem;"></div>
+
+        <!-- Totais e alertas -->
+        <div id="prm-totais" style="padding:.6rem .85rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:.45rem;font-size:.8rem;display:flex;justify-content:space-between;margin-bottom:1rem;">
+            <span>Total distribuído:</span>
+            <span id="prm-total-dist" style="font-family:'Space Mono',monospace;font-weight:800;color:#22c55e;">R$ 0</span>
+        </div>
+
+        <!-- Ações -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+            <label style="display:flex;align-items:center;gap:.6rem;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;">
+                <input type="checkbox" id="prm-show-tv" style="accent-color:var(--gold);">
+                <div>
+                    <div style="font-size:.85rem;font-weight:700;">Mostrar na TV</div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">Exibe a premiação no rodapé da TV</div>
+                </div>
+            </label>
+            <button onclick="salvarPremiacaoProjetada()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Salvar e Aplicar</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: CONFIG STATS TV PRO LIVE -->
 <div id="modal-config-stats-tv" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
@@ -1962,6 +2036,9 @@
                     </button>
                     <button onclick="abrirConfigStatsTV()" id="btn-config-stats-tv" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;" title="Configurar stats do layout Pro Live">
                         <i class="fa-solid fa-sliders"></i>
+                    </button>
+                    <button onclick="abrirPremiacaoProjetada()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;color:var(--gold);" title="Premiação projetada (payout)">
+                        <i class="fa-solid fa-trophy"></i>
                     </button>
                 </div>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
@@ -3490,8 +3567,14 @@ function balancearMesas(idx) {
 // TV
 // ============================================================
 function updateTV(idx) {
+    try {
     if (!tvWindow || tvWindow.closed) return;
     const t     = torneios[idx];
+    if (!t) return;
+    if (!t.blinds || !t.blinds.length) return;
+    // Garante que nivelAtual está dentro dos limites
+    if (t.nivelAtual == null || t.nivelAtual < 0) t.nivelAtual = 0;
+    if (t.nivelAtual >= t.blinds.length) t.nivelAtual = t.blinds.length - 1;
     const ativos = getAtivos(t);
 
     // Calcular fichas totais corretamente com rebuys/addons + jackpots
@@ -3508,8 +3591,9 @@ function updateTV(idx) {
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
 
     // Avg em BBs (útil para jogadores verem pressão)
-    const bbAtual = t.blinds[t.nivelAtual] ? t.blinds[t.nivelAtual].bb : 1;
-    const avgBBs = bbAtual > 0 ? Math.round(avg / bbAtual) : 0;
+    const bbRef = (t.blinds[t.nivelAtual] && !t.blinds[t.nivelAtual].isBreak) ? t.blinds[t.nivelAtual].bb : 0;
+    const bbAtual = bbRef > 0 ? bbRef : 1;
+    const avgBBs = avg > 0 && bbAtual > 0 ? Math.round(avg / bbAtual) : 0;
 
     // Contadores de entradas por tipo
     const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
@@ -3537,7 +3621,7 @@ function updateTV(idx) {
     // Proximo nivel NAO-break (para mostrar na tela de intervalo)
     let proxNaoBreak = null;
     for (let i = t.nivelAtual + 1; i < t.blinds.length; i++) {
-        if (!t.blinds[i].isBreak) { proxNaoBreak = t.blinds[i]; break; }
+        if (t.blinds[i] && !t.blinds[i].isBreak) { proxNaoBreak = t.blinds[i]; break; }
     }
     const nextBlinds = proxNaoBreak ? (proxNaoBreak.sb.toLocaleString() + ' / ' + proxNaoBreak.bb.toLocaleString() + (proxNaoBreak.ante ? ' (ante ' + proxNaoBreak.ante.toLocaleString() + ')' : '')) : '';
 
@@ -3565,16 +3649,32 @@ function updateTV(idx) {
     // Nome do clube (se configurado)
     const clubeNome = (typeof config !== 'undefined' && config.clube && config.clube.nome) ? config.clube.nome : 'PokerSul';
 
+    // Nível "efetivo" — se atual é break, mostra blinds do anterior para não exibir 0/0
+    let blindsRef = t.blinds[t.nivelAtual];
+    if (blindsRef && blindsRef.isBreak) {
+        for (let k = t.nivelAtual - 1; k >= 0; k--) {
+            if (t.blinds[k] && !t.blinds[k].isBreak) { blindsRef = t.blinds[k]; break; }
+        }
+    }
+    if (!blindsRef) blindsRef = { sb: 0, bb: 0, ante: 0 };
+
+    // Contar nível de jogo (só níveis não-break)
+    let nivelJogo = 0;
+    for (let k = 0; k <= t.nivelAtual; k++) {
+        if (t.blinds[k] && !t.blinds[k].isBreak) nivelJogo++;
+    }
+    const totalNiveisJogo = t.blinds.filter(b => !b.isBreak).length;
+
     tvWindow.postMessage({
         tournamentName: t.nome,
         tipo:     t.tipo,
         layout:   t.tvLayout || 'classico',
         showPrize: t.tvShowPrize !== false,
-        timer:    formatTime(t.tempoRestante),
-        nivel:    t.nivelAtual + 1,
-        totalNiveis: t.blinds.length,
-        blinds:   `${t.blinds[t.nivelAtual].sb.toLocaleString()} / ${t.blinds[t.nivelAtual].bb.toLocaleString()}`,
-        ante:     t.blinds[t.nivelAtual].ante.toLocaleString(),
+        timer:    formatTime(t.tempoRestante || 0),
+        nivel:    nivelJogo || 1,
+        totalNiveis: totalNiveisJogo || t.blinds.length,
+        blinds:   (blindsRef.sb || 0).toLocaleString() + ' / ' + (blindsRef.bb || 0).toLocaleString(),
+        ante:     (blindsRef.ante || 0).toLocaleString(),
         players:  ativos,
         totalEntries: t.entries.filter(e=>e.tipo!=='addon').length,
         avg:      avg.toLocaleString(),
@@ -3587,16 +3687,24 @@ function updateTV(idx) {
         jackpotsQtd,
         statsStrip,
         breakIn,
-        nextAnte: prox ? prox.ante.toLocaleString() : '',
+        nextAnte: prox ? ((prox.ante || 0).toLocaleString()) : '',
         prize:    formatMoney(getPrize(t)),
         isBreak:  t.isBreak,
-        next:     prox ? `${prox.sb.toLocaleString()}/${prox.bb.toLocaleString()}` : 'FINAL',
-        pct:      (t.tempoRestante / t.tempoTotal) * 100,
+        next:     prox ? ((prox.sb || 0).toLocaleString() + '/' + (prox.bb || 0).toLocaleString()) : 'FINAL',
+        pct:      t.tempoTotal > 0 ? (t.tempoRestante / t.tempoTotal) * 100 : 0,
         elapsed:  elapsedFormatted,
         clubeNome: clubeNome,
         clubeLogo: (typeof config !== 'undefined' && config.clube && config.clube.logo) ? config.clube.logo : '',
         nextBlinds,
+        premiacaoProjetada: (t.premiacaoProjetada && t.premiacaoProjetada.mostrarNaTV) ? {
+            qtd: t.premiacaoProjetada.qtd,
+            valores: t.premiacaoProjetada.valores.map(v => Math.round(v)),
+            percentuais: t.premiacaoProjetada.percentuais,
+        } : null,
     }, '*');
+    } catch (e) {
+        console.error('updateTV erro:', e);
+    }
 }
 
 function formatElapsed(ms) {
@@ -3774,34 +3882,87 @@ function abrirTV(idx) {
         .pw-bar-bg { width: 70%; height: 4px; background: rgba(255,255,255,.15); border-radius: 2px; overflow: hidden; margin: .5rem auto 1rem; }
         .pw-bar-fill { height:100%; background: linear-gradient(90deg, #f5d572, #22c55e); border-radius: 2px; transition: width .5s linear; }
 
-        .pw-blinds {
-            font-size: clamp(2.2rem, 5vw, 4.5rem);
+        /* Bloco de blinds + ante — SB/BB em destaque, ante discreto */
+        .pw-blinds-wrap {
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .4rem;
+            margin-top: .5rem;
+        }
+        .pw-blinds-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: nowrap;
+            max-width: 98%;
             font-weight: 800;
             color: #fef3c7;
-            text-shadow: 0 2px 6px rgba(0,0,0,.4);
-            letter-spacing: -.01em;
-            display: flex; align-items: baseline; gap: 1.2rem;
+            text-shadow: 0 2px 8px rgba(0,0,0,.5);
+            letter-spacing: -.015em;
+            line-height: 1;
+            gap: clamp(.8rem, 1.5vw, 1.6rem);
+        }
+        /* Destaque principal: SB / BB */
+        .pw-blinds-main {
+            font-size: clamp(2.2rem, 6vw, 5.5rem);
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            font-family: 'Space Mono', 'Manrope', monospace;
+            color: #fef3c7;
+            text-shadow:
+                0 0 30px rgba(245,213,114,.3),
+                0 2px 8px rgba(0,0,0,.5);
+        }
+        /* Ante - discreto, agrupado ao lado */
+        .pw-ante-block {
+            display: inline-flex;
+            align-items: baseline;
+            gap: .5rem;
+            padding-left: .9rem;
+            border-left: 2px solid rgba(245,213,114,.3);
+            opacity: .85;
         }
         .pw-ante-label {
-            font-size: clamp(.85rem, 1.2vw, 1.2rem);
+            font-size: clamp(.55rem, .85vw, .85rem);
             color: #f5d572;
             font-weight: 700;
-            opacity: .85;
-            text-transform:uppercase; letter-spacing:.08em;
-            margin-bottom: .2em;
+            opacity: .8;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            line-height: 1;
+            white-space: nowrap;
         }
         .pw-ante-value {
-            font-size: clamp(2rem, 4.5vw, 4rem);
-            font-weight: 800;
+            font-size: clamp(.9rem, 1.7vw, 1.6rem);
+            font-weight: 700;
             color: #fef3c7;
+            font-variant-numeric: tabular-nums;
+            font-family: 'Space Mono', 'Manrope', monospace;
+            line-height: 1;
+            white-space: nowrap;
+            opacity: .9;
         }
         .pw-blinds-next {
-            font-size: clamp(.9rem, 1.4vw, 1.3rem);
-            color: rgba(254,243,199,.6);
-            margin-top: .25rem;
+            font-size: clamp(.7rem, 1.1vw, 1.1rem);
+            color: rgba(254,243,199,.5);
             font-weight: 700;
-            letter-spacing: .04em;
+            letter-spacing: .05em;
             text-align: center;
+            white-space: nowrap;
+        }
+
+        /* Quebra quando valores muito grandes — viewport estreita */
+        @media (max-width: 1200px) {
+            .pw-blinds-main { font-size: clamp(1.8rem, 4.5vw, 4rem); }
+            .pw-ante-value { font-size: clamp(.85rem, 1.5vw, 1.4rem); }
+        }
+        /* Quando altura reduzida, compacta mais */
+        @media (max-height: 700px) {
+            .pw-blinds-main { font-size: clamp(1.7rem, 4vw, 3.8rem); }
+            .pw-ante-value { font-size: clamp(.8rem, 1.3vw, 1.3rem); }
         }
 
         /* Right column: Tempo, Intervalo, Chipcount */
@@ -3812,13 +3973,118 @@ function abrirTV(idx) {
         }
         .pw-col-right .pw-stat-block { align-items:flex-end; }
 
+        /* Prize ticker - banda horizontal acima da strip de stats */
+        .pw-prize-carousel {
+            display: none;
+            padding: .7rem 0 .55rem;
+            margin: 0 -2rem;
+            background: linear-gradient(180deg, rgba(10,40,30,.5), rgba(0,0,0,.75) 70%);
+            border-top: 1px solid rgba(245,213,114,.35);
+            border-bottom: 1px solid rgba(245,213,114,.35);
+            backdrop-filter: blur(8px);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .pw-prize-carousel.show { display: block; }
+        .pw-prize-carousel-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .6rem;
+            font-size: clamp(.65rem, .85vw, .9rem);
+            color: #f5d572;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .2em;
+            margin-bottom: .4rem;
+            text-shadow: 0 0 15px rgba(245,213,114,.5);
+        }
+        .pw-prize-carousel-header i { color: #f5d572; }
+
+        /* Ticker horizontal - track com máscara nas bordas */
+        .pw-prize-track {
+            position: relative;
+            overflow: hidden;
+            height: 2.5rem;
+            mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+        }
+        .pw-prize-strip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            gap: clamp(1.5rem, 3vw, 3.5rem);
+            padding-left: 100%; /* começa fora da tela, à direita */
+            height: 100%;
+            white-space: nowrap;
+            will-change: transform;
+            animation: pw-ticker-scroll 30s linear infinite;
+        }
+        .pw-prize-carousel:hover .pw-prize-strip { animation-play-state: paused; }
+
+        @keyframes pw-ticker-scroll {
+            0%   { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .pw-prize-item {
+            display: inline-flex;
+            align-items: center;
+            gap: .6rem;
+            font-family: 'Space Mono', monospace;
+            flex-shrink: 0;
+        }
+        .pw-prize-pos {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2.2rem;
+            height: 2.2rem;
+            padding: 0 .55rem;
+            border-radius: 1.1rem;
+            background: rgba(245,213,114,.12);
+            border: 2px solid rgba(245,213,114,.4);
+            color: #f5d572;
+            font-size: clamp(.85rem, 1.1vw, 1.1rem);
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .pw-prize-pos.gold   { background: rgba(245,213,114,.22); border-color: #f5d572; color: #fef3c7; box-shadow: 0 0 18px rgba(245,213,114,.55); }
+        .pw-prize-pos.silver { background: rgba(212,212,216,.15); border-color: #d4d4d8; color: #fafafa; box-shadow: 0 0 12px rgba(212,212,216,.35); }
+        .pw-prize-pos.bronze { background: rgba(198,141,30,.22); border-color: #c68d1e; color: #fef3c7; box-shadow: 0 0 12px rgba(198,141,30,.35); }
+        .pw-prize-label {
+            font-size: clamp(.65rem, .85vw, .85rem);
+            color: rgba(254,243,199,.6);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+        }
+        .pw-prize-value {
+            font-size: clamp(1rem, 1.4vw, 1.35rem);
+            color: #f5d572;
+            font-weight: 800;
+            text-shadow: 0 0 18px rgba(245,213,114,.5);
+            letter-spacing: -.005em;
+        }
+        .pw-prize-sep {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: rgba(245,213,114,.35);
+            flex-shrink: 0;
+        }
+
+        /* Quando carousel está visível, strip continua visível abaixo dele */
+        /* .pw-strip-hidden removido - ambos coexistem */
+
         /* Bottom strip: stats */
         .pw-bottom-strip {
             background: rgba(0,0,0,.35);
             border-top: 2px solid rgba(245,213,114,.3);
             backdrop-filter: blur(8px);
-            padding: 1rem 1.5rem;
-            margin: 1rem -2rem 0;
+            padding: .85rem 1.5rem;
+            margin: 0 -2rem;
             display: flex;
             flex-wrap: wrap;
             justify-content: space-around;
@@ -3940,14 +4206,16 @@ function abrirTV(idx) {
                     <div class="pw-timer" id="pw-timer">00:00</div>
                     <div class="pw-bar-bg"><div class="pw-bar-fill" id="pw-bar" style="width:100%;"></div></div>
 
-                    <div class="pw-blinds">
-                        <span id="pw-blinds-main">0 / 0</span>
-                        <div style="display:flex;flex-direction:column;align-items:flex-start;">
-                            <span class="pw-ante-label">Big-Ante</span>
-                            <span class="pw-ante-value" id="pw-ante">0</span>
+                    <div class="pw-blinds-wrap">
+                        <div class="pw-blinds-row">
+                            <span class="pw-blinds-main" id="pw-blinds-main">0 / 0</span>
+                            <div class="pw-ante-block">
+                                <span class="pw-ante-label">Big-Ante</span>
+                                <span class="pw-ante-value" id="pw-ante">0</span>
+                            </div>
                         </div>
+                        <div class="pw-blinds-next"><span id="pw-blinds-next"></span></div>
                     </div>
-                    <div class="pw-blinds-next"><span id="pw-blinds-next"></span></div>
                 </div>
 
                 <!-- RIGHT COLUMN -->
@@ -3967,10 +4235,29 @@ function abrirTV(idx) {
                 </div>
             </div>
 
+            <!-- PREMIAÇÃO TICKER (rola horizontalmente acima da strip de stats) -->
+            <div id="prize-carousel" class="pw-prize-carousel">
+                <div class="pw-prize-carousel-header"><i class="fa-solid fa-trophy"></i> Premiação</div>
+                <div class="pw-prize-track">
+                    <div class="pw-prize-strip" id="prize-strip">
+                        <!-- itens criados dinamicamente (x2 para loop contínuo) -->
+                    </div>
+                </div>
+            </div>
+
             <!-- BOTTOM STRIP -->
             <div class="pw-bottom-strip" id="pw-bottom-strip">
                 <!-- pills rendered dynamically -->
             </div>
+        </div>
+
+        <!-- PREMIAÇÃO OVERLAY (fallback para layouts não-Pro Live) -->
+        <div id="prize-overlay" style="display:none;position:fixed;top:8vh;right:1.5vw;z-index:50;background:rgba(10,10,15,.85);backdrop-filter:blur(10px);border:1px solid rgba(245,213,114,.35);border-radius:1rem;padding:1rem 1.2rem;min-width:240px;max-width:26vw;max-height:78vh;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.5);">
+            <div style="text-align:center;font-size:clamp(.8rem, 1vw, 1.1rem);font-weight:800;color:#f5d572;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem;text-shadow:0 0 15px rgba(245,213,114,.4);">
+                <i class="fa-solid fa-trophy"></i> Premiação
+            </div>
+            <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(245,213,114,.5),transparent);margin-bottom:.6rem;"></div>
+            <div id="prize-list" style="display:flex;flex-direction:column;gap:.25rem;"></div>
         </div>
 
         <div id="main-tv" style="position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;padding:2rem 2.5rem;">
@@ -4024,9 +4311,176 @@ function abrirTV(idx) {
         </div>
 
     <script>
+    // === TICKER HORIZONTAL DE PREMIAÇÃO (layout Pro Live) ===
+    // Estado para evitar rebuild desnecessário
+    var _prizeTicker = {
+        dataKey: null,
+    };
+
+    function pararCarouselPremiacao() {
+        // CSS animation é auto-gerenciada; função mantida para compatibilidade
+    }
+
+    function criarItemTicker(i, valor) {
+        var classe = '';
+        if (i === 0)      classe = 'gold';
+        else if (i === 1) classe = 'silver';
+        else if (i === 2) classe = 'bronze';
+
+        var item = document.createElement('div');
+        item.className = 'pw-prize-item';
+
+        var pos = document.createElement('span');
+        pos.className = 'pw-prize-pos ' + classe;
+        pos.textContent = (i + 1) + 'º';
+        item.appendChild(pos);
+
+        var label = document.createElement('span');
+        label.className = 'pw-prize-label';
+        label.textContent = 'Lugar';
+        item.appendChild(label);
+
+        var valSpan = document.createElement('span');
+        valSpan.className = 'pw-prize-value';
+        valSpan.textContent = 'R$ ' + (valor || 0).toLocaleString('pt-BR');
+        item.appendChild(valSpan);
+
+        return item;
+    }
+
+    function criarSeparadorTicker() {
+        var sep = document.createElement('div');
+        sep.className = 'pw-prize-sep';
+        return sep;
+    }
+
+    function montarCarouselPremiacao(d) {
+        var carousel = document.getElementById('prize-carousel');
+        var strip = document.getElementById('prize-strip');
+        if (!carousel || !strip) return;
+
+        var pp = d.premiacaoProjetada;
+        if (!pp || !pp.valores || !pp.valores.length) {
+            carousel.classList.remove('show');
+            return;
+        }
+
+        // Verifica se os dados mudaram - evita rebuild desnecessário
+        var dataKey = JSON.stringify(pp.valores);
+        if (_prizeTicker.dataKey === dataKey && strip.children.length > 0) {
+            // Dados iguais - só garante que está visível
+            if (!carousel.classList.contains('show')) {
+                carousel.classList.add('show');
+            }
+            return;
+        }
+
+        // Rebuild items - duplicamos a lista para criar loop perfeito
+        _prizeTicker.dataKey = dataKey;
+        strip.innerHTML = '';
+
+        // Monta 2 conjuntos da lista seguidos para loop contínuo
+        for (var pass = 0; pass < 2; pass++) {
+            for (var i = 0; i < pp.valores.length; i++) {
+                strip.appendChild(criarItemTicker(i, pp.valores[i]));
+                // Separador entre itens (exceto no último do segundo conjunto)
+                if (!(pass === 1 && i === pp.valores.length - 1)) {
+                    strip.appendChild(criarSeparadorTicker());
+                }
+            }
+        }
+
+        // Ajusta duração da animação proporcional à quantidade de itens
+        // (~2s por item para ficar legível)
+        var segundos = Math.max(12, pp.valores.length * 2.5);
+        strip.style.animationDuration = segundos + 's';
+
+        carousel.classList.add('show');
+    }
+
+    function iniciarCiclagemCarousel() {
+        // CSS animation é auto-gerenciada; função mantida para compatibilidade
+    }
+
+    // === OVERLAY LATERAL (para layouts não-Pro Live) ===
+    function atualizarPrizeOverlayLateral(d) {
+        try {
+            var ov = document.getElementById('prize-overlay');
+            if (!ov) return;
+            if (!d || !d.premiacaoProjetada || !d.premiacaoProjetada.valores || !d.premiacaoProjetada.valores.length) {
+                ov.style.display = 'none';
+                return;
+            }
+            ov.style.display = 'block';
+            var pp = d.premiacaoProjetada;
+            var list = document.getElementById('prize-list');
+            if (!list) return;
+
+            list.innerHTML = '';
+            for (var i = 0; i < pp.valores.length; i++) {
+                var cor = '#71717a';
+                var bg = 'transparent';
+                if (i === 0)      { cor = '#f5d572'; bg = 'rgba(245,213,114,.1)'; }
+                else if (i === 1) { cor = '#d4d4d8'; bg = 'rgba(161,161,170,.06)'; }
+                else if (i === 2) { cor = '#c68d1e'; bg = 'rgba(146,97,10,.08)'; }
+                var valorFmt = 'R$ ' + (pp.valores[i] || 0).toLocaleString('pt-BR');
+                var pctFmt = (pp.percentuais && pp.percentuais[i] != null) ? pp.percentuais[i].toFixed(1) : '0.0';
+
+                var row = document.createElement('div');
+                row.style.cssText = 'display:grid;grid-template-columns:2.2rem 1fr auto;gap:.4rem;align-items:center;padding:.3rem .5rem;background:' + bg + ';border-radius:.3rem;font-size:clamp(.7rem, .9vw, 1rem);';
+
+                var sp1 = document.createElement('span');
+                sp1.style.cssText = 'font-weight:800;color:' + cor + ';';
+                sp1.textContent = (i+1) + 'º';
+                row.appendChild(sp1);
+
+                var sp2 = document.createElement('span');
+                sp2.style.cssText = 'color:rgba(254,243,199,.5);font-size:.7em;';
+                sp2.textContent = pctFmt + '%';
+                row.appendChild(sp2);
+
+                var sp3 = document.createElement('span');
+                sp3.style.cssText = 'font-family:Space Mono,monospace;font-weight:800;color:' + cor + ';text-align:right;white-space:nowrap;';
+                sp3.textContent = valorFmt;
+                row.appendChild(sp3);
+
+                list.appendChild(row);
+            }
+        } catch (e) {
+            console.error('atualizarPrizeOverlayLateral erro:', e);
+        }
+    }
+
+    // === ROTEADOR: decide entre carousel (Pro Live) ou overlay lateral (outros) ===
+    function atualizarPrizeOverlay(d) {
+        try {
+            // Determina layout atual
+            var isProLive = d && d.layout === 'pokerweb';
+
+            if (isProLive) {
+                // Esconde overlay lateral
+                var ov = document.getElementById('prize-overlay');
+                if (ov) ov.style.display = 'none';
+                // Usa carousel
+                montarCarouselPremiacao(d);
+            } else {
+                // Esconde carousel
+                var car = document.getElementById('prize-carousel');
+                if (car) car.classList.remove('show');
+                pararCarouselPremiacao();
+                // Usa overlay lateral
+                atualizarPrizeOverlayLateral(d);
+            }
+        } catch (e) {
+            console.error('atualizarPrizeOverlay erro:', e);
+        }
+    }
+
     // Break screen helper - usa data-url de logo armazenada em background via postMessage
     function atualizarBreakScreen(d) {
+        try {
         const bs = document.getElementById('break-screen');
+        if (!bs) return;
         if (!d.isBreak) { bs.classList.remove('show'); return; }
         bs.classList.add('show');
         document.getElementById('break-timer').innerText = d.timer || '--:--';
@@ -4047,6 +4501,7 @@ function abrirTV(idx) {
                 document.getElementById('bs-proxnivel-blinds').innerText = d.nextBlinds;
             } else wrap.style.display = 'none';
         }
+        } catch (e) { console.error('atualizarBreakScreen erro:', e); }
     }
 
     // Modo kiosk helpers
@@ -4140,6 +4595,7 @@ function abrirTV(idx) {
 
             // Break overlay still works
             atualizarBreakScreen(d);
+            atualizarPrizeOverlay(d);
             return;
         }
 
@@ -4181,6 +4637,7 @@ function abrirTV(idx) {
         if(d.pct<20){document.getElementById('bar').style.background='#ef4444';}
         else{document.getElementById('bar').style.background='';}
         atualizarBreakScreen(d);
+        atualizarPrizeOverlay(d);
     };
     <\/script>
     </body></html>`);
@@ -6621,6 +7078,9 @@ Aplicar taxa?`)) {
         });
     }
 
+    // === Marcador de tempo para identificar transações criadas nesta operação (usado pelo undo) ===
+    const tMarcador = Date.now();
+
     registrarTransacao({
         jogadorId: pagamentoJogadorId,
         tipo: 'pagamento',
@@ -6632,10 +7092,22 @@ Aplicar taxa?`)) {
 
     // Se o operador marcou "incluir comandas" e existe checkbox marcada, fecha as comandas abertas
     const incCheckbox = document.getElementById('pj-incluir-comandas');
+    const comandasAlteradas = []; // snapshot para undo: { id, status, fechadoEm, pagamento, total, fechadaPeloCaixa }
     if (incCheckbox && incCheckbox.checked) {
         const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
         let comandasFechadas = 0;
         comandasAbertas.forEach(c => {
+            // Salva estado anterior para permitir undo
+            comandasAlteradas.push({
+                id: c.id,
+                estadoAnterior: {
+                    status: c.status,
+                    fechadoEm: c.fechadoEm || null,
+                    pagamento: c.pagamento || null,
+                    total: c.total || 0,
+                    fechadaPeloCaixa: c.fechadaPeloCaixa || false,
+                }
+            });
             const totalC = calcTotalComanda(c);
             // Registra débito da comanda (consumo)
             registrarTransacao({
@@ -6661,10 +7133,46 @@ Aplicar taxa?`)) {
 
     showToast(`✅ Pagamento de ${formatMoney(valor)} registrado para ${j.nome}`);
     saveData();
+
+    // === UNDO COMPLETO: desfaz pagamento + reabre comandas ===
+    const jogIdUndo = pagamentoJogadorId;
+    registrarUndo(`💰 Pagamento de ${formatMoney(valor)} · ${j.nome}`, () => {
+        // 1. Remove as transações criadas nesta operação (pagamento, taxa, débitos de comanda)
+        transacoes = transacoes.filter(tx => {
+            // Pega transações do mesmo jogador criadas após tMarcador
+            if (tx.jogadorId !== jogIdUndo) return true;
+            if (tx.ts < tMarcador) return true;
+            // É uma das transações criadas neste pagamento
+            return false;
+        });
+
+        // 2. Reabre as comandas que foram fechadas nesta operação
+        comandasAlteradas.forEach(alt => {
+            const c = barComandas.find(c => c.id === alt.id);
+            if (c) {
+                c.status         = alt.estadoAnterior.status;
+                c.fechadoEm      = alt.estadoAnterior.fechadoEm;
+                c.pagamento      = alt.estadoAnterior.pagamento;
+                c.total          = alt.estadoAnterior.total;
+                c.fechadaPeloCaixa = alt.estadoAnterior.fechadaPeloCaixa;
+            }
+        });
+
+        saveData();
+        renderSaldoCard(getSaldoJogador(jogIdUndo));
+        renderPagarConta();
+        renderExtratoJogador();
+        renderCaixaAberto();
+        renderComandas && renderComandas();  // lista do bar
+        renderRelatorio && renderRelatorio(); // relatório do bar
+        renderDashboard();
+    });
+
     renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
     renderPagarConta();
     renderExtratoJogador();
     renderCaixaAberto();
+    renderComandas && renderComandas();  // atualiza lista do bar
     renderDashboard();
 }
 
@@ -7657,16 +8165,37 @@ function abrirJackpot(idx) {
         <div style="color:#71717a;font-size:.75rem;">Torneio: <strong style="color:#e4e4e7;">${t.nome}</strong></div>
         <div style="color:#71717a;font-size:.75rem;margin-top:.25rem;">Cada compra: <strong style="color:var(--gold);">${formatMoney(t.jackpotValor)}</strong> → <strong style="color:#22c55e;">${t.jackpotFichas.toLocaleString()} fichas</strong></div>
     `;
-    // Populate players (ativos)
+    // Populate players (ativos que ainda NÃO compraram jackpot)
     const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
-    const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))].filter(id => !eliminadosIds.has(id));
+    const jaComprouIds = new Set((t.jackpotCompras || []).map(j => j.jogadorId));
+    const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))]
+        .filter(id => !eliminadosIds.has(id))
+        .filter(id => !jaComprouIds.has(id)); // exclui quem já comprou
+
     const sel = document.getElementById('jackpot-jogador');
-    sel.innerHTML = ativos.length
-        ? ativos.map(id => `<option value="${id}">${getJogadorNome(id)}</option>`).join('')
-        : '<option value="">Nenhum jogador ativo</option>';
-    document.getElementById('jackpot-qtd').value = 1;
+    if (ativos.length) {
+        sel.innerHTML = ativos.map(id => `<option value="${id}">${getJogadorNome(id)}</option>`).join('');
+        sel.disabled = false;
+    } else {
+        // Mensagem explicativa se todos já compraram
+        const totalCompras = (t.jackpotCompras || []).length;
+        const totalAtivos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))].filter(id => !eliminadosIds.has(id)).length;
+        sel.innerHTML = '<option value="">Nenhum jogador disponível</option>';
+        sel.disabled = true;
+        if (totalCompras > 0 && totalCompras >= totalAtivos) {
+            showToast(`ℹ️ Todos os ${totalAtivos} jogadores ativos já compraram jackpot`);
+        }
+    }
+
+    // Jackpot é compra ÚNICA por jogador — fixar qtd em 1 e esconder o campo se permitido
+    const qtdInp = document.getElementById('jackpot-qtd');
+    if (qtdInp) {
+        qtdInp.value = 1;
+        qtdInp.readOnly = true;
+        qtdInp.style.opacity = '.6';
+        qtdInp.title = 'Jackpot é compra única por jogador';
+    }
     atualizarTotalJackpot();
-    document.getElementById('jackpot-qtd').oninput = atualizarTotalJackpot;
     openModal('modal-jackpot');
 }
 
@@ -7684,7 +8213,6 @@ function atualizarTotalJackpot() {
 function confirmarJackpot() {
     const t = torneios[activeTorneioIdx];
     const jid = parseInt(document.getElementById('jackpot-jogador').value);
-    const qtd = parseInt(document.getElementById('jackpot-qtd').value) || 1;
     if (!jid) return showToast('⚠️ Selecione um jogador');
 
     // Bloqueio: caixa do torneio precisa estar aberto
@@ -7693,8 +8221,14 @@ function confirmarJackpot() {
         return showToast('🔒 Abra o caixa do torneio primeiro');
     }
 
-    const total = qtd * t.jackpotValor;
-    const totalFichas = qtd * t.jackpotFichas;
+    // Segurança extra: verifica se jogador já comprou jackpot
+    const jaComprou = (t.jackpotCompras || []).some(j => j.jogadorId === jid);
+    if (jaComprou) return showToast('⚠️ Este jogador já comprou o jackpot');
+
+    // Jackpot é sempre qtd = 1 (compra única)
+    const qtd = 1;
+    const total = t.jackpotValor;
+    const totalFichas = t.jackpotFichas;
 
     t.jackpotCompras.push({
         jogadorId: jid, qtd, valor: total, fichas: totalFichas, ts: Date.now(),
@@ -8690,6 +9224,197 @@ function validarCNPJ(cnpj) {
 function validarFone(fone) {
     const digits = (fone || '').replace(/\D/g, '');
     return digits.length === 10 || digits.length === 11;
+}
+
+
+
+// ============================================================
+// PREMIAÇÃO PROJETADA
+// ============================================================
+// Distribuições-padrão para N premiados (somam 100%)
+const PAYOUT_TEMPLATES = {
+    1:  [100],
+    2:  [65, 35],
+    3:  [50, 30, 20],
+    4:  [45, 27, 18, 10],
+    5:  [40, 25, 17, 11, 7],
+    6:  [36, 23, 16, 11, 8, 6],
+    7:  [33, 22, 15, 11, 8, 6, 5],
+    8:  [31, 21, 14, 10, 8, 6, 5, 5],
+    9:  [29, 20, 14, 10, 7, 6, 5, 5, 4],
+    10: [27, 19, 13, 10, 7, 6, 5, 5, 4, 4],
+};
+
+function gerarPayoutInteligente(qtd) {
+    if (PAYOUT_TEMPLATES[qtd]) return [...PAYOUT_TEMPLATES[qtd]];
+    // Para qtd > 10, usa fórmula decrescente
+    const arr = [];
+    let total = 100;
+    for (let i = 0; i < qtd; i++) {
+        const pct = (total * 0.35) / (qtd - i);  // distribuição decrescente
+        arr.push(pct);
+        total -= pct;
+    }
+    // Normaliza para somar 100%
+    const sum = arr.reduce((a,b) => a+b, 0);
+    return arr.map(p => Math.round((p / sum) * 100 * 10) / 10);
+}
+
+function gerarPayoutFlat(qtd) {
+    const pct = 100 / qtd;
+    return Array(qtd).fill(Math.round(pct * 10) / 10);
+}
+
+function gerarPayoutTopHeavy(qtd) {
+    const arr = [];
+    // top1 leva 50%, resto distribuído decrescente
+    let resto = 50;
+    arr.push(50);
+    for (let i = 1; i < qtd; i++) {
+        const pct = (resto * 0.45) / Math.max(1, qtd - i);
+        arr.push(pct);
+        resto -= pct;
+    }
+    const sum = arr.reduce((a,b) => a+b, 0);
+    return arr.map(p => Math.round((p / sum) * 100 * 10) / 10);
+}
+
+function abrirPremiacaoProjetada() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+
+    const prize = getPrize(t);
+    const entradas = t.entries.filter(e => e.tipo !== 'addon').length;
+    const ativos = getAtivos(t);
+
+    document.getElementById('prm-prize-pool').innerText = formatMoney(prize);
+    document.getElementById('prm-entradas').innerText = entradas;
+    document.getElementById('prm-ativos').innerText = ativos;
+
+    // Carrega configuração existente ou cria padrão
+    if (!t.premiacaoProjetada) {
+        t.premiacaoProjetada = {
+            qtd: Math.min(6, Math.max(3, Math.floor(entradas * 0.15))),  // ~15% dos jogadores
+            modelo: 'smart',
+            percentuais: [],
+            valores: [],
+            mostrarNaTV: false,
+        };
+    }
+
+    const pp = t.premiacaoProjetada;
+    document.getElementById('prm-qtd').value = pp.qtd;
+    document.getElementById('prm-modelo').value = pp.modelo;
+    document.getElementById('prm-show-tv').checked = pp.mostrarNaTV || false;
+
+    recalcularPayoutDist(false);
+    openModal('modal-premiacao-proj');
+}
+
+function recalcularPayoutDist(forceRegen = false) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const pp = t.premiacaoProjetada = t.premiacaoProjetada || {};
+
+    const qtd = Math.max(1, parseInt(document.getElementById('prm-qtd').value) || 6);
+    const modelo = document.getElementById('prm-modelo').value;
+    const prize = getPrize(t);
+
+    // Re-gera percentuais se não existe ou se qtd/modelo mudaram ou forceRegen
+    const precisaRegenerar = forceRegen || !pp.percentuais || pp.percentuais.length !== qtd || pp.modelo !== modelo;
+
+    let pcts;
+    if (precisaRegenerar) {
+        if (modelo === 'flat')          pcts = gerarPayoutFlat(qtd);
+        else if (modelo === 'top-heavy') pcts = gerarPayoutTopHeavy(qtd);
+        else                             pcts = gerarPayoutInteligente(qtd);
+    } else {
+        pcts = [...pp.percentuais];
+    }
+
+    pp.qtd = qtd;
+    pp.modelo = modelo;
+    pp.percentuais = pcts;
+    pp.valores = pcts.map(pc => (prize * pc) / 100);
+
+    // Renderiza lista
+    const lista = document.getElementById('prm-payout-list');
+    lista.innerHTML = pcts.map((pct, i) => `
+        <div style="display:grid;grid-template-columns:3rem 1fr 1fr;gap:.5rem;align-items:center;padding:.4rem .6rem;background:${i===0?'rgba(245,158,11,.08)':i===1?'rgba(161,161,170,.05)':i===2?'rgba(146,97,10,.06)':'#0f0f12'};border:1px solid ${i===0?'rgba(245,158,11,.25)':i===1?'rgba(161,161,170,.15)':i===2?'rgba(146,97,10,.2)':'#1e1e23'};border-radius:.4rem;">
+            <span style="font-weight:800;color:${i===0?'var(--gold)':i===1?'#a1a1aa':i===2?'#92610a':'#71717a'};">${i+1}º</span>
+            <input type="number" step="0.1" min="0" value="${pct.toFixed(1)}" data-idx="${i}" class="prm-pct-inp inp" style="padding:.3rem .5rem;font-family:'Space Mono',monospace;font-size:.8rem;text-align:center;">
+            <input type="number" step="1" min="0" value="${Math.round(pp.valores[i])}" data-idx="${i}" class="prm-val-inp inp" style="padding:.3rem .5rem;font-family:'Space Mono',monospace;font-size:.8rem;text-align:right;">
+        </div>
+    `).join('');
+
+    // Eventos de edição
+    document.querySelectorAll('.prm-pct-inp').forEach(inp => {
+        inp.oninput = function() {
+            const i = parseInt(this.dataset.idx);
+            const v = parseFloat(this.value) || 0;
+            t.premiacaoProjetada.percentuais[i] = v;
+            t.premiacaoProjetada.valores[i] = (prize * v) / 100;
+            atualizarTotalPayout();
+            // Atualiza o valor correspondente
+            const valInp = document.querySelector(`.prm-val-inp[data-idx="${i}"]`);
+            if (valInp) valInp.value = Math.round(t.premiacaoProjetada.valores[i]);
+        };
+    });
+    document.querySelectorAll('.prm-val-inp').forEach(inp => {
+        inp.oninput = function() {
+            const i = parseInt(this.dataset.idx);
+            const v = parseFloat(this.value) || 0;
+            t.premiacaoProjetada.valores[i] = v;
+            // Recalcula percentual
+            if (prize > 0) t.premiacaoProjetada.percentuais[i] = (v / prize) * 100;
+            atualizarTotalPayout();
+            const pctInp = document.querySelector(`.prm-pct-inp[data-idx="${i}"]`);
+            if (pctInp) pctInp.value = t.premiacaoProjetada.percentuais[i].toFixed(1);
+        };
+    });
+
+    atualizarTotalPayout();
+}
+
+function atualizarTotalPayout() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    const prize = getPrize(t);
+    const totalVal = t.premiacaoProjetada.valores.reduce((s, v) => s + v, 0);
+    const totalPct = t.premiacaoProjetada.percentuais.reduce((s, p) => s + p, 0);
+    const totalEl = document.getElementById('prm-totais');
+    const dispEl = document.getElementById('prm-total-dist');
+    if (dispEl) dispEl.innerText = formatMoney(totalVal);
+
+    // Cor indica se está próximo do prize pool
+    const diff = Math.abs(totalVal - prize);
+    const tolerancia = prize * 0.02; // 2% de tolerância
+    if (totalEl) {
+        if (diff <= tolerancia) {
+            totalEl.style.background = 'rgba(34,197,94,.06)';
+            totalEl.style.borderColor = 'rgba(34,197,94,.2)';
+            dispEl.style.color = '#22c55e';
+        } else if (totalVal > prize) {
+            totalEl.style.background = 'rgba(239,68,68,.06)';
+            totalEl.style.borderColor = 'rgba(239,68,68,.25)';
+            dispEl.style.color = '#ef4444';
+        } else {
+            totalEl.style.background = 'rgba(245,158,11,.06)';
+            totalEl.style.borderColor = 'rgba(245,158,11,.25)';
+            dispEl.style.color = 'var(--gold)';
+        }
+    }
+}
+
+function salvarPremiacaoProjetada() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    t.premiacaoProjetada.mostrarNaTV = document.getElementById('prm-show-tv').checked;
+
+    saveData();
+    closeModal('modal-premiacao-proj');
+    updateTV(activeTorneioIdx);
+    showToast(`🏆 Premiação projetada salva${t.premiacaoProjetada.mostrarNaTV ? ' e ativada na TV' : ''}`);
 }
 
 
