@@ -279,7 +279,7 @@
                     <div id="user-nome" style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
                     <div id="user-role" style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-top:.1rem;">—</div>
                 </div>
-                <button onclick="abrirAjudaAtalhos()" class="btn-ghost" style="font-size:.7rem;padding:.4rem .65rem;margin-right:.4rem;" title="Atalhos de teclado (F1)"><i class="fa-solid fa-keyboard"></i></button><button onclick="logout()" title="Sair" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.2rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-right-from-bracket"></i></button>
+                <span id="db-status" style="font-size:.7rem;color:#22c55e;margin-right:.6rem;display:inline-flex;align-items:center;font-weight:700;"><i class="fa-solid fa-circle" style="color:#22c55e;font-size:.5rem;margin-right:.25rem;"></i>Online</span><button onclick="abrirAjudaAtalhos()" class="btn-ghost" style="font-size:.7rem;padding:.4rem .65rem;margin-right:.4rem;" title="Atalhos de teclado (F1)"><i class="fa-solid fa-keyboard"></i></button><button onclick="logout()" title="Sair" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.2rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
         </div>
     </div>
@@ -2719,6 +2719,168 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 let sbSession = null;
 let sbClube   = null;
 
+
+// ============================================================
+// DB — Camada de abstração de dados (Supabase + fallback offline)
+// ============================================================
+// Estrutura:
+//   db.jogadores.list()      → array de jogadores
+//   db.jogadores.create(j)   → cria
+//   db.jogadores.update(id, j) → atualiza
+//   db.jogadores.delete(id)  → remove
+//
+// Cada método tenta o Supabase primeiro. Se falhar (offline/erro),
+// faz fallback no localStorage (sistema continua funcionando).
+// ============================================================
+
+// Estado de conexão (online/offline)
+let dbOnline = navigator.onLine;
+window.addEventListener('online',  () => { dbOnline = true;  atualizarStatusDB(); showToast('🟢 Conexão restaurada'); });
+window.addEventListener('offline', () => { dbOnline = false; atualizarStatusDB(); showToast('🔴 Sem conexão — modo offline'); });
+
+function atualizarStatusDB() {
+    const el = document.getElementById('db-status');
+    if (!el) return;
+    if (dbOnline) {
+        el.innerHTML = '<i class="fa-solid fa-circle" style="color:#22c55e;font-size:.5rem;margin-right:.25rem;"></i>Online';
+        el.style.color = '#22c55e';
+    } else {
+        el.innerHTML = '<i class="fa-solid fa-circle" style="color:#ef4444;font-size:.5rem;margin-right:.25rem;"></i>Offline';
+        el.style.color = '#ef4444';
+    }
+}
+
+// Helper: gera UUID v4 (pra IDs novos no offline)
+function _genUuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// Helper: converte registro do banco (snake_case) para o formato da UI (camelCase)
+function _jogadorFromDb(row) {
+    return {
+        id: row.id,                          // UUID (string)
+        nome: row.nome,
+        apelido: row.apelido || '',
+        whatsapp: row.whatsapp || '',
+        cidade: row.cidade || '',
+        uf: row.uf || '',
+        cpf: row.cpf || '',
+        email: row.email || '',
+        notas: row.notas || '',
+        criadoEm: row.criado_em ? new Date(row.criado_em).getTime() : Date.now(),
+    };
+}
+
+// Helper: converte da UI para o banco
+function _jogadorToDb(j) {
+    return {
+        id: j.id,
+        clube_id: sbClube ? sbClube.id : null,
+        nome: j.nome,
+        apelido: j.apelido || null,
+        whatsapp: j.whatsapp || null,
+        cidade: j.cidade || null,
+        uf: j.uf || null,
+        cpf: j.cpf || null,
+        email: j.email || null,
+        notas: j.notas || null,
+    };
+}
+
+const db = {
+    jogadores: {
+        // Lista todos os jogadores do clube (do Supabase). Atualiza cache local "jogadores".
+        async list() {
+            try {
+                const { data, error } = await sb
+                    .from('jogadores')
+                    .select('*')
+                    .order('nome');
+                if (error) throw error;
+                jogadores = (data || []).map(_jogadorFromDb);
+                localStorage.setItem('ps_jogadores', JSON.stringify(jogadores));
+                return jogadores;
+            } catch (e) {
+                console.warn('db.jogadores.list falhou, usando localStorage:', e.message);
+                return jogadores; // fallback: cache local
+            }
+        },
+
+        // Cria um jogador no banco. Retorna o jogador criado (com ID do banco).
+        async create(dados) {
+            const novoId = _genUuid();
+            const novo = { id: novoId, ...dados };
+
+            try {
+                const payload = _jogadorToDb(novo);
+                const { data, error } = await sb
+                    .from('jogadores')
+                    .insert(payload)
+                    .select()
+                    .single();
+                if (error) throw error;
+                const criado = _jogadorFromDb(data);
+                jogadores.push(criado);
+                localStorage.setItem('ps_jogadores', JSON.stringify(jogadores));
+                return criado;
+            } catch (e) {
+                console.error('db.jogadores.create erro:', e);
+                throw e; // propaga pra UI mostrar erro
+            }
+        },
+
+        // Atualiza um jogador existente.
+        async update(id, dados) {
+            try {
+                const payload = _jogadorToDb({ id, ...dados });
+                delete payload.clube_id; // evita re-setar clube_id
+                const { data, error } = await sb
+                    .from('jogadores')
+                    .update(payload)
+                    .eq('id', id)
+                    .select()
+                    .single();
+                if (error) throw error;
+                const atualizado = _jogadorFromDb(data);
+                const idx = jogadores.findIndex(j => j.id === id);
+                if (idx >= 0) jogadores[idx] = atualizado;
+                else jogadores.push(atualizado);
+                localStorage.setItem('ps_jogadores', JSON.stringify(jogadores));
+                return atualizado;
+            } catch (e) {
+                console.error('db.jogadores.update erro:', e);
+                throw e;
+            }
+        },
+
+        // Remove um jogador.
+        async delete(id) {
+            try {
+                const { error } = await sb
+                    .from('jogadores')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+                jogadores = jogadores.filter(j => j.id !== id);
+                localStorage.setItem('ps_jogadores', JSON.stringify(jogadores));
+                return true;
+            } catch (e) {
+                console.error('db.jogadores.delete erro:', e);
+                throw e;
+            }
+        },
+
+        // Helper: busca rápida por id no cache (sem hit no banco)
+        getById(id) {
+            return jogadores.find(j => j.id === id);
+        },
+    },
+};
+
 async function inicializarAuth() {
     try {
         const { data: { session } } = await sb.auth.getSession();
@@ -2827,6 +2989,9 @@ async function login() {
         iniciarRelogio();
         logAudit('LOGIN', `Login: ${currentUser.nome}`);
         iniciarBackupAutomatico();
+        atualizarStatusDB();
+        // Carrega jogadores do banco em background (não bloqueia UI)
+        db.jogadores.list().then(() => { renderJogadores(); renderDashboard(); }).catch(e => console.warn('Carregar jogadores:', e));
         showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
     } catch (e) {
         console.error('Login erro:', e);
@@ -3989,8 +4154,8 @@ function renderJogadores(data = jogadores) {
                 <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Devedor':credito?'Crédito':'Zerado'}</div>
             </td>
             <td style="padding:.9rem 1.5rem;text-align:right;">
-                <button onclick="editarJogador(${j.id})" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;margin-right:.3rem;" title="Editar informações cadastrais"><i class="fa-solid fa-pen"></i> Editar</button>
-                <button onclick="removerJogador(${j.id})" class="btn-danger"><i class="fa-solid fa-trash"></i></button>
+                <button onclick="editarJogador('${j.id}')" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;margin-right:.3rem;" title="Editar informações cadastrais"><i class="fa-solid fa-pen"></i> Editar</button>
+                <button onclick="removerJogador('${j.id}')" class="btn-danger"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>`;
     }).join('');
@@ -4000,7 +4165,7 @@ function contarTorneiosJogador(id) {
     return torneios.filter(t => t.entries.some(e => e.jogadorId === id)).length + ' torneio(s)';
 }
 
-function salvarJogador() {
+async function salvarJogador() {
     // Validação completa
     const v = validarCampos([
         { id:'j-nome',     nome:'Nome',     obrigatorio:true, minLength:2 },
@@ -4019,26 +4184,33 @@ function salvarJogador() {
         uf:       document.getElementById('j-uf').value.trim().toUpperCase(),
     };
 
-    if (editId) {
-        // Modo edição
-        const j = jogadores.find(x => x.id === parseInt(editId));
-        if (!j) return showToast('⚠️ Jogador não encontrado');
-        Object.assign(j, dados);
-        logAudit('JOGADOR_EDITA', `Editado: ${nome}`, { id: j.id, dados });
-        showToast(`✅ ${nome} atualizado!`);
-    } else {
-        // Modo cadastro
-        const novoId = Date.now();
-        jogadores.push({ id: novoId, ...dados });
-        logAudit('JOGADOR_CRIA', `Cadastrado: ${nome}`, { id: novoId, dados });
-        showToast(`✅ ${nome} cadastrado!`);
-    }
+    // UI: estado de loading
+    const btn = document.getElementById('j-submit-btn');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.7'; }
 
-    saveData();
-    closeModal('modal-jogador');
-    limparFormularioJogador();
-    renderJogadores();
-    renderDashboard();
+    try {
+        if (editId) {
+            // Modo edição
+            const atualizado = await db.jogadores.update(editId, dados);
+            logAudit('JOGADOR_EDITA', `Editado: ${nome}`, { id: editId, dados });
+            showToast(`✅ ${nome} atualizado!`);
+        } else {
+            // Modo cadastro
+            const criado = await db.jogadores.create(dados);
+            logAudit('JOGADOR_CRIA', `Cadastrado: ${nome}`, { id: criado.id, dados });
+            showToast(`✅ ${nome} cadastrado!`);
+        }
+
+        closeModal('modal-jogador');
+        limparFormularioJogador();
+        renderJogadores();
+        renderDashboard();
+    } catch (e) {
+        console.error('salvarJogador erro:', e);
+        showToast('⚠️ Erro: ' + (e.message || 'Não foi possível salvar'));
+    } finally {
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
 }
 
 // Alias para compatibilidade com código existente
@@ -4071,12 +4243,19 @@ function editarJogador(jogadorId) {
     openModal('modal-jogador');
 }
 
-function removerJogador(id) {
+async function removerJogador(id) {
     if (!confirm('Deseja remover este jogador?')) return;
-    jogadores = jogadores.filter(j => j.id !== id);
-    saveData();
-    renderJogadores();
-    renderDashboard();
+    try {
+        const j = jogadores.find(x => x.id === id);
+        await db.jogadores.delete(id);
+        if (j) logAudit('JOGADOR_DELETE', `Removido: ${j.nome}`, { id });
+        showToast('🗑️ Jogador removido');
+        renderJogadores();
+        renderDashboard();
+    } catch (e) {
+        console.error('removerJogador erro:', e);
+        showToast('⚠️ Erro: ' + (e.message || 'Não foi possível remover'));
+    }
 }
 
 function filtrarJogadores(val) {
@@ -11427,7 +11606,7 @@ function abrirCadastroRapido() {
     }, 100);
 }
 
-function salvarCadastroRapido() {
+async function salvarCadastroRapido() {
     const v = validarCampos([
         { id:'qr-nome',     nome:'Nome',     obrigatorio:true, minLength:2 },
         { id:'qr-whatsapp', nome:'WhatsApp', obrigatorio:false, tipo:'fone' },
@@ -11437,32 +11616,37 @@ function salvarCadastroRapido() {
 
     const nome = document.getElementById('qr-nome').value.trim();
 
-    const novoJog = {
-        id: Date.now(),
+    const dados = {
         nome,
         apelido:  document.getElementById('qr-apelido').value.trim(),
         whatsapp: document.getElementById('qr-whatsapp').value.trim(),
         cidade:   document.getElementById('qr-cidade').value.trim(),
         uf:       document.getElementById('qr-uf').value.trim().toUpperCase(),
     };
-    jogadores.push(novoJog);
-    saveData();
 
-    // Re-renderiza o dropdown do modal de entrada com o novo jogador
-    closeModal('modal-cadastro-rapido');
+    try {
+        const novoJog = await db.jogadores.create(dados);
+        logAudit('JOGADOR_CRIA', `Cadastro rápido: ${nome}`, { id: novoJog.id });
 
-    // Se está dentro de torneio, repopula o select e já seleciona o novo
-    const sel = document.getElementById('entrada-jogador');
-    if (sel) {
-        openModalEntrada(activeTorneioIdx);  // repopula lista
-        setTimeout(() => {
-            const newSel = document.getElementById('entrada-jogador');
-            if (newSel) newSel.value = novoJog.id;
-        }, 50);
+        closeModal('modal-cadastro-rapido');
+
+        // Repopula select do modal de entrada e seleciona o recém-criado
+        const sel = document.getElementById('entrada-jogador');
+        if (sel) {
+            openModalEntrada(activeTorneioIdx);
+            setTimeout(() => {
+                const newSel = document.getElementById('entrada-jogador');
+                if (newSel) newSel.value = novoJog.id;
+            }, 50);
+        }
+        renderJogadores();
+        renderDashboard();
+        showToast(`✅ ${nome} cadastrado e pronto para entrada`);
+    } catch (e) {
+        console.error('salvarCadastroRapido erro:', e);
+        showToast('⚠️ Erro: ' + (e.message || 'Não foi possível cadastrar'));
     }
-    renderJogadores();
-    renderDashboard();
-    showToast(`✅ ${nome} cadastrado e pronto para entrada`);
+
 }
 
 // ============================================================
@@ -12567,6 +12751,9 @@ window.onload = () => {
             renderDashboard();
             iniciarRelogio();
             iniciarBackupAutomatico();
+            atualizarStatusDB();
+            // Carrega dados do clube em background
+            db.jogadores.list().then(() => { renderJogadores(); renderDashboard(); }).catch(e => console.warn('Carregar jogadores:', e));
             console.log('✅ Sessão recuperada:', currentUser.nome, '| Clube:', sbClube && sbClube.nome);
         } else {
             if (ls) ls.style.display = 'flex';
