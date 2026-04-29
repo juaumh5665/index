@@ -3809,7 +3809,7 @@ function logAudit(categoria, descricao, detalhes) {
     // Hook: marca pra sync no Supabase (background)
     try {
         const log = {
-            id: Date.now() + Math.random(),
+            id: _genUuid(),
             ts: Date.now(),
             usuario: currentUser ? (currentUser.nome || currentUser.email || 'Operador') : 'Sistema',
             usuarioId: currentUser ? currentUser.id : null,
@@ -4948,7 +4948,7 @@ function saveTournament() {
     const rankingRakePct = document.getElementById('t-ranking-rake-pct') ? parseFloat(document.getElementById('t-ranking-rake-pct').value) || 0 : 0;
 
     const t = {
-        id:           Date.now(),
+        id:           _genUuid(),  // UUID para Supabase
         nome,
         tipo,                                                                    // normal | bounty | pko | knockout
         formato,                                                                 // unico | dia1 | dia2 (parte de uma série)
@@ -5003,7 +5003,7 @@ function saveTournament() {
 
     // Se é Dia 1 e tem série vinculada mas series não existe, cria série
     if (t.formato === 'dia1' && !t.seriesId) {
-        t.seriesId = 'series_' + t.id;
+        t.seriesId = _genUuid();
     }
     saveData();
     closeModal('modal-novo-torneio');
@@ -5523,7 +5523,7 @@ function registrarEntrada() {
 
 function _registrarEntradaImpl() {
     const t   = torneios[activeTorneioIdx];
-    const jid = parseInt(document.getElementById('entrada-jogador').value);
+    const jid = document.getElementById('entrada-jogador').value;
     const tipo = document.getElementById('entrada-tipo').value;
 
     // REGRA: bloquear entrada se o caixa do torneio estiver fechado
@@ -5553,7 +5553,7 @@ function _registrarEntradaImpl() {
     if (tipo === 'rebuy_duplo')   valorRS = t.rebuyDuplo;
     if (tipo === 'addon')         valorRS = 0;   // add-on pode ser cortesia ou cobrado separado; mantemos sem valor em caixa
 
-    t.entries.push({ jogadorId: jid, tipo, ts: Date.now(), valor: valorRS });
+    t.entries.push({ id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorRS });
     alocarJogadorMesa(t, jid);
 
     // Para torneios KO: cada entrada paga também bounty (exceto add-on)
@@ -5654,12 +5654,12 @@ function confirmarEliminacao() {
 
 function _confirmarEliminacaoImpl() {
     const t   = torneios[activeTorneioIdx];
-    const jid = parseInt(document.getElementById('eliminar-jogador').value);
+    const jid = document.getElementById('eliminar-jogador').value;
     if (!jid) return;
 
     // Para KO: pegar eliminador se selecionado
     const eliminadorSel = document.getElementById('eliminador-jogador');
-    const eliminadorId = eliminadorSel ? parseInt(eliminadorSel.value) : null;
+    const eliminadorId = eliminadorSel && eliminadorSel.value ? eliminadorSel.value : null;
 
     const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
     const entriesIds    = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
@@ -7586,7 +7586,7 @@ function salvarProduto() {
         showToast('✅ Produto atualizado!');
     } else {
         barProdutos.push({
-            id: Date.now(),
+            id: _genUuid(),
             nome,
             descricao: document.getElementById('prod-descricao').value.trim(),
             valor,
@@ -7807,12 +7807,12 @@ function calcTotalComanda(c) {
 
 function abrirComanda() {
     if (!isBarCaixaAberto()) return showToast('🚫 Caixa fechado, abra para continuar');
-    const jid = parseInt(document.getElementById('comanda-jogador').value);
+    const jid = document.getElementById('comanda-jogador').value;
     if (!jid) return showToast('⚠️ Selecione um jogador');
     const jaAberta = barComandas.find(c => c.jogadorId === jid && c.status === 'aberta');
     if (jaAberta) return showToast('⚠️ Jogador já tem comanda aberta');
     barComandas.push({
-        id: Date.now(),
+        id: _genUuid(),
         jogadorId: jid,
         itens: [],
         status: 'aberta',
@@ -8249,7 +8249,7 @@ function abrirAddJogadorCash(mesaId) {
 function confirmAddCashJogador() {
     const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
     if (!m) return;
-    const jid = parseInt(document.getElementById('acj-jogador').value);
+    const jid = document.getElementById('acj-jogador').value;
     const valor = parseFloat(document.getElementById('acj-valor').value) || 0;
 
     if (!jid) return showToast('⚠️ Selecione um jogador');
@@ -9100,7 +9100,7 @@ function playBeep() {
 
 function registrarTransacao(dados) {
     const t = {
-        id: Date.now() + Math.random(),
+        id: _genUuid(),
         ts: Date.now(),
         fechamentoId: null,
         ...dados,
@@ -9711,7 +9711,7 @@ function openModalDepositoRapido() {
 }
 
 function confirmarDeposito() {
-    const jid = parseInt(document.getElementById('dep-jogador').value);
+    const jid = document.getElementById('dep-jogador').value;
     const valor = parseFloat(document.getElementById('dep-valor').value) || 0;
     const metodo = (document.querySelector('input[name="metodo-quick"]:checked') || {}).value;
     const obs = document.getElementById('dep-obs').value.trim();
@@ -9814,7 +9814,7 @@ function renderCaixaFechamento() {
         </div>`;
     } else {
         resumoEl.innerHTML = Object.entries(porJogador).map(([jid, d]) => {
-            const j = jogadores.find(x => x.id === parseInt(jid));
+            const j = jogadores.find(x => x.id === jid);
             const saldoLiq = d.creditos - d.debitos;
             return `
             <div class="stat-card" style="padding:.85rem 1rem;">
@@ -10385,7 +10385,7 @@ function criarDia2DaSerie(seriesId) {
     const base = seriesInfo.dias[0];
     const t = {
         ...JSON.parse(JSON.stringify(base)),
-        id: Date.now(),
+        id: _genUuid(),
         nome: (base.seriesNome || base.nome) + ' — Dia Final',
         formato: 'dia2',
         diaLabel: 'Final',
@@ -10408,7 +10408,7 @@ function criarDia2DaSerie(seriesId) {
 
     // Importa fichas dos classificados como buyin + adiciona stack customizado
     classificados.forEach(c => {
-        t.entries.push({ jogadorId: c.jogadorId, tipo: 'buyin', ts: Date.now(), valor: 0 });  // valor 0 porque já pagou no dia 1
+        t.entries.push({ id: _genUuid(), jogadorId: c.jogadorId, tipo: 'buyin', ts: Date.now(), valor: 0 });  // valor 0 porque já pagou no dia 1
         t.stacksImportados[c.jogadorId] = c.fichas;
         alocarJogadorMesa(t, c.jogadorId);
     });
@@ -10583,8 +10583,8 @@ function calcularPontuacoesRanking(r) {
     });
 
     return Object.entries(pontos).map(([jid, v]) => ({
-        jogadorId: parseInt(jid),
-        nome: getJogadorNome(parseInt(jid)),
+        jogadorId: jid,
+        nome: getJogadorNome(jid),
         pontos: v.pontos,
         torneios: v.torneios,
     })).sort((a, b) => b.pontos - a.pontos);
@@ -10690,7 +10690,7 @@ function atualizarTotalJackpot() {
 
 function confirmarJackpot() {
     const t = torneios[activeTorneioIdx];
-    const jid = parseInt(document.getElementById('jackpot-jogador').value);
+    const jid = document.getElementById('jackpot-jogador').value;
     if (!jid) return showToast('⚠️ Selecione um jogador');
 
     // Bloqueio: caixa do torneio precisa estar aberto
@@ -11487,8 +11487,8 @@ function renderRelClientes() {
 
     const busca = ((document.getElementById('rcli-busca') || {}).value || '').toLowerCase();
     let lista = Object.entries(porCliente).map(([jid, d]) => {
-        const j = jogadores.find(x => x.id === parseInt(jid));
-        return { jogadorId: parseInt(jid), nome: j ? j.nome : '?', ...d };
+        const j = jogadores.find(x => x.id === jid);
+        return { jogadorId: jid, nome: j ? j.nome : '?', ...d };
     }).sort((a,b) => b.gasto - a.gasto);
     if (busca) lista = lista.filter(c => c.nome.toLowerCase().includes(busca));
 
@@ -11634,7 +11634,7 @@ function exportRelClientes() {
 
     const rows = [['Cliente','Cidade/UF','Transações','Gasto Total','Torneios','Cash','Bar','Recebido','Saldo Final']];
     Object.entries(porCliente).forEach(([jid, d]) => {
-        const j = jogadores.find(x => x.id === parseInt(jid));
+        const j = jogadores.find(x => x.id === jid);
         if (!j) return;
         rows.push([
             j.nome,
