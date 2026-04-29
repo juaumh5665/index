@@ -2778,6 +2778,62 @@ function _genUuid() {
     });
 }
 
+
+// Helper: verifica se uma string é UUID válido
+function _isUuid(v) {
+    return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
+
+// Helper: corrige IDs antigos (numéricos) → UUID e marca em localStorage
+function _migrarIdsAntigos() {
+    let migrou = false;
+    // Torneios
+    if (typeof torneios !== 'undefined') {
+        torneios.forEach(t => {
+            if (!_isUuid(t.id)) {
+                console.log('[MIGRAÇÃO] Torneio com ID antigo:', t.id, '→ gerando UUID');
+                t.id = _genUuid();
+                if (t.seriesId && !_isUuid(t.seriesId)) t.seriesId = _genUuid();
+                migrou = true;
+            }
+            // entries
+            if (t.entries) {
+                t.entries.forEach(e => { if (!_isUuid(e.id)) { e.id = _genUuid(); migrou = true; } });
+            }
+        });
+    }
+    // Bar produtos
+    if (typeof barProdutos !== 'undefined') {
+        barProdutos.forEach(p => {
+            if (!_isUuid(p.id)) { p.id = _genUuid(); migrou = true; }
+        });
+    }
+    // Bar comandas
+    if (typeof barComandas !== 'undefined') {
+        barComandas.forEach(c => {
+            if (!_isUuid(c.id)) { c.id = _genUuid(); migrou = true; }
+        });
+    }
+    // Cash mesas
+    if (typeof cashMesas !== 'undefined') {
+        cashMesas.forEach(m => {
+            if (!_isUuid(m.id)) { m.id = _genUuid(); migrou = true; }
+        });
+    }
+    // Transações
+    if (typeof transacoes !== 'undefined') {
+        transacoes.forEach(tx => {
+            if (!_isUuid(tx.id)) { tx.id = _genUuid(); migrou = true; }
+        });
+    }
+    if (migrou) {
+        console.log('[MIGRAÇÃO] IDs antigos foram convertidos. Salvando...');
+        if (typeof _saveDataInner === 'function') _saveDataInner();
+    }
+    return migrou;
+}
+
+
 // Helper: converte registro do banco (snake_case) para o formato da UI (camelCase)
 function _jogadorFromDb(row) {
     return {
@@ -3098,6 +3154,9 @@ async function sincronizarEstado() {
         return;
     }
 
+    // Garante que todos os IDs locais são UUIDs antes de mandar pro Supabase
+    _migrarIdsAntigos();
+
     _syncEmAndamento = true;
     console.log('[SYNC] Iniciando. Queue:', {
         torneios: _syncQueue.torneios.size,
@@ -3118,7 +3177,17 @@ async function sincronizarEstado() {
             console.log('[SYNC] Torneios pra sync:', torneiosRows.length, 'IDs:', ids);
 
             if (torneiosRows.length) {
-                const payload = torneiosRows.map(_torneioToDb);
+                let payload = torneiosRows.map(_torneioToDb);
+                // Filtra payloads com IDs inválidos (defensivo)
+                const payloadValido = payload.filter(p => _isUuid(p.id));
+                if (payloadValido.length !== payload.length) {
+                    console.warn('[SYNC] ⚠️ Filtrei', payload.length - payloadValido.length, 'torneios com ID inválido');
+                }
+                payload = payloadValido;
+                if (!payload.length) {
+                    console.warn('[SYNC] Nenhum torneio com ID válido pra sincronizar');
+                    _syncQueue.torneios.clear();
+                } else {
                 console.log('[SYNC] Payload torneios:', JSON.stringify(payload[0]).substring(0, 500));
 
                 // 1. Sync torneios principais
@@ -3201,6 +3270,7 @@ async function sincronizarEstado() {
                 }
             }
         }
+                }
 
         // === CASH MESAS
         if (_syncQueue.cashMesas.size && typeof cashMesas !== 'undefined') {
