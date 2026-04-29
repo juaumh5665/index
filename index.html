@@ -7631,8 +7631,8 @@ function renderProdutos() {
                     <span style="font-size:.85rem;font-weight:700;color:${p.estoque<=5?'#ef4444':p.estoque<=10?'#f59e0b':'#e4e4e7'};">${p.estoque}</span>
                 </div>
                 <div style="display:flex;gap:.4rem;">
-                    <button onclick="editarProduto(${p.id})" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .55rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-pen"></i></button>
-                    <button onclick="removerProduto(${p.id})" class="btn-danger" style="padding:.3rem .55rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="editarProduto('${p.id}')" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .55rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="removerProduto('${p.id}')" class="btn-danger" style="padding:.3rem .55rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
             `).join('')}
@@ -7685,7 +7685,7 @@ function salvarProduto() {
 
     const editId = document.getElementById('prod-edit-id').value;
     if (editId) {
-        const idx = barProdutos.findIndex(p => p.id === parseInt(editId));
+        const idx = barProdutos.findIndex(p => p.id === editId);
         if (idx !== -1) {
             barProdutos[idx] = { ...barProdutos[idx],
                 nome,
@@ -7791,7 +7791,7 @@ function renderComandas() {
         const total = calcTotalComanda(c);
         const ativa = c.id === activeComandaId;
         return `
-        <div onclick="selecionarComanda(${c.id})" style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:${ativa?'#1a1a1e':'#0f0f12'};border:1px solid ${ativa?'var(--gold)':'#1e1e23'};border-radius:.6rem;cursor:pointer;transition:all .15s;">
+        <div onclick="selecionarComanda('${c.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:${ativa?'#1a1a1e':'#0f0f12'};border:1px solid ${ativa?'var(--gold)':'#1e1e23'};border-radius:.6rem;cursor:pointer;transition:all .15s;">
             <div>
                 <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}${j && j.apelido ? ` <span style="color:#52525b;font-weight:400;">(${j.apelido})</span>` : ''}</div>
                 <div style="font-size:.75rem;color:#52525b;margin-top:.15rem;">${c.itens.length} item(s)</div>
@@ -7873,7 +7873,7 @@ function addItemComanda() {
     if (!isBarCaixaAberto()) return showToast('🚫 Caixa fechado, abra para continuar');
     const c = barComandas.find(c => c.id === activeComandaId);
     if (!c) return showToast('⚠️ Selecione uma comanda');
-    const prodId = parseInt(document.getElementById('cd-produto-sel').value);
+    const prodId = document.getElementById('cd-produto-sel').value;
     const qtd    = parseInt(document.getElementById('cd-qtd').value) || 1;
     const prod   = barProdutos.find(p => p.id === prodId);
     if (!prod) return showToast('⚠️ Produto inválido');
@@ -8264,8 +8264,8 @@ function renderCashMesas() {
                     </div>
                 </div>
                 <div style="display:flex;gap:.5rem;">
-                    <button onclick="abrirAddJogadorCash(${m.id})" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Jogador</button>
-                    <button onclick="encerrarMesaCash(${m.id})" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;" title="Encerrar mesa"><i class="fa-solid fa-stop"></i> Encerrar</button>
+                    <button onclick="abrirAddJogadorCash('${m.id}')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Jogador</button>
+                    <button onclick="encerrarMesaCash('${m.id}')" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;" title="Encerrar mesa"><i class="fa-solid fa-stop"></i> Encerrar</button>
                 </div>
             </div>
             <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;border-bottom:1px solid #1e1e23;">
@@ -8309,8 +8309,8 @@ function renderJogadoresCashMesa(m) {
                     <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem;color:#22c55e;">${formatMoney(j.totalInvestido)}</div>
                 </div>
                 <div style="display:flex;gap:.35rem;">
-                    <button onclick="abrirRecompra(${m.id}, ${j.jogadorId})" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
-                    <button onclick="abrirRetirar(${m.id}, ${j.jogadorId})" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+                    <button onclick="abrirRecompra('${m.id}', ${j.jogadorId})" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
+                    <button onclick="abrirRetirar('${m.id}', ${j.jogadorId})" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
                 </div>
                 <div></div>
             </div>`;
@@ -9297,12 +9297,12 @@ function renderCaixaAberto() {
         const zerado  = saldo === 0;
         return `
         <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
-            <div onclick="abrirPagamentoJogador(${jogador.id})" style="cursor:pointer;width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
-            <div onclick="abrirPagamentoJogador(${jogador.id})" style="cursor:pointer;">
+            <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
+            <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;">
                 <div style="font-weight:700;font-size:.9rem;">${jogador.nome}</div>
                 ${jogador.apelido ? `<div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">${jogador.apelido}</div>` : ''}
             </div>
-            <div onclick="abrirPagamentoJogador(${jogador.id})" style="cursor:pointer;text-align:right;">
+            <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;text-align:right;">
                 <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Deve':credito?'Crédito':'Saldo'}</div>
                 <div style="font-family:'Space Mono',monospace;font-weight:800;color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};font-size:1rem;">${zerado?formatMoney(0):(devedor?'-':'+')+formatMoney(Math.abs(saldo))}</div>
             </div>
@@ -9366,7 +9366,7 @@ function renderComandasAbertasCaixa() {
                 <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${c.itens.length} iten${c.itens.length>1?'s':''} · aberta ${timeAgo(c.abertoEm || c.createdAt || Date.now())}</div>
             </div>
             <span style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(total)}</span>
-            <button onclick="acertarComandaDoCaixa(${c.id})" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .7rem;cursor:pointer;font-weight:700;font-size:.7rem;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-hand-holding-dollar"></i> Acertar</button>
+            <button onclick="acertarComandaDoCaixa('${c.id}')" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .7rem;cursor:pointer;font-weight:700;font-size:.7rem;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-hand-holding-dollar"></i> Acertar</button>
         </div>`;
     }).join('');
 
@@ -9480,7 +9480,7 @@ function renderExtratoJogador() {
                 </div>
             </div>
             <span style="font-family:'Space Mono',monospace;font-weight:800;font-size:.9rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
-            <button onclick="removerTransacao(${t.id})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar transação" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-rotate-left"></i></button>
+            <button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar transação" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-rotate-left"></i></button>
         </div>`;
     }).join('');
 }
@@ -10070,7 +10070,7 @@ function renderCaixaTransacoes() {
             </div>
             ${t.fechamentoId?`<span class="tag tag-finished" style="font-size:.6rem;">Fechado</span>`:'<span></span>'}
             <span style="font-family:'Space Mono',monospace;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
-            ${!t.fechamentoId ? `<button onclick="removerTransacao(${t.id})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar"><i class="fa-solid fa-rotate-left"></i></button>` : '<span></span>'}
+            ${!t.fechamentoId ? `<button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar"><i class="fa-solid fa-rotate-left"></i></button>` : '<span></span>'}
         </div>`;
     }).join('');
 }
