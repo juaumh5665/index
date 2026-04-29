@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PokerSul – Sistema Pro</title>
+    <!-- ===== ERROR CAPTURE (debug) ===== -->
+    <script>
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('Invalid or unexpected token')) {
+                console.error('🐛 SYNTAX ERROR DETECTED:');
+                console.error('   Mensagem:', e.message);
+                console.error('   Arquivo:', e.filename);
+                console.error('   Linha:', e.lineno, 'Coluna:', e.colno);
+                console.error('   Stack:', e.error && e.error.stack);
+                console.error('   Source:', e.source);
+            }
+        });
+        // Também captura quando avalia HTML inline (onclick etc)
+        const _origErr = console.error;
+    </script>
     <!-- ===== SUPABASE BACKEND ===== -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -2870,10 +2885,12 @@ const db = {
     jogadores: {
         // Lista todos os jogadores do clube (do Supabase). Atualiza cache local "jogadores".
         async list() {
+            if (!sbClube) return jogadores;  // 🛡️ não tenta sem clube
             try {
                 const { data, error } = await sb
                     .from('jogadores')
                     .select('*')
+                    .eq('clube_id', sbClube.id)  // 🛡️ defesa em profundidade
                     .order('nome');
                 if (error) throw error;
                 jogadores = (data || []).map(_jogadorFromDb);
@@ -3385,46 +3402,48 @@ const _saveDataOriginal = (typeof saveData === 'function') ? saveData : null;
 // ============================================================
 async function carregarEstadoDoSupabase() {
     if (!sbClube) return;
+    const clubeIdEsperado = sbClube.id;
     try {
-        // Torneios
-        const { data: tRows } = await sb.from('torneios').select('*').order('criado_em', { ascending: false });
+        // Torneios — sempre filtra pelo clube_id atual (defesa em profundidade)
+        const { data: tRowsRaw } = await sb.from('torneios').select('*').eq('clube_id', clubeIdEsperado).order('criado_em', { ascending: false });
+        const tRows = (tRowsRaw || []).filter(r => r.clube_id === clubeIdEsperado);
         if (tRows && tRows.length) {
-            // Buscar entries, eliminados, jackpot, mesas em paralelo
+            // Buscar entries, eliminados, jackpot, mesas em paralelo (filtrado por clube_id)
             const ids = tRows.map(t => t.id);
             const [eRes, elRes, jRes, mRes] = await Promise.all([
-                sb.from('torneio_entries').select('*').in('torneio_id', ids),
-                sb.from('torneio_eliminados').select('*').in('torneio_id', ids),
-                sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids),
-                sb.from('torneio_mesas').select('*').in('torneio_id', ids),
+                sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
+                sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
+                sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
+                sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
             ]);
             // Reconstruir torneios em formato de UI
             torneios = tRows.map(r => _torneioFromDb(r, eRes.data || [], elRes.data || [], jRes.data || [], mRes.data || []));
             localStorage.setItem('ps_torneios', JSON.stringify(torneios));
         }
 
-        // Cash mesas
+        // Cash mesas (filtrado por clube_id)
         if (typeof cashMesas !== 'undefined') {
-            const { data: cmRows } = await sb.from('cash_mesas').select('*');
+            const { data: cmRows } = await sb.from('cash_mesas').select('*').eq('clube_id', clubeIdEsperado);
             if (cmRows) {
                 cashMesas = cmRows.map(_cashFromDb);
                 localStorage.setItem('ps_cash_mesas', JSON.stringify(cashMesas));
             }
         }
 
-        // Bar grupos + produtos
-        const { data: gRows } = await sb.from('bar_grupos').select('*').order('ordem');
+        // Bar grupos + produtos (filtrado por clube_id)
+        const { data: gRows } = await sb.from('bar_grupos').select('*').eq('clube_id', clubeIdEsperado).order('ordem');
         if (gRows && gRows.length) {
             barGrupos = gRows.map(g => g.nome);
             localStorage.setItem('ps_bar_grupos', JSON.stringify(barGrupos));
         }
-        const { data: pRows } = await sb.from('bar_produtos').select('*');
+        const { data: pRows } = await sb.from('bar_produtos').select('*').eq('clube_id', clubeIdEsperado);
         if (pRows) {
             barProdutos = pRows.map(_produtoFromDb);
             localStorage.setItem('ps_bar_produtos', JSON.stringify(barProdutos));
         }
 
-        // Bar comandas + itens
-        const { data: cRows } = await sb.from('bar_comandas').select('*');
+        // Bar comandas + itens (filtrado por clube_id)
+        const { data: cRows } = await sb.from('bar_comandas').select('*').eq('clube_id', clubeIdEsperado);
         if (cRows) {
             barComandas = cRows.map(_comandaFromDb);
             // Buscar itens em batch
@@ -3446,8 +3465,8 @@ async function carregarEstadoDoSupabase() {
             localStorage.setItem('ps_bar_comandas', JSON.stringify(barComandas));
         }
 
-        // Transações (últimas 1000)
-        const { data: txRows } = await sb.from('transacoes').select('*').order('ts', { ascending: false }).limit(1000);
+        // Transações (filtrado por clube_id, últimas 1000)
+        const { data: txRows } = await sb.from('transacoes').select('*').eq('clube_id', clubeIdEsperado).order('ts', { ascending: false }).limit(1000);
         if (txRows) {
             transacoes = txRows.map(_transacaoFromDb);
             localStorage.setItem('ps_transacoes', JSON.stringify(transacoes));
@@ -3595,6 +3614,9 @@ async function inicializarAuth() {
 }
 
 async function carregarUsuarioEClube(authUser) {
+    // 🛡️ SEGURANÇA: limpa qualquer estado anterior antes de carregar novo clube
+    _limparEstadoClube();
+
     const { data: usuario, error: errUser } = await sb
         .from('usuarios').select('*').eq('id', authUser.id).single();
     if (errUser || !usuario) {
@@ -3626,6 +3648,12 @@ async function carregarUsuarioEClube(authUser) {
         papel: usuario.papel,
         clube_id: usuario.clube_id,
     };
+
+    // Log de diagnóstico (segurança/auditoria)
+    console.log('🔐 SESSÃO INICIADA:');
+    console.log('   Usuário:', usuario.email, '(papel:', usuario.papel + ')');
+    console.log('   Clube:', clube.nome, '— ID:', clube.id);
+
     return { usuario, clube };
 }
 
@@ -3651,6 +3679,7 @@ sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
         sbSession = null; sbClube = null; currentUser = null;
         sessionStorage.clear();
+        if (typeof _limparEstadoClube === 'function') _limparEstadoClube();  // 🛡️ SEGURANÇA
         const ls = document.getElementById('login-screen');
         const ma = document.getElementById('main-app');
         if (ls) ls.style.display = 'flex';
@@ -4729,6 +4758,50 @@ function abrirAjudaAtalhos() {
 }
 
 
+
+// ============================================================
+// SEGURANÇA: Limpar TODO o estado em memória + localStorage
+// Chamado ao fazer logout OU antes de carregar novo clube
+// ============================================================
+function _limparEstadoClube() {
+    // Limpa cache local de TUDO que pertence a um clube específico
+    const keysClube = [
+        'ps_jogadores', 'ps_torneios', 'ps_bar_grupos', 'ps_bar_produtos',
+        'ps_bar_comandas', 'ps_cash_mesas', 'ps_transacoes', 'ps_fechamentos',
+        'ps_bar_caixa', 'ps_rankings', 'ps_auditoria', 'ps_torneio_templates',
+        'ps_backup_auto', 'ps_fichas_denominacoes',
+    ];
+    keysClube.forEach(k => localStorage.removeItem(k));
+
+    // Reseta variáveis em memória
+    if (typeof jogadores !== 'undefined')   jogadores = [];
+    if (typeof torneios !== 'undefined')    torneios = [];
+    if (typeof barGrupos !== 'undefined')   barGrupos = ['Refrigerantes','Cervejas','Salgados','Picolés','Outros'];
+    if (typeof barProdutos !== 'undefined') barProdutos = [];
+    if (typeof barComandas !== 'undefined') barComandas = [];
+    if (typeof cashMesas !== 'undefined')   cashMesas = [];
+    if (typeof transacoes !== 'undefined')  transacoes = [];
+    if (typeof fechamentos !== 'undefined') fechamentos = [];
+    if (typeof barCaixa !== 'undefined')    barCaixa = { aberto: false, valorInicial: 0, abertoEm: null, fechadoEm: null, abertoPor: null, fechadoPor: null, historico: [] };
+    if (typeof rankings !== 'undefined')    rankings = [];
+    if (typeof auditoria !== 'undefined')   auditoria = [];
+    if (typeof torneioTemplates !== 'undefined') torneioTemplates = [];
+    if (typeof fichasDenominacoes !== 'undefined') fichasDenominacoes = [];
+
+    // Limpa queue de sync (não vai sincronizar dados antigos)
+    if (typeof _syncQueue !== 'undefined') {
+        Object.keys(_syncQueue).forEach(k => {
+            if (k === 'deletes') {
+                Object.keys(_syncQueue.deletes).forEach(d => _syncQueue.deletes[d].clear());
+            } else {
+                _syncQueue[k].clear();
+            }
+        });
+    }
+
+    console.log('🧹 Estado do clube limpo');
+}
+
 async function logout() {
     if (!confirm('Deseja sair do sistema?')) return;
     logAudit('LOGOUT', 'Logout do sistema');
@@ -4738,6 +4811,7 @@ async function logout() {
     currentUser = null;
     sbSession = null;
     sbClube = null;
+    _limparEstadoClube();  // 🛡️ SEGURANÇA: remove dados do clube anterior
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('login-pass').value = '';
@@ -11610,7 +11684,7 @@ function renderRelClientes() {
         return;
     }
     listaEl.innerHTML = lista.map((c, i) => `
-        <div onclick="abrirDetalhesCliente(${c.jogadorId})" style="display:grid;grid-template-columns:2rem 1fr auto auto auto auto auto;gap:.75rem;align-items:center;padding:.7rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'" title="Ver detalhamento (somente leitura)">
+        <div onclick="abrirDetalhesCliente('${c.jogadorId}')" style="display:grid;grid-template-columns:2rem 1fr auto auto auto auto auto;gap:.75rem;align-items:center;padding:.7rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'" title="Ver detalhamento (somente leitura)">
             <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};">${i+1}º</span>
             <div>
                 <div style="font-weight:700;">${c.nome}</div>
