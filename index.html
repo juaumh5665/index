@@ -2935,7 +2935,10 @@ function _agendarSync() {
 
 // Marcar entidade como suja (precisa sincronizar)
 function _markDirty(tipo, id) {
-    if (_syncQueue[tipo]) _syncQueue[tipo].add(id);
+    if (_syncQueue[tipo]) {
+        _syncQueue[tipo].add(id);
+        console.log('[SYNC] _markDirty:', tipo, '→', id);
+    }
     _agendarSync();
 }
 
@@ -3086,10 +3089,24 @@ function _auditoriaToDb(l) {
 // SYNC PRINCIPAL — manda mudanças pro Supabase
 // ============================================================
 async function sincronizarEstado() {
-    if (_syncEmAndamento || !sbClube) return;
-    if (!dbOnline) return; // não tenta se offline
+    if (_syncEmAndamento || !sbClube) {
+        console.log('[SYNC] Pulando: emAndamento=' + _syncEmAndamento + ', sbClube=' + (sbClube ? 'OK' : 'NULL'));
+        return;
+    }
+    if (!dbOnline) {
+        console.log('[SYNC] Offline, pulando');
+        return;
+    }
 
     _syncEmAndamento = true;
+    console.log('[SYNC] Iniciando. Queue:', {
+        torneios: _syncQueue.torneios.size,
+        cashMesas: _syncQueue.cashMesas.size,
+        barProdutos: _syncQueue.barProdutos.size,
+        barComandas: _syncQueue.barComandas.size,
+        transacoes: _syncQueue.transacoes.size,
+        auditoria: _syncQueue.auditoria.size,
+    });
 
     try {
         const cid = sbClube.id;
@@ -3098,12 +3115,20 @@ async function sincronizarEstado() {
         if (_syncQueue.torneios.size) {
             const ids = [..._syncQueue.torneios];
             const torneiosRows = ids.map(id => torneios.find(t => t.id === id)).filter(Boolean);
+            console.log('[SYNC] Torneios pra sync:', torneiosRows.length, 'IDs:', ids);
 
             if (torneiosRows.length) {
+                const payload = torneiosRows.map(_torneioToDb);
+                console.log('[SYNC] Payload torneios:', JSON.stringify(payload[0]).substring(0, 500));
+
                 // 1. Sync torneios principais
-                const { error: errT } = await sb.from('torneios').upsert(torneiosRows.map(_torneioToDb));
-                if (errT) { console.warn('Sync torneios:', errT); }
+                const { data: dataT, error: errT } = await sb.from('torneios').upsert(payload).select();
+                if (errT) {
+                    console.error('[SYNC] ❌ Erro torneios:', errT);
+                    showToast('⚠️ Erro sync torneio: ' + errT.message);
+                }
                 else {
+                    console.log('[SYNC] ✅ Torneios sincronizados:', dataT ? dataT.length : 0);
                     // 2. Sync tabelas filhas — DELETE-then-INSERT (mais simples e robusto)
                     for (const t of torneiosRows) {
                         try {
@@ -13350,6 +13375,22 @@ window.onload = () => {
     } else {
         currentUser = null;
         sessionStorage.removeItem('ps_current_user');
+    }
+};
+
+
+// Helper de debug: forçar sync manual e ver o que acontece
+window.debugSync = async function() {
+    console.log('=== DEBUG SYNC ===');
+    console.log('sbClube:', sbClube);
+    console.log('dbOnline:', dbOnline);
+    console.log('Torneios em memória:', torneios.length);
+    if (torneios.length) {
+        console.log('Primeiro torneio:', torneios[0]);
+        console.log('Tentando syncar TODOS os torneios...');
+        torneios.forEach(t => _markDirty('torneios', t.id));
+        await sincronizarEstado();
+        console.log('=== Sync forçado concluído ===');
     }
 };
 
