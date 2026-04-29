@@ -5737,7 +5737,24 @@ function openModalEliminar(idx) {
     }
 
     document.getElementById('eliminar-posicao-info').innerHTML = html;
-    sel.onchange = () => openModalEliminar(idx);  // rebuild to update eliminador list
+
+    // Atualiza apenas o select de "quem eliminou" sem recriar o modal inteiro
+    sel.onchange = () => {
+        const eliminadorSel = document.getElementById('eliminador-jogador');
+        if (!eliminadorSel) return;  // não é torneio KO
+        const jidEliminado = sel.value;
+        // Reconstroi opções do eliminador, excluindo o jogador eliminado
+        const valorAtual = eliminadorSel.value;
+        eliminadorSel.innerHTML = '<option value="">— Sem eliminador (blindada) —</option>' +
+            ativos.filter(id => id !== jidEliminado).map(id => {
+                const j = jogadores.find(j => j.id === id);
+                return `<option value="${id}">${j ? j.nome : '?'}</option>`;
+            }).join('');
+        // Mantém valor selecionado se ainda for válido
+        if (valorAtual && valorAtual !== jidEliminado) eliminadorSel.value = valorAtual;
+    };
+    // Dispara uma vez para inicializar
+    sel.onchange();
     openModal('modal-eliminar');
 }
 
@@ -6004,7 +6021,7 @@ function updateTV(idx) {
         blinds:   (blindsRef.sb || 0).toLocaleString() + ' / ' + (blindsRef.bb || 0).toLocaleString(),
         ante:     (blindsRef.ante || 0).toLocaleString(),
         players:  ativos,
-        totalEntries: t.entries.filter(e=>e.tipo!=='addon').length,
+        totalEntries: new Set(t.entries.filter(e=>e.tipo==='buyin' || e.tipo==='reentry').map(e=>e.jogadorId)).size,
         avg:      avg.toLocaleString(),
         avgBBs:   avgBBs,
         chipCount: chipCount.toLocaleString(),
