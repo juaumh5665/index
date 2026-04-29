@@ -2683,7 +2683,8 @@ let blindStructure = [
     { sb:2000, bb:4000, ante:4000 },
 ];
 
-function saveData() {
+// Wrapper que dispara sync automaticamente após cada save
+function _saveDataInner() {
     localStorage.setItem('ps_jogadores',   JSON.stringify(jogadores));
     localStorage.setItem('ps_torneios',    JSON.stringify(torneios));
     localStorage.setItem('ps_bar_grupos',  JSON.stringify(barGrupos));
@@ -2697,6 +2698,24 @@ function saveData() {
     localStorage.setItem('ps_rankings',    JSON.stringify(rankings));
     localStorage.setItem('ps_fichas_denom', JSON.stringify(fichasDenominacoes));
 }
+
+// Wrapper público — chama original + dispara sync com debounce
+function saveData() {
+    _saveDataInner();
+    // Marca tudo como dirty pra próximo sync (estratégia simples mas eficaz)
+    if (sbClube && dbOnline) {
+        // Marca todos os torneios como dirty (vai fazer upsert dos que mudaram)
+        torneios.forEach(t => _markDirty('torneios', t.id));
+        if (typeof cashMesas !== 'undefined') cashMesas.forEach(m => _markDirty('cashMesas', m.id));
+        if (typeof barProdutos !== 'undefined') barProdutos.forEach(p => _markDirty('barProdutos', p.id));
+        if (typeof barComandas !== 'undefined') barComandas.forEach(c => _markDirty('barComandas', c.id));
+        // Apenas as últimas transações (otimização)
+        if (typeof transacoes !== 'undefined') {
+            transacoes.slice(-10).forEach(tx => _markDirty('transacoes', tx.id));
+        }
+    }
+}
+
 
 // ============================================================
 // CORE
@@ -2881,6 +2900,593 @@ const db = {
     },
 };
 
+// ============================================================
+// DB SYNC — Sincronização do estado local com o Supabase
+// ============================================================
+// Estratégia "Cache-First + Background Sync":
+//   1. UI continua escrevendo no cache local (jogadores, torneios, etc)
+//   2. saveData() persiste no localStorage (como sempre fez)
+//   3. Após saveData(), um sync assíncrono manda diffs pro Supabase
+//   4. Se o sync falhar, o estado local fica certo e a queue de sync
+//      tenta de novo depois (quando voltar online)
+//
+// Isso permite migração incremental sem mexer em centenas de funções.
+// ============================================================
+
+// Queue de sincronização (dirty entities)
+let _syncQueue = {
+    torneios: new Set(),       // IDs de torneios para sincronizar
+    cashMesas: new Set(),
+    barGrupos: new Set(),
+    barProdutos: new Set(),
+    barComandas: new Set(),
+    transacoes: new Set(),
+    auditoria: new Set(),
+    deletes: { torneios: new Set(), cashMesas: new Set(), barGrupos: new Set(),
+               barProdutos: new Set(), barComandas: new Set() },
+};
+let _syncTimer = null;
+let _syncEmAndamento = false;
+
+function _agendarSync() {
+    if (_syncTimer) clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(() => sincronizarEstado(), 800); // debounce 800ms
+}
+
+// Marcar entidade como suja (precisa sincronizar)
+function _markDirty(tipo, id) {
+    if (_syncQueue[tipo]) _syncQueue[tipo].add(id);
+    _agendarSync();
+}
+
+// Marcar para deletar
+function _markDelete(tipo, id) {
+    if (_syncQueue.deletes[tipo]) _syncQueue.deletes[tipo].add(id);
+    _agendarSync();
+}
+
+// ============================================================
+// CONVERSORES UI ↔ BANCO (snake_case ↔ camelCase)
+// ============================================================
+function _torneioToDb(t) {
+    return {
+        id: t.id,
+        clube_id: sbClube ? sbClube.id : null,
+        nome: t.nome || 'Torneio',
+        tipo: t.tipo || 'normal',
+        formato: t.formato || 'unico',
+        dia_label: t.diaLabel || null,
+        series_id: t.seriesId || null,
+        series_nome: t.seriesNome || null,
+        buyin: t.buyin || 0,
+        rake: t.rake || 0,
+        stack: t.stack || 0,
+        tempo_nivel: t.tempoNivel || 15,
+        reentry_ate: t.reentryAte || 0,
+        addon_valor: t.addonValor || 0,
+        addon_fichas: t.addonFichas || 0,
+        rebuy_valor: t.rebuyValor || 0,
+        rebuy_fichas: t.rebuyFichas || 0,
+        rebuy_duplo_valor: t.rebuyDuploValor || 0,
+        rebuy_duplo_fichas: t.rebuyDuploFichas || 0,
+        jackpot_valor: t.jackpotValor || 0,
+        jackpot_fichas: t.jackpotFichas || 0,
+        bounty_valor: t.bountyValor || 0,
+        bounty_ko_split: t.bountyKoSplit || 50,
+        ranking_id: t.rankingId || null,
+        ranking_rake_pct: t.rankingRakePct || 0,
+        blinds: t.blinds || [],
+        nivel_atual: t.nivelAtual || 0,
+        tempo_total: t.tempoTotal || 0,
+        tempo_restante: t.tempoRestante || 0,
+        status: t.status || 'aguardando',
+        rodando: !!t.rodando,
+        is_break: !!t.isBreak,
+        iniciado_em: t.iniciadoEm ? new Date(t.iniciadoEm).toISOString() : null,
+        encerrado_em: t.encerradoEm ? new Date(t.encerradoEm).toISOString() : null,
+        encerrado_por: t.encerradoPor || null,
+        caixa_status: (t.caixaTorneio && t.caixaTorneio.status) || 'fechado',
+        caixa_aberto_em: t.caixaTorneio && t.caixaTorneio.abertoEm ? new Date(t.caixaTorneio.abertoEm).toISOString() : null,
+        caixa_aberto_por: t.caixaTorneio && t.caixaTorneio.abertoPor || null,
+        caixa_fechado_em: t.caixaTorneio && t.caixaTorneio.fechadoEm ? new Date(t.caixaTorneio.fechadoEm).toISOString() : null,
+        caixa_fechado_por: t.caixaTorneio && t.caixaTorneio.fechadoPor || null,
+        caixa_resumo: (t.caixaTorneio && t.caixaTorneio.resumoFinal) || null,
+        tv_layout: t.tvLayout || 'classico',
+        tv_show_prize: t.tvShowPrize !== false,
+        pw_stats_visiveis: t.pwStatsVisiveis || null,
+        premiacao_proj: t.premiacaoProj || null,
+    };
+}
+
+function _cashToDb(m) {
+    return {
+        id: m.id,
+        clube_id: sbClube ? sbClube.id : null,
+        nome: m.nome || 'Mesa',
+        sb: m.sb || 1,
+        bb: m.bb || 2,
+        bmin: m.bmin || 0,
+        bmax: m.bmax || 0,
+        rake_pct: m.rakePct || 0,
+        modo: m.modo || 'livre',
+        duracao_h: m.duracaoH || null,
+        fichas_iniciais: m.fichasIniciais || null,
+        contagem_inicial: m.contagemInicial || null,
+        contagem_final: m.contagemFinal || null,
+        status: m.status || 'aberta',
+        abertura_ts: m.aberturaTs ? new Date(m.aberturaTs).toISOString() : new Date().toISOString(),
+        fechamento_ts: m.fechamentoTs ? new Date(m.fechamentoTs).toISOString() : null,
+        operador: m.operador || null,
+    };
+}
+
+function _produtoToDb(p) {
+    return {
+        id: p.id,
+        clube_id: sbClube ? sbClube.id : null,
+        grupo_id: p.grupoId || null,
+        nome: p.nome,
+        descricao: p.descricao || null,
+        valor: p.valor || 0,
+        custo: p.custo || 0,
+        estoque: p.estoque || 0,
+        estoque_min: p.estoqueMin || 0,
+        ativo: p.ativo !== false,
+    };
+}
+
+function _comandaToDb(c) {
+    return {
+        id: c.id,
+        clube_id: sbClube ? sbClube.id : null,
+        jogador_id: c.jogadorId || null,
+        avulso_nome: c.avulsoNome || null,
+        status: c.status || 'aberta',
+        aberto_em: c.abertoEm ? new Date(c.abertoEm).toISOString() : new Date().toISOString(),
+        fechado_em: c.fechadoEm ? new Date(c.fechadoEm).toISOString() : null,
+        pagamento: c.pagamento || null,
+        total: c.total || 0,
+        fechada_pelo_caixa: !!c.fechadaPeloCaixa,
+        operador: c.operador || null,
+    };
+}
+
+function _transacaoToDb(tx) {
+    return {
+        id: tx.id || _genUuid(),
+        clube_id: sbClube ? sbClube.id : null,
+        jogador_id: tx.jogadorId || null,
+        tipo: tx.tipo || 'pagamento',
+        valor: tx.valor || 0,
+        metodo: tx.metodo || null,
+        descricao: tx.descricao || null,
+        origem: tx.origem || null,
+        ref_id: tx.refId || null,
+        ts: tx.ts ? new Date(tx.ts).toISOString() : new Date().toISOString(),
+        operador: tx.operador || (currentUser ? currentUser.nome : null),
+        operador_id: tx.operadorId || (currentUser ? currentUser.id : null),
+    };
+}
+
+function _auditoriaToDb(l) {
+    return {
+        id: l.id ? String(l.id).replace(/[^a-f0-9-]/g, '').slice(0, 36) || _genUuid() : _genUuid(),
+        clube_id: sbClube ? sbClube.id : null,
+        usuario_id: l.usuarioId || null,
+        usuario_nome: l.usuario || null,
+        papel: l.papel || null,
+        categoria: l.categoria || 'INFO',
+        descricao: l.descricao || '',
+        detalhes: l.detalhes || null,
+        ts: l.ts ? new Date(l.ts).toISOString() : new Date().toISOString(),
+    };
+}
+
+// ============================================================
+// SYNC PRINCIPAL — manda mudanças pro Supabase
+// ============================================================
+async function sincronizarEstado() {
+    if (_syncEmAndamento || !sbClube) return;
+    if (!dbOnline) return; // não tenta se offline
+
+    _syncEmAndamento = true;
+
+    try {
+        const cid = sbClube.id;
+
+        // === TORNEIOS + TABELAS FILHAS (UPSERT cascade)
+        if (_syncQueue.torneios.size) {
+            const ids = [..._syncQueue.torneios];
+            const torneiosRows = ids.map(id => torneios.find(t => t.id === id)).filter(Boolean);
+
+            if (torneiosRows.length) {
+                // 1. Sync torneios principais
+                const { error: errT } = await sb.from('torneios').upsert(torneiosRows.map(_torneioToDb));
+                if (errT) { console.warn('Sync torneios:', errT); }
+                else {
+                    // 2. Sync tabelas filhas — DELETE-then-INSERT (mais simples e robusto)
+                    for (const t of torneiosRows) {
+                        try {
+                            // Limpa entries/eliminados/jackpots/mesas antigos do torneio
+                            await sb.from('torneio_entries').delete().eq('torneio_id', t.id);
+                            await sb.from('torneio_eliminados').delete().eq('torneio_id', t.id);
+                            await sb.from('torneio_jackpot_compras').delete().eq('torneio_id', t.id);
+                            await sb.from('torneio_mesas').delete().eq('torneio_id', t.id);
+
+                            // Re-insere o estado atual
+                            if (t.entries && t.entries.length) {
+                                const entryRows = t.entries.map(e => ({
+                                    id: e.id || _genUuid(),
+                                    torneio_id: t.id,
+                                    clube_id: sbClube.id,
+                                    jogador_id: e.jogadorId,
+                                    tipo: e.tipo,
+                                    valor: e.valor || 0,
+                                    fichas: e.fichas || 0,
+                                    nivel: e.nivel || null,
+                                    ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
+                                    operador: e.operador || null,
+                                }));
+                                await sb.from('torneio_entries').insert(entryRows);
+                            }
+
+                            if (t.eliminados && t.eliminados.length) {
+                                const elimRows = t.eliminados.map(e => ({
+                                    id: _genUuid(),
+                                    torneio_id: t.id,
+                                    clube_id: sbClube.id,
+                                    jogador_id: e.jogadorId,
+                                    eliminador_id: e.eliminadorId || null,
+                                    posicao: e.posicao,
+                                    bounty_pago: e.bountyPago || 0,
+                                    ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
+                                    operador: e.operador || null,
+                                }));
+                                await sb.from('torneio_eliminados').insert(elimRows);
+                            }
+
+                            if (t.jackpotCompras && t.jackpotCompras.length) {
+                                const jackRows = t.jackpotCompras.map(j => ({
+                                    id: _genUuid(),
+                                    torneio_id: t.id,
+                                    clube_id: sbClube.id,
+                                    jogador_id: j.jogadorId,
+                                    valor: j.valor,
+                                    fichas: j.fichas,
+                                    ts: j.ts ? new Date(j.ts).toISOString() : new Date().toISOString(),
+                                }));
+                                await sb.from('torneio_jackpot_compras').insert(jackRows);
+                            }
+
+                            if (t.mesas && t.mesas.length) {
+                                const mesaRows = t.mesas.map(m => ({
+                                    id: _genUuid(),
+                                    torneio_id: t.id,
+                                    clube_id: sbClube.id,
+                                    numero: m.numero,
+                                    jogadores: m.jogadores || [],
+                                }));
+                                await sb.from('torneio_mesas').insert(mesaRows);
+                            }
+                        } catch (e) {
+                            console.warn('Sync filhas do torneio ' + t.id + ':', e.message);
+                        }
+                    }
+                    _syncQueue.torneios.clear();
+                }
+            }
+        }
+
+        // === CASH MESAS
+        if (_syncQueue.cashMesas.size && typeof cashMesas !== 'undefined') {
+            const ids = [..._syncQueue.cashMesas];
+            const rows = ids.map(id => cashMesas.find(m => m.id === id))
+                            .filter(Boolean)
+                            .map(_cashToDb);
+            if (rows.length) {
+                const { error } = await sb.from('cash_mesas').upsert(rows);
+                if (!error) _syncQueue.cashMesas.clear();
+            }
+        }
+
+        // === BAR PRODUTOS
+        if (_syncQueue.barProdutos.size) {
+            const ids = [..._syncQueue.barProdutos];
+            const rows = ids.map(id => barProdutos.find(p => p.id === id))
+                            .filter(Boolean)
+                            .map(_produtoToDb);
+            if (rows.length) {
+                const { error } = await sb.from('bar_produtos').upsert(rows);
+                if (!error) _syncQueue.barProdutos.clear();
+            }
+        }
+
+        // === BAR COMANDAS + ITENS
+        if (_syncQueue.barComandas.size) {
+            const ids = [..._syncQueue.barComandas];
+            const comandasUI = ids.map(id => barComandas.find(c => c.id === id)).filter(Boolean);
+            if (comandasUI.length) {
+                const { error: errC } = await sb.from('bar_comandas').upsert(comandasUI.map(_comandaToDb));
+                if (errC) { console.warn('Sync bar_comandas:', errC); }
+                else {
+                    // Sync itens (delete-then-insert para cada comanda)
+                    for (const c of comandasUI) {
+                        try {
+                            await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id);
+                            if (c.itens && c.itens.length) {
+                                const itensRows = c.itens.map(it => {
+                                    const prod = barProdutos.find(p => p.id === it.produtoId);
+                                    return {
+                                        id: _genUuid(),
+                                        comanda_id: c.id,
+                                        clube_id: sbClube.id,
+                                        produto_id: it.produtoId || null,
+                                        nome: prod ? prod.nome : (it.nome || '?'),
+                                        qtd: it.qtd || 1,
+                                        valor_unit: it.valor || (prod ? prod.valor : 0),
+                                        subtotal: (it.qtd || 1) * (it.valor || (prod ? prod.valor : 0)),
+                                        ts: it.ts ? new Date(it.ts).toISOString() : new Date().toISOString(),
+                                    };
+                                });
+                                await sb.from('bar_comanda_itens').insert(itensRows);
+                            }
+                        } catch (e) { console.warn('Sync itens da comanda:', e.message); }
+                    }
+                    _syncQueue.barComandas.clear();
+                }
+            }
+        }
+
+        // === TRANSAÇÕES (insert-only, nunca atualiza)
+        if (_syncQueue.transacoes.size) {
+            const ids = [..._syncQueue.transacoes];
+            const rows = ids.map(id => transacoes.find(t => t.id === id || String(t.id) === String(id)))
+                            .filter(Boolean)
+                            .map(_transacaoToDb);
+            if (rows.length) {
+                const { error } = await sb.from('transacoes').upsert(rows);
+                if (!error) _syncQueue.transacoes.clear();
+            }
+        }
+
+        // === AUDITORIA (insert-only)
+        if (_syncQueue.auditoria.size) {
+            const ids = [..._syncQueue.auditoria];
+            const rows = ids.map(id => auditoria.find(l => l.id === id || String(l.id) === String(id)))
+                            .filter(Boolean)
+                            .map(_auditoriaToDb);
+            if (rows.length) {
+                const { error } = await sb.from('auditoria').upsert(rows);
+                if (!error) _syncQueue.auditoria.clear();
+            }
+        }
+
+        // === DELETES
+        for (const tipo of ['torneios', 'cashMesas', 'barProdutos', 'barComandas']) {
+            const tableName = { torneios: 'torneios', cashMesas: 'cash_mesas',
+                                barProdutos: 'bar_produtos', barComandas: 'bar_comandas' }[tipo];
+            if (_syncQueue.deletes[tipo].size) {
+                const ids = [..._syncQueue.deletes[tipo]];
+                const { error } = await sb.from(tableName).delete().in('id', ids);
+                if (!error) _syncQueue.deletes[tipo].clear();
+            }
+        }
+
+    } catch (e) {
+        console.warn('Sync falhou:', e.message);
+    } finally {
+        _syncEmAndamento = false;
+    }
+}
+
+// ============================================================
+// HOOK no saveData() — sincroniza após cada save
+// ============================================================
+const _saveDataOriginal = (typeof saveData === 'function') ? saveData : null;
+// Será sobrescrito após declarações... vide bloco abaixo
+
+// ============================================================
+// CARREGAR ESTADO DO SUPABASE (no boot, após login)
+// ============================================================
+async function carregarEstadoDoSupabase() {
+    if (!sbClube) return;
+    try {
+        // Torneios
+        const { data: tRows } = await sb.from('torneios').select('*').order('criado_em', { ascending: false });
+        if (tRows && tRows.length) {
+            // Buscar entries, eliminados, jackpot, mesas em paralelo
+            const ids = tRows.map(t => t.id);
+            const [eRes, elRes, jRes, mRes] = await Promise.all([
+                sb.from('torneio_entries').select('*').in('torneio_id', ids),
+                sb.from('torneio_eliminados').select('*').in('torneio_id', ids),
+                sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids),
+                sb.from('torneio_mesas').select('*').in('torneio_id', ids),
+            ]);
+            // Reconstruir torneios em formato de UI
+            torneios = tRows.map(r => _torneioFromDb(r, eRes.data || [], elRes.data || [], jRes.data || [], mRes.data || []));
+            localStorage.setItem('ps_torneios', JSON.stringify(torneios));
+        }
+
+        // Cash mesas
+        if (typeof cashMesas !== 'undefined') {
+            const { data: cmRows } = await sb.from('cash_mesas').select('*');
+            if (cmRows) {
+                cashMesas = cmRows.map(_cashFromDb);
+                localStorage.setItem('ps_cash_mesas', JSON.stringify(cashMesas));
+            }
+        }
+
+        // Bar grupos + produtos
+        const { data: gRows } = await sb.from('bar_grupos').select('*').order('ordem');
+        if (gRows && gRows.length) {
+            barGrupos = gRows.map(g => g.nome);
+            localStorage.setItem('ps_bar_grupos', JSON.stringify(barGrupos));
+        }
+        const { data: pRows } = await sb.from('bar_produtos').select('*');
+        if (pRows) {
+            barProdutos = pRows.map(_produtoFromDb);
+            localStorage.setItem('ps_bar_produtos', JSON.stringify(barProdutos));
+        }
+
+        // Bar comandas + itens
+        const { data: cRows } = await sb.from('bar_comandas').select('*');
+        if (cRows) {
+            barComandas = cRows.map(_comandaFromDb);
+            // Buscar itens em batch
+            if (cRows.length) {
+                const { data: itRows } = await sb.from('bar_comanda_itens')
+                    .select('*').in('comanda_id', cRows.map(c => c.id));
+                if (itRows) {
+                    barComandas.forEach(c => {
+                        c.itens = itRows.filter(i => i.comanda_id === c.id).map(i => ({
+                            produtoId: i.produto_id,
+                            nome: i.nome,
+                            qtd: i.qtd,
+                            valor: parseFloat(i.valor_unit),
+                            ts: new Date(i.ts).getTime(),
+                        }));
+                    });
+                }
+            }
+            localStorage.setItem('ps_bar_comandas', JSON.stringify(barComandas));
+        }
+
+        // Transações (últimas 1000)
+        const { data: txRows } = await sb.from('transacoes').select('*').order('ts', { ascending: false }).limit(1000);
+        if (txRows) {
+            transacoes = txRows.map(_transacaoFromDb);
+            localStorage.setItem('ps_transacoes', JSON.stringify(transacoes));
+        }
+
+        console.log(`✅ Estado carregado do Supabase: ${torneios.length} torneios, ${cashMesas?.length||0} mesas, ${barProdutos.length} produtos, ${barComandas.length} comandas`);
+    } catch (e) {
+        console.error('Carregar estado falhou:', e);
+    }
+}
+
+// Conversores reversos (banco → UI)
+function _torneioFromDb(r, entries, elims, jackpots, mesas) {
+    const tEntries = entries.filter(e => e.torneio_id === r.id);
+    const tElims   = elims.filter(e => e.torneio_id === r.id);
+    const tJacks   = jackpots.filter(j => j.torneio_id === r.id);
+    const tMesas   = mesas.filter(m => m.torneio_id === r.id);
+
+    return {
+        id: r.id,
+        nome: r.nome,
+        tipo: r.tipo,
+        formato: r.formato,
+        diaLabel: r.dia_label,
+        seriesId: r.series_id,
+        seriesNome: r.series_nome,
+        buyin: parseFloat(r.buyin || 0),
+        rake: parseFloat(r.rake || 0),
+        stack: r.stack || 0,
+        tempoNivel: r.tempo_nivel || 15,
+        reentryAte: r.reentry_ate || 0,
+        addonValor: parseFloat(r.addon_valor || 0),
+        addonFichas: r.addon_fichas || 0,
+        rebuyValor: parseFloat(r.rebuy_valor || 0),
+        rebuyFichas: r.rebuy_fichas || 0,
+        rebuyDuploValor: parseFloat(r.rebuy_duplo_valor || 0),
+        rebuyDuploFichas: r.rebuy_duplo_fichas || 0,
+        jackpotValor: parseFloat(r.jackpot_valor || 0),
+        jackpotFichas: r.jackpot_fichas || 0,
+        bountyValor: parseFloat(r.bounty_valor || 0),
+        bountyKoSplit: parseFloat(r.bounty_ko_split || 50),
+        rankingId: r.ranking_id,
+        rankingRakePct: parseFloat(r.ranking_rake_pct || 0),
+        blinds: r.blinds || [],
+        nivelAtual: r.nivel_atual || 0,
+        tempoTotal: r.tempo_total || 0,
+        tempoRestante: r.tempo_restante || 0,
+        status: r.status,
+        rodando: !!r.rodando,
+        isBreak: !!r.is_break,
+        iniciadoEm: r.iniciado_em ? new Date(r.iniciado_em).getTime() : null,
+        encerradoEm: r.encerrado_em ? new Date(r.encerrado_em).getTime() : null,
+        encerradoPor: r.encerrado_por,
+        caixaTorneio: {
+            status: r.caixa_status || 'fechado',
+            abertoEm: r.caixa_aberto_em ? new Date(r.caixa_aberto_em).getTime() : null,
+            abertoPor: r.caixa_aberto_por,
+            fechadoEm: r.caixa_fechado_em ? new Date(r.caixa_fechado_em).getTime() : null,
+            fechadoPor: r.caixa_fechado_por,
+            resumoFinal: r.caixa_resumo,
+        },
+        tvLayout: r.tv_layout || 'classico',
+        tvShowPrize: r.tv_show_prize !== false,
+        pwStatsVisiveis: r.pw_stats_visiveis,
+        premiacaoProj: r.premiacao_proj,
+        // Entries, eliminados, etc
+        entries: tEntries.map(e => ({
+            id: e.id, jogadorId: e.jogador_id, tipo: e.tipo,
+            valor: parseFloat(e.valor || 0), fichas: e.fichas || 0,
+            nivel: e.nivel, ts: new Date(e.ts).getTime(), operador: e.operador,
+        })),
+        eliminados: tElims.map(e => ({
+            jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
+            posicao: e.posicao, bountyPago: parseFloat(e.bounty_pago || 0),
+            ts: new Date(e.ts).getTime(), operador: e.operador,
+        })),
+        jackpotCompras: tJacks.map(j => ({
+            jogadorId: j.jogador_id, valor: parseFloat(j.valor),
+            fichas: j.fichas, ts: new Date(j.ts).getTime(),
+        })),
+        mesas: tMesas.map(m => ({ numero: m.numero, jogadores: m.jogadores || [] })),
+    };
+}
+
+function _cashFromDb(r) {
+    return {
+        id: r.id, nome: r.nome,
+        sb: parseFloat(r.sb), bb: parseFloat(r.bb),
+        bmin: parseFloat(r.bmin), bmax: parseFloat(r.bmax),
+        rakePct: parseFloat(r.rake_pct),
+        modo: r.modo, duracaoH: r.duracao_h,
+        fichasIniciais: r.fichas_iniciais,
+        contagemInicial: r.contagem_inicial,
+        contagemFinal: r.contagem_final,
+        status: r.status,
+        aberturaTs: r.abertura_ts ? new Date(r.abertura_ts).getTime() : Date.now(),
+        fechamentoTs: r.fechamento_ts ? new Date(r.fechamento_ts).getTime() : null,
+        operador: r.operador,
+        sessoes: [],
+    };
+}
+
+function _produtoFromDb(r) {
+    return {
+        id: r.id, grupoId: r.grupo_id, nome: r.nome,
+        descricao: r.descricao || '',
+        valor: parseFloat(r.valor), custo: parseFloat(r.custo),
+        estoque: r.estoque || 0, estoqueMin: r.estoque_min || 0,
+        ativo: r.ativo !== false,
+    };
+}
+
+function _comandaFromDb(r) {
+    return {
+        id: r.id, jogadorId: r.jogador_id, avulsoNome: r.avulso_nome,
+        status: r.status, abertoEm: r.aberto_em ? new Date(r.aberto_em).getTime() : Date.now(),
+        fechadoEm: r.fechado_em ? new Date(r.fechado_em).getTime() : null,
+        pagamento: r.pagamento, total: parseFloat(r.total || 0),
+        fechadaPeloCaixa: !!r.fechada_pelo_caixa,
+        operador: r.operador, itens: [],
+    };
+}
+
+function _transacaoFromDb(r) {
+    return {
+        id: r.id, jogadorId: r.jogador_id, tipo: r.tipo,
+        valor: parseFloat(r.valor), metodo: r.metodo,
+        descricao: r.descricao, origem: r.origem, refId: r.ref_id,
+        ts: r.ts ? new Date(r.ts).getTime() : Date.now(),
+        operador: r.operador, operadorId: r.operador_id,
+    };
+}
+
+
 async function inicializarAuth() {
     try {
         const { data: { session } } = await sb.auth.getSession();
@@ -2990,8 +3596,17 @@ async function login() {
         logAudit('LOGIN', `Login: ${currentUser.nome}`);
         iniciarBackupAutomatico();
         atualizarStatusDB();
-        // Carrega jogadores do banco em background (não bloqueia UI)
-        db.jogadores.list().then(() => { renderJogadores(); renderDashboard(); }).catch(e => console.warn('Carregar jogadores:', e));
+        // Carrega TODO o estado do clube em background (não bloqueia UI)
+        (async () => {
+            try {
+                await db.jogadores.list();
+                await carregarEstadoDoSupabase();
+                renderJogadores();
+                renderTorneiosList();
+                renderDashboard();
+                console.log('✅ Estado completo carregado');
+            } catch (e) { console.warn('Carregar estado:', e); }
+        })();
         showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
     } catch (e) {
         console.error('Login erro:', e);
@@ -3191,6 +3806,7 @@ function salvarAuditoria() {
 // - BACKUP_AUTO, RESTORE
 // - DELETE_* (qualquer deleção)
 function logAudit(categoria, descricao, detalhes) {
+    // Hook: marca pra sync no Supabase (background)
     try {
         const log = {
             id: Date.now() + Math.random(),
@@ -3204,6 +3820,7 @@ function logAudit(categoria, descricao, detalhes) {
         };
         auditoria.push(log);
         salvarAuditoria();
+        if (sbClube && dbOnline) _markDirty('auditoria', log.id);
     } catch (e) {
         console.warn('logAudit falhou:', e);
     }
@@ -12752,8 +13369,15 @@ window.onload = () => {
             iniciarRelogio();
             iniciarBackupAutomatico();
             atualizarStatusDB();
-            // Carrega dados do clube em background
-            db.jogadores.list().then(() => { renderJogadores(); renderDashboard(); }).catch(e => console.warn('Carregar jogadores:', e));
+            (async () => {
+                try {
+                    await db.jogadores.list();
+                    await carregarEstadoDoSupabase();
+                    renderJogadores();
+                    renderTorneiosList();
+                    renderDashboard();
+                } catch (e) { console.warn('Carregar estado:', e); }
+            })();
             console.log('✅ Sessão recuperada:', currentUser.nome, '| Clube:', sbClube && sbClube.nome);
         } else {
             if (ls) ls.style.display = 'flex';
