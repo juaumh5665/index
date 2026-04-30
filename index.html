@@ -553,6 +553,211 @@
     </div>
 </div>
 
+
+<!-- ============================================ -->
+<!-- PAINEL SUPER ADMIN (?admin=1) -->
+<!-- ============================================ -->
+<div id="admin-screen" style="display:none;min-height:100vh;background:#0a0a0b;color:#fafafa;padding:0;">
+    <!-- Header -->
+    <div style="background:#0d0d0f;border-bottom:1px solid #27272a;padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="background:linear-gradient(135deg,#a855f7,#3b82f6);padding:.5rem .75rem;border-radius:.5rem;font-weight:800;font-size:.9rem;">⚡ SUPER ADMIN</div>
+            <div>
+                <div style="font-size:1.1rem;font-weight:700;">Painel Administrativo StackOS</div>
+                <div style="font-size:.75rem;color:#71717a;" id="admin-user-info">Carregando...</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:.5rem;">
+            <button onclick="adminAtualizarTudo()" class="btn-ghost" style="padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;border:1px solid #27272a;background:#18181b;color:#fafafa;cursor:pointer;">
+                <i class="fa-solid fa-arrows-rotate"></i> Atualizar
+            </button>
+            <button onclick="adminVoltarSistema()" class="btn-ghost" style="padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;border:1px solid #27272a;background:#18181b;color:#fafafa;cursor:pointer;">
+                <i class="fa-solid fa-arrow-left"></i> Voltar ao Sistema
+            </button>
+            <button onclick="logout()" style="padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;border:none;background:#dc2626;color:white;cursor:pointer;">
+                <i class="fa-solid fa-right-from-bracket"></i> Sair
+            </button>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div style="background:#0d0d0f;border-bottom:1px solid #27272a;padding:0 2rem;display:flex;gap:.25rem;overflow-x:auto;">
+        <button onclick="adminMostrarTab('dashboard')" id="admin-tab-dashboard" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#fafafa;cursor:pointer;border-bottom:2px solid var(--gold);font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-gauge-high"></i> Dashboard
+        </button>
+        <button onclick="adminMostrarTab('clubes')" id="admin-tab-clubes" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-building"></i> Clubes
+        </button>
+        <button onclick="adminMostrarTab('pagamentos')" id="admin-tab-pagamentos" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-money-bill"></i> Pagamentos
+        </button>
+        <button onclick="adminMostrarTab('planos')" id="admin-tab-planos" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-tag"></i> Planos
+        </button>
+        <button onclick="adminMostrarTab('cupons')" id="admin-tab-cupons" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-ticket"></i> Cupons
+        </button>
+    </div>
+    
+    <!-- Content area -->
+    <div style="padding:2rem;max-width:1400px;margin:0 auto;">
+        
+        <!-- TAB: DASHBOARD -->
+        <div id="admin-content-dashboard" class="admin-content">
+            <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Visão Geral</h2>
+            
+            <!-- Métricas principais -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem;" id="admin-metricas">
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">MRR (Receita Mensal Recorrente)</div>
+                    <div style="font-size:2rem;font-weight:800;color:#10b981;margin-top:.5rem;" id="admin-m-mrr">R$ —</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Total de Clubes</div>
+                    <div style="font-size:2rem;font-weight:800;margin-top:.5rem;" id="admin-m-total">—</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Clubes Ativos</div>
+                    <div style="font-size:2rem;font-weight:800;color:#10b981;margin-top:.5rem;" id="admin-m-ativos">—</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Em Trial</div>
+                    <div style="font-size:2rem;font-weight:800;color:#3b82f6;margin-top:.5rem;" id="admin-m-trial">—</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Suspensos</div>
+                    <div style="font-size:2rem;font-weight:800;color:#f59e0b;margin-top:.5rem;" id="admin-m-suspensos">—</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Expirados</div>
+                    <div style="font-size:2rem;font-weight:800;color:#dc2626;margin-top:.5rem;" id="admin-m-expirados">—</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Pagamentos Pendentes</div>
+                    <div style="font-size:2rem;font-weight:800;color:#f59e0b;margin-top:.5rem;" id="admin-m-pendentes">—</div>
+                </div>
+                <div style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                    <div style="color:#71717a;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">Novos no Mês</div>
+                    <div style="font-size:2rem;font-weight:800;color:var(--gold);margin-top:.5rem;" id="admin-m-novos">—</div>
+                </div>
+            </div>
+            
+            <!-- Alertas -->
+            <div id="admin-alertas" style="background:#18181b;border:1px solid #27272a;padding:1.5rem;border-radius:.75rem;">
+                <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;"><i class="fa-solid fa-bell"></i> Alertas</h3>
+                <div id="admin-alertas-lista" style="display:flex;flex-direction:column;gap:.5rem;color:#a1a1aa;font-size:.9rem;">
+                    Carregando...
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: CLUBES -->
+        <div id="admin-content-clubes" class="admin-content" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <h2 style="font-size:1.5rem;font-weight:700;">Clubes Cadastrados</h2>
+                <input type="text" id="admin-clubes-busca" placeholder="Buscar por nome ou email..." onkeyup="adminFiltrarClubes()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;width:300px;font-size:.9rem;">
+            </div>
+            
+            <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;overflow:hidden;">
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                        <thead style="background:#0d0d0f;border-bottom:1px solid #27272a;">
+                            <tr>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Clube</th>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Email Dono</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Plano</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Status</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Validade</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Dias Rest.</th>
+                                <th style="padding:.75rem 1rem;text-align:right;color:#71717a;font-weight:600;">Valor</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-clubes-tbody">
+                            <tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: PAGAMENTOS -->
+        <div id="admin-content-pagamentos" class="admin-content" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <h2 style="font-size:1.5rem;font-weight:700;">Pagamentos</h2>
+                <select id="admin-pag-filtro" onchange="adminCarregarPagamentos()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.9rem;">
+                    <option value="todos">Todos</option>
+                    <option value="pendente">Pendentes</option>
+                    <option value="pago">Pagos</option>
+                    <option value="vencido">Vencidos</option>
+                    <option value="cancelado">Cancelados</option>
+                </select>
+            </div>
+            
+            <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;overflow:hidden;">
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                        <thead style="background:#0d0d0f;border-bottom:1px solid #27272a;">
+                            <tr>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Clube</th>
+                                <th style="padding:.75rem 1rem;text-align:right;color:#71717a;font-weight:600;">Valor</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Status</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Forma</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Vencimento</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Pagamento</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Período</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-pagamentos-tbody">
+                            <tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: PLANOS -->
+        <div id="admin-content-planos" class="admin-content" style="display:none;">
+            <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">Planos Disponíveis</h2>
+            <div id="admin-planos-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
+                Carregando...
+            </div>
+        </div>
+        
+        <!-- TAB: CUPONS -->
+        <div id="admin-content-cupons" class="admin-content" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+                <h2 style="font-size:1.5rem;font-weight:700;">Cupons de Desconto</h2>
+                <button onclick="adminCriarCupom()" class="btn-gold" style="padding:.6rem 1.2rem;border-radius:.5rem;font-weight:700;cursor:pointer;border:none;">
+                    <i class="fa-solid fa-plus"></i> Novo Cupom
+                </button>
+            </div>
+            <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;overflow:hidden;">
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                        <thead style="background:#0d0d0f;border-bottom:1px solid #27272a;">
+                            <tr>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Código</th>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Descrição</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Tipo</th>
+                                <th style="padding:.75rem 1rem;text-align:right;color:#71717a;font-weight:600;">Valor</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Usos</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Validade</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-cupons-tbody">
+                            <tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+
 <!-- MAIN APP -->
 <div id="main-app" class="hidden" style="display:none;height:100vh;flex-direction:row;">
     <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu" type="button">
@@ -4197,6 +4402,16 @@ async function login() {
         sbSession = data.session;
         await carregarUsuarioEClube(data.user);
 
+        // Se acessou via ?admin=1, tentar abrir painel admin
+        if (window._goToAdmin) {
+            const ok = await adminVerificarAcessoEMostrar();
+            if (ok) {
+                logAudit('LOGIN', `Login admin: ${currentUser?.nome || data.user.email}`);
+                return;
+            }
+            // Se não é admin, segue fluxo normal
+        }
+
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'flex';
 
@@ -5895,6 +6110,459 @@ async function aceitarConviteSubmit() {
 }
 
 // ============================================================
+
+// ============================================================
+// PAINEL SUPER ADMIN - JavaScript
+// ============================================================
+let _adminIsLoaded = false;
+let _adminClubesCache = [];
+
+async function adminVerificarAcessoEMostrar() {
+    // Verifica se usuário é super admin via RPC
+    try {
+        const { data: isAdmin, error } = await sb.rpc('is_super_admin');
+        if (error) throw error;
+        if (!isAdmin) {
+            alert('Acesso negado: você não é super admin.');
+            window._goToAdmin = false;
+            return false;
+        }
+        // É super admin -> mostrar painel
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('signup-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'block';
+        
+        // Atualizar info do usuário no header
+        const email = currentUser ? currentUser.email : (sbSession?.user?.email || '—');
+        document.getElementById('admin-user-info').innerText = email + ' • Super Admin';
+        
+        // Carregar dados iniciais
+        await adminAtualizarTudo();
+        return true;
+    } catch(e) {
+        console.error('[ADMIN] Erro:', e);
+        alert('Erro ao verificar permissões: ' + (e.message || e));
+        return false;
+    }
+}
+
+function adminVoltarSistema() {
+    document.getElementById('admin-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'flex';
+    // Remove ?admin=1 da URL sem reload
+    const url = new URL(window.location.href);
+    url.searchParams.delete('admin');
+    window.history.replaceState({}, '', url.toString());
+    window._goToAdmin = false;
+}
+
+function adminMostrarTab(tab) {
+    // Esconder todas
+    document.querySelectorAll('.admin-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.admin-tab').forEach(el => {
+        el.style.color = '#71717a';
+        el.style.borderBottomColor = 'transparent';
+    });
+    
+    // Mostrar selecionada
+    const content = document.getElementById('admin-content-' + tab);
+    if (content) content.style.display = 'block';
+    
+    const tabBtn = document.getElementById('admin-tab-' + tab);
+    if (tabBtn) {
+        tabBtn.style.color = '#fafafa';
+        tabBtn.style.borderBottomColor = 'var(--gold)';
+    }
+    
+    // Carregar dados sob demanda
+    if (tab === 'clubes') adminCarregarClubes();
+    else if (tab === 'pagamentos') adminCarregarPagamentos();
+    else if (tab === 'planos') adminCarregarPlanos();
+    else if (tab === 'cupons') adminCarregarCupons();
+    else if (tab === 'dashboard') adminCarregarDashboard();
+}
+
+async function adminAtualizarTudo() {
+    await Promise.all([
+        adminCarregarDashboard(),
+        adminCarregarClubes()
+    ]);
+}
+
+async function adminCarregarDashboard() {
+    try {
+        const { data, error } = await sb.rpc('get_metricas_admin');
+        if (error) throw error;
+        const m = data || {};
+        document.getElementById('admin-m-mrr').innerText = 'R$ ' + (Number(m.mrr || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('admin-m-total').innerText = m.total_clubes || 0;
+        document.getElementById('admin-m-ativos').innerText = m.clubes_ativos || 0;
+        document.getElementById('admin-m-trial').innerText = m.clubes_trial || 0;
+        document.getElementById('admin-m-suspensos').innerText = m.clubes_suspensos || 0;
+        document.getElementById('admin-m-expirados').innerText = m.clubes_expirados || 0;
+        document.getElementById('admin-m-pendentes').innerText = m.pagamentos_pendentes || 0;
+        document.getElementById('admin-m-novos').innerText = m.novos_clubes_mes || 0;
+        
+        // Alertas
+        const alertas = [];
+        if ((m.clubes_expirados || 0) > 0) alertas.push({ tipo: 'erro', txt: `${m.clubes_expirados} clube(s) com assinatura expirada — bloquear ou estender.` });
+        if ((m.pagamentos_vencidos || 0) > 0) alertas.push({ tipo: 'aviso', txt: `${m.pagamentos_vencidos} pagamento(s) vencido(s) — cobrar clientes.` });
+        if ((m.clubes_trial || 0) > 0) alertas.push({ tipo: 'info', txt: `${m.clubes_trial} clube(s) em trial — convidar pra upgrade.` });
+        if (alertas.length === 0) alertas.push({ tipo: 'ok', txt: '✅ Tudo em dia! Nenhum alerta no momento.' });
+        
+        const cores = { erro: '#dc2626', aviso: '#f59e0b', info: '#3b82f6', ok: '#10b981' };
+        document.getElementById('admin-alertas-lista').innerHTML = alertas.map(a => 
+            `<div style="padding:.75rem 1rem;background:#0d0d0f;border-left:3px solid ${cores[a.tipo]};border-radius:.25rem;">${a.txt}</div>`
+        ).join('');
+    } catch(e) {
+        console.error('[ADMIN] Erro métricas:', e);
+        document.getElementById('admin-alertas-lista').innerHTML = '<div style="color:#dc2626;">Erro ao carregar: ' + (e.message || e) + '</div>';
+    }
+}
+
+async function adminCarregarClubes() {
+    try {
+        const { data, error } = await sb.rpc('listar_clubes_admin');
+        if (error) throw error;
+        _adminClubesCache = data || [];
+        adminRenderClubes(_adminClubesCache);
+    } catch(e) {
+        console.error('[ADMIN] Erro listar clubes:', e);
+        document.getElementById('admin-clubes-tbody').innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#dc2626;">Erro: ' + (e.message || e) + '</td></tr>';
+    }
+}
+
+function adminFiltrarClubes() {
+    const q = (document.getElementById('admin-clubes-busca').value || '').toLowerCase().trim();
+    if (!q) {
+        adminRenderClubes(_adminClubesCache);
+        return;
+    }
+    const filtrados = _adminClubesCache.filter(c => 
+        (c.nome || '').toLowerCase().includes(q) ||
+        (c.email_dono || '').toLowerCase().includes(q) ||
+        (c.cnpj || '').toLowerCase().includes(q)
+    );
+    adminRenderClubes(filtrados);
+}
+
+function adminRenderClubes(clubes) {
+    const tbody = document.getElementById('admin-clubes-tbody');
+    if (!clubes || clubes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">Nenhum clube encontrado</td></tr>';
+        return;
+    }
+    
+    const corStatus = {
+        'ativa': '#10b981',
+        'trial': '#3b82f6',
+        'pendente': '#f59e0b',
+        'suspensa': '#f59e0b',
+        'expirada': '#dc2626',
+        'cancelada': '#71717a'
+    };
+    
+    tbody.innerHTML = clubes.map(c => {
+        const dias = c.dias_restantes != null ? c.dias_restantes : '—';
+        const corDias = (c.dias_restantes != null && c.dias_restantes < 0) ? '#dc2626' : 
+                        (c.dias_restantes != null && c.dias_restantes < 7) ? '#f59e0b' : '#fafafa';
+        const validade = c.data_validade ? new Date(c.data_validade).toLocaleDateString('pt-BR') : '—';
+        const valor = c.valor_mensal ? 'R$ ' + Number(c.valor_mensal).toFixed(2).replace('.', ',') : '—';
+        const cor = corStatus[c.status] || '#71717a';
+        const planoBadge = c.plano_nome ? c.plano_nome.replace('StackOS ', '') : '—';
+        const corBloq = c.bloqueado ? '#dc2626' : '#10b981';
+        const txtBloq = c.bloqueado ? '🔒 BLOQUEADO' : '🔓 LIBERADO';
+        
+        return `<tr style="border-bottom:1px solid #27272a;">
+            <td style="padding:.75rem 1rem;">
+                <div style="font-weight:600;">${c.nome || '—'}</div>
+                <div style="font-size:.7rem;color:${corBloq};margin-top:.15rem;">${txtBloq}</div>
+            </td>
+            <td style="padding:.75rem 1rem;color:#a1a1aa;font-size:.8rem;">${c.email_dono || '—'}</td>
+            <td style="padding:.75rem 1rem;text-align:center;">
+                <span style="background:#27272a;padding:.2rem .6rem;border-radius:.25rem;font-size:.75rem;font-weight:600;">${planoBadge}</span>
+            </td>
+            <td style="padding:.75rem 1rem;text-align:center;">
+                <span style="color:${cor};font-weight:600;text-transform:uppercase;font-size:.7rem;">${c.status || '—'}</span>
+            </td>
+            <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${validade}</td>
+            <td style="padding:.75rem 1rem;text-align:center;font-weight:700;color:${corDias};">${dias}</td>
+            <td style="padding:.75rem 1rem;text-align:right;font-weight:600;">${valor}</td>
+            <td style="padding:.75rem 1rem;text-align:center;">
+                <button onclick="adminAcoesClube('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')" style="padding:.4rem .75rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.35rem;font-size:.75rem;cursor:pointer;">
+                    <i class="fa-solid fa-gear"></i> Ações
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function adminAcoesClube(clubeId, nome) {
+    const opcao = prompt(
+        `Ações para "${nome}":\n\n` +
+        `1 - Estender validade (dias)\n` +
+        `2 - Mudar plano\n` +
+        `3 - Suspender (bloquear acesso)\n` +
+        `4 - Reativar\n` +
+        `5 - Registrar pagamento manual\n` +
+        `6 - Ver histórico de pagamentos\n\n` +
+        `Digite o número da ação:`
+    );
+    if (!opcao) return;
+    
+    try {
+        if (opcao === '1') {
+            const dias = prompt('Quantos dias estender? (ex: 30 para 1 mês)');
+            if (!dias) return;
+            const diasNum = parseInt(dias, 10);
+            if (isNaN(diasNum) || diasNum <= 0) { alert('Número inválido'); return; }
+            // Calcular nova data
+            const clube = _adminClubesCache.find(c => c.id === clubeId);
+            const base = clube?.data_validade ? new Date(clube.data_validade) : new Date();
+            if (base < new Date()) base.setTime(Date.now());
+            base.setDate(base.getDate() + diasNum);
+            const novaData = base.toISOString().split('T')[0];
+            const { error } = await sb.rpc('estender_validade', { p_clube_id: clubeId, p_nova_data: novaData });
+            if (error) throw error;
+            alert(`✓ Validade estendida até ${new Date(novaData).toLocaleDateString('pt-BR')}`);
+            await adminCarregarClubes();
+            await adminCarregarDashboard();
+        }
+        else if (opcao === '2') {
+            const novoPlano = prompt('Novo plano: digite "basic", "premium" ou "pro"');
+            if (!novoPlano || !['basic','premium','pro'].includes(novoPlano.toLowerCase())) {
+                alert('Plano inválido'); return;
+            }
+            const ciclo = prompt('Ciclo: "mensal" ou "anual"', 'mensal');
+            if (!ciclo || !['mensal','anual'].includes(ciclo.toLowerCase())) {
+                alert('Ciclo inválido'); return;
+            }
+            const { error } = await sb.rpc('mudar_plano', { 
+                p_clube_id: clubeId, 
+                p_novo_plano: novoPlano.toLowerCase(),
+                p_novo_ciclo: ciclo.toLowerCase()
+            });
+            if (error) throw error;
+            alert(`✓ Plano alterado para ${novoPlano.toUpperCase()} (${ciclo})`);
+            await adminCarregarClubes();
+            await adminCarregarDashboard();
+        }
+        else if (opcao === '3') {
+            const motivo = prompt('Motivo da suspensão (opcional):', 'Inadimplência');
+            if (!confirm(`Confirma SUSPENDER o acesso do clube "${nome}"?`)) return;
+            const { error } = await sb.rpc('suspender_clube', { p_clube_id: clubeId, p_motivo: motivo || 'Suspensão manual' });
+            if (error) throw error;
+            alert('✓ Clube suspenso');
+            await adminCarregarClubes();
+            await adminCarregarDashboard();
+        }
+        else if (opcao === '4') {
+            if (!confirm(`Confirma REATIVAR o clube "${nome}"?`)) return;
+            const { error } = await sb.rpc('reativar_clube', { p_clube_id: clubeId });
+            if (error) throw error;
+            alert('✓ Clube reativado');
+            await adminCarregarClubes();
+            await adminCarregarDashboard();
+        }
+        else if (opcao === '5') {
+            const valor = prompt('Valor pago (R$):');
+            if (!valor) return;
+            const valorNum = parseFloat(valor.replace(',', '.'));
+            if (isNaN(valorNum) || valorNum <= 0) { alert('Valor inválido'); return; }
+            const dias = prompt('Quantos dias estender pelo pagamento?', '30');
+            const diasNum = parseInt(dias, 10);
+            if (isNaN(diasNum) || diasNum <= 0) { alert('Dias inválido'); return; }
+            const desc = prompt('Descrição (opcional):', 'Pagamento PIX manual');
+            const { error } = await sb.rpc('registrar_pagamento_manual', {
+                p_clube_id: clubeId,
+                p_valor: valorNum,
+                p_dias_extensao: diasNum,
+                p_forma: 'manual',
+                p_descricao: desc || null
+            });
+            if (error) throw error;
+            alert(`✓ Pagamento de R$ ${valorNum.toFixed(2).replace('.', ',')} registrado. Validade estendida em ${diasNum} dias.`);
+            await adminCarregarClubes();
+            await adminCarregarDashboard();
+        }
+        else if (opcao === '6') {
+            const { data, error } = await sb.from('pagamentos').select('*').eq('clube_id', clubeId).order('created_at', { ascending: false });
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                alert(`${nome} não tem histórico de pagamentos.`);
+                return;
+            }
+            const txt = data.map(p => 
+                `${new Date(p.data_vencimento).toLocaleDateString('pt-BR')} | R$ ${Number(p.valor).toFixed(2)} | ${p.status.toUpperCase()} | ${p.forma_pagamento || '—'}`
+            ).join('\n');
+            alert(`Histórico de ${nome}:\n\n${txt}`);
+        }
+    } catch(e) {
+        console.error('[ADMIN] Erro ação:', e);
+        alert('Erro: ' + (e.message || e));
+    }
+}
+
+async function adminCarregarPagamentos() {
+    const filtro = document.getElementById('admin-pag-filtro').value;
+    try {
+        let query = sb.from('pagamentos').select('*, clubes(nome)').order('created_at', { ascending: false }).limit(200);
+        if (filtro && filtro !== 'todos') query = query.eq('status', filtro);
+        const { data, error } = await query;
+        if (error) throw error;
+        const tbody = document.getElementById('admin-pagamentos-tbody');
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Nenhum pagamento</td></tr>';
+            return;
+        }
+        const corStatus = { pago: '#10b981', pendente: '#f59e0b', vencido: '#dc2626', cancelado: '#71717a', estornado: '#71717a' };
+        tbody.innerHTML = data.map(p => {
+            const clubeNome = p.clubes?.nome || '(clube removido)';
+            const venc = new Date(p.data_vencimento).toLocaleDateString('pt-BR');
+            const pago = p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '—';
+            const periodo = (p.periodo_inicio && p.periodo_fim) ? 
+                `${new Date(p.periodo_inicio).toLocaleDateString('pt-BR')} → ${new Date(p.periodo_fim).toLocaleDateString('pt-BR')}` : '—';
+            const cor = corStatus[p.status] || '#71717a';
+            return `<tr style="border-bottom:1px solid #27272a;">
+                <td style="padding:.75rem 1rem;font-weight:600;">${clubeNome}</td>
+                <td style="padding:.75rem 1rem;text-align:right;font-weight:700;">R$ ${Number(p.valor).toFixed(2).replace('.', ',')}</td>
+                <td style="padding:.75rem 1rem;text-align:center;"><span style="color:${cor};font-weight:600;text-transform:uppercase;font-size:.7rem;">${p.status}</span></td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${p.forma_pagamento || '—'}</td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${venc}</td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${pago}</td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.75rem;color:#71717a;">${periodo}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        console.error('[ADMIN] Erro pagamentos:', e);
+        document.getElementById('admin-pagamentos-tbody').innerHTML = '<tr><td colspan="7" style="padding:2rem;color:#dc2626;">Erro: ' + (e.message || e) + '</td></tr>';
+    }
+}
+
+async function adminCarregarPlanos() {
+    try {
+        const { data, error } = await sb.from('planos').select('*').order('ordem');
+        if (error) throw error;
+        const cont = document.getElementById('admin-planos-cards');
+        if (!data || data.length === 0) {
+            cont.innerHTML = '<div style="color:#71717a;">Nenhum plano</div>';
+            return;
+        }
+        cont.innerHTML = data.map(p => {
+            const features = [];
+            if (p.feature_bar_comandas) features.push('Bar/Comandas');
+            if (p.feature_fechamento_dia) features.push('Fechamento Dia');
+            if (p.feature_relatorios_avancados) features.push('Relatórios+');
+            if (p.feature_templates_torneio) features.push('Templates');
+            if (p.feature_impressao_termica) features.push('Impressão');
+            if (p.feature_multi_clube) features.push('Multi-clube');
+            if (p.feature_multi_tv) features.push('Multi-TV');
+            if (p.feature_backup_automatico) features.push('Backup Auto');
+            if (p.feature_suporte_prioritario) features.push('Suporte+');
+            if (p.feature_api) features.push('API');
+            if (p.feature_white_label) features.push('White-label');
+            
+            const corPlano = p.id === 'pro' ? '#dc2626' : (p.id === 'premium' ? '#f59e0b' : '#10b981');
+            
+            return `<div style="background:#18181b;border:2px solid ${corPlano};padding:1.5rem;border-radius:.75rem;">
+                <div style="font-size:.7rem;color:${corPlano};font-weight:700;text-transform:uppercase;letter-spacing:.1em;">${p.id}</div>
+                <div style="font-size:1.25rem;font-weight:800;margin-top:.25rem;">${p.nome}</div>
+                <div style="font-size:2rem;font-weight:800;color:${corPlano};margin:.75rem 0;">R$ ${Number(p.preco_mensal).toFixed(2).replace('.', ',')}<span style="font-size:.85rem;color:#71717a;">/mês</span></div>
+                <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:.75rem;">${p.descricao || ''}</div>
+                <div style="font-size:.75rem;color:#71717a;margin-top:1rem;">
+                    <div><strong>Limites:</strong></div>
+                    <div>Jogadores: ${p.max_jogadores ? p.max_jogadores : 'Ilimitado'}</div>
+                    <div>Operadores: ${p.max_operadores ? p.max_operadores : 'Ilimitado'}</div>
+                    <div>Clubes: ${p.max_clubes ? p.max_clubes : 'Ilimitado'}</div>
+                </div>
+                ${features.length ? `<div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:.25rem;">` + 
+                    features.map(f => `<span style="background:${corPlano}33;color:${corPlano};padding:.15rem .5rem;border-radius:.25rem;font-size:.7rem;font-weight:600;">${f}</span>`).join('') + 
+                    `</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) {
+        console.error('[ADMIN] Erro planos:', e);
+        document.getElementById('admin-planos-cards').innerHTML = '<div style="color:#dc2626;">Erro: ' + (e.message || e) + '</div>';
+    }
+}
+
+async function adminCarregarCupons() {
+    try {
+        const { data, error } = await sb.from('cupons').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        const tbody = document.getElementById('admin-cupons-tbody');
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Nenhum cupom criado ainda</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(c => {
+            const valor = c.tipo === 'percentual' ? `${c.valor}%` : `R$ ${Number(c.valor).toFixed(2)}`;
+            const usos = c.max_usos ? `${c.usos_atuais}/${c.max_usos}` : `${c.usos_atuais}/∞`;
+            const validade = c.valido_ate ? new Date(c.valido_ate).toLocaleDateString('pt-BR') : 'Sem prazo';
+            return `<tr style="border-bottom:1px solid #27272a;">
+                <td style="padding:.75rem 1rem;font-family:monospace;font-weight:700;color:var(--gold);">${c.codigo}</td>
+                <td style="padding:.75rem 1rem;color:#a1a1aa;font-size:.8rem;">${c.descricao || '—'}</td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${c.tipo}</td>
+                <td style="padding:.75rem 1rem;text-align:right;font-weight:700;">${valor}</td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${usos}</td>
+                <td style="padding:.75rem 1rem;text-align:center;font-size:.8rem;">${validade}</td>
+                <td style="padding:.75rem 1rem;text-align:center;">
+                    <button onclick="adminToggleCupom('${c.id}', ${c.ativo})" style="padding:.3rem .6rem;background:${c.ativo ? '#10b981' : '#27272a'};color:white;border:none;border-radius:.25rem;font-size:.7rem;cursor:pointer;">${c.ativo ? '✓ Ativo' : '✗ Inativo'}</button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        console.error('[ADMIN] Erro cupons:', e);
+        document.getElementById('admin-cupons-tbody').innerHTML = '<tr><td colspan="7" style="padding:2rem;color:#dc2626;">Erro: ' + (e.message || e) + '</td></tr>';
+    }
+}
+
+async function adminCriarCupom() {
+    const codigo = prompt('Código do cupom (ex: BLACKFRIDAY30):');
+    if (!codigo) return;
+    const tipo = prompt('Tipo: "percentual" (ex: 30%) ou "fixo" (ex: R$50)', 'percentual');
+    if (!tipo || !['percentual','fixo'].includes(tipo.toLowerCase())) { alert('Tipo inválido'); return; }
+    const valor = prompt(tipo === 'percentual' ? 'Percentual de desconto (ex: 30):' : 'Valor em R$ (ex: 50):');
+    if (!valor) return;
+    const valorNum = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valorNum) || valorNum <= 0) { alert('Valor inválido'); return; }
+    const desc = prompt('Descrição:', 'Promoção');
+    const maxUsos = prompt('Máximo de usos (deixe vazio para ilimitado):');
+    const validoAte = prompt('Válido até (YYYY-MM-DD, deixe vazio para sem prazo):');
+    
+    try {
+        const cupom = {
+            codigo: codigo.toUpperCase().trim(),
+            tipo: tipo.toLowerCase(),
+            valor: valorNum,
+            descricao: desc || null,
+            ativo: true
+        };
+        if (maxUsos && maxUsos.trim()) cupom.max_usos = parseInt(maxUsos, 10);
+        if (validoAte && validoAte.trim()) cupom.valido_ate = validoAte.trim();
+        
+        const { error } = await sb.from('cupons').insert(cupom);
+        if (error) throw error;
+        alert(`✓ Cupom "${cupom.codigo}" criado!`);
+        await adminCarregarCupons();
+    } catch(e) {
+        alert('Erro: ' + (e.message || e));
+    }
+}
+
+async function adminToggleCupom(id, ativoAtual) {
+    try {
+        const { error } = await sb.from('cupons').update({ ativo: !ativoAtual }).eq('id', id);
+        if (error) throw error;
+        await adminCarregarCupons();
+    } catch(e) {
+        alert('Erro: ' + (e.message || e));
+    }
+}
+
+
+// ============================================================
 // ROTEAMENTO POR URL: ?cadastrar=1, ?convite=TOKEN
 // ============================================================
 function _processarUrlInicial() {
@@ -5907,6 +6575,13 @@ function _processarUrlInicial() {
     if (token) {
         carregarConvitePorToken(token);
         return true;
+    }
+    // Painel super admin: ?admin=1
+    if (params.get('admin') === '1') {
+        // Não retornamos true aqui - login normal acontece, e DEPOIS do
+        // login bem-sucedido, redirecionamos pro admin se for super admin.
+        // A flag fica armazenada na window pra ser checada após login.
+        window._goToAdmin = true;
     }
     return false;
 }
@@ -14681,10 +15356,27 @@ window.debugSync = async function() {
 // ============================================================
 (async function bootSupabase() {
     try {
+        // Processar URL antes do auth pra setar window._goToAdmin
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('admin') === '1') {
+            window._goToAdmin = true;
+        }
+        
         const ok = await inicializarAuth();
         const ls = document.getElementById('login-screen');
         const ma = document.getElementById('main-app');
         if (ok && currentUser) {
+            // Se URL pede admin e usuário já logado, tentar abrir painel admin
+            if (window._goToAdmin) {
+                if (ls) ls.style.display = 'none';
+                if (ma) ma.style.display = 'none';
+                const adminOk = await adminVerificarAcessoEMostrar();
+                if (adminOk) {
+                    console.log('✅ Painel admin aberto');
+                    return;  // Não carrega main-app
+                }
+                // Se não é admin, segue fluxo normal
+            }
             if (ls) ls.style.display = 'none';
             if (ma) ma.style.display = 'flex';
             applyPermissions();
@@ -14703,9 +15395,12 @@ window.debugSync = async function() {
             })();
             console.log('✅ Sessão recuperada:', currentUser.nome, '| Clube:', sbClube && sbClube.nome);
         } else {
-            // Verifica se tem ?cadastrar=1 ou ?convite=TOKEN antes de mostrar login
+            // Verifica se tem ?cadastrar=1, ?convite=TOKEN ou ?admin=1 antes de mostrar login
             if (!_processarUrlInicial()) {
                 if (ls) ls.style.display = 'flex';
+            } else {
+                // Se tem ?admin=1 sem sessão, mostra login (depois redireciona)
+                if (window._goToAdmin && ls) ls.style.display = 'flex';
             }
             if (ma) ma.style.display = 'none';
         }
