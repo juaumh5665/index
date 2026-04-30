@@ -806,6 +806,10 @@
             <div onclick="showPage('config')" id="nav-config" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-gear" style="width:16px;"></i> Configurações
             </div>
+            <div onclick="showPage('assinatura')" id="nav-assinatura" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-credit-card" style="width:16px;"></i> Minha Assinatura
+                <span id="nav-assinatura-badge" style="display:none;margin-left:auto;background:#dc2626;color:white;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;"></span>
+            </div>
         </nav>
         <div style="padding:1rem;border-top:1px solid #1a1a1e;">
             <button id="btn-resetar-db" onclick="confirmarLimparDados()" style="width:100%;font-size:.7rem;color:#3f3f46;background:none;border:none;cursor:pointer;padding:.4rem;font-family:'Manrope',sans-serif;display:none;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'">Resetar Database</button>
@@ -1606,6 +1610,82 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- MINHA ASSINATURA -->
+            <div id="page-assinatura" class="page-content fade-in" style="display:none;">
+                <!-- Banner de status -->
+                <div id="assinatura-banner-status" style="margin-bottom:1.5rem;"></div>
+                
+                <!-- Card do plano atual -->
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;padding:2rem;margin-bottom:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <div style="font-size:.75rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;">Plano Atual</div>
+                            <div id="assinatura-plano-nome" style="font-size:1.75rem;font-weight:800;margin-top:.25rem;">—</div>
+                            <div id="assinatura-plano-desc" style="color:#a1a1aa;margin-top:.5rem;font-size:.85rem;">—</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div id="assinatura-plano-preco" style="font-size:2rem;font-weight:800;color:var(--gold);">—</div>
+                            <div id="assinatura-plano-ciclo" style="color:#71717a;font-size:.85rem;">—</div>
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid #27272a;">
+                        <div>
+                            <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;">Status</div>
+                            <div id="assinatura-status" style="font-size:1rem;font-weight:700;margin-top:.25rem;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;">Validade</div>
+                            <div id="assinatura-validade" style="font-size:1rem;font-weight:700;margin-top:.25rem;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;">Dias Restantes</div>
+                            <div id="assinatura-dias-restantes" style="font-size:1rem;font-weight:700;margin-top:.25rem;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;">Próxima Cobrança</div>
+                            <div id="assinatura-proxima-cobranca" style="font-size:1rem;font-weight:700;margin-top:.25rem;">—</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Comparação de planos -->
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;padding:2rem;margin-bottom:1.5rem;">
+                    <h3 style="font-size:1.25rem;font-weight:700;margin-bottom:1rem;">Compare os Planos</h3>
+                    <p style="color:#a1a1aa;font-size:.85rem;margin-bottom:1.5rem;">Faça upgrade ou downgrade quando quiser. Você pode entrar em contato com o suporte para alterações.</p>
+                    <div id="assinatura-planos-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+                        Carregando planos...
+                    </div>
+                </div>
+                
+                <!-- Histórico de pagamentos -->
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;padding:2rem;">
+                    <h3 style="font-size:1.25rem;font-weight:700;margin-bottom:1rem;">Histórico de Pagamentos</h3>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                            <thead style="border-bottom:1px solid #27272a;">
+                                <tr>
+                                    <th style="padding:.75rem .5rem;text-align:left;color:#71717a;font-weight:600;">Vencimento</th>
+                                    <th style="padding:.75rem .5rem;text-align:right;color:#71717a;font-weight:600;">Valor</th>
+                                    <th style="padding:.75rem .5rem;text-align:center;color:#71717a;font-weight:600;">Status</th>
+                                    <th style="padding:.75rem .5rem;text-align:center;color:#71717a;font-weight:600;">Forma</th>
+                                    <th style="padding:.75rem .5rem;text-align:center;color:#71717a;font-weight:600;">Pago em</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assinatura-pagamentos-tbody">
+                                <tr><td colspan="5" style="padding:2rem;text-align:center;color:#71717a;">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Footer info -->
+                <div style="text-align:center;color:#52525b;font-size:.75rem;margin-top:2rem;padding-top:2rem;border-top:1px solid #27272a;">
+                    <p>Precisa de ajuda? Entre em contato pelo WhatsApp ou e-mail de suporte.</p>
+                    <p style="margin-top:.25rem;">Cancelamento e reembolsos seguem nossos termos de uso.</p>
+                </div>
             </div>
 
             <!-- CASH / BAR placeholders -->
@@ -3307,7 +3387,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','config','relatorios'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','config','relatorios','assinatura'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
@@ -3699,17 +3779,43 @@ function _agendarSync() {
 
 // Marcar entidade como suja (precisa sincronizar)
 function _markDirty(tipo, id) {
+    // 🔒 BLOQUEIO PARCIAL: se assinatura expirada, bloqueia TODAS as mutações
+    // Exceção: 'auditoria' continua passando pra preservar logs
+    if (typeof _bloqueioAtivo !== 'undefined' && _bloqueioAtivo && tipo !== 'auditoria') {
+        console.warn('[BLOQUEIO] Mutação bloqueada (assinatura expirada):', tipo, id);
+        if (!window._bloqueioAvisoMostrado) {
+            window._bloqueioAvisoMostrado = true;
+            setTimeout(() => {
+                alert('🔒 Sua assinatura expirou.\n\nVocê está em modo somente leitura. Pode visualizar dados, mas não pode criar/editar.\n\nAcesse "Minha Assinatura" no menu para renovar.');
+                setTimeout(() => { window._bloqueioAvisoMostrado = false; }, 30000); // re-permitir aviso após 30s
+            }, 100);
+        }
+        return false;
+    }
     if (_syncQueue[tipo]) {
         _syncQueue[tipo].add(id);
         console.log('[SYNC] _markDirty:', tipo, '→', id);
     }
     _agendarSync();
+    return true;
 }
 
 // Marcar para deletar
 function _markDelete(tipo, id) {
+    if (typeof _bloqueioAtivo !== 'undefined' && _bloqueioAtivo) {
+        console.warn('[BLOQUEIO] Delete bloqueado (assinatura expirada):', tipo, id);
+        if (!window._bloqueioAvisoMostrado) {
+            window._bloqueioAvisoMostrado = true;
+            setTimeout(() => {
+                alert('🔒 Sua assinatura expirou. Operações de exclusão estão bloqueadas até a renovação.');
+                setTimeout(() => { window._bloqueioAvisoMostrado = false; }, 30000);
+            }, 100);
+        }
+        return false;
+    }
     if (_syncQueue.deletes[tipo]) _syncQueue.deletes[tipo].add(id);
     _agendarSync();
+    return true;
 }
 
 // ============================================================
@@ -4421,6 +4527,8 @@ async function login() {
         logAudit('LOGIN', `Login: ${currentUser.nome}`);
         iniciarBackupAutomatico();
         atualizarStatusDB();
+        // Carregar dados de assinatura e renderizar banner global
+        carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
         // Carrega TODO o estado do clube em background (não bloqueia UI)
         (async () => {
             try {
@@ -5940,6 +6048,8 @@ async function fazerSignup() {
         logAudit && logAudit('SIGNUP', `Novo clube criado: ${clubeNome}`);
         iniciarBackupAutomatico && iniciarBackupAutomatico();
         atualizarStatusDB && atualizarStatusDB();
+        // Assinatura trial criada automaticamente pelo trigger SQL
+        carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
 
         // Carrega estado em background
         (async () => {
@@ -6112,10 +6222,324 @@ async function aceitarConviteSubmit() {
 // ============================================================
 
 // ============================================================
-// PAINEL SUPER ADMIN - JavaScript
+// MINHA ASSINATURA (Etapa 13.3)
 // ============================================================
-let _adminIsLoaded = false;
-let _adminClubesCache = [];
+let _assinaturaAtual = null;
+let _planosCache = null;
+let _bloqueioAtivo = false; // true quando assinatura expirada/suspensa
+
+async function carregarAssinaturaAtual() {
+    // Carrega assinatura do clube atual + planos disponíveis
+    try {
+        if (!sbClube?.id) return null;
+        
+        const [assinaturaRes, planosRes, clubeRes] = await Promise.all([
+            sb.from('assinaturas').select('*').eq('clube_id', sbClube.id).maybeSingle(),
+            sb.from('planos').select('*').eq('ativo', true).order('ordem'),
+            sb.from('clubes').select('bloqueado, motivo_bloqueio, plano_atual, data_validade').eq('id', sbClube.id).single()
+        ]);
+        
+        if (assinaturaRes.error && assinaturaRes.error.code !== 'PGRST116') {
+            console.warn('[ASSINATURA] erro:', assinaturaRes.error);
+        }
+        if (planosRes.error) {
+            console.warn('[ASSINATURA] erro planos:', planosRes.error);
+        }
+        
+        _assinaturaAtual = assinaturaRes.data || null;
+        _planosCache = planosRes.data || [];
+        
+        // Verificar bloqueio
+        const clube = clubeRes.data;
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        const validade = clube?.data_validade ? new Date(clube.data_validade) : null;
+        const expirada = validade && validade < hoje;
+        const bloqueadoCampo = clube?.bloqueado === true;
+        const statusInativo = _assinaturaAtual && ['suspensa','expirada','cancelada'].includes(_assinaturaAtual.status);
+        
+        _bloqueioAtivo = bloqueadoCampo || statusInativo || expirada;
+        
+        // Atualizar badge no menu
+        atualizarBadgeAssinatura();
+        
+        return _assinaturaAtual;
+    } catch(e) {
+        console.error('[ASSINATURA] erro:', e);
+        return null;
+    }
+}
+
+function atualizarBadgeAssinatura() {
+    const badge = document.getElementById('nav-assinatura-badge');
+    if (!badge) return;
+    
+    if (!_assinaturaAtual) {
+        badge.style.display = 'none';
+        return;
+    }
+    
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const validade = _assinaturaAtual.data_validade ? new Date(_assinaturaAtual.data_validade) : null;
+    if (!validade) { badge.style.display = 'none'; return; }
+    
+    const dias = Math.ceil((validade - hoje) / (1000*60*60*24));
+    
+    if (dias < 0) {
+        // Expirada
+        badge.style.display = 'inline-block';
+        badge.style.background = '#dc2626';
+        badge.innerText = 'EXPIRADA';
+    } else if (dias <= 3) {
+        // Aviso urgente
+        badge.style.display = 'inline-block';
+        badge.style.background = '#dc2626';
+        badge.innerText = dias + 'd';
+    } else if (dias <= 7) {
+        // Aviso amarelo
+        badge.style.display = 'inline-block';
+        badge.style.background = '#f59e0b';
+        badge.innerText = dias + 'd';
+    } else if (_assinaturaAtual.status === 'trial') {
+        // Em trial, mostrar dias
+        badge.style.display = 'inline-block';
+        badge.style.background = '#3b82f6';
+        badge.innerText = 'TRIAL';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+async function renderAssinatura() {
+    await carregarAssinaturaAtual();
+    
+    if (!_assinaturaAtual) {
+        document.getElementById('assinatura-banner-status').innerHTML = 
+            '<div style="background:#18181b;border:1px solid #f59e0b;border-left:4px solid #f59e0b;padding:1rem 1.25rem;border-radius:.5rem;color:#fbbf24;">' +
+            '<i class="fa-solid fa-circle-exclamation"></i> <strong>Sem assinatura cadastrada.</strong> Entre em contato com o suporte.' +
+            '</div>';
+        return;
+    }
+    
+    // === Banner de status ===
+    const a = _assinaturaAtual;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const validade = a.data_validade ? new Date(a.data_validade) : null;
+    const dias = validade ? Math.ceil((validade - hoje) / (1000*60*60*24)) : null;
+    
+    let banner = '';
+    if (a.status === 'trial' && dias > 0) {
+        banner = `<div style="background:#1e3a8a22;border:1px solid #3b82f6;border-left:4px solid #3b82f6;padding:1rem 1.25rem;border-radius:.5rem;color:#93c5fd;">
+            <i class="fa-solid fa-rocket"></i> <strong>Período de avaliação ativo!</strong> Você tem ${dias} dia${dias !== 1 ? 's' : ''} restante${dias !== 1 ? 's' : ''} para testar todas as funcionalidades do plano ${getPlanoNome(a.plano_id)}.
+        </div>`;
+    } else if (a.status === 'ativa' && dias > 7) {
+        banner = `<div style="background:#0f291922;border:1px solid #10b981;border-left:4px solid #10b981;padding:1rem 1.25rem;border-radius:.5rem;color:#6ee7b7;">
+            <i class="fa-solid fa-circle-check"></i> <strong>Assinatura ativa.</strong> Próximo vencimento em ${validade.toLocaleDateString('pt-BR')} (${dias} dias).
+        </div>`;
+    } else if (dias != null && dias > 0 && dias <= 7) {
+        banner = `<div style="background:#78350f22;border:1px solid #f59e0b;border-left:4px solid #f59e0b;padding:1rem 1.25rem;border-radius:.5rem;color:#fbbf24;">
+            <i class="fa-solid fa-triangle-exclamation"></i> <strong>Atenção: assinatura vence em ${dias} dia${dias !== 1 ? 's' : ''}!</strong> Entre em contato com o suporte para renovar.
+        </div>`;
+    } else if (dias != null && dias <= 0) {
+        banner = `<div style="background:#7f1d1d22;border:1px solid #dc2626;border-left:4px solid #dc2626;padding:1rem 1.25rem;border-radius:.5rem;color:#fca5a5;">
+            <i class="fa-solid fa-circle-xmark"></i> <strong>Assinatura expirada!</strong> Sua conta está em modo bloqueio parcial — você pode visualizar dados, mas não pode criar/editar. Renove agora para liberar acesso completo.
+        </div>`;
+    } else if (a.status === 'suspensa') {
+        banner = `<div style="background:#7f1d1d22;border:1px solid #dc2626;border-left:4px solid #dc2626;padding:1rem 1.25rem;border-radius:.5rem;color:#fca5a5;">
+            <i class="fa-solid fa-ban"></i> <strong>Assinatura suspensa.</strong> Entre em contato com o suporte.
+        </div>`;
+    }
+    document.getElementById('assinatura-banner-status').innerHTML = banner;
+    
+    // === Card do plano ===
+    const planoAtual = _planosCache?.find(p => p.id === a.plano_id);
+    if (planoAtual) {
+        document.getElementById('assinatura-plano-nome').innerText = planoAtual.nome;
+        document.getElementById('assinatura-plano-desc').innerText = planoAtual.descricao || '';
+        const preco = a.ciclo === 'anual' ? planoAtual.preco_anual : planoAtual.preco_mensal;
+        document.getElementById('assinatura-plano-preco').innerText = 'R$ ' + Number(preco).toFixed(2).replace('.', ',');
+        document.getElementById('assinatura-plano-ciclo').innerText = '/' + (a.ciclo === 'anual' ? 'ano' : 'mês');
+    }
+    
+    // Status com cor
+    const corStatus = { ativa: '#10b981', trial: '#3b82f6', pendente: '#f59e0b', suspensa: '#f59e0b', expirada: '#dc2626', cancelada: '#71717a' };
+    const elStatus = document.getElementById('assinatura-status');
+    elStatus.innerText = (a.status || '').toUpperCase();
+    elStatus.style.color = corStatus[a.status] || '#fafafa';
+    
+    document.getElementById('assinatura-validade').innerText = validade ? validade.toLocaleDateString('pt-BR') : '—';
+    
+    const elDias = document.getElementById('assinatura-dias-restantes');
+    if (dias != null) {
+        elDias.innerText = dias < 0 ? 'Expirada' : (dias + ' dia' + (dias !== 1 ? 's' : ''));
+        elDias.style.color = dias < 0 ? '#dc2626' : (dias <= 7 ? '#f59e0b' : '#fafafa');
+    } else {
+        elDias.innerText = '—';
+    }
+    
+    document.getElementById('assinatura-proxima-cobranca').innerText = a.data_proxima_cobranca ? 
+        new Date(a.data_proxima_cobranca).toLocaleDateString('pt-BR') : '—';
+    
+    // === Grid de planos ===
+    renderPlanosGrid();
+    
+    // === Histórico de pagamentos ===
+    await renderHistoricoPagamentos();
+}
+
+function renderPlanosGrid() {
+    const grid = document.getElementById('assinatura-planos-grid');
+    if (!grid || !_planosCache) return;
+    
+    const planoAtualId = _assinaturaAtual?.plano_id;
+    
+    grid.innerHTML = _planosCache.map(p => {
+        const isAtual = p.id === planoAtualId;
+        const cor = p.id === 'pro' ? '#dc2626' : (p.id === 'premium' ? '#f59e0b' : '#10b981');
+        
+        const features = [];
+        features.push(p.max_jogadores ? `Até ${p.max_jogadores} jogadores` : '✓ Jogadores ilimitados');
+        features.push(p.max_operadores ? `Até ${p.max_operadores} operador${p.max_operadores > 1 ? 'es' : ''}` : '✓ Operadores ilimitados');
+        if (p.feature_bar_comandas) features.push('✓ Bar e comandas');
+        if (p.feature_fechamento_dia) features.push('✓ Fechamento de dia');
+        if (p.feature_relatorios_avancados) features.push('✓ Relatórios avançados');
+        if (p.feature_templates_torneio) features.push('✓ Templates de torneio');
+        if (p.feature_impressao_termica) features.push('✓ Impressão térmica');
+        if (p.feature_multi_clube) features.push('✓ Multi-clube');
+        if (p.feature_multi_tv) features.push('✓ Múltiplas TVs');
+        if (p.feature_backup_automatico) features.push('✓ Backup automático');
+        if (p.feature_suporte_prioritario) features.push('✓ Suporte prioritário');
+        if (p.feature_api) features.push('✓ API');
+        if (p.feature_white_label) features.push('✓ White-label');
+        
+        return `<div style="background:${isAtual ? cor + '22' : '#0d0d0f'};border:2px solid ${isAtual ? cor : '#27272a'};padding:1.5rem;border-radius:.75rem;position:relative;">
+            ${isAtual ? `<div style="position:absolute;top:-10px;right:1rem;background:${cor};color:white;padding:.2rem .75rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;border-radius:.25rem;">PLANO ATUAL</div>` : ''}
+            <div style="font-size:.7rem;color:${cor};font-weight:700;text-transform:uppercase;letter-spacing:.1em;">${p.id}</div>
+            <div style="font-size:1.25rem;font-weight:800;margin-top:.25rem;">${p.nome.replace('StackOS ','')}</div>
+            <div style="font-size:2rem;font-weight:800;margin:.75rem 0;">R$ ${Number(p.preco_mensal).toFixed(2).replace('.', ',')}<span style="font-size:.85rem;color:#71717a;">/mês</span></div>
+            <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">ou R$ ${Number(p.preco_anual).toFixed(2).replace('.', ',')} /ano (~17% off)</div>
+            <div style="display:flex;flex-direction:column;gap:.4rem;font-size:.8rem;color:#a1a1aa;margin-top:1rem;">
+                ${features.map(f => `<div>${f}</div>`).join('')}
+            </div>
+            ${!isAtual ? `<button onclick="solicitarMudancaPlano('${p.id}', '${p.nome.replace(/'/g, "\\\\'")}')" class="btn-gold" style="width:100%;margin-top:1.5rem;padding:.7rem;border-radius:.5rem;font-weight:700;cursor:pointer;border:none;">Quero esse plano</button>` : '<div style="margin-top:1.5rem;padding:.7rem;text-align:center;color:#71717a;font-size:.8rem;">Você está neste plano</div>'}
+        </div>`;
+    }).join('');
+}
+
+async function renderHistoricoPagamentos() {
+    const tbody = document.getElementById('assinatura-pagamentos-tbody');
+    try {
+        const { data, error } = await sb.from('pagamentos').select('*').eq('clube_id', sbClube.id).order('data_vencimento', { ascending: false }).limit(50);
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#71717a;">Nenhum pagamento registrado</td></tr>';
+            return;
+        }
+        const corStatus = { pago: '#10b981', pendente: '#f59e0b', vencido: '#dc2626', cancelado: '#71717a' };
+        tbody.innerHTML = data.map(p => {
+            const venc = new Date(p.data_vencimento).toLocaleDateString('pt-BR');
+            const pago = p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '—';
+            const cor = corStatus[p.status] || '#71717a';
+            return `<tr style="border-bottom:1px solid #27272a;">
+                <td style="padding:.75rem .5rem;">${venc}</td>
+                <td style="padding:.75rem .5rem;text-align:right;font-weight:700;">R$ ${Number(p.valor).toFixed(2).replace('.', ',')}</td>
+                <td style="padding:.75rem .5rem;text-align:center;"><span style="color:${cor};font-weight:600;text-transform:uppercase;font-size:.7rem;">${p.status}</span></td>
+                <td style="padding:.75rem .5rem;text-align:center;font-size:.8rem;">${p.forma_pagamento || '—'}</td>
+                <td style="padding:.75rem .5rem;text-align:center;">${pago}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        console.error('[ASSINATURA] histórico erro:', e);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#dc2626;">Erro: ' + (e.message || e) + '</td></tr>';
+    }
+}
+
+function getPlanoNome(planoId) {
+    const p = _planosCache?.find(p => p.id === planoId);
+    return p ? p.nome.replace('StackOS ', '') : planoId;
+}
+
+function solicitarMudancaPlano(planoId, planoNome) {
+    alert(
+        `Para mudar para o plano ${planoNome}, entre em contato com nosso suporte:\n\n` +
+        `📧 E-mail: suporte@stackos.com.br\n` +
+        `📱 WhatsApp: (49) 99999-9999\n\n` +
+        `Em breve a mudança de plano será automática!`
+    );
+}
+
+// ============================================================
+// BLOQUEIO PARCIAL: bloqueia ações de criação/edição quando expirado
+// ============================================================
+function podeEditar() {
+    // Retorna true se pode editar/criar; false se está em bloqueio parcial.
+    // Usuário sempre pode visualizar; apenas mutações são bloqueadas.
+    return !_bloqueioAtivo;
+}
+
+function bloquearSeExpirado(mensagemAcao) {
+    // Helper: chame no início de funções de criar/editar
+    // Retorna true se está bloqueado (e mostra alerta), false se pode prosseguir
+    if (_bloqueioAtivo) {
+        const msg = mensagemAcao || 'esta ação';
+        alert(
+            `🔒 Acesso restrito\n\n` +
+            `Sua assinatura expirou. Você ainda pode visualizar seus dados, mas ${msg} está bloqueado(a) até a renovação.\n\n` +
+            `Acesse "Minha Assinatura" no menu para renovar.`
+        );
+        return true;
+    }
+    return false;
+}
+
+// ============================================================
+// BANNER GLOBAL DE ALERTA (aparece em todas as páginas)
+// ============================================================
+function renderBannerGlobalAssinatura() {
+    // Remove banner anterior se existir
+    const existente = document.getElementById('global-banner-assinatura');
+    if (existente) existente.remove();
+    
+    if (!_assinaturaAtual) return;
+    
+    const a = _assinaturaAtual;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const validade = a.data_validade ? new Date(a.data_validade) : null;
+    const dias = validade ? Math.ceil((validade - hoje) / (1000*60*60*24)) : null;
+    
+    let bg, cor, icone, msg;
+    
+    if (_bloqueioAtivo || (dias != null && dias <= 0)) {
+        bg = '#7f1d1d';
+        cor = '#fca5a5';
+        icone = 'fa-circle-xmark';
+        msg = '<strong>Assinatura expirada.</strong> Modo somente leitura ativo. <a href="#" onclick="event.preventDefault();showPage(\'assinatura\');" style="color:#fff;text-decoration:underline;">Renovar agora</a>';
+    } else if (dias != null && dias <= 3) {
+        bg = '#7f1d1d';
+        cor = '#fca5a5';
+        icone = 'fa-triangle-exclamation';
+        msg = `<strong>Sua assinatura vence em ${dias} dia${dias !== 1 ? 's' : ''}!</strong> <a href="#" onclick="event.preventDefault();showPage('assinatura');" style="color:#fff;text-decoration:underline;">Renovar agora</a>`;
+    } else if (dias != null && dias <= 7) {
+        bg = '#78350f';
+        cor = '#fbbf24';
+        icone = 'fa-bell';
+        msg = `<strong>Atenção:</strong> sua assinatura vence em ${dias} dias. <a href="#" onclick="event.preventDefault();showPage('assinatura');" style="color:#fff;text-decoration:underline;">Ver detalhes</a>`;
+    } else {
+        return; // sem banner
+    }
+    
+    const banner = document.createElement('div');
+    banner.id = 'global-banner-assinatura';
+    banner.style.cssText = `position:sticky;top:0;left:0;right:0;z-index:100;background:${bg};color:${cor};padding:.6rem 1.5rem;font-size:.85rem;text-align:center;border-bottom:1px solid ${cor}33;`;
+    banner.innerHTML = `<i class="fa-solid ${icone}"></i> ${msg}`;
+    
+    // Inserir no topo do main-app
+    const mainApp = document.getElementById('main-app');
+    if (mainApp) mainApp.insertBefore(banner, mainApp.firstChild);
+}
+
+// ============================================================
+
+
 
 async function adminVerificarAcessoEMostrar() {
     // Verifica se usuário é super admin via RPC
@@ -6631,6 +7055,7 @@ function applyPermissions() {
         'nav-bar':       'bar',
         'nav-usuarios':  'usuarios',
         'nav-config':    'config',
+        'nav-assinatura':'assinatura',
         'nav-caixa':     'caixa',
         'nav-relatorios':'relatorios',
     };
@@ -6682,6 +7107,7 @@ function showPage(page) {
     if (page === 'cash')      renderCashMesas();
     if (page === 'usuarios')  renderUsuarios();
     if (page === 'config')    renderConfig();
+    if (page === 'assinatura') renderAssinatura();
     if (page === 'caixa')     renderCaixa();
     if (page === 'relatorios') {
         setReportPeriod(_reportPeriod.tipo || '30d');
@@ -6745,6 +7171,7 @@ function contarTorneiosJogador(id) {
 }
 
 async function salvarJogador() {
+    if (bloquearSeExpirado('cadastrar/editar jogadores')) return;
     // Validação completa
     const v = validarCampos([
         { id:'j-nome',     nome:'Nome',     obrigatorio:true, minLength:2 },
@@ -15384,6 +15811,8 @@ window.debugSync = async function() {
             iniciarRelogio();
             iniciarBackupAutomatico();
             atualizarStatusDB();
+            // Carregar dados de assinatura e renderizar banner global
+            carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
             (async () => {
                 try {
                     await db.jogadores.list();
