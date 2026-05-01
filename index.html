@@ -4451,6 +4451,26 @@ async function carregarUsuarioEClube(authUser) {
         clube_id: usuario.clube_id,
     };
 
+    // Sincronizar config.clube (localStorage) com dados FRESCOS do Supabase
+    // Isso garante que CNPJ/telefone/endereco sempre venham do banco (fonte da verdade)
+    try {
+        if (!config) config = {};
+        if (!config.clube) config.clube = {};
+        config.clube = {
+            ...config.clube,
+            nome:     clube.nome     || config.clube.nome || 'StackOS',
+            cnpj:     clube.cnpj     || config.clube.cnpj || '',
+            fone:     clube.telefone || config.clube.fone || '',
+            endereco: clube.endereco || config.clube.endereco || '',
+            cidade:   clube.cidade   || config.clube.cidade || '',
+            uf:       clube.uf       || config.clube.uf || '',
+            email:    clube.email    || config.clube.email || '',
+        };
+        if (typeof salvarConfig === 'function') salvarConfig();
+    } catch(e) {
+        console.warn('[LOGIN] sync config.clube falhou:', e);
+    }
+
     // Log de diagnóstico (segurança/auditoria)
     console.log('🔐 SESSÃO INICIADA:');
     console.log('   Usuário:', usuario.email, '(papel:', usuario.papel + ')');
@@ -11793,7 +11813,31 @@ function switchConfigTab(tabId, btn) {
     if (tabId === 'cfg-seguranca') renderSegurancaStats();
 }
 
-function renderConfig() {
+async function renderConfig() {
+    // Sincronizar do Supabase primeiro (caso outro dispositivo tenha alterado)
+    if (sbClube?.id) {
+        try {
+            const { data: clubeBd } = await sb.from('clubes')
+                .select('nome, cnpj, telefone, endereco, cidade, uf, email, logo_url')
+                .eq('id', sbClube.id).single();
+            if (clubeBd) {
+                config.clube = {
+                    ...config.clube,
+                    nome:     clubeBd.nome     || config.clube.nome,
+                    cnpj:     clubeBd.cnpj     || config.clube.cnpj,
+                    fone:     clubeBd.telefone || config.clube.fone,
+                    endereco: clubeBd.endereco || config.clube.endereco,
+                    cidade:   clubeBd.cidade   || config.clube.cidade,
+                    uf:       clubeBd.uf       || config.clube.uf,
+                    email:    clubeBd.email    || config.clube.email,
+                };
+                sbClube = { ...sbClube, ...clubeBd };
+            }
+        } catch(e) {
+            console.warn('[CONFIG] não conseguiu sincronizar do Supabase:', e);
+        }
+    }
+    
     // Carregar valores nos inputs
     // Clube
     document.getElementById('cfg-clube-nome').value     = config.clube.nome || '';
@@ -11841,21 +11885,58 @@ function renderConfig() {
 }
 
 // --- CLUBE ---
-function salvarConfigClube() {
+async function salvarConfigClube() {
+    const novoNome = document.getElementById('cfg-clube-nome').value.trim();
+    const novoCnpj = document.getElementById('cfg-clube-cnpj').value.trim();
+    const novoFone = document.getElementById('cfg-clube-fone').value.trim();
+    const novoEndereco = document.getElementById('cfg-clube-endereco').value.trim();
+    const novoCidade = document.getElementById('cfg-clube-cidade').value.trim();
+    const novoUf = document.getElementById('cfg-clube-uf').value.trim().toUpperCase();
+    const novoEmail = document.getElementById('cfg-clube-email').value.trim();
+    
+    // Atualiza cache local primeiro
     config.clube = {
         ...config.clube,
-        nome:     document.getElementById('cfg-clube-nome').value.trim(),
-        cnpj:     document.getElementById('cfg-clube-cnpj').value.trim(),
-        fone:     document.getElementById('cfg-clube-fone').value.trim(),
-        endereco: document.getElementById('cfg-clube-endereco').value.trim(),
-        cidade:   document.getElementById('cfg-clube-cidade').value.trim(),
-        uf:       document.getElementById('cfg-clube-uf').value.trim().toUpperCase(),
-        email:    document.getElementById('cfg-clube-email').value.trim(),
+        nome: novoNome,
+        cnpj: novoCnpj,
+        fone: novoFone,
+        endereco: novoEndereco,
+        cidade: novoCidade,
+        uf: novoUf,
+        email: novoEmail,
     };
-    logAudit('CONFIG_EDITA', 'Dados do clube editados');
     salvarConfig();
     aplicarNomeClube();
-    showToast('✅ Dados do clube salvos!');
+    
+    // Persiste no Supabase (tabela clubes)
+    if (sbClube?.id) {
+        try {
+            const { error } = await sb.from('clubes').update({
+                nome: novoNome,
+                cnpj: novoCnpj || null,
+                telefone: novoFone || null,
+                endereco: novoEndereco || null,
+                cidade: novoCidade || null,
+                uf: novoUf || null,
+                email: novoEmail || null,
+                atualizado_em: new Date().toISOString(),
+            }).eq('id', sbClube.id);
+            
+            if (error) throw error;
+            
+            // Atualiza cache em memória
+            sbClube = { ...sbClube, nome: novoNome, cnpj: novoCnpj, telefone: novoFone, endereco: novoEndereco, cidade: novoCidade, uf: novoUf, email: novoEmail };
+            
+            logAudit('CONFIG_EDITA', 'Dados do clube editados');
+            showToast('✅ Dados do clube salvos!');
+        } catch(e) {
+            console.error('[CONFIG] Erro ao salvar no Supabase:', e);
+            showToast('⚠️ Salvou localmente, mas erro ao sincronizar: ' + (e.message || e));
+        }
+    } else {
+        logAudit('CONFIG_EDITA', 'Dados do clube editados (offline)');
+        showToast('✅ Dados salvos localmente');
+    }
 }
 
 function aplicarNomeClube() {
