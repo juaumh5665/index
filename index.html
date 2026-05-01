@@ -6458,13 +6458,352 @@ function getPlanoNome(planoId) {
     return p ? p.nome.replace('StackOS ', '') : planoId;
 }
 
+// ============================================================
+// FLUXO DE PAGAMENTO COM ASAAS
+// ============================================================
+let _planoEscolhido = null;
+
 function solicitarMudancaPlano(planoId, planoNome) {
-    alert(
-        `Para mudar para o plano ${planoNome}, entre em contato com nosso suporte:\n\n` +
-        `📧 E-mail: suporte@stackos.com.br\n` +
-        `📱 WhatsApp: (49) 99999-9999\n\n` +
-        `Em breve a mudança de plano será automática!`
-    );
+    const plano = _planosCache?.find(p => p.id === planoId);
+    if (!plano) { alert('Plano não encontrado'); return; }
+    _planoEscolhido = plano;
+    abrirModalPagamento();
+}
+
+function abrirModalPagamento() {
+    const p = _planoEscolhido;
+    if (!p) return;
+    
+    const modalHtml = `
+    <div id="modal-pagamento" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;">
+        <div style="background:#0d0d0f;border:1px solid #27272a;border-radius:.75rem;max-width:540px;width:100%;padding:2rem;color:#fafafa;max-height:90vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
+                <div>
+                    <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;">Assinar plano</div>
+                    <div style="font-size:1.5rem;font-weight:800;margin-top:.25rem;">${p.nome}</div>
+                </div>
+                <button onclick="fecharModalPagamento()" style="background:transparent;border:none;color:#71717a;font-size:1.5rem;cursor:pointer;padding:0;">&times;</button>
+            </div>
+            
+            <!-- Step 1: Ciclo + Forma de Pagamento -->
+            <div id="modal-pag-step1">
+                <div style="margin-bottom:1.5rem;">
+                    <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:.5rem;font-weight:600;">PERIODICIDADE</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                        <button onclick="pagSelecionarCiclo('mensal')" id="ciclo-mensal" class="ciclo-btn" style="padding:.85rem;background:var(--gold);color:#0a0a0b;border:none;border-radius:.5rem;font-weight:700;cursor:pointer;font-size:.9rem;">
+                            Mensal · R$ ${Number(p.preco_mensal).toFixed(2).replace('.', ',')}
+                        </button>
+                        <button onclick="pagSelecionarCiclo('anual')" id="ciclo-anual" class="ciclo-btn" style="padding:.85rem;background:#18181b;color:#fafafa;border:1px solid #27272a;border-radius:.5rem;font-weight:700;cursor:pointer;font-size:.9rem;">
+                            Anual · R$ ${Number(p.preco_anual).toFixed(2).replace('.', ',')}
+                            <div style="font-size:.7rem;color:#10b981;margin-top:.15rem;">Economize ~17%</div>
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:1.5rem;">
+                    <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:.5rem;font-weight:600;">FORMA DE PAGAMENTO</div>
+                    <div style="display:flex;flex-direction:column;gap:.5rem;">
+                        <button onclick="pagSelecionarForma('PIX','avulsa')" class="forma-btn" data-forma="pix-avulso" style="padding:.85rem 1rem;background:#18181b;color:#fafafa;border:1px solid #27272a;border-radius:.5rem;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-weight:700;font-size:.9rem;"><i class="fa-brands fa-pix"></i> PIX (avulso)</div>
+                                <div style="font-size:.75rem;color:#71717a;margin-top:.15rem;">Pago manualmente todo mês — recibo no momento</div>
+                            </div>
+                            <span style="color:#10b981;font-size:.75rem;font-weight:700;">RECOMENDADO</span>
+                        </button>
+                        <button onclick="pagSelecionarForma('BOLETO','avulsa')" class="forma-btn" data-forma="boleto-avulso" style="padding:.85rem 1rem;background:#18181b;color:#fafafa;border:1px solid #27272a;border-radius:.5rem;cursor:pointer;text-align:left;">
+                            <div style="font-weight:700;font-size:.9rem;"><i class="fa-solid fa-barcode"></i> Boleto (avulso)</div>
+                            <div style="font-size:.75rem;color:#71717a;margin-top:.15rem;">Recebe boleto a cada vencimento — taxa R$ 1,99</div>
+                        </button>
+                        <button onclick="pagSelecionarForma('CREDIT_CARD','recorrente')" class="forma-btn" data-forma="cartao-recorrente" style="padding:.85rem 1rem;background:#18181b;color:#fafafa;border:1px solid #27272a;border-radius:.5rem;cursor:pointer;text-align:left;">
+                            <div style="font-weight:700;font-size:.9rem;"><i class="fa-solid fa-credit-card"></i> Cartão de Crédito (recorrente)</div>
+                            <div style="font-size:.75rem;color:#71717a;margin-top:.15rem;">Cobrança automática todo mês — não precisa lembrar</div>
+                        </button>
+                        <button onclick="pagSelecionarForma('CREDIT_CARD','avulsa')" class="forma-btn" data-forma="cartao-avulso" style="padding:.85rem 1rem;background:#18181b;color:#fafafa;border:1px solid #27272a;border-radius:.5rem;cursor:pointer;text-align:left;">
+                            <div style="font-weight:700;font-size:.9rem;"><i class="fa-solid fa-credit-card"></i> Cartão de Crédito (avulso)</div>
+                            <div style="font-size:.75rem;color:#71717a;margin-top:.15rem;">Pago manualmente — sem cobrança automática</div>
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.85rem;font-size:.75rem;color:#a1a1aa;margin-bottom:1.5rem;">
+                    <i class="fa-solid fa-circle-info" style="color:#3b82f6;"></i> Após o pagamento, sua assinatura é estendida automaticamente. Você tem <strong>3 dias de tolerância</strong> após cada vencimento antes de bloqueio.
+                </div>
+            </div>
+            
+            <!-- Step 2: Cartão (se cartão for selecionado) -->
+            <div id="modal-pag-step2-cartao" style="display:none;">
+                <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:.75rem;font-weight:600;">DADOS DO CARTÃO</div>
+                <div style="display:grid;grid-template-columns:1fr;gap:.5rem;margin-bottom:.75rem;">
+                    <input type="text" id="cc-holder" placeholder="Nome impresso no cartão" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                    <input type="text" id="cc-number" placeholder="Número do cartão" maxlength="19" oninput="this.value=this.value.replace(/\\D/g,'').replace(/(\\d{4})(?=\\d)/g,'$1 ')" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem;">
+                    <input type="text" id="cc-month" placeholder="MM" maxlength="2" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                    <input type="text" id="cc-year" placeholder="AAAA" maxlength="4" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                    <input type="text" id="cc-cvv" placeholder="CVV" maxlength="4" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                </div>
+                
+                <div style="font-size:.8rem;color:#a1a1aa;margin:1rem 0 .5rem 0;font-weight:600;">DADOS DO TITULAR (cobrança)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">
+                    <input type="text" id="cc-cpf" placeholder="CPF do titular" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                    <input type="text" id="cc-phone" placeholder="Telefone (DDD+9 dígitos)" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem;">
+                    <input type="text" id="cc-cep" placeholder="CEP" maxlength="9" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                    <input type="text" id="cc-numero" placeholder="Número endereço" style="padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.9rem;">
+                </div>
+                <div style="font-size:.7rem;color:#71717a;margin-bottom:1rem;"><i class="fa-solid fa-lock"></i> Seus dados são enviados criptografados (HTTPS) ao Asaas. Não armazenamos seu cartão.</div>
+            </div>
+            
+            <!-- Step 3: PIX QR Code -->
+            <div id="modal-pag-step3-pix" style="display:none;text-align:center;">
+                <div style="background:white;padding:1rem;border-radius:.5rem;display:inline-block;margin:0 auto 1rem;">
+                    <img id="pix-qr-img" src="" alt="QR Code PIX" style="max-width:240px;display:block;">
+                </div>
+                <div style="font-size:.85rem;color:#a1a1aa;margin-bottom:1rem;">Escaneie o QR Code com seu app de banco ou copie o código abaixo:</div>
+                <textarea id="pix-copia-cola" readonly style="width:100%;padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.7rem;font-family:monospace;height:80px;resize:none;margin-bottom:.5rem;"></textarea>
+                <button onclick="copiarPixCodigo()" class="btn-gold" style="padding:.6rem 1.2rem;border-radius:.4rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;">
+                    <i class="fa-solid fa-copy"></i> Copiar Código PIX
+                </button>
+                <div style="font-size:.75rem;color:#71717a;margin-top:1rem;">Após pagar, o sistema confirma automaticamente em até 1 minuto. Você pode fechar esta janela.</div>
+            </div>
+            
+            <!-- Step 4: Boleto -->
+            <div id="modal-pag-step4-boleto" style="display:none;text-align:center;">
+                <i class="fa-solid fa-circle-check" style="color:#10b981;font-size:3rem;margin-bottom:1rem;"></i>
+                <div style="font-size:1.1rem;font-weight:700;margin-bottom:1rem;">Boleto gerado!</div>
+                <div style="color:#a1a1aa;font-size:.85rem;margin-bottom:1.5rem;">Click no botão abaixo pra abrir/imprimir seu boleto:</div>
+                <a id="boleto-link" href="#" target="_blank" class="btn-gold" style="display:inline-block;padding:.7rem 1.5rem;border-radius:.4rem;font-weight:700;text-decoration:none;font-size:.9rem;">
+                    <i class="fa-solid fa-file-invoice"></i> Abrir Boleto
+                </a>
+                <div style="font-size:.75rem;color:#71717a;margin-top:1.5rem;">Após pagar, o sistema confirma em até 2 dias úteis (compensação bancária).</div>
+            </div>
+            
+            <!-- Step 5: Sucesso recorrente -->
+            <div id="modal-pag-step5-recorrente" style="display:none;text-align:center;">
+                <i class="fa-solid fa-circle-check" style="color:#10b981;font-size:3rem;margin-bottom:1rem;"></i>
+                <div style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem;">Assinatura ativada!</div>
+                <div id="recorrente-msg" style="color:#a1a1aa;font-size:.85rem;margin-bottom:1.5rem;">Seu cartão foi cadastrado e a próxima cobrança será feita automaticamente.</div>
+            </div>
+            
+            <!-- Erro genérico -->
+            <div id="modal-pag-erro" style="display:none;background:#7f1d1d22;border:1px solid #dc2626;color:#fca5a5;padding:.85rem;border-radius:.5rem;font-size:.85rem;margin-bottom:1rem;"></div>
+            
+            <!-- Botões -->
+            <div id="modal-pag-botoes" style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;">
+                <button onclick="fecharModalPagamento()" style="padding:.7rem 1.2rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;cursor:pointer;font-size:.85rem;">Cancelar</button>
+                <button id="btn-pagar-confirmar" onclick="processarPagamento()" class="btn-gold" style="padding:.7rem 1.5rem;border-radius:.4rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;">
+                    Continuar
+                </button>
+            </div>
+        </div>
+    </div>`;
+    
+    // Inserir no DOM
+    const existing = document.getElementById('modal-pagamento');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Estado inicial
+    window._pagState = {
+        ciclo: 'mensal',
+        forma: null,
+        tipo: null,
+    };
+}
+
+function fecharModalPagamento() {
+    const modal = document.getElementById('modal-pagamento');
+    if (modal) modal.remove();
+    _planoEscolhido = null;
+    window._pagState = null;
+    // Recarregar dados de assinatura
+    carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura());
+    if (document.getElementById('page-assinatura').style.display !== 'none') {
+        renderAssinatura();
+    }
+}
+
+function pagSelecionarCiclo(ciclo) {
+    if (!window._pagState) return;
+    window._pagState.ciclo = ciclo;
+    document.getElementById('ciclo-mensal').style.background = ciclo === 'mensal' ? 'var(--gold)' : '#18181b';
+    document.getElementById('ciclo-mensal').style.color = ciclo === 'mensal' ? '#0a0a0b' : '#fafafa';
+    document.getElementById('ciclo-mensal').style.border = ciclo === 'mensal' ? 'none' : '1px solid #27272a';
+    document.getElementById('ciclo-anual').style.background = ciclo === 'anual' ? 'var(--gold)' : '#18181b';
+    document.getElementById('ciclo-anual').style.color = ciclo === 'anual' ? '#0a0a0b' : '#fafafa';
+    document.getElementById('ciclo-anual').style.border = ciclo === 'anual' ? 'none' : '1px solid #27272a';
+}
+
+function pagSelecionarForma(forma, tipo) {
+    if (!window._pagState) return;
+    window._pagState.forma = forma;
+    window._pagState.tipo = tipo;
+    
+    // Marcar visualmente o botão selecionado
+    document.querySelectorAll('.forma-btn').forEach(b => {
+        b.style.borderColor = '#27272a';
+        b.style.background = '#18181b';
+    });
+    const key = `${forma === 'PIX' ? 'pix' : (forma === 'BOLETO' ? 'boleto' : 'cartao')}-${tipo === 'avulsa' ? 'avulso' : 'recorrente'}`;
+    const sel = document.querySelector(`.forma-btn[data-forma="${key}"]`);
+    if (sel) {
+        sel.style.borderColor = 'var(--gold)';
+        sel.style.background = '#27272a';
+    }
+}
+
+async function processarPagamento() {
+    const state = window._pagState;
+    if (!state || !state.forma) {
+        alert('Escolha uma forma de pagamento');
+        return;
+    }
+    
+    const btn = document.getElementById('btn-pagar-confirmar');
+    const erroDiv = document.getElementById('modal-pag-erro');
+    erroDiv.style.display = 'none';
+    
+    // Se for cartão e ainda não preencheu dados, mostrar form
+    const ehCartao = state.forma === 'CREDIT_CARD';
+    const stepCartao = document.getElementById('modal-pag-step2-cartao');
+    const step1 = document.getElementById('modal-pag-step1');
+    
+    if (ehCartao && stepCartao.style.display === 'none') {
+        // Mostrar formulário de cartão
+        step1.style.display = 'none';
+        stepCartao.style.display = 'block';
+        btn.innerText = 'Confirmar Pagamento';
+        return;
+    }
+    
+    // Coletar dados do cartão (se aplicável)
+    let creditCard = null, creditCardHolderInfo = null;
+    if (ehCartao) {
+        creditCard = {
+            holderName: document.getElementById('cc-holder').value.trim(),
+            number: document.getElementById('cc-number').value.replace(/\s/g, ''),
+            expiryMonth: document.getElementById('cc-month').value.padStart(2, '0'),
+            expiryYear: document.getElementById('cc-year').value,
+            ccv: document.getElementById('cc-cvv').value,
+        };
+        creditCardHolderInfo = {
+            name: creditCard.holderName,
+            email: currentUser?.email || sbSession?.user?.email,
+            cpfCnpj: document.getElementById('cc-cpf').value.replace(/\D/g, ''),
+            postalCode: document.getElementById('cc-cep').value.replace(/\D/g, ''),
+            addressNumber: document.getElementById('cc-numero').value.trim(),
+            phone: document.getElementById('cc-phone').value.replace(/\D/g, ''),
+        };
+        // Validações básicas
+        if (!creditCard.holderName || !creditCard.number || !creditCard.expiryMonth || !creditCard.expiryYear || !creditCard.ccv) {
+            erroDiv.innerText = 'Preencha todos os dados do cartão';
+            erroDiv.style.display = 'block';
+            return;
+        }
+        if (!creditCardHolderInfo.cpfCnpj || creditCardHolderInfo.cpfCnpj.length < 11) {
+            erroDiv.innerText = 'CPF do titular inválido';
+            erroDiv.style.display = 'block';
+            return;
+        }
+    }
+    
+    // Loading
+    btn.disabled = true;
+    btn.innerText = '⏳ Processando...';
+    
+    try {
+        // Chamar Edge Function
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) throw new Error('Sessão expirada, faça login novamente');
+        
+        const supabaseUrl = sb.supabaseUrl;
+        const url = `${supabaseUrl}/functions/v1/asaas-criar-cobranca`;
+        
+        const reqBody = {
+            clube_id: sbClube.id,
+            plano_id: _planoEscolhido.id,
+            ciclo: state.ciclo,
+            forma: state.forma,
+            tipo: state.tipo,
+            creditCard,
+            creditCardHolderInfo,
+        };
+        
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+                'apikey': sb.supabaseKey,
+            },
+            body: JSON.stringify(reqBody),
+        });
+        
+        const data = await res.json();
+        if (!res.ok || data.erro) {
+            throw new Error(data.erro || `HTTP ${res.status}`);
+        }
+        
+        // Sucesso! Mostrar resultado
+        step1.style.display = 'none';
+        stepCartao.style.display = 'none';
+        document.getElementById('modal-pag-botoes').style.display = 'none';
+        
+        if (data.tipo === 'recorrente') {
+            document.getElementById('modal-pag-step5-recorrente').style.display = 'block';
+            const msg = `Próxima cobrança automática: ${data.proxima_cobranca ? new Date(data.proxima_cobranca).toLocaleDateString('pt-BR') : 'em breve'}.`;
+            document.getElementById('recorrente-msg').innerText = msg;
+        } else if (state.forma === 'PIX' || state.forma === 'UNDEFINED') {
+            document.getElementById('modal-pag-step3-pix').style.display = 'block';
+            if (data.pix_qr_code) {
+                document.getElementById('pix-qr-img').src = data.pix_qr_code;
+            }
+            if (data.pix_copia_e_cola) {
+                document.getElementById('pix-copia-cola').value = data.pix_copia_e_cola;
+            }
+        } else if (state.forma === 'BOLETO') {
+            document.getElementById('modal-pag-step4-boleto').style.display = 'block';
+            const link = data.invoice_url || data.bank_slip_url;
+            if (link) document.getElementById('boleto-link').href = link;
+        } else if (state.forma === 'CREDIT_CARD') {
+            // Cartão avulso pago direto
+            document.getElementById('modal-pag-step5-recorrente').style.display = 'block';
+            document.getElementById('recorrente-msg').innerText = 'Pagamento aprovado! Sua assinatura foi estendida.';
+        }
+        
+        // Botão "Fechar" no rodapé
+        document.getElementById('modal-pag-botoes').style.display = 'flex';
+        document.getElementById('modal-pag-botoes').innerHTML = 
+            `<button onclick="fecharModalPagamento()" class="btn-gold" style="padding:.7rem 1.5rem;border-radius:.4rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;">Fechar</button>`;
+        
+    } catch(e) {
+        console.error('[PAGAMENTO]', e);
+        erroDiv.innerText = 'Erro: ' + (e.message || e);
+        erroDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.innerText = ehCartao ? 'Confirmar Pagamento' : 'Continuar';
+    }
+}
+
+function copiarPixCodigo() {
+    const txt = document.getElementById('pix-copia-cola');
+    if (!txt) return;
+    txt.select();
+    txt.setSelectionRange(0, 99999);
+    try {
+        navigator.clipboard.writeText(txt.value).then(() => {
+            const btn = event.target.closest('button');
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+            btn.style.background = '#10b981';
+            btn.style.color = 'white';
+            setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; btn.style.color = ''; }, 2000);
+        });
+    } catch(e) {
+        document.execCommand('copy');
+        alert('Código copiado!');
+    }
 }
 
 // ============================================================
