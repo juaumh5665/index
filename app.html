@@ -597,6 +597,9 @@
         <button onclick="adminMostrarTab('cupons')" id="admin-tab-cupons" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
             <i class="fa-solid fa-ticket"></i> Cupons
         </button>
+        <button onclick="adminMostrarTab('contatos')" id="admin-tab-contatos" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-envelope"></i> Leads <span id="admin-leads-badge" style="display:none;background:#dc2626;color:white;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;margin-left:.25rem;"></span>
+        </button>
     </div>
     
     <!-- Content area -->
@@ -752,6 +755,47 @@
                             </tr>
                         </thead>
                         <tbody id="admin-cupons-tbody">
+                            <tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TAB: LEADS / CONTATOS LANDING -->
+        <div id="admin-content-contatos" class="admin-content" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                <h2 style="font-size:1.5rem;font-weight:700;">Leads da Landing Page</h2>
+                <div style="display:flex;gap:.5rem;align-items:center;">
+                    <select id="admin-leads-filtro" onchange="adminCarregarContatos()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.9rem;">
+                        <option value="todos">Todos</option>
+                        <option value="novo" selected>Novos</option>
+                        <option value="contatado">Já contatados</option>
+                        <option value="convertido">Convertidos</option>
+                        <option value="descartado">Descartados</option>
+                        <option value="spam">Spam</option>
+                    </select>
+                    <button onclick="adminCarregarContatos()" class="btn-ghost" style="padding:.6rem 1rem;border-radius:.5rem;font-size:.85rem;border:1px solid #27272a;background:#18181b;color:#fafafa;cursor:pointer;">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;overflow:hidden;">
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+                        <thead style="background:#0d0d0f;border-bottom:1px solid #27272a;">
+                            <tr>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Data</th>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Nome</th>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Email</th>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">WhatsApp</th>
+                                <th style="padding:.75rem 1rem;text-align:left;color:#71717a;font-weight:600;">Clube</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Status</th>
+                                <th style="padding:.75rem 1rem;text-align:center;color:#71717a;font-weight:600;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-contatos-tbody">
                             <tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Carregando...</td></tr>
                         </tbody>
                     </table>
@@ -6968,6 +7012,7 @@ function adminMostrarTab(tab) {
     else if (tab === 'pagamentos') adminCarregarPagamentos();
     else if (tab === 'planos') adminCarregarPlanos();
     else if (tab === 'cupons') adminCarregarCupons();
+    else if (tab === 'contatos') adminCarregarContatos();
     else if (tab === 'dashboard') adminCarregarDashboard();
 }
 
@@ -7627,6 +7672,108 @@ async function adminToggleCupom(id, ativoAtual) {
     } catch(e) {
         alert('Erro: ' + (e.message || e));
     }
+}
+
+// ============================================================
+// LEADS / CONTATOS DA LANDING (Super Admin)
+// ============================================================
+
+async function adminCarregarContatos() {
+    const filtro = (document.getElementById('admin-leads-filtro')?.value) || 'novo';
+    const tbody = document.getElementById('admin-contatos-tbody');
+    try {
+        let query = sb.from('contatos_landing')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        if (filtro && filtro !== 'todos') query = query.eq('status', filtro);
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Nenhum lead nessa categoria.</td></tr>';
+            return;
+        }
+        
+        const corStatus = { novo: '#3b82f6', contatado: '#f59e0b', convertido: '#10b981', descartado: '#71717a', spam: '#dc2626' };
+        
+        tbody.innerHTML = data.map(c => {
+            const dt = new Date(c.created_at).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'});
+            const cor = corStatus[c.status] || '#71717a';
+            const wppLink = c.telefone ? `https://wa.me/55${c.telefone.replace(/\D/g,'')}` : null;
+            const mailLink = c.email ? `mailto:${c.email}` : null;
+            return `<tr style="border-bottom:1px solid #27272a;">
+                <td style="padding:.75rem 1rem;font-size:.78rem;color:#a1a1aa;white-space:nowrap;">${dt}</td>
+                <td style="padding:.75rem 1rem;font-weight:600;">${escapeHtml(c.nome || '—')}${c.mensagem ? `<div style="font-size:.7rem;color:#71717a;margin-top:.2rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(c.mensagem)}">"${escapeHtml(c.mensagem.substring(0,60))}${c.mensagem.length > 60 ? '...' : ''}"</div>` : ''}</td>
+                <td style="padding:.75rem 1rem;font-size:.8rem;">${mailLink ? `<a href="${mailLink}" style="color:#fafafa;text-decoration:none;">${escapeHtml(c.email)}</a>` : '—'}</td>
+                <td style="padding:.75rem 1rem;font-size:.8rem;">${wppLink ? `<a href="${wppLink}" target="_blank" style="color:#10b981;text-decoration:none;"><i class="fa-brands fa-whatsapp"></i> ${escapeHtml(c.telefone)}</a>` : '—'}</td>
+                <td style="padding:.75rem 1rem;font-size:.8rem;color:#a1a1aa;">${escapeHtml(c.clube_nome) || '—'}</td>
+                <td style="padding:.75rem 1rem;text-align:center;">
+                    <span style="color:${cor};font-weight:700;text-transform:uppercase;font-size:.7rem;">${c.status}</span>
+                </td>
+                <td style="padding:.75rem 1rem;text-align:center;">
+                    <button onclick="adminMudarStatusContato('${c.id}', '${escapeHtml(c.nome).replace(/'/g, "\\'")}', '${c.status}')" style="padding:.4rem .75rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.35rem;font-size:.75rem;cursor:pointer;">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+        
+        // Atualizar badge de "novos" no header da tab
+        const novos = data.filter(c => c.status === 'novo').length;
+        const badge = document.getElementById('admin-leads-badge');
+        if (badge) {
+            if (filtro === 'novo' && novos > 0) {
+                badge.innerText = novos;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    } catch(e) {
+        console.error('[ADMIN] erro contatos:', e);
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#dc2626;">Erro: ${escapeHtml(e.message || String(e))}</td></tr>`;
+    }
+}
+
+async function adminMudarStatusContato(id, nome, statusAtual) {
+    const opcao = prompt(
+        `Lead: "${nome}" (status atual: ${statusAtual})\n\n` +
+        `Novo status:\n` +
+        `1 - Novo (não tocado)\n` +
+        `2 - Contatado (já liguei/escrevi)\n` +
+        `3 - Convertido (virou cliente!)\n` +
+        `4 - Descartado (não tem fit)\n` +
+        `5 - Spam\n\n` +
+        `Digite o número:`
+    );
+    if (!opcao) return;
+    const map = { '1': 'novo', '2': 'contatado', '3': 'convertido', '4': 'descartado', '5': 'spam' };
+    const novoStatus = map[opcao];
+    if (!novoStatus) { alert('Opção inválida'); return; }
+    
+    try {
+        const update = { status: novoStatus, updated_at: new Date().toISOString() };
+        if (novoStatus === 'contatado' || novoStatus === 'convertido') {
+            update.contatado_em = new Date().toISOString();
+        }
+        const { error } = await sb.from('contatos_landing').update(update).eq('id', id);
+        if (error) throw error;
+        await adminCarregarContatos();
+    } catch(e) {
+        alert('Erro: ' + (e.message || e));
+    }
+}
+
+// Helper de escape HTML
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 
