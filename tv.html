@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StackOS · TV Ao Vivo</title>
+<meta name="robots" content="noindex,nofollow">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+  --bg: #050605;
+  --panel: #0f1410;
+  --panel-2: #161b15;
+  --gold: #d4af37;
+  --gold-light: #f4d76e;
+  --green: #10b981;
+  --red: #dc2626;
+  --text: #f5e6c8;
+  --text-muted: #6b7261;
+  --border: rgba(212,175,55,.15);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Manrope', sans-serif;
+  overflow: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at top, rgba(19, 55, 32, 0.3) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* === STATES === */
+#screen-loading,
+#screen-error,
+#screen-empty,
+#screen-tv {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 1;
+}
+#screen-loading.active,
+#screen-error.active,
+#screen-empty.active,
+#screen-tv.active { display: flex; }
+
+/* === LOADING === */
+.spinner {
+  width: 60px; height: 60px;
+  border: 4px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#screen-loading p { color: var(--text-muted); font-size: 1rem; }
+
+/* === ERROR === */
+.error-icon {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--red);
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+}
+#screen-error h1 { font-size: 2rem; margin-bottom: .75rem; }
+#screen-error p { color: var(--text-muted); max-width: 540px; text-align: center; line-height: 1.6; }
+
+/* === EMPTY === */
+.empty-icon {
+  font-size: 5rem;
+  color: var(--gold);
+  opacity: 0.5;
+  margin-bottom: 1.5rem;
+}
+#screen-empty h1 { font-size: 2.5rem; margin-bottom: 0.75rem; }
+#screen-empty p { color: var(--text-muted); font-size: 1.1rem; }
+
+/* === TV LAYOUT === */
+#screen-tv {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+}
+
+/* Header com logo + status */
+.tv-header {
+  flex-shrink: 0;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 1.25rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tv-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.tv-logo {
+  width: 56px; height: 56px;
+  display: grid; place-items: center;
+}
+.tv-logo img { width: 100%; height: 100%; object-fit: contain; }
+.tv-clube-info .clube-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--gold);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.tv-clube-info .clube-nome {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.tv-header-right {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.tv-clock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+.tv-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.live-dot {
+  width: 10px; height: 10px;
+  background: var(--green);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--green);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.7; }
+}
+.live-dot.off { background: var(--red); animation: none; box-shadow: 0 0 12px var(--red); }
+.live-text { color: var(--green); }
+.live-text.off { color: var(--red); }
+
+/* === TORNEIO ATIVO === */
+.tv-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1.5rem 2rem 2rem;
+  gap: 1.5rem;
+}
+
+.torneio-titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  flex-shrink: 0;
+}
+.torneio-nome {
+  font-size: 2.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background: linear-gradient(120deg, var(--text) 30%, var(--gold) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.torneio-status-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
+  background: rgba(16, 185, 129, 0.18);
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+.torneio-status-badge.pausado { background: rgba(212, 175, 55, 0.18); color: var(--gold); border-color: var(--gold); }
+
+/* Stats cards (grandes) */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  flex-shrink: 0;
+}
+.stat-card {
+  background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.5rem 1.75rem;
+  position: relative;
+}
+.stat-card.highlight { border-color: var(--gold); box-shadow: 0 0 24px rgba(212, 175, 55, 0.1); }
+.stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+.stat-value.gold { color: var(--gold); }
+.stat-value.big { font-size: 3rem; }
+.stat-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+/* Timer destacado */
+.timer-card {
+  grid-column: span 2;
+  background: linear-gradient(135deg, #1a3520 0%, #0a1a0e 100%);
+  border-color: var(--gold);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.timer-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 5rem;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
+}
+.timer-value.urgent { color: var(--red); animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.4; } }
+
+.blinds-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+  width: 100%;
+}
+.blind-item {
+  text-align: center;
+  padding: 0.5rem;
+  background: rgba(0,0,0,0.3);
+  border-radius: 0.5rem;
+}
+.blind-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.blind-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-top: 0.2rem;
+}
+
+/* Tabelas (ranking + eliminados) */
+.tables-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.table-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.table-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.table-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.table-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.table-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+.table-row {
+  display: grid;
+  grid-template-columns: 50px 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.05);
+  transition: background 0.2s;
+}
+.table-row:hover { background: rgba(212, 175, 55, 0.03); }
+.table-row.top1 { background: linear-gradient(90deg, rgba(212, 175, 55, 0.15), transparent); }
+.table-row.top1:hover { background: linear-gradient(90deg, rgba(212, 175, 55, 0.2), transparent); }
+
+.rank {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-align: center;
+}
+.rank.top1 { color: var(--gold); font-size: 1.5rem; }
+.rank.top2 { color: #d3d3d3; font-size: 1.4rem; }
+.rank.top3 { color: #cd7f32; font-size: 1.35rem; }
+
+.player-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.player-name.eliminated { text-decoration: line-through; color: var(--text-muted); font-weight: 400; }
+
+.player-prize {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.player-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.player-tag.rebuy { background: rgba(212, 175, 55, 0.15); color: var(--gold); margin-left: 0.5rem; }
+
+.empty-table {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Multi-torneio: indicador de qual está mostrando */
+.torneio-indicator {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  z-index: 10;
+}
+.indicator-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.3);
+  transition: all 0.3s;
+}
+.indicator-dot.active { background: var(--gold); transform: scale(1.4); }
+
+/* === Responsive: ajustes para TVs menores ou retrato === */
+@media (max-width: 1280px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .timer-card { grid-column: span 2; }
+  .torneio-nome { font-size: 2rem; }
+  .stat-value.big { font-size: 2.5rem; }
+  .timer-value { font-size: 4rem; }
+}
+
+@media (max-width: 900px) {
+  .tables-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .timer-card { grid-column: span 2; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="screen-loading" class="active">
+  <div class="spinner"></div>
+  <p>Conectando com a TV...</p>
+</div>
+
+<!-- ERROR SCREEN -->
+<div id="screen-error">
+  <div class="error-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+  <h1 id="error-title">Acesso negado</h1>
+  <p id="error-msg">URL inválida. Verifique o link da TV nas configurações do clube.</p>
+</div>
+
+<!-- EMPTY SCREEN: clube válido mas sem torneios -->
+<div id="screen-empty">
+  <div class="empty-icon"><i class="fa-solid fa-trophy"></i></div>
+  <h1 id="empty-clube-nome">—</h1>
+  <p>Nenhum torneio em andamento no momento.</p>
+  <p style="margin-top:.5rem;font-size:.9rem;">A TV vai atualizar automaticamente assim que um torneio começar.</p>
+</div>
+
+<!-- TV SCREEN -->
+<div id="screen-tv">
+  <header class="tv-header">
+    <div class="tv-header-left">
+      <div class="tv-logo"><img id="tv-logo-img" src="" alt=""></div>
+      <div class="tv-clube-info">
+        <div class="clube-eyebrow">Ao vivo</div>
+        <div class="clube-nome" id="tv-clube-nome">—</div>
+      </div>
+    </div>
+    <div class="tv-header-right">
+      <div class="tv-clock mono" id="tv-clock">--:--:--</div>
+      <div class="tv-status">
+        <div class="live-dot" id="live-dot"></div>
+        <span class="live-text" id="live-text">AO VIVO</span>
+      </div>
+    </div>
+  </header>
+  
+  <main class="tv-content" id="tv-content">
+    <!-- Conteúdo dinâmico do torneio aqui -->
+  </main>
+  
+  <div class="torneio-indicator" id="torneio-indicator"></div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  clubeId: null,
+  token: null,
+  clube: null,
+  torneios: [],
+  torneioAtivoIdx: 0,
+  channel: null,
+  rotacaoInterval: null,
+  pollingInterval: null,
+  conectado: false,
+};
+
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('DOMContentLoaded', boot);
+
+async function boot() {
+  // Parse URL: /tv?clube=xxx&token=yyy
+  const params = new URLSearchParams(window.location.search);
+  state.clubeId = params.get('clube');
+  state.token = params.get('token');
+  
+  if (!state.clubeId || !state.token) {
+    return mostrarErro('Link incompleto', 'Use o link completo gerado nas configurações do clube (com clube e token).');
+  }
+  
+  // Iniciar relógio
+  iniciarRelogio();
+  
+  // Carregar dados iniciais
+  try {
+    await carregarDados();
+    
+    // Setup realtime
+    iniciarRealtime();
+    
+    // Polling backup (a cada 30s, caso realtime falhe)
+    state.pollingInterval = setInterval(carregarDados, 30000);
+  } catch(e) {
+    console.error('[TV] Erro no boot:', e);
+    mostrarErro('Falha ao carregar', 'Verifique a URL ou regenere o token nas configurações.');
+  }
+}
+
+// ============================================================
+// CARREGAR DADOS via RPC pública
+// ============================================================
+async function carregarDados() {
+  try {
+    const { data, error } = await sb.rpc('tv_dados_torneios', {
+      p_clube_id: state.clubeId,
+      p_token: state.token,
+    });
+    
+    if (error) throw error;
+    if (!data || data.erro) {
+      mostrarErro('Acesso negado', 'Token inválido ou expirado. Peça uma nova URL ao admin do clube.');
+      return;
+    }
+    
+    state.clube = data.clube;
+    state.torneios = (data.torneios || []).filter(t => t.status === 'em_andamento' || t.status === 'pausado');
+    state.conectado = true;
+    
+    atualizarStatusConexao(true);
+    renderizar();
+    
+  } catch(e) {
+    console.error('[TV] erro carregarDados:', e);
+    state.conectado = false;
+    atualizarStatusConexao(false);
+  }
+}
+
+// ============================================================
+// REALTIME
+// ============================================================
+function iniciarRealtime() {
+  // Limpar canal anterior se existir
+  if (state.channel) {
+    sb.removeChannel(state.channel);
+    state.channel = null;
+  }
+  
+  state.channel = sb.channel(`tv:${state.clubeId}`)
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'torneios',
+      filter: `clube_id=eq.${state.clubeId}` 
+    }, (payload) => {
+      console.log('[TV] torneio update:', payload.eventType);
+      carregarDados();
+    })
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'torneio_entries' 
+    }, (payload) => {
+      const t = state.torneios.find(t => t.id === payload.new?.torneio_id || t.id === payload.old?.torneio_id);
+      if (t) { console.log('[TV] entries update'); carregarDados(); }
+    })
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'torneio_eliminados' 
+    }, (payload) => {
+      const t = state.torneios.find(t => t.id === payload.new?.torneio_id || t.id === payload.old?.torneio_id);
+      if (t) { console.log('[TV] eliminado update'); carregarDados(); }
+    })
+    .subscribe((status) => {
+      console.log('[TV] realtime status:', status);
+      if (status === 'SUBSCRIBED') {
+        state.conectado = true;
+        atualizarStatusConexao(true);
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        state.conectado = false;
+        atualizarStatusConexao(false);
+        // Tentar reconectar em 5s
+        setTimeout(() => iniciarRealtime(), 5000);
+      }
+    });
+}
+
+// ============================================================
+// RENDERIZAR
+// ============================================================
+function renderizar() {
+  if (!state.clube) {
+    mostrarErro('Erro', 'Dados do clube não carregados.');
+    return;
+  }
+  
+  // Atualizar header
+  document.getElementById('tv-clube-nome').textContent = state.clube.nome;
+  if (state.clube.logo_url) {
+    document.getElementById('tv-logo-img').src = state.clube.logo_url;
+    document.getElementById('tv-logo-img').style.display = 'block';
+  }
+  
+  // Sem torneios? Mostra empty state
+  if (!state.torneios || state.torneios.length === 0) {
+    mostrarTela('empty');
+    document.getElementById('empty-clube-nome').textContent = state.clube.nome;
+    pararRotacao();
+    return;
+  }
+  
+  mostrarTela('tv');
+  
+  // Garante que torneioAtivoIdx é válido
+  if (state.torneioAtivoIdx >= state.torneios.length) {
+    state.torneioAtivoIdx = 0;
+  }
+  
+  renderizarTorneioAtivo();
+  renderizarIndicador();
+  
+  // Se há mais de 1 torneio, rotacionar a cada 15s
+  if (state.torneios.length > 1) {
+    iniciarRotacao();
+  } else {
+    pararRotacao();
+  }
+}
+
+function renderizarTorneioAtivo() {
+  const t = state.torneios[state.torneioAtivoIdx];
+  if (!t) return;
+  
+  const ativos = (t.entries || []).filter(e => !e.eliminado).length;
+  const totalEntries = (t.entries || []).length;
+  const rebuys = (t.entries || []).reduce((acc, e) => acc + (e.rebuy ? 1 : 0), 0);
+  const totalArrecadado = totalEntries * (Number(t.buy_in) || 0);
+  const prizePool = totalArrecadado - (totalArrecadado * (Number(t.rake) || 0) / 100);
+  
+  // Timer formatado
+  const timerSec = Math.max(0, Number(t.tempo_restante) || 0);
+  const timerMin = Math.floor(timerSec / 60);
+  const timerS = timerSec % 60;
+  const timerStr = String(timerMin).padStart(2,'0') + ':' + String(timerS).padStart(2,'0');
+  const timerUrgent = timerSec < 60 && timerSec > 0;
+  
+  // Status badge
+  const statusTxt = t.pausado ? 'PAUSADO' : 'EM ANDAMENTO';
+  const statusClass = t.pausado ? 'pausado' : '';
+  
+  // Ranking: jogadores ativos ordenados (jogadores com mais entries primeiro)
+  // Como não temos chip count realtime, ordenamos por: ativos primeiro, depois por ordem de entrada
+  const ranking = [...(t.entries || [])]
+    .filter(e => !e.eliminado)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  
+  const eliminados = [...(t.eliminados || [])].sort((a, b) => (a.posicao || 999) - (b.posicao || 999));
+  
+  document.getElementById('tv-content').innerHTML = `
+    <div class="torneio-titulo">
+      <h1 class="torneio-nome">${escapeHtml(t.nome)}</h1>
+      <div class="torneio-status-badge ${statusClass}">${statusTxt}</div>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card timer-card">
+        <div class="stat-label">Próximo Nível em</div>
+        <div class="timer-value ${timerUrgent ? 'urgent' : ''}">${timerStr}</div>
+        <div class="blinds-row">
+          <div class="blind-item">
+            <div class="blind-label">Small</div>
+            <div class="blind-value">${formatNumber(t.small_blind)}</div>
+          </div>
+          <div class="blind-item">
+            <div class="blind-label">Big</div>
+            <div class="blind-value">${formatNumber(t.big_blind)}</div>
+          </div>
+          <div class="blind-item">
+            <div class="blind-label">Ante</div>
+            <div class="blind-value">${formatNumber(t.ante || 0)}</div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-label">Prize Pool</div>
+        <div class="stat-value gold big">R$ ${formatMoney(prizePool)}</div>
+        <div class="stat-sub">${totalEntries} entradas · ${rebuys} rebuys</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Jogadores Ativos</div>
+        <div class="stat-value gold big">${ativos}<span style="font-size:1.5rem;color:var(--text-muted);">/${totalEntries}</span></div>
+        <div class="stat-sub">Nível ${t.nivel_atual || 1}</div>
+      </div>
+    </div>
+    
+    <div class="tables-grid">
+      <div class="table-panel">
+        <div class="table-header">
+          <div class="table-title"><i class="fa-solid fa-users" style="color:var(--gold);margin-right:.5rem;"></i>Jogadores Ativos</div>
+          <div class="table-count">${ativos} / ${totalEntries}</div>
+        </div>
+        <div class="table-body">
+          ${ranking.length === 0 ? '<div class="empty-table">Nenhum jogador ativo</div>' : 
+            ranking.map((p, i) => `
+              <div class="table-row ${i === 0 ? 'top1' : ''}">
+                <div class="rank ${i === 0 ? 'top1' : (i === 1 ? 'top2' : (i === 2 ? 'top3' : ''))}">${i + 1}</div>
+                <div class="player-name">${escapeHtml(p.nome || 'Jogador')}${p.rebuy ? '<span class="player-tag rebuy">REBUY</span>' : ''}</div>
+                <div></div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+      <div class="table-panel">
+        <div class="table-header">
+          <div class="table-title"><i class="fa-solid fa-medal" style="color:#cd7f32;margin-right:.5rem;"></i>Premiados</div>
+          <div class="table-count">${eliminados.filter(e => e.premio > 0).length}</div>
+        </div>
+        <div class="table-body">
+          ${eliminados.length === 0 ? '<div class="empty-table">Nenhum eliminado</div>' :
+            eliminados.map(e => `
+              <div class="table-row">
+                <div class="rank ${e.posicao === 1 ? 'top1' : (e.posicao === 2 ? 'top2' : (e.posicao === 3 ? 'top3' : ''))}">${e.posicao || '-'}º</div>
+                <div class="player-name eliminated">${escapeHtml(e.nome || '')}</div>
+                <div class="player-prize">${e.premio > 0 ? 'R$ ' + formatMoney(e.premio) : ''}</div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderizarIndicador() {
+  const cont = document.getElementById('torneio-indicator');
+  if (!cont) return;
+  if (state.torneios.length <= 1) {
+    cont.innerHTML = '';
+    return;
+  }
+  cont.innerHTML = state.torneios.map((_, i) => 
+    `<div class="indicator-dot ${i === state.torneioAtivoIdx ? 'active' : ''}"></div>`
+  ).join('');
+}
+
+// ============================================================
+// ROTAÇÃO entre múltiplos torneios
+// ============================================================
+function iniciarRotacao() {
+  pararRotacao();
+  state.rotacaoInterval = setInterval(() => {
+    state.torneioAtivoIdx = (state.torneioAtivoIdx + 1) % state.torneios.length;
+    renderizarTorneioAtivo();
+    renderizarIndicador();
+  }, 15000);
+}
+
+function pararRotacao() {
+  if (state.rotacaoInterval) {
+    clearInterval(state.rotacaoInterval);
+    state.rotacaoInterval = null;
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function mostrarTela(tela) {
+  ['loading','error','empty','tv'].forEach(t => {
+    document.getElementById('screen-' + t).classList.toggle('active', t === tela);
+  });
+}
+
+function mostrarErro(titulo, msg) {
+  document.getElementById('error-title').textContent = titulo;
+  document.getElementById('error-msg').textContent = msg;
+  mostrarTela('error');
+}
+
+function atualizarStatusConexao(conectado) {
+  const dot = document.getElementById('live-dot');
+  const txt = document.getElementById('live-text');
+  if (!dot || !txt) return;
+  if (conectado) {
+    dot.classList.remove('off');
+    txt.classList.remove('off');
+    txt.textContent = 'AO VIVO';
+  } else {
+    dot.classList.add('off');
+    txt.classList.add('off');
+    txt.textContent = 'RECONECTANDO...';
+  }
+}
+
+function iniciarRelogio() {
+  function tick() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    const el = document.getElementById('tv-clock');
+    if (el) el.textContent = `${h}:${m}:${s}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+function formatMoney(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatNumber(v) {
+  const n = Number(v || 0);
+  if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1).replace('.', ',') + 'K';
+  return String(n);
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Atualizar timer localmente a cada segundo (visual smooth)
+setInterval(() => {
+  if (state.torneios.length > 0) {
+    const t = state.torneios[state.torneioAtivoIdx];
+    if (t && !t.pausado && t.tempo_restante > 0) {
+      t.tempo_restante = Math.max(0, t.tempo_restante - 1);
+      // Re-render apenas o timer pra economizar
+      const timerSec = Math.max(0, Number(t.tempo_restante) || 0);
+      const timerMin = Math.floor(timerSec / 60);
+      const timerS = timerSec % 60;
+      const timerStr = String(timerMin).padStart(2,'0') + ':' + String(timerS).padStart(2,'0');
+      const timerEl = document.querySelector('.timer-value');
+      if (timerEl) {
+        timerEl.textContent = timerStr;
+        timerEl.classList.toggle('urgent', timerSec < 60 && timerSec > 0);
+      }
+    }
+  }
+}, 1000);
+
+// Solicitar fullscreen ao primeiro click do usuário (pra TV/Chromecast)
+document.addEventListener('click', () => {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+}, { once: true });
+
+</script>
+</body>
+</html>
