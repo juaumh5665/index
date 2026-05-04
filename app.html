@@ -866,7 +866,10 @@
                 <div id="user-avatar" style="width:32px;height:32px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:#000;flex-shrink:0;">AD</div>
                 <div style="flex:1;min-width:0;">
                     <div id="user-nome" style="font-size:.8rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
-                    <div id="user-role" style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-top:.1rem;">—</div>
+                    <div style="display:flex;align-items:center;gap:.4rem;margin-top:.15rem;">
+                        <div id="user-role" style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">—</div>
+                        <div id="realtime-indicator" title="Realtime ativo - mudanças sincronizam entre operadores"></div>
+                    </div>
                 </div>
                 <span id="db-status" style="font-size:.7rem;color:#22c55e;margin-right:.6rem;display:inline-flex;align-items:center;font-weight:700;"><i class="fa-solid fa-circle" style="color:#22c55e;font-size:.5rem;margin-right:.25rem;"></i>Online</span><button onclick="abrirAjudaAtalhos()" class="btn-ghost" style="font-size:.7rem;padding:.4rem .65rem;margin-right:.4rem;" title="Atalhos de teclado (F1)"><i class="fa-solid fa-keyboard"></i></button><button onclick="logout()" title="Sair" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.2rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
@@ -1372,6 +1375,7 @@
                     <button class="tab-btn"        id="cfgtab-btn-seguranca"   onclick="switchConfigTab('cfg-seguranca', this)"><i class="fa-solid fa-shield-halved"></i> Segurança</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
+                    <button class="tab-btn"        id="cfgtab-btn-tv"          onclick="switchConfigTab('cfg-tv', this); renderConfigTV();"><i class="fa-solid fa-tv"></i> TV Pública</button>
                 </div>
 
                 <!-- ABA: CLUBE -->
@@ -1654,6 +1658,55 @@
                                 </div>
                                 <div><label class="inp-label">Texto do rodapé</label><input id="cfg-print-footer" class="inp" placeholder="Obrigado pela preferência!"></div>
                                 <button onclick="salvarIntegracoes(); testarImpressao()" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-print"></i> Salvar e Testar Impressão</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: TV PÚBLICA -->
+                <div id="cfg-tv" class="configtab-content" style="display:none;">
+                    <div style="max-width:780px;">
+                        <div class="stat-card" style="padding:2rem;">
+                            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;">
+                                <i class="fa-solid fa-tv" style="color:var(--gold);font-size:1.25rem;"></i>
+                                <div>
+                                    <div style="font-size:1.1rem;font-weight:700;">TV Pública do Clube</div>
+                                    <div style="font-size:.8rem;color:#71717a;">URL para exibir torneios em tempo real em uma TV ou Chromecast</div>
+                                </div>
+                            </div>
+                            
+                            <div style="background:#0d0d0f;border:1px solid #27272a;border-radius:.5rem;padding:1rem;margin:1.25rem 0;">
+                                <div style="font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">URL da TV</div>
+                                <div style="display:flex;gap:.5rem;align-items:stretch;">
+                                    <input type="text" id="cfg-tv-url" readonly value="Carregando..." style="flex:1;padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.8rem;font-family:monospace;">
+                                    <button onclick="copiarUrlTV()" id="btn-copiar-tv" class="btn-gold" style="padding:.6rem 1rem;border-radius:.4rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;white-space:nowrap;">
+                                        <i class="fa-solid fa-copy"></i> Copiar
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:1rem;">
+                                <button onclick="abrirTVNovaAba()" class="btn-ghost" style="padding:.7rem;border-radius:.4rem;font-size:.85rem;cursor:pointer;border:1px solid #27272a;background:#18181b;color:#fafafa;">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir TV em nova aba
+                                </button>
+                                <button onclick="regenerarTokenTV()" style="padding:.7rem;border-radius:.4rem;font-size:.85rem;cursor:pointer;border:1px solid #7f1d1d;background:transparent;color:#fca5a5;">
+                                    <i class="fa-solid fa-arrows-rotate"></i> Regenerar URL (revogar antiga)
+                                </button>
+                            </div>
+                            
+                            <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid #27272a;">
+                                <div style="font-size:.85rem;color:#a1a1aa;font-weight:700;margin-bottom:.75rem;">📺 Como usar</div>
+                                <ol style="color:#71717a;font-size:.85rem;line-height:1.7;padding-left:1.25rem;display:flex;flex-direction:column;gap:.4rem;">
+                                    <li><strong>Copie a URL</strong> acima e cole no navegador da TV (Smart TV, Chromecast, computador conectado à TV).</li>
+                                    <li>A TV mostra automaticamente o torneio em andamento — ranking, blinds, prize pool, eliminados.</li>
+                                    <li>Mudanças no sistema (eliminações, novos níveis) aparecem na TV em <strong>menos de 1 segundo</strong>.</li>
+                                    <li>Se você tem mais de um torneio rolando, a TV alterna entre eles a cada 15s.</li>
+                                </ol>
+                            </div>
+                            
+                            <div style="margin-top:1.5rem;padding:1rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:.5rem;font-size:.8rem;color:#fbbf24;">
+                                <i class="fa-solid fa-shield-halved" style="margin-right:.4rem;"></i>
+                                <strong>Segurança:</strong> Esta URL é privada e contém um token de acesso. Não compartilhe publicamente. Se vazar, click em "Regenerar URL" para criar uma nova.
                             </div>
                         </div>
                     </div>
@@ -3821,6 +3874,313 @@ let _syncQueue = {
 let _syncTimer = null;
 let _syncEmAndamento = false;
 
+// ============================================================
+// CONFIG: TV PÚBLICA — gerar/copiar/regenerar URL
+// ============================================================
+
+let _tvTokenCache = null;
+
+async function renderConfigTV() {
+    const urlInput = document.getElementById('cfg-tv-url');
+    if (!urlInput) return;
+    urlInput.value = 'Carregando...';
+    
+    try {
+        if (!sbClube?.id) throw new Error('Clube não carregado');
+        
+        // Buscar tv_token do clube
+        const { data, error } = await sb.from('clubes')
+            .select('tv_token')
+            .eq('id', sbClube.id)
+            .single();
+        if (error) throw error;
+        
+        if (!data.tv_token) {
+            // Sem token — gerar um agora
+            const novoToken = await regenerarTokenTV(true);
+            if (!novoToken) {
+                urlInput.value = 'Erro ao gerar token. Click em "Regenerar URL".';
+                return;
+            }
+            _tvTokenCache = novoToken;
+        } else {
+            _tvTokenCache = data.tv_token;
+        }
+        
+        // Construir URL
+        const baseUrl = window.location.origin;
+        const url = `${baseUrl}/tv?clube=${sbClube.id}&token=${_tvTokenCache}`;
+        urlInput.value = url;
+        
+    } catch(e) {
+        console.error('[TV CONFIG]', e);
+        urlInput.value = 'Erro: ' + (e.message || e);
+    }
+}
+
+async function copiarUrlTV() {
+    const input = document.getElementById('cfg-tv-url');
+    if (!input || !input.value || input.value.startsWith('Erro') || input.value === 'Carregando...') {
+        alert('URL ainda não está disponível. Tente recarregar a página.');
+        return;
+    }
+    
+    try {
+        await navigator.clipboard.writeText(input.value);
+        const btn = document.getElementById('btn-copiar-tv');
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+            btn.style.background = '#10b981';
+            btn.style.color = 'white';
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.style.background = '';
+                btn.style.color = '';
+            }, 2000);
+        }
+        if (typeof showToast === 'function') showToast('✓ URL copiada para área de transferência');
+    } catch(e) {
+        // Fallback antigo
+        input.select();
+        document.execCommand('copy');
+        alert('URL copiada!');
+    }
+}
+
+async function regenerarTokenTV(silencioso = false) {
+    if (!silencioso) {
+        const ok = confirm(
+            '⚠️ ATENÇÃO: Regenerar URL vai INVALIDAR a URL atual.\n\n' +
+            'Qualquer dispositivo que estiver usando a URL antiga vai parar de funcionar e ' +
+            'precisar ser atualizado com a nova URL.\n\n' +
+            'Isso é útil quando:\n' +
+            '• A URL vazou pra alguém que não deveria ter acesso\n' +
+            '• Um ex-funcionário levou a URL\n\n' +
+            'Continuar?'
+        );
+        if (!ok) return null;
+    }
+    
+    try {
+        const { data, error } = await sb.rpc('regenerar_tv_token', { p_clube_id: sbClube.id });
+        if (error) throw error;
+        
+        _tvTokenCache = data;
+        const baseUrl = window.location.origin;
+        const url = `${baseUrl}/tv?clube=${sbClube.id}&token=${_tvTokenCache}`;
+        const urlInput = document.getElementById('cfg-tv-url');
+        if (urlInput) urlInput.value = url;
+        
+        if (!silencioso) {
+            if (typeof showToast === 'function') showToast('✓ Nova URL gerada com sucesso!');
+            else alert('✓ Nova URL gerada!');
+        }
+        
+        return data;
+    } catch(e) {
+        console.error('[TV CONFIG] regenerar erro:', e);
+        if (!silencioso) alert('Erro: ' + (e.message || e));
+        return null;
+    }
+}
+
+function abrirTVNovaAba() {
+    const url = document.getElementById('cfg-tv-url')?.value;
+    if (!url || url.startsWith('Erro') || url === 'Carregando...') {
+        alert('URL ainda não está disponível.');
+        return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+// ============================================================
+// REALTIME CROSS-DEVICE (Etapa 14)
+// ============================================================
+// Subscreve em mudanças nas tabelas para sincronizar entre operadores.
+// Quando alguém atualiza algo no Supabase, todos recebem em <1s.
+// ============================================================
+
+let _realtimeChannel = null;
+let _realtimeReconnectTimer = null;
+let _realtimeUltimaAtualizacao = 0;
+let _realtimeDebounceTimer = null;
+
+function iniciarRealtime() {
+    if (!sbClube?.id) return;
+    if (_realtimeChannel) return; // já iniciado
+    
+    const clubeId = sbClube.id;
+    console.log('[REALTIME] Iniciando para clube:', clubeId);
+    
+    _realtimeChannel = sb.channel(`clube:${clubeId}`)
+        // === TORNEIOS ===
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'torneios',
+            filter: `clube_id=eq.${clubeId}` 
+        }, (payload) => _onRealtimeEvent('torneio', payload))
+        
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'torneio_entries' 
+        }, (payload) => _onRealtimeEvent('entry', payload))
+        
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'torneio_eliminados' 
+        }, (payload) => _onRealtimeEvent('eliminado', payload))
+        
+        // === BAR / COMANDAS ===
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'bar_comandas',
+            filter: `clube_id=eq.${clubeId}` 
+        }, (payload) => _onRealtimeEvent('comanda', payload))
+        
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'bar_comanda_itens' 
+        }, (payload) => _onRealtimeEvent('comanda_item', payload))
+        
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'bar_produtos',
+            filter: `clube_id=eq.${clubeId}` 
+        }, (payload) => _onRealtimeEvent('produto', payload))
+        
+        // === CASH GAME ===
+        .on('postgres_changes', { 
+            event: '*', schema: 'public', table: 'cash_mesas',
+            filter: `clube_id=eq.${clubeId}` 
+        }, (payload) => _onRealtimeEvent('cash_mesa', payload))
+        
+        .subscribe((status) => {
+            console.log('[REALTIME] status:', status);
+            if (status === 'SUBSCRIBED') {
+                _atualizarIndicadorRealtime(true);
+                if (_realtimeReconnectTimer) {
+                    clearTimeout(_realtimeReconnectTimer);
+                    _realtimeReconnectTimer = null;
+                }
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                _atualizarIndicadorRealtime(false);
+                _agendarReconexaoRealtime();
+            }
+        });
+}
+
+function _onRealtimeEvent(tipo, payload) {
+    // Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
+    // pra evitar loop. O markDirty já reflete localmente.
+    const agora = Date.now();
+    
+    // Debounce: agrupar múltiplos eventos em uma janela de 500ms
+    if (_realtimeDebounceTimer) clearTimeout(_realtimeDebounceTimer);
+    _realtimeDebounceTimer = setTimeout(() => {
+        _realtimeUltimaAtualizacao = Date.now();
+        _processarMudancaRealtime(tipo, payload);
+    }, 500);
+}
+
+async function _processarMudancaRealtime(tipo, payload) {
+    console.log('[REALTIME] processando:', tipo, payload.eventType);
+    
+    try {
+        // Recarregar dados do Supabase (mais simples que fazer merge incremental)
+        // O carregarEstadoDoSupabase respeita filtros multi-tenant
+        await carregarEstadoDoSupabase();
+        
+        // Re-renderizar páginas afetadas (apenas a página visível)
+        const paginaAtual = window._paginaAtual || 'dashboard';
+        
+        if (tipo === 'torneio' || tipo === 'entry' || tipo === 'eliminado') {
+            if (paginaAtual === 'torneios' && typeof renderTorneiosList === 'function') renderTorneiosList();
+            if (paginaAtual === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
+            // Re-renderizar torneio aberto se houver
+            if (typeof torneioAtual !== 'undefined' && torneioAtual && typeof renderTorneioAtivo === 'function') {
+                renderTorneioAtivo();
+            }
+        }
+        
+        if (tipo === 'comanda' || tipo === 'comanda_item' || tipo === 'produto') {
+            if (paginaAtual === 'bar' && typeof renderBar === 'function') renderBar();
+            if (paginaAtual === 'caixa' && typeof renderCaixa === 'function') renderCaixa();
+        }
+        
+        if (tipo === 'cash_mesa') {
+            if (paginaAtual === 'cash' && typeof renderCash === 'function') renderCash();
+        }
+        
+        // Toast discreto
+        _mostrarToastRealtime(tipo, payload.eventType);
+    } catch(e) {
+        console.error('[REALTIME] erro processar:', e);
+    }
+}
+
+function _agendarReconexaoRealtime() {
+    if (_realtimeReconnectTimer) return;
+    _realtimeReconnectTimer = setTimeout(() => {
+        console.log('[REALTIME] tentando reconectar...');
+        if (_realtimeChannel) {
+            sb.removeChannel(_realtimeChannel);
+            _realtimeChannel = null;
+        }
+        iniciarRealtime();
+    }, 5000);
+}
+
+function pararRealtime() {
+    if (_realtimeChannel) {
+        sb.removeChannel(_realtimeChannel);
+        _realtimeChannel = null;
+    }
+    if (_realtimeReconnectTimer) {
+        clearTimeout(_realtimeReconnectTimer);
+        _realtimeReconnectTimer = null;
+    }
+    _atualizarIndicadorRealtime(false);
+}
+
+function _atualizarIndicadorRealtime(conectado) {
+    const ind = document.getElementById('realtime-indicator');
+    if (!ind) return;
+    if (conectado) {
+        ind.style.display = 'flex';
+        ind.innerHTML = '<span class="rt-dot"></span><span style="color:#10b981;font-size:.65rem;font-weight:700;letter-spacing:.1em;">AO VIVO</span>';
+    } else {
+        ind.style.display = 'flex';
+        ind.innerHTML = '<span class="rt-dot off"></span><span style="color:#71717a;font-size:.65rem;font-weight:700;letter-spacing:.1em;">OFFLINE</span>';
+    }
+}
+
+function _mostrarToastRealtime(tipo, evento) {
+    const labels = {
+        torneio: { INSERT: 'Torneio criado', UPDATE: 'Torneio atualizado', DELETE: 'Torneio removido' },
+        entry: { INSERT: 'Nova inscrição', UPDATE: 'Inscrição atualizada', DELETE: 'Inscrição cancelada' },
+        eliminado: { INSERT: 'Eliminação registrada', UPDATE: 'Eliminação atualizada', DELETE: 'Eliminação removida' },
+        comanda: { INSERT: 'Nova comanda', UPDATE: 'Comanda atualizada', DELETE: 'Comanda fechada' },
+        comanda_item: { INSERT: 'Item adicionado', UPDATE: 'Item atualizado', DELETE: 'Item removido' },
+        produto: { INSERT: 'Produto criado', UPDATE: 'Produto atualizado', DELETE: 'Produto removido' },
+        cash_mesa: { INSERT: 'Mesa aberta', UPDATE: 'Mesa atualizada', DELETE: 'Mesa fechada' },
+    };
+    const label = labels[tipo]?.[evento];
+    if (label && typeof showToast === 'function') {
+        showToast('🔄 ' + label, 1800);
+    }
+}
+
+// CSS pro indicador (vai injetar no head)
+(function injetarCssRealtime() {
+    if (document.getElementById('css-realtime')) return;
+    const css = document.createElement('style');
+    css.id = 'css-realtime';
+    css.textContent = `
+        #realtime-indicator { display:none; align-items:center; gap:.4rem; padding:.3rem .6rem; background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3); border-radius:.3rem; }
+        #realtime-indicator .rt-dot { width:8px; height:8px; background:#10b981; border-radius:50%; box-shadow:0 0 8px #10b981; animation:rt-pulse 1.6s ease-in-out infinite; }
+        #realtime-indicator .rt-dot.off { background:#71717a; box-shadow:none; animation:none; }
+        @keyframes rt-pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.6;transform:scale(1.3);} }
+    `;
+    document.head.appendChild(css);
+})();
+
+// ============================================================
+
 function _agendarSync() {
     if (_syncTimer) clearTimeout(_syncTimer);
     _syncTimer = setTimeout(() => sincronizarEstado(), 800); // debounce 800ms
@@ -4598,6 +4958,8 @@ async function login() {
         atualizarStatusDB();
         // Carregar dados de assinatura e renderizar banner global
         carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
+        // Iniciar realtime cross-device
+        try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
         // Carrega TODO o estado do clube em background (não bloqueia UI)
         (async () => {
             try {
@@ -6119,6 +6481,8 @@ async function fazerSignup() {
         atualizarStatusDB && atualizarStatusDB();
         // Assinatura trial criada automaticamente pelo trigger SQL
         carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
+        // Iniciar realtime cross-device
+        try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
 
         // Carrega estado em background
         (async () => {
@@ -6688,6 +7052,7 @@ function fecharModalPagamento() {
     window._pagState = null;
     // Recarregar dados de assinatura
     carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura());
+        try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
     if (document.getElementById('page-assinatura').style.display !== 'none') {
         renderAssinatura();
     }
@@ -7814,6 +8179,7 @@ async function logout() {
     if (!confirm('Deseja sair do sistema?')) return;
     logAudit('LOGOUT', 'Logout do sistema');
     descartarUndo();  // limpar toast pendente
+    try { pararRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
     try { await sb.auth.signOut(); } catch(e) { console.warn(e); }
     sessionStorage.removeItem('ps_current_user');
     currentUser = null;
@@ -16665,6 +17031,8 @@ window.debugSync = async function() {
             atualizarStatusDB();
             // Carregar dados de assinatura e renderizar banner global
             carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
+        // Iniciar realtime cross-device
+        try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
             (async () => {
                 try {
                     await db.jogadores.list();
