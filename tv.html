@@ -588,7 +588,9 @@ async function carregarDados() {
     }
     
     state.clube = data.clube;
-    state.torneios = (data.torneios || []).filter(t => t.status === 'em_andamento' || t.status === 'pausado');
+    state.torneios = (data.torneios || []).filter(t => 
+      t.status !== 'finished' && t.status !== 'encerrado' && t.status !== 'cancelado'
+    );
     state.conectado = true;
     
     atualizarStatusConexao(true);
@@ -697,10 +699,17 @@ function renderizarTorneioAtivo() {
   const t = state.torneios[state.torneioAtivoIdx];
   if (!t) return;
   
-  const ativos = (t.entries || []).filter(e => !e.eliminado).length;
+  // Pegar blinds do nível atual a partir do array t.blinds
+  const blinds = Array.isArray(t.blinds) ? t.blinds : [];
+  const nivelIdx = Math.max(0, Math.min((t.nivel_atual || 1) - 1, blinds.length - 1));
+  const currentBlind = blinds[nivelIdx] || { sb: 0, bb: 0, ante: 0 };
+  
+  // Calcular ativos: entries que não estão na lista de eliminados
+  const eliminadosIds = new Set((t.eliminados || []).map(el => el.jogador_id));
+  const ativos = (t.entries || []).filter(e => !eliminadosIds.has(e.jogador_id)).length;
   const totalEntries = (t.entries || []).length;
   const rebuys = (t.entries || []).reduce((acc, e) => acc + (e.rebuy ? 1 : 0), 0);
-  const totalArrecadado = totalEntries * (Number(t.buy_in) || 0);
+  const totalArrecadado = totalEntries * (Number(t.buyin) || 0);
   const prizePool = totalArrecadado - (totalArrecadado * (Number(t.rake) || 0) / 100);
   
   // Timer formatado
@@ -710,15 +719,22 @@ function renderizarTorneioAtivo() {
   const timerStr = String(timerMin).padStart(2,'0') + ':' + String(timerS).padStart(2,'0');
   const timerUrgent = timerSec < 60 && timerSec > 0;
   
-  // Status badge
-  const statusTxt = t.pausado ? 'PAUSADO' : 'EM ANDAMENTO';
-  const statusClass = t.pausado ? 'pausado' : '';
+  // Status badge: usa t.rodando (boolean) e t.is_break
+  const isPaused = !t.rodando;
+  const isBreak = t.is_break;
+  const statusTxt = isBreak ? 'INTERVALO' : (isPaused ? 'PAUSADO' : 'EM ANDAMENTO');
+  const statusClass = isPaused ? 'pausado' : '';
   
-  // Ranking: jogadores ativos ordenados (jogadores com mais entries primeiro)
-  // Como não temos chip count realtime, ordenamos por: ativos primeiro, depois por ordem de entrada
-  const ranking = [...(t.entries || [])]
-    .filter(e => !e.eliminado)
-    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  // Ranking: dedup entries por jogador_id (1 por jogador), filtra eliminados
+  const seenJ = new Set();
+  const rankingDedup = [];
+  for (const e of (t.entries || [])) {
+    if (!seenJ.has(e.jogador_id) && !eliminadosIds.has(e.jogador_id)) {
+      seenJ.add(e.jogador_id);
+      rankingDedup.push(e);
+    }
+  }
+  const ranking = rankingDedup.sort((a, b) => new Date(a.ts || 0) - new Date(b.ts || 0));
   
   const eliminados = [...(t.eliminados || [])].sort((a, b) => (a.posicao || 999) - (b.posicao || 999));
   
@@ -735,15 +751,15 @@ function renderizarTorneioAtivo() {
         <div class="blinds-row">
           <div class="blind-item">
             <div class="blind-label">Small</div>
-            <div class="blind-value">${formatNumber(t.small_blind)}</div>
+            <div class="blind-value">${formatNumber(currentBlind.sb)}</div>
           </div>
           <div class="blind-item">
             <div class="blind-label">Big</div>
-            <div class="blind-value">${formatNumber(t.big_blind)}</div>
+            <div class="blind-value">${formatNumber(currentBlind.bb)}</div>
           </div>
           <div class="blind-item">
             <div class="blind-label">Ante</div>
-            <div class="blind-value">${formatNumber(t.ante || 0)}</div>
+            <div class="blind-value">${formatNumber(currentBlind.ante || 0)}</div>
           </div>
         </div>
       </div>
@@ -788,7 +804,7 @@ function renderizarTorneioAtivo() {
               <div class="table-row">
                 <div class="rank ${e.posicao === 1 ? 'top1' : (e.posicao === 2 ? 'top2' : (e.posicao === 3 ? 'top3' : ''))}">${e.posicao || '-'}º</div>
                 <div class="player-name eliminated">${escapeHtml(e.nome || '')}</div>
-                <div class="player-prize">${e.premio > 0 ? 'R$ ' + formatMoney(e.premio) : ''}</div>
+                <div class="player-prize">${e.bounty_pago > 0 ? 'R$ ' + formatMoney(e.bounty_pago) : ''}</div>
               </div>
             `).join('')
           }
@@ -897,7 +913,7 @@ function escapeHtml(str) {
 setInterval(() => {
   if (state.torneios.length > 0) {
     const t = state.torneios[state.torneioAtivoIdx];
-    if (t && !t.pausado && t.tempo_restante > 0) {
+    if (t && t.rodando && !t.is_break && t.tempo_restante > 0) {
       t.tempo_restante = Math.max(0, t.tempo_restante - 1);
       // Re-render apenas o timer pra economizar
       const timerSec = Math.max(0, Number(t.tempo_restante) || 0);
