@@ -3747,9 +3747,9 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','funcionarios','config','relatorios','assinatura'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','usuarios','funcionarios','config','relatorios','assinatura'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
-    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa'] },
+    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
 };
 
@@ -4261,24 +4261,48 @@ let _realtimeUltimaAtualizacao = 0;
 let _realtimeDebounceTimer = null;
 // Anti-loop: IDs que NÓS MESMOS acabamos de salvar (não devem disparar refresh)
 let _realtimeIdsRecentes = new Map(); // id -> timestamp
-const REALTIME_JANELA_PROPRIA_MS = 8000; // 8s — qualquer evento de ID nosso recente é ignorado
+const REALTIME_JANELA_PROPRIA_MS = 30000; // 30s — janela ampla pra cobrir sync lento
+// Suspender realtime totalmente durante operações sensíveis
+let _realtimeSuspenso = false;
+let _realtimeSuspensoTimer = null;
+
+function _suspenderRealtime(durMs) {
+    _realtimeSuspenso = true;
+    if (_realtimeSuspensoTimer) clearTimeout(_realtimeSuspensoTimer);
+    _realtimeSuspensoTimer = setTimeout(() => {
+        _realtimeSuspenso = false;
+    }, durMs || 8000);
+}
 
 function _marcarIdRecente(id) {
     if (!id) return;
     _realtimeIdsRecentes.set(id, Date.now());
-    // Limpar IDs antigos (mais de 30s)
-    const limite = Date.now() - 30000;
+    // Limpar IDs antigos (mais de 60s)
+    const limite = Date.now() - 60000;
     for (const [k, v] of _realtimeIdsRecentes) {
         if (v < limite) _realtimeIdsRecentes.delete(k);
     }
 }
 
 function _ehMudancaPropria(payload) {
-    const id = payload?.new?.id || payload?.old?.id;
-    if (!id) return false;
-    const ts = _realtimeIdsRecentes.get(id);
-    if (!ts) return false;
-    return (Date.now() - ts) < REALTIME_JANELA_PROPRIA_MS;
+    // Verifica IDs envolvidos
+    const ids = [];
+    if (payload?.new?.id) ids.push(payload.new.id);
+    if (payload?.old?.id) ids.push(payload.old.id);
+    if (payload?.new?.comanda_id) ids.push(payload.new.comanda_id);
+    if (payload?.old?.comanda_id) ids.push(payload.old.comanda_id);
+    if (payload?.new?.torneio_id) ids.push(payload.new.torneio_id);
+    if (payload?.old?.torneio_id) ids.push(payload.old.torneio_id);
+    if (payload?.new?.mesa_id) ids.push(payload.new.mesa_id);
+    if (payload?.old?.mesa_id) ids.push(payload.old.mesa_id);
+    
+    for (const id of ids) {
+        const ts = _realtimeIdsRecentes.get(id);
+        if (ts && (Date.now() - ts) < REALTIME_JANELA_PROPRIA_MS) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function iniciarRealtime() {
@@ -4340,26 +4364,115 @@ function iniciarRealtime() {
 }
 
 function _onRealtimeEvent(tipo, payload) {
-    // ANTI-LOOP: Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
-    if (_ehMudancaPropria(payload)) {
-        console.log('[REALTIME] ignorando mudança própria:', tipo, payload?.new?.id || payload?.old?.id);
+    // SUSPENSÃO: durante operações sensíveis, ignora completamente
+    if (_realtimeSuspenso) {
+        console.log('[REALTIME] suspenso — ignorando:', tipo);
         return;
     }
     
-    // Debounce: agrupar múltiplos eventos em uma janela de 500ms
+    // ANTI-LOOP: Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
+    if (_ehMudancaPropria(payload)) {
+        console.log('[REALTIME] ignorando mudança própria:', tipo);
+        return;
+    }
+    
+    // Debounce: agrupar múltiplos eventos em uma janela de 1.5s
     if (_realtimeDebounceTimer) clearTimeout(_realtimeDebounceTimer);
     _realtimeDebounceTimer = setTimeout(() => {
         _realtimeUltimaAtualizacao = Date.now();
         _processarMudancaRealtime(tipo, payload);
-    }, 500);
+    }, 1500); // 1.5s — espera vários eventos seguidos antes de processar
 }
 
 async function _processarMudancaRealtime(tipo, payload) {
     console.log('[REALTIME] processando:', tipo, payload.eventType);
     
     try {
-        // Recarregar dados do Supabase (mais simples que fazer merge incremental)
-        await carregarEstadoDoSupabase();
+        // ESTRATÉGIA NOVA: recarregamento focado por tipo, preservando dados locais não sincronizados
+        const clubeId = sbClube?.id;
+        if (!clubeId) return;
+        
+        // Recarregar APENAS a tabela relevante ao evento
+        if (tipo === 'torneio' || tipo === 'entry' || tipo === 'eliminado') {
+            // Recarrega torneios + suas filhas
+            try {
+                const { data: tRows } = await sb.from('torneios').select('*').eq('clube_id', clubeId).order('criado_em', { ascending: false });
+                if (tRows) {
+                    const ids = tRows.map(r => r.id);
+                    const [{ data: eRows }, { data: elRows }, { data: jpRows }, { data: tmRows }] = await Promise.all([
+                        sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
+                        sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
+                        sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
+                        sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
+                    ]);
+                    
+                    torneios = tRows.map(r => {
+                        const t = _torneioFromDb(r);
+                        t.entries = (eRows || []).filter(e => e.torneio_id === r.id).map(e => ({
+                            id: e.id, jogadorId: e.jogador_id, tipo: e.tipo,
+                            valor: parseFloat(e.valor || 0), fichas: parseInt(e.fichas || 0),
+                            ts: new Date(e.ts).getTime(),
+                            staff: parseFloat(e.staff || 0),
+                        }));
+                        t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
+                            jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
+                            posicao: el.posicao, bountyPago: parseFloat(el.bounty_pago || 0),
+                            ts: new Date(el.ts).getTime(),
+                        }));
+                        t.jackpotCompras = (jpRows || []).filter(j => j.torneio_id === r.id).map(j => ({
+                            jogadorId: j.jogador_id, valor: parseFloat(j.valor),
+                            ts: new Date(j.ts).getTime(),
+                        }));
+                        t.mesas = (tmRows || []).filter(m => m.torneio_id === r.id).map(m => ({
+                            numero: m.numero, jogadores: m.jogadores || [],
+                        }));
+                        return t;
+                    });
+                    localStorage.setItem('ps_torneios', JSON.stringify(torneios));
+                }
+            } catch(e) { console.warn('[REALTIME] reload torneios:', e); }
+        }
+        
+        if (tipo === 'comanda' || tipo === 'comanda_item' || tipo === 'produto') {
+            // Recarrega bar_comandas + itens + produtos
+            try {
+                const [{ data: cRows }, { data: pRows }] = await Promise.all([
+                    sb.from('bar_comandas').select('*').eq('clube_id', clubeId),
+                    sb.from('bar_produtos').select('*').eq('clube_id', clubeId),
+                ]);
+                if (cRows) {
+                    const ids = cRows.map(c => c.id);
+                    let itRows = [];
+                    if (ids.length > 0) {
+                        const r = await sb.from('bar_comanda_itens').select('*').in('comanda_id', ids);
+                        itRows = r.data || [];
+                    }
+                    barComandas = cRows.map(c => {
+                        const obj = _comandaFromDb(c);
+                        obj.itens = itRows.filter(i => i.comanda_id === c.id).map(i => ({
+                            produtoId: i.produto_id, nome: i.nome, qtd: i.qtd,
+                            valor: parseFloat(i.valor_unit), ts: new Date(i.ts).getTime(),
+                        }));
+                        return obj;
+                    });
+                    localStorage.setItem('ps_bar_comandas', JSON.stringify(barComandas));
+                }
+                if (pRows) {
+                    barProdutos = pRows.map(_produtoFromDb);
+                    localStorage.setItem('ps_bar_produtos', JSON.stringify(barProdutos));
+                }
+            } catch(e) { console.warn('[REALTIME] reload bar:', e); }
+        }
+        
+        if (tipo === 'cash_mesa') {
+            try {
+                const { data: cmRows } = await sb.from('cash_mesas').select('*').eq('clube_id', clubeId);
+                if (cmRows) {
+                    cashMesas = cmRows.map(_cashFromDb); // _cashFromDb preserva jogadores do cache
+                    localStorage.setItem('ps_cash_mesas', JSON.stringify(cashMesas));
+                }
+            } catch(e) { console.warn('[REALTIME] reload cash:', e); }
+        }
         
         // 🔑 RESSINCRONIZAR índice do torneio ativo por ID (evita timer cruzado)
         if (activeTorneioId && Array.isArray(torneios)) {
@@ -4367,7 +4480,6 @@ async function _processarMudancaRealtime(tipo, payload) {
             if (novoIdx >= 0) {
                 activeTorneioIdx = novoIdx;
             } else {
-                // Torneio foi deletado — limpa estado
                 console.warn('[REALTIME] torneio ativo foi deletado, limpando estado');
                 activeTorneioIdx = null;
                 activeTorneioId = null;
@@ -4385,10 +4497,7 @@ async function _processarMudancaRealtime(tipo, payload) {
         if (tipo === 'torneio' || tipo === 'entry' || tipo === 'eliminado') {
             if (paginaAtual === 'torneios') safeRender(window.renderTorneiosList, 'renderTorneiosList');
             if (paginaAtual === 'dashboard') safeRender(window.renderDashboard, 'renderDashboard');
-            // Re-renderizar torneio aberto se houver
-            if (typeof torneioAtual !== 'undefined' && torneioAtual) {
-                safeRender(window.renderTorneioAtivo, 'renderTorneioAtivo');
-            }
+            if (activeTorneioIdx !== null) safeRender(window.updateModalTorneio, 'updateModalTorneio');
         }
         
         if (tipo === 'comanda' || tipo === 'comanda_item' || tipo === 'produto') {
@@ -9348,6 +9457,7 @@ function applyPermissions() {
         'nav-config':    'config',
         'nav-assinatura':'assinatura',
         'nav-caixa':     'caixa',
+        'nav-fechamento':'fechamento',
         'nav-relatorios':'relatorios',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
@@ -10083,6 +10193,12 @@ function calcPayout(n, prize) {
 // ============================================================
 function toggleTimer(idx) {
     const t = torneios[idx];
+    if (!t) return;
+    
+    // Suspende realtime pra evitar que outro operador (ou eco do realtime)
+    // sobrescreva o estado local antes do save concluir
+    _suspenderRealtime(10000); // 10s
+    
     t.rodando = !t.rodando;
     if (t.rodando) {
         t.status = 'running';
@@ -10090,6 +10206,10 @@ function toggleTimer(idx) {
     } else {
         t.status = 'paused';
     }
+    
+    // Marca como mudança nossa (anti-loop fica protegido)
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
+    
     saveData();
     updateModalTorneio();
     renderTorneiosList();
@@ -10273,6 +10393,10 @@ function _registrarEntradaImpl() {
     if (tipo === 'reentry' && t.nivelAtual >= t.reentryAte) return showToast(`⚠️ Re-entry encerrado após nível ${t.reentryAte}`);
     if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
     if (tipo === 'addon' && t.addonAte > 0 && t.nivelAtual >= t.addonAte) return showToast(`⚠️ Add-on encerrado após nível ${t.addonAte}`);
+    
+    // Suspender realtime durante toda a inscrição (8s)
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
 
     // Se re-entry: reativar (remover da lista de eliminados)
     if (tipo === 'reentry') {
@@ -12583,7 +12707,11 @@ function abrirComanda() {
     if (!jid) return showToast('⚠️ Selecione um jogador');
     const jaAberta = barComandas.find(c => c.jogadorId === jid && c.status === 'aberta');
     if (jaAberta) return showToast('⚠️ Jogador já tem comanda aberta');
-    barComandas.push({
+    
+    // Suspender realtime durante operação pra evitar sobrescrever a comanda nova
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
+    
+    const novaComanda = {
         id: _genUuid(),
         jogadorId: jid,
         itens: [],
@@ -12592,7 +12720,12 @@ function abrirComanda() {
         fechadoEm: null,
         pagamento: null,
         total: 0,
-    });
+    };
+    barComandas.push(novaComanda);
+    
+    // Marca anti-loop
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(novaComanda.id);
+    
     saveData();
     closeModal('modal-nova-comanda');
     renderComandas();
@@ -12969,8 +13102,8 @@ function renderJogadoresCashMesa(m) {
                     <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem;color:#22c55e;">${formatMoney(j.totalInvestido)}</div>
                 </div>
                 <div style="display:flex;gap:.35rem;">
-                    <button onclick="abrirRecompra('${m.id}', ${j.jogadorId})" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
-                    <button onclick="abrirRetirar('${m.id}', ${j.jogadorId})" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+                    <button onclick="abrirRecompra('${m.id}', '${j.jogadorId}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
+                    <button onclick="abrirRetirar('${m.id}', '${j.jogadorId}')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
                 </div>
                 <div></div>
             </div>`;
