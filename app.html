@@ -3481,6 +3481,7 @@ config = mergeConfig(config, DEFAULT_CONFIG);
 localStorage.setItem('ps_config', JSON.stringify(config));
 let tvWindow   = null;
 let activeTorneioIdx  = null;
+let activeTorneioId   = null;  // ID estável do torneio aberto (sobrevive a refreshes)
 let activeComandaId   = null;
 let activeCashMesaId  = null;
 let activeCashContext = { mesaId: null, jogadorId: null };
@@ -4005,6 +4006,27 @@ let _realtimeChannel = null;
 let _realtimeReconnectTimer = null;
 let _realtimeUltimaAtualizacao = 0;
 let _realtimeDebounceTimer = null;
+// Anti-loop: IDs que NÓS MESMOS acabamos de salvar (não devem disparar refresh)
+let _realtimeIdsRecentes = new Map(); // id -> timestamp
+const REALTIME_JANELA_PROPRIA_MS = 8000; // 8s — qualquer evento de ID nosso recente é ignorado
+
+function _marcarIdRecente(id) {
+    if (!id) return;
+    _realtimeIdsRecentes.set(id, Date.now());
+    // Limpar IDs antigos (mais de 30s)
+    const limite = Date.now() - 30000;
+    for (const [k, v] of _realtimeIdsRecentes) {
+        if (v < limite) _realtimeIdsRecentes.delete(k);
+    }
+}
+
+function _ehMudancaPropria(payload) {
+    const id = payload?.new?.id || payload?.old?.id;
+    if (!id) return false;
+    const ts = _realtimeIdsRecentes.get(id);
+    if (!ts) return false;
+    return (Date.now() - ts) < REALTIME_JANELA_PROPRIA_MS;
+}
 
 function iniciarRealtime() {
     if (!sbClube?.id) return;
@@ -4065,9 +4087,11 @@ function iniciarRealtime() {
 }
 
 function _onRealtimeEvent(tipo, payload) {
-    // Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
-    // pra evitar loop. O markDirty já reflete localmente.
-    const agora = Date.now();
+    // ANTI-LOOP: Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
+    if (_ehMudancaPropria(payload)) {
+        console.log('[REALTIME] ignorando mudança própria:', tipo, payload?.new?.id || payload?.old?.id);
+        return;
+    }
     
     // Debounce: agrupar múltiplos eventos em uma janela de 500ms
     if (_realtimeDebounceTimer) clearTimeout(_realtimeDebounceTimer);
@@ -4082,28 +4106,45 @@ async function _processarMudancaRealtime(tipo, payload) {
     
     try {
         // Recarregar dados do Supabase (mais simples que fazer merge incremental)
-        // O carregarEstadoDoSupabase respeita filtros multi-tenant
         await carregarEstadoDoSupabase();
         
-        // Re-renderizar páginas afetadas (apenas a página visível)
+        // 🔑 RESSINCRONIZAR índice do torneio ativo por ID (evita timer cruzado)
+        if (activeTorneioId && Array.isArray(torneios)) {
+            const novoIdx = torneios.findIndex(t => t.id === activeTorneioId);
+            if (novoIdx >= 0) {
+                activeTorneioIdx = novoIdx;
+            } else {
+                // Torneio foi deletado — limpa estado
+                console.warn('[REALTIME] torneio ativo foi deletado, limpando estado');
+                activeTorneioIdx = null;
+                activeTorneioId = null;
+            }
+        }
+        
+        // Re-renderizar páginas afetadas — cada uma em try/catch isolado pra não derrubar tudo
         const paginaAtual = window._paginaAtual || 'dashboard';
         
+        const safeRender = (fn, nome) => {
+            try { if (typeof fn === 'function') fn(); }
+            catch(e) { console.warn('[REALTIME] erro em ' + nome + ':', e); }
+        };
+        
         if (tipo === 'torneio' || tipo === 'entry' || tipo === 'eliminado') {
-            if (paginaAtual === 'torneios' && typeof renderTorneiosList === 'function') renderTorneiosList();
-            if (paginaAtual === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
+            if (paginaAtual === 'torneios') safeRender(window.renderTorneiosList, 'renderTorneiosList');
+            if (paginaAtual === 'dashboard') safeRender(window.renderDashboard, 'renderDashboard');
             // Re-renderizar torneio aberto se houver
-            if (typeof torneioAtual !== 'undefined' && torneioAtual && typeof renderTorneioAtivo === 'function') {
-                renderTorneioAtivo();
+            if (typeof torneioAtual !== 'undefined' && torneioAtual) {
+                safeRender(window.renderTorneioAtivo, 'renderTorneioAtivo');
             }
         }
         
         if (tipo === 'comanda' || tipo === 'comanda_item' || tipo === 'produto') {
-            if (paginaAtual === 'bar' && typeof renderBar === 'function') renderBar();
-            if (paginaAtual === 'caixa' && typeof renderCaixa === 'function') renderCaixa();
+            if (paginaAtual === 'bar') safeRender(window.renderBar, 'renderBar');
+            if (paginaAtual === 'caixa') safeRender(window.renderCaixa, 'renderCaixa');
         }
         
         if (tipo === 'cash_mesa') {
-            if (paginaAtual === 'cash' && typeof renderCash === 'function') renderCash();
+            if (paginaAtual === 'cash') safeRender(window.renderCash, 'renderCash');
         }
         
         // Toast discreto
@@ -4150,18 +4191,24 @@ function _atualizarIndicadorRealtime(conectado) {
 }
 
 function _mostrarToastRealtime(tipo, evento) {
+    // Cooldown global: máximo 1 toast a cada 3s
+    const agora = Date.now();
+    if (window._lastRealtimeToast && (agora - window._lastRealtimeToast) < 3000) return;
+    
+    // Eventos "barulhentos" (acontecem MUITO durante operação normal): silenciar
+    const silenciados = new Set(['comanda_item', 'produto', 'entry']);
+    if (silenciados.has(tipo)) return;
+    
     const labels = {
-        torneio: { INSERT: 'Torneio criado', UPDATE: 'Torneio atualizado', DELETE: 'Torneio removido' },
-        entry: { INSERT: 'Nova inscrição', UPDATE: 'Inscrição atualizada', DELETE: 'Inscrição cancelada' },
-        eliminado: { INSERT: 'Eliminação registrada', UPDATE: 'Eliminação atualizada', DELETE: 'Eliminação removida' },
-        comanda: { INSERT: 'Nova comanda', UPDATE: 'Comanda atualizada', DELETE: 'Comanda fechada' },
-        comanda_item: { INSERT: 'Item adicionado', UPDATE: 'Item atualizado', DELETE: 'Item removido' },
-        produto: { INSERT: 'Produto criado', UPDATE: 'Produto atualizado', DELETE: 'Produto removido' },
-        cash_mesa: { INSERT: 'Mesa aberta', UPDATE: 'Mesa atualizada', DELETE: 'Mesa fechada' },
+        torneio: { INSERT: 'Novo torneio criado', UPDATE: 'Torneio atualizado', DELETE: 'Torneio removido' },
+        eliminado: { INSERT: 'Eliminação registrada', UPDATE: null, DELETE: 'Eliminação desfeita' },
+        comanda: { INSERT: 'Nova comanda', UPDATE: null, DELETE: 'Comanda fechada' },
+        cash_mesa: { INSERT: 'Mesa aberta', UPDATE: null, DELETE: 'Mesa fechada' },
     };
     const label = labels[tipo]?.[evento];
     if (label && typeof showToast === 'function') {
-        showToast('🔄 ' + label, 1800);
+        showToast('🔄 ' + label, 1500);
+        window._lastRealtimeToast = agora;
     }
 }
 
@@ -4205,6 +4252,8 @@ function _markDirty(tipo, id) {
         _syncQueue[tipo].add(id);
         console.log('[SYNC] _markDirty:', tipo, '→', id);
     }
+    // Marcar como "mudança nossa" pro anti-loop do realtime
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(id);
     _agendarSync();
     return true;
 }
@@ -4758,6 +4807,19 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
 }
 
 function _cashFromDb(r) {
+    // Preservar jogadores e sessoes do cache local se existirem (não vão pro banco)
+    let jogadoresExistentes = [];
+    let sessoesExistentes = [];
+    try {
+        if (typeof cashMesas !== 'undefined' && Array.isArray(cashMesas)) {
+            const existente = cashMesas.find(m => m.id === r.id);
+            if (existente) {
+                jogadoresExistentes = existente.jogadores || [];
+                sessoesExistentes = existente.sessoes || [];
+            }
+        }
+    } catch(e) {}
+    
     return {
         id: r.id, nome: r.nome,
         sb: parseFloat(r.sb), bb: parseFloat(r.bb),
@@ -4771,7 +4833,8 @@ function _cashFromDb(r) {
         aberturaTs: r.abertura_ts ? new Date(r.abertura_ts).getTime() : Date.now(),
         fechamentoTs: r.fechamento_ts ? new Date(r.fechamento_ts).getTime() : null,
         operador: r.operador,
-        sessoes: [],
+        jogadores: jogadoresExistentes,  // ← preservar
+        sessoes: sessoesExistentes,        // ← preservar
     };
 }
 
@@ -8627,6 +8690,7 @@ function renderTorneiosList() {
 // ============================================================
 function abrirDetalhesTorneio(idx) {
     activeTorneioIdx = idx;
+    activeTorneioId = torneios[idx]?.id || null;  // guarda ID estável
     // Pede permissão de notificações na primeira vez que abre torneio
     pedirPermissaoNotificacoes();
     const t = torneios[idx];
@@ -16396,7 +16460,7 @@ function renderDashboard() {
 
     const cashBadge = document.getElementById('dash-cash-badge');
     if (cashBadge) {
-        const totalJogadoresCash = cashAtivas.reduce((s,m) => s + m.jogadores.filter(j=>j.status==='ativo').length, 0);
+        const totalJogadoresCash = cashAtivas.reduce((s,m) => s + (m.jogadores || []).filter(j=>j.status==='ativo').length, 0);
         cashBadge.innerText = totalJogadoresCash ? `${totalJogadoresCash} jogadores` : '';
     }
 
@@ -16406,7 +16470,7 @@ function renderDashboard() {
             cashMini.innerHTML = '<div style="color:#3f3f46;font-size:.7rem;padding:.35rem 0;">Nenhuma mesa ativa</div>';
         } else {
             cashMini.innerHTML = cashAtivas.slice(0, 3).map(m => {
-                const ativos = m.jogadores.filter(j => j.status === 'ativo').length;
+                const ativos = (m.jogadores || []).filter(j => j.status === 'ativo').length;
                 return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:#0a0a0c;border-radius:.3rem;">
                     <span style="font-weight:600;">${m.nome}</span>
                     <span style="color:#71717a;font-size:.7rem;">${ativos} jog · ${m.sb}/${m.bb}</span>
