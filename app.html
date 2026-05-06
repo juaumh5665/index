@@ -3116,7 +3116,17 @@
                     <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Deixe rebuy duplo = 0 para permitir apenas o simples</div>
                 </div>
 
-                <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                    <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
+                    <div><label class="inp-label">Add-on (R$)</label><input id="t-addon-valor" type="number" step="0.01" value="0" class="inp" placeholder="0 = grátis"></div>
+                </div>
+
+                <!-- Staff / Taxa de serviço -->
+                <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff / Taxa de Serviço</div>
+                    <div><label class="inp-label">Valor do staff (R$)</label><input id="t-staff-valor" type="number" step="0.01" value="0" class="inp" placeholder="0 = sem staff"></div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.5;">Taxa adicional cobrada apenas no <strong>buy-in (1ª entrada)</strong>. Não é cobrada em rebuys ou re-entries. Pode ser <strong>desmarcada na hora da inscrição</strong> caso o jogador esteja isento.</div>
+                </div>
             </div>
             <!-- Blinds -->
             <div style="display:flex;flex-direction:column;gap:.75rem;">
@@ -3392,11 +3402,24 @@
             </div>
             <div>
                 <label class="inp-label">Tipo</label>
-                <select id="entrada-tipo" class="inp">
+                <select id="entrada-tipo" class="inp" onchange="atualizarResumoEntrada()">
                     <option value="buyin">Buy-in (entrada normal)</option>
                     <option value="reentry">Re-entry</option>
                     <option value="addon">Add-on</option>
                 </select>
+            </div>
+            <!-- Staff (só aparece se buyin e torneio tem staff configurado) -->
+            <div id="entrada-staff-wrap" style="display:none;padding:.75rem 1rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
+                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.85rem;">
+                    <input type="checkbox" id="entrada-staff-cobrar" checked onchange="atualizarResumoEntrada()" style="width:18px;height:18px;cursor:pointer;accent-color:var(--gold);">
+                    <span><strong>Cobrar staff</strong> <span id="entrada-staff-valor-label" style="color:var(--gold);">R$ 0,00</span></span>
+                </label>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.4rem;margin-left:1.65rem;">Desmarque caso o jogador esteja isento desta taxa</div>
+            </div>
+            <!-- Resumo do total -->
+            <div id="entrada-resumo" style="padding:.85rem 1rem;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:.75rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Total a cobrar</span>
+                <span id="entrada-resumo-valor" style="font-size:1.4rem;font-weight:800;color:var(--gold);font-family:monospace;">R$ 0,00</span>
             </div>
             <button onclick="registrarEntrada()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Entrada</button>
         </div>
@@ -4296,6 +4319,7 @@ function _torneioToDb(t) {
         reentry_ate: t.reentryAte || 0,
         addon_valor: t.addonValor || 0,
         addon_fichas: t.addonFichas || 0,
+        staff_valor: t.staffValor || 0,
         rebuy_valor: t.rebuyValor || 0,
         rebuy_fichas: t.rebuyFichas || 0,
         rebuy_duplo_valor: t.rebuyDuploValor || 0,
@@ -4755,6 +4779,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         reentryAte: r.reentry_ate || 0,
         addonValor: parseFloat(r.addon_valor || 0),
         addonFichas: r.addon_fichas || 0,
+        staffValor: parseFloat(r.staff_valor || 0),
         rebuyValor: parseFloat(r.rebuy_valor || 0),
         rebuyFichas: r.rebuy_fichas || 0,
         rebuyDuploValor: parseFloat(r.rebuy_duplo_valor || 0),
@@ -8574,6 +8599,8 @@ function saveTournament() {
         reentryAte:   parseInt(document.getElementById('t-reentry').value)  || 0,
         addonAte:     parseInt(document.getElementById('t-addon-nivel').value) || 0,
         addonFichas:  parseInt(document.getElementById('t-addon').value)    || 0,
+        addonValor:   parseFloat(document.getElementById('t-addon-valor').value) || 0,
+        staffValor:   parseFloat(document.getElementById('t-staff-valor').value) || 0,
         // Rebuy structure
         rebuySimples:       parseFloat(document.getElementById('t-rebuy-simples').value)        || 0,
         rebuySimplesFichas: parseInt(document.getElementById('t-rebuy-simples-fichas').value)   || 0,
@@ -9120,9 +9147,56 @@ function openModalEntrada(idx) {
     if (t.rebuySimples > 0) opts.push(`<option value="rebuy_simples">Rebuy Simples — R$ ${t.rebuySimples} (${(t.rebuySimplesFichas||0).toLocaleString()} fichas)</option>`);
     if (t.rebuyDuplo > 0)   opts.push(`<option value="rebuy_duplo">Rebuy Duplo — R$ ${t.rebuyDuplo} (${(t.rebuyDuploFichas||0).toLocaleString()} fichas)</option>`);
     if (t.reentryAte > 0)   opts.push(`<option value="reentry">Re-entry — R$ ${t.buyin}</option>`);
-    if (t.addonFichas > 0)  opts.push(`<option value="addon">Add-on (${t.addonFichas.toLocaleString()} fichas extras)</option>`);
+    if (t.addonFichas > 0)  {
+        const addonLabel = (t.addonValor && t.addonValor > 0)
+            ? `Add-on — R$ ${t.addonValor} (${t.addonFichas.toLocaleString()} fichas extras)`
+            : `Add-on — Cortesia (${t.addonFichas.toLocaleString()} fichas extras)`;
+        opts.push(`<option value="addon">${addonLabel}</option>`);
+    }
     tipoSel.innerHTML = opts.join('');
+    
+    // Configurar staff (mostrar apenas se houver staff e tipo for buyin)
+    const staffWrap = document.getElementById('entrada-staff-wrap');
+    const staffLabel = document.getElementById('entrada-staff-valor-label');
+    if (staffWrap && t.staffValor && t.staffValor > 0) {
+        if (staffLabel) staffLabel.innerText = `R$ ${Number(t.staffValor).toFixed(2).replace('.',',')}`;
+        const cb = document.getElementById('entrada-staff-cobrar');
+        if (cb) cb.checked = true;
+    }
+    
+    atualizarResumoEntrada();
     openModal('modal-entrada');
+}
+
+// Atualiza visibilidade do staff e valor total mostrado no modal
+function atualizarResumoEntrada() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    const tipo = document.getElementById('entrada-tipo')?.value || 'buyin';
+    const staffWrap = document.getElementById('entrada-staff-wrap');
+    const cbStaff = document.getElementById('entrada-staff-cobrar');
+    const resumoVal = document.getElementById('entrada-resumo-valor');
+    
+    // Staff aparece SÓ no tipo "buyin" e SE o torneio tem staff configurado
+    const mostrarStaff = (tipo === 'buyin') && (t.staffValor && t.staffValor > 0);
+    if (staffWrap) staffWrap.style.display = mostrarStaff ? 'block' : 'none';
+    
+    // Calcular total
+    let valorBase = 0;
+    if (tipo === 'buyin')          valorBase = Number(t.buyin) || 0;
+    else if (tipo === 'reentry')   valorBase = Number(t.buyin) || 0;
+    else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuySimples) || 0;
+    else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuplo) || 0;
+    else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
+    
+    let staff = 0;
+    if (mostrarStaff && cbStaff && cbStaff.checked) {
+        staff = Number(t.staffValor) || 0;
+    }
+    
+    const total = valorBase + staff;
+    if (resumoVal) resumoVal.innerText = 'R$ ' + total.toFixed(2).replace('.', ',');
 }
 
 function registrarEntrada() {
@@ -9157,13 +9231,22 @@ function _registrarEntradaImpl() {
         t.eliminados = t.eliminados.filter(e => e.jogadorId !== jid);
     }
 
-    // Determina valor em R$ com base no tipo
-    let valorRS = t.buyin;
-    if (tipo === 'rebuy_simples') valorRS = t.rebuySimples;
-    if (tipo === 'rebuy_duplo')   valorRS = t.rebuyDuplo;
-    if (tipo === 'addon')         valorRS = 0;   // add-on pode ser cortesia ou cobrado separado; mantemos sem valor em caixa
+    // Determina valor BASE em R$ com base no tipo
+    let valorBase = t.buyin;
+    if (tipo === 'rebuy_simples') valorBase = t.rebuySimples;
+    if (tipo === 'rebuy_duplo')   valorBase = t.rebuyDuplo;
+    if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
+    
+    // Staff: aplicado SÓ em buy-in (1ª entrada) e se checkbox estiver marcado
+    let staffCobrado = 0;
+    const cbStaff = document.getElementById('entrada-staff-cobrar');
+    if (tipo === 'buyin' && t.staffValor && t.staffValor > 0 && cbStaff && cbStaff.checked) {
+        staffCobrado = Number(t.staffValor);
+    }
+    const valorRS = valorBase; // mantém variável legada pra compat
+    const valorTotal = valorBase + staffCobrado;
 
-    t.entries.push({ id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorRS });
+    t.entries.push({ id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado });
     alocarJogadorMesa(t, jid);
 
     // Para torneios KO: cada entrada paga também bounty (exceto add-on)
@@ -9178,14 +9261,26 @@ function _registrarEntradaImpl() {
         }
     }
 
-    // Registra transação no caixa
+    // Registra transação no caixa (valor BASE da inscrição — addon agora também tem valor)
     const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on' };
-    if (tipo !== 'addon' && valorRS > 0) {
+    if (valorBase > 0) {
         registrarTransacao({
             jogadorId: jid,
-            tipo: tipo === 'buyin' ? 'buyin' : 'reentry',
-            valor: -valorRS,
+            tipo: tipo === 'buyin' ? 'buyin' : (tipo === 'addon' ? 'addon' : 'reentry'),
+            valor: -valorBase,
             descricao: `${descMap[tipo]} · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+        });
+    }
+    
+    // Registra transação SEPARADA para staff (caixa do clube, não vai pro prize)
+    if (staffCobrado > 0) {
+        registrarTransacao({
+            jogadorId: jid,
+            tipo: 'staff',
+            valor: -staffCobrado,
+            descricao: `Staff · ${t.nome} · ${getJogadorNome(jid)}`,
             origem: 'torneio',
             refId: t.id,
         });
@@ -9200,7 +9295,8 @@ function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const txsBefore = transacoes.length - ((tipo !== 'addon' && valorRS > 0) ? 1 : 0);
+    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0);
+    const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
         torneios[tornIdx] = JSON.parse(snapshot);
@@ -9211,7 +9307,8 @@ function _registrarEntradaImpl() {
         renderDashboard();
     });
 
-    showToast(`💰 ${tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in'} registrado!`);
+    const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
+    showToast(`💰 ${tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in'} registrado!${totalLabel}`);
 }
 
 function openModalEliminar(idx) {
