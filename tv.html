@@ -509,17 +509,52 @@ const state = {
 window.addEventListener('DOMContentLoaded', boot);
 
 async function boot() {
-  // Parse URL: /tv?clube=xxx&token=yyy
-  const params = new URLSearchParams(window.location.search);
-  state.clubeId = params.get('clube');
-  state.token = params.get('token');
+  // 3 formatos suportados:
+  //   1) /tv/SLUG (URL curta nova)         ← recomendado
+  //   2) /tv?slug=SLUG (URL curta query)
+  //   3) /tv?clube=xxx&token=yyy (URL longa, legado)
   
-  if (!state.clubeId || !state.token) {
-    return mostrarErro('Link incompleto', 'Use o link completo gerado nas configurações do clube (com clube e token).');
+  // Detectar SLUG pela URL
+  const params = new URLSearchParams(window.location.search);
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, ''); // remove / inicial e final
+  const pathParts = path.split('/').filter(Boolean);
+  
+  let slug = params.get('slug');
+  // /tv/abc123 → pathParts = ['tv', 'abc123']
+  if (!slug && pathParts.length >= 2 && pathParts[0] === 'tv') {
+    slug = pathParts[1];
+  }
+  // /tv.html/abc123 → pathParts = ['tv.html', 'abc123']
+  if (!slug && pathParts.length >= 2 && pathParts[0] === 'tv.html') {
+    slug = pathParts[1];
   }
   
   // Iniciar relógio
   iniciarRelogio();
+  
+  if (slug) {
+    // Resolver slug → clube_id + token
+    try {
+      const { data, error } = await sb.rpc('resolver_tv_slug', { p_slug: slug });
+      if (error) throw error;
+      if (!data || data.erro) {
+        return mostrarErro('Link inválido', 'Este link expirou ou não existe. Peça uma URL nova ao admin do clube.');
+      }
+      state.clubeId = data.clube_id;
+      state.token = data.tv_token;
+    } catch(e) {
+      console.error('[TV] erro resolver slug:', e);
+      return mostrarErro('Erro ao resolver link', 'Não foi possível identificar o clube. Peça uma URL nova ao admin.');
+    }
+  } else {
+    // Modo legado: pega ?clube= e ?token= da query
+    state.clubeId = params.get('clube');
+    state.token = params.get('token');
+  }
+  
+  if (!state.clubeId || !state.token) {
+    return mostrarErro('Link incompleto', 'Use a URL curta gerada nas configurações do clube.');
+  }
   
   // Carregar dados iniciais
   try {
@@ -532,7 +567,7 @@ async function boot() {
     state.pollingInterval = setInterval(carregarDados, 30000);
   } catch(e) {
     console.error('[TV] Erro no boot:', e);
-    mostrarErro('Falha ao carregar', 'Verifique a URL ou regenere o token nas configurações.');
+    mostrarErro('Falha ao carregar', 'Verifique a URL ou regenere o link nas configurações.');
   }
 }
 

@@ -4136,7 +4136,7 @@ let _syncEmAndamento = false;
 // CONFIG: TV PÚBLICA — gerar/copiar/regenerar URL
 // ============================================================
 
-let _tvTokenCache = null;
+let _tvSlugCache = null;
 
 async function renderConfigTV() {
     const urlInput = document.getElementById('cfg-tv-url');
@@ -4146,29 +4146,25 @@ async function renderConfigTV() {
     try {
         if (!sbClube?.id) throw new Error('Clube não carregado');
         
-        // Buscar tv_token do clube
-        const { data, error } = await sb.from('clubes')
-            .select('tv_token')
-            .eq('id', sbClube.id)
-            .single();
-        if (error) throw error;
+        // Buscar slug existente
+        let slug = null;
+        try {
+            const { data, error } = await sb.rpc('obter_tv_slug', { p_clube_id: sbClube.id });
+            if (!error && data) slug = data;
+        } catch(e) { /* ignora — gera abaixo */ }
         
-        if (!data.tv_token) {
-            // Sem token — gerar um agora
-            const novoToken = await regenerarTokenTV(true);
-            if (!novoToken) {
-                urlInput.value = 'Erro ao gerar token. Click em "Regenerar URL".';
+        // Se não tem, gerar agora
+        if (!slug) {
+            slug = await regenerarTokenTV(true);
+            if (!slug) {
+                urlInput.value = 'Erro ao gerar URL. Click em "Regenerar URL".';
                 return;
             }
-            _tvTokenCache = novoToken;
-        } else {
-            _tvTokenCache = data.tv_token;
         }
         
-        // Construir URL
+        _tvSlugCache = slug;
         const baseUrl = window.location.origin;
-        const url = `${baseUrl}/tv?clube=${sbClube.id}&token=${_tvTokenCache}`;
-        urlInput.value = url;
+        urlInput.value = `${baseUrl}/tv/${slug}`;
         
     } catch(e) {
         console.error('[TV CONFIG]', e);
@@ -4221,12 +4217,12 @@ async function regenerarTokenTV(silencioso = false) {
     }
     
     try {
-        const { data, error } = await sb.rpc('regenerar_tv_token', { p_clube_id: sbClube.id });
+        const { data, error } = await sb.rpc('gerar_tv_slug', { p_clube_id: sbClube.id });
         if (error) throw error;
         
-        _tvTokenCache = data;
+        _tvSlugCache = data;
         const baseUrl = window.location.origin;
-        const url = `${baseUrl}/tv?clube=${sbClube.id}&token=${_tvTokenCache}`;
+        const url = `${baseUrl}/tv/${data}`;
         const urlInput = document.getElementById('cfg-tv-url');
         if (urlInput) urlInput.value = url;
         
