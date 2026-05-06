@@ -849,6 +849,9 @@
                 <i class="fa-solid fa-receipt" style="width:16px;"></i> Fechamento do Dia
             </div>
             <div style="height:1px;background:#1a1a1e;margin:.5rem .5rem;" id="nav-divider-admin"></div>
+            <div onclick="showPage('funcionarios')" id="nav-funcionarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
+                <i class="fa-solid fa-id-card-clip" style="width:16px;"></i> Funcionários
+            </div>
             <div onclick="showPage('usuarios')" id="nav-usuarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-user-shield" style="width:16px;"></i> Usuários
             </div>
@@ -1049,6 +1052,42 @@
                     <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Selecione um layout para previsualizar</div>
                     <div id="tv-layouts-gallery" style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;"></div>
                 </div>
+            </div>
+
+            <!-- FUNCIONÁRIOS -->
+            <div id="page-funcionarios" class="page-content fade-in" style="display:none;">
+                
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h2 style="font-size:1.5rem;font-weight:800;letter-spacing:-.02em;"><i class="fa-solid fa-id-card-clip" style="color:var(--gold);"></i> Funcionários</h2>
+                        <div style="font-size:.85rem;color:#a1a1aa;margin-top:.25rem;">Cadastro de dealers, gerentes, garçons e equipe do clube</div>
+                    </div>
+                    <button onclick="abrirModalFuncionario()" class="btn-gold" style="padding:.6rem 1.25rem;border-radius:.5rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;">
+                        <i class="fa-solid fa-plus"></i> Novo Funcionário
+                    </button>
+                </div>
+                
+                <!-- Filtros -->
+                <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+                    <input type="text" id="filtro-funcionario-busca" placeholder="Buscar por nome..." oninput="renderFuncionarios()" style="flex:1;min-width:200px;padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.85rem;">
+                    <select id="filtro-funcionario-cargo" onchange="renderFuncionarios()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.85rem;">
+                        <option value="">Todos cargos</option>
+                        <option value="dealer">Dealer</option>
+                        <option value="gerente">Gerente</option>
+                        <option value="garcom">Garçom</option>
+                        <option value="caixa">Caixa</option>
+                        <option value="recepcao">Recepção</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                    <select id="filtro-funcionario-status" onchange="renderFuncionarios()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.85rem;">
+                        <option value="ativo">Ativos</option>
+                        <option value="inativo">Inativos</option>
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                
+                <!-- Lista -->
+                <div id="lista-funcionarios" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem;"></div>
             </div>
 
             <!-- USUÁRIOS -->
@@ -3185,17 +3224,20 @@
                     </button>
                 </div>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
+                <button onclick="copiarLinkRanking()" class="btn-ghost" style="font-size:.8rem;" title="Copiar link público do ranking"><i class="fa-solid fa-share-nodes"></i> Copiar Link</button>
+                <button onclick="compartilharWhatsApp()" class="btn-ghost" style="font-size:.8rem;color:#25d366;border-color:rgba(37,211,102,.3);" title="Compartilhar no WhatsApp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
                 <button onclick="ativarKioskTV()" class="btn-ghost" style="font-size:.8rem;" title="Modo apresentação (fullscreen)"><i class="fa-solid fa-expand"></i> Kiosk</button>
                 <button onclick="closeModal('modal-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
             </div>
         </div>
         <!-- Tabs -->
-        <div style="padding:.75rem 1.5rem 0;border-bottom:1px solid #1e1e23;display:flex;gap:.25rem;flex-shrink:0;">
+        <div style="padding:.75rem 1.5rem 0;border-bottom:1px solid #1e1e23;display:flex;gap:.25rem;flex-shrink:0;flex-wrap:wrap;">
             <button class="tab-btn active" onclick="switchTab('tab-controle', this)">Controle</button>
             <button class="tab-btn" onclick="switchTab('tab-jogadores', this)">Jogadores</button>
             <button class="tab-btn" onclick="switchTab('tab-mesas', this)">Mesas</button>
             <button class="tab-btn" onclick="switchTab('tab-financeiro', this)">Financeiro</button>
             <button class="tab-btn" onclick="switchTab('tab-blinds', this)">Blinds</button>
+            <button class="tab-btn" onclick="switchTab('tab-dealers', this)"><i class="fa-solid fa-spade"></i> Dealers</button>
         </div>
         <!-- Body -->
         <div style="flex:1;overflow:auto;padding:1.5rem;">
@@ -3355,6 +3397,44 @@
                 <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Estrutura Completa de Blinds</div>
                 <div id="mt-blinds-full" style="display:flex;flex-direction:column;gap:.3rem;"></div>
             </div>
+            
+            <!-- TAB: DEALERS / CAPILÉ -->
+            <div id="tab-dealers" class="tab-content" style="display:none;">
+                <!-- Modo de capilé -->
+                <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.75rem;padding:1rem 1.25rem;margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;">Modo de divisão do capilé</div>
+                            <div style="font-size:.85rem;color:#a1a1aa;">Como o dinheiro de capilé deste torneio será dividido</div>
+                        </div>
+                        <select id="capile-modo-select" onchange="alterarCapileModo()" class="inp" style="width:auto;min-width:180px;">
+                            <option value="pote">Pote (dividido igualmente)</option>
+                            <option value="individual">Individual (por dealer)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Dealers vinculados -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Dealers no torneio</div>
+                    <button onclick="abrirModalAdicionarDealer()" class="btn-ghost" style="padding:.4rem .85rem;border-radius:.4rem;font-size:.75rem;font-weight:700;">
+                        <i class="fa-solid fa-plus"></i> Adicionar Dealer
+                    </button>
+                </div>
+                <div id="lista-dealers-torneio" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.5rem;"></div>
+                
+                <!-- Capilés registrados -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;margin-bottom:.75rem;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Capilés registrados</div>
+                    <button onclick="abrirModalRegistrarCapile()" class="btn-ghost" style="padding:.4rem .85rem;border-radius:.4rem;font-size:.75rem;font-weight:700;">
+                        <i class="fa-solid fa-money-bill-wave"></i> Registrar Capilé
+                    </button>
+                </div>
+                <div id="lista-capiles-torneio" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem;"></div>
+                
+                <!-- Resumo de ganhos -->
+                <div id="resumo-dealers-torneio" style="margin-top:1.5rem;"></div>
+            </div>
 
         </div>
     </div>
@@ -3426,6 +3506,156 @@
     </div>
 </div>
 
+<!-- MODAL: ADICIONAR DEALER AO TORNEIO -->
+<div id="modal-dealer-torneio" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 id="dealer-torneio-titulo" style="font-weight:800;"><i class="fa-solid fa-spade" style="color:var(--gold);"></i> Adicionar Dealer</h3>
+            <button onclick="closeModal('modal-dealer-torneio')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.85rem;">
+            <input type="hidden" id="td-id" value="">
+            <div>
+                <label class="inp-label">Dealer / Funcionário *</label>
+                <select id="td-funcionario" class="inp" onchange="onSelecionarDealerNoTorneio()">
+                    <option value="">Selecione um funcionário ativo...</option>
+                </select>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.3rem;">
+                    Não está na lista? <a href="#" onclick="event.preventDefault();closeModal('modal-dealer-torneio');showPage('funcionarios');" style="color:var(--gold);">Cadastre em Funcionários</a>
+                </div>
+            </div>
+            <div>
+                <label class="inp-label">Diária (R$) *</label>
+                <input type="number" id="td-diaria-valor" class="inp" step="0.01" min="0" value="0">
+                <div style="font-size:.7rem;color:#71717a;margin-top:.3rem;">Valor que será pago a este dealer pelo torneio</div>
+            </div>
+            <div>
+                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
+                    <input type="checkbox" id="td-diaria-paga" style="width:18px;height:18px;accent-color:var(--gold);">
+                    <span>Diária já paga</span>
+                </label>
+            </div>
+            <div>
+                <label class="inp-label">Observações (opcional)</label>
+                <textarea id="td-obs" class="inp" rows="2" style="resize:vertical;font-family:inherit;"></textarea>
+            </div>
+            <div style="display:flex;gap:.5rem;justify-content:space-between;align-items:center;margin-top:.5rem;">
+                <button id="td-btn-deletar" onclick="removerDealerDoTorneioModal()" style="display:none;padding:.6rem 1rem;background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:.5rem;font-size:.8rem;cursor:pointer;font-weight:600;">
+                    <i class="fa-solid fa-trash"></i> Remover
+                </button>
+                <div style="display:flex;gap:.5rem;margin-left:auto;">
+                    <button onclick="closeModal('modal-dealer-torneio')" class="btn-ghost" style="padding:.7rem 1.25rem;border-radius:.5rem;font-size:.85rem;">Cancelar</button>
+                    <button onclick="salvarDealerNoTorneio()" class="btn-gold" style="padding:.7rem 1.5rem;border-radius:.5rem;font-weight:700;font-size:.85rem;">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: REGISTRAR CAPILÉ -->
+<div id="modal-capile" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-money-bill-wave" style="color:var(--gold);"></i> Registrar Capilé</h3>
+            <button onclick="closeModal('modal-capile')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.85rem;">
+            <input type="hidden" id="cap-id" value="">
+            <div id="cap-info-modo" style="padding:.65rem .9rem;border-radius:.5rem;font-size:.8rem;"></div>
+            <div>
+                <label class="inp-label">Valor (R$) *</label>
+                <input type="number" id="cap-valor" class="inp" step="0.01" min="0" placeholder="Ex: 10.00">
+            </div>
+            <div id="cap-funcionario-wrap" style="display:none;">
+                <label class="inp-label">Dealer beneficiário *</label>
+                <select id="cap-funcionario" class="inp">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+            <div>
+                <label class="inp-label">Jogador que pagou (opcional)</label>
+                <input type="text" id="cap-jogador-nome" class="inp" placeholder="Nome do jogador">
+            </div>
+            <div>
+                <label class="inp-label">Observações (opcional)</label>
+                <input type="text" id="cap-obs" class="inp" placeholder="Ex: capilé no flop turn">
+            </div>
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;">
+                <button onclick="closeModal('modal-capile')" class="btn-ghost" style="padding:.7rem 1.25rem;border-radius:.5rem;font-size:.85rem;">Cancelar</button>
+                <button onclick="salvarCapile()" class="btn-gold" style="padding:.7rem 1.5rem;border-radius:.5rem;font-weight:700;font-size:.85rem;">Registrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FUNCIONÁRIO (criar/editar) -->
+<div id="modal-funcionario" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 id="modal-func-titulo" style="font-weight:800;"><i class="fa-solid fa-id-card-clip" style="color:var(--gold);"></i> Novo Funcionário</h3>
+            <button onclick="closeModal('modal-funcionario')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.85rem;">
+            <input type="hidden" id="func-id" value="">
+            <div>
+                <label class="inp-label">Nome completo *</label>
+                <input type="text" id="func-nome" class="inp" placeholder="Ex: João da Silva" autocomplete="off">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div>
+                    <label class="inp-label">Cargo *</label>
+                    <select id="func-cargo" class="inp">
+                        <option value="dealer">Dealer</option>
+                        <option value="gerente">Gerente</option>
+                        <option value="garcom">Garçom</option>
+                        <option value="caixa">Caixa</option>
+                        <option value="recepcao">Recepção</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="inp-label">Status</label>
+                    <select id="func-status" class="inp">
+                        <option value="ativo">Ativo</option>
+                        <option value="inativo">Inativo</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div>
+                    <label class="inp-label">CPF (opcional)</label>
+                    <input type="text" id="func-cpf" class="inp" placeholder="000.000.000-00">
+                </div>
+                <div>
+                    <label class="inp-label">Telefone</label>
+                    <input type="text" id="func-telefone" class="inp" placeholder="(00) 90000-0000">
+                </div>
+            </div>
+            <div>
+                <label class="inp-label">Email (opcional)</label>
+                <input type="email" id="func-email" class="inp" placeholder="email@exemplo.com">
+            </div>
+            <div>
+                <label class="inp-label">Diária padrão (R$) <span style="color:#71717a;font-weight:400;">— sugestão usada nos torneios</span></label>
+                <input type="number" id="func-diaria-padrao" class="inp" value="0" step="0.01" min="0">
+            </div>
+            <div>
+                <label class="inp-label">Observações (opcional)</label>
+                <textarea id="func-obs" class="inp" rows="2" style="resize:vertical;font-family:inherit;" placeholder="Informações adicionais..."></textarea>
+            </div>
+            <div style="display:flex;gap:.5rem;justify-content:space-between;align-items:center;margin-top:.5rem;">
+                <button id="func-btn-deletar" onclick="deletarFuncionarioModal()" style="display:none;padding:.6rem 1rem;background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,.3);border-radius:.5rem;font-size:.8rem;cursor:pointer;font-weight:600;">
+                    <i class="fa-solid fa-trash"></i> Deletar
+                </button>
+                <div style="display:flex;gap:.5rem;margin-left:auto;">
+                    <button onclick="closeModal('modal-funcionario')" class="btn-ghost" style="padding:.7rem 1.25rem;border-radius:.5rem;font-size:.85rem;">Cancelar</button>
+                    <button onclick="salvarFuncionarioModal()" class="btn-gold" style="padding:.7rem 1.5rem;border-radius:.5rem;font-weight:700;font-size:.85rem;">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: ELIMINAR -->
 <div id="modal-eliminar" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
@@ -3461,6 +3691,10 @@ let fechamentos= JSON.parse(localStorage.getItem('ps_fechamentos')) || [];
 let barCaixa   = JSON.parse(localStorage.getItem('ps_bar_caixa'))   || { status:'fechado', abertoEm:null, abertoPor:null, historico:[] };
 let rankings   = JSON.parse(localStorage.getItem('ps_rankings'))    || [];
 let auditoria  = (function(){ try { return JSON.parse(localStorage.getItem('ps_auditoria')) || []; } catch(e){ return []; } })();
+// FUNCIONÁRIOS / DEALERS (Etapa Extra)
+let funcionarios   = JSON.parse(localStorage.getItem('ps_funcionarios'))   || [];
+let torneioDealers = JSON.parse(localStorage.getItem('ps_torneio_dealers'))|| [];
+let torneioCapiles = JSON.parse(localStorage.getItem('ps_torneio_capiles'))|| [];
 // Denominações de fichas padrão do clube (editável em Configurações)
 let fichasDenominacoes = JSON.parse(localStorage.getItem('ps_fichas_denom')) || [
     { valor:25,    cor:'#22c55e', nome:'Verde'   },
@@ -3513,7 +3747,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','config','relatorios','assinatura'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','usuarios','funcionarios','config','relatorios','assinatura'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
@@ -4328,6 +4562,7 @@ function _torneioToDb(t) {
         jackpot_fichas: t.jackpotFichas || 0,
         bounty_valor: t.bountyValor || 0,
         bounty_ko_split: t.bountyKoSplit || 50,
+        capile_modo: t.capileModo || 'pote',
         ranking_id: t.rankingId || null,
         ranking_rake_pct: t.rankingRakePct || 0,
         blinds: t.blinds || [],
@@ -4750,6 +4985,50 @@ async function carregarEstadoDoSupabase() {
             transacoes = txRows.map(_transacaoFromDb);
             localStorage.setItem('ps_transacoes', JSON.stringify(transacoes));
         }
+        
+        // === FUNCIONÁRIOS ===
+        if (typeof funcionarios !== 'undefined') {
+            try {
+                const { data: fRows } = await sb.from('funcionarios')
+                    .select('*')
+                    .eq('clube_id', clubeIdEsperado)
+                    .order('nome');
+                if (fRows) {
+                    funcionarios = fRows.map(_funcionarioFromDb);
+                    localStorage.setItem('ps_funcionarios', JSON.stringify(funcionarios));
+                }
+            } catch(e) { console.warn('[FUNCIONARIOS] erro carregar:', e); }
+        }
+        
+        // === TORNEIO DEALERS (vínculo dealer ↔ torneio) ===
+        if (typeof torneioDealers !== 'undefined' && torneios.length) {
+            try {
+                const torneioIds = torneios.map(t => t.id);
+                const { data: tdRows } = await sb.from('torneio_dealers')
+                    .select('*')
+                    .in('torneio_id', torneioIds)
+                    .eq('clube_id', clubeIdEsperado);
+                if (tdRows) {
+                    torneioDealers = tdRows.map(_torneioDealerFromDb);
+                    localStorage.setItem('ps_torneio_dealers', JSON.stringify(torneioDealers));
+                }
+            } catch(e) { console.warn('[DEALERS] erro carregar:', e); }
+        }
+        
+        // === TORNEIO CAPILÉS ===
+        if (typeof torneioCapiles !== 'undefined' && torneios.length) {
+            try {
+                const torneioIds = torneios.map(t => t.id);
+                const { data: tcRows } = await sb.from('torneio_capiles')
+                    .select('*')
+                    .in('torneio_id', torneioIds)
+                    .eq('clube_id', clubeIdEsperado);
+                if (tcRows) {
+                    torneioCapiles = tcRows.map(_capileFromDb);
+                    localStorage.setItem('ps_torneio_capiles', JSON.stringify(torneioCapiles));
+                }
+            } catch(e) { console.warn('[CAPILES] erro carregar:', e); }
+        }
 
         console.log(`✅ Estado carregado do Supabase: ${torneios.length} torneios, ${cashMesas?.length||0} mesas, ${barProdutos.length} produtos, ${barComandas.length} comandas`);
     } catch (e) {
@@ -4780,6 +5059,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         addonValor: parseFloat(r.addon_valor || 0),
         addonFichas: r.addon_fichas || 0,
         staffValor: parseFloat(r.staff_valor || 0),
+        capileModo: r.capile_modo || 'pote',
         rebuyValor: parseFloat(r.rebuy_valor || 0),
         rebuyFichas: r.rebuy_fichas || 0,
         rebuyDuploValor: parseFloat(r.rebuy_duplo_valor || 0),
@@ -4892,6 +5172,775 @@ function _transacaoFromDb(r) {
         ts: r.ts ? new Date(r.ts).getTime() : Date.now(),
         operador: r.operador, operadorId: r.operador_id,
     };
+}
+
+// ============================================================
+// CONVERSORES: FUNCIONÁRIOS / DEALERS / CAPILÉS
+// ============================================================
+function _funcionarioToDb(f) {
+    return {
+        id: f.id,
+        clube_id: sbClube ? sbClube.id : null,
+        nome: f.nome,
+        cpf: f.cpf || null,
+        telefone: f.telefone || null,
+        email: f.email || null,
+        cargo: f.cargo || 'outro',
+        diaria_padrao: f.diariaPadrao || 0,
+        observacoes: f.observacoes || null,
+        status: f.status || 'ativo',
+        atualizado_em: new Date().toISOString(),
+    };
+}
+function _funcionarioFromDb(r) {
+    return {
+        id: r.id,
+        nome: r.nome,
+        cpf: r.cpf,
+        telefone: r.telefone,
+        email: r.email,
+        cargo: r.cargo,
+        diariaPadrao: parseFloat(r.diaria_padrao || 0),
+        observacoes: r.observacoes,
+        status: r.status,
+        criadoEm: r.criado_em ? new Date(r.criado_em).getTime() : Date.now(),
+    };
+}
+
+function _torneioDealerToDb(td) {
+    return {
+        id: td.id,
+        torneio_id: td.torneioId,
+        funcionario_id: td.funcionarioId,
+        clube_id: sbClube ? sbClube.id : null,
+        diaria_valor: td.diariaValor || 0,
+        diaria_paga: !!td.diariaPaga,
+        inicio_em: td.inicioEm ? new Date(td.inicioEm).toISOString() : null,
+        fim_em: td.fimEm ? new Date(td.fimEm).toISOString() : null,
+        observacoes: td.observacoes || null,
+        atualizado_em: new Date().toISOString(),
+    };
+}
+function _torneioDealerFromDb(r) {
+    return {
+        id: r.id,
+        torneioId: r.torneio_id,
+        funcionarioId: r.funcionario_id,
+        diariaValor: parseFloat(r.diaria_valor || 0),
+        diariaPaga: !!r.diaria_paga,
+        inicioEm: r.inicio_em ? new Date(r.inicio_em).getTime() : null,
+        fimEm: r.fim_em ? new Date(r.fim_em).getTime() : null,
+        observacoes: r.observacoes,
+        criadoEm: r.criado_em ? new Date(r.criado_em).getTime() : Date.now(),
+    };
+}
+
+function _capileToDb(c) {
+    return {
+        id: c.id,
+        torneio_id: c.torneioId,
+        clube_id: sbClube ? sbClube.id : null,
+        funcionario_id: c.funcionarioId || null,
+        jogador_id: c.jogadorId || null,
+        jogador_nome: c.jogadorNome || null,
+        valor: c.valor || 0,
+        modo: c.modo || 'pote',
+        observacoes: c.observacoes || null,
+    };
+}
+function _capileFromDb(r) {
+    return {
+        id: r.id,
+        torneioId: r.torneio_id,
+        funcionarioId: r.funcionario_id,
+        jogadorId: r.jogador_id,
+        jogadorNome: r.jogador_nome,
+        valor: parseFloat(r.valor || 0),
+        modo: r.modo,
+        observacoes: r.observacoes,
+        criadoEm: r.criado_em ? new Date(r.criado_em).getTime() : Date.now(),
+    };
+}
+
+// ============================================================
+// SYNC: FUNCIONÁRIOS / DEALERS / CAPILÉS (escrita direta no Supabase)
+// ============================================================
+// Como esses dados são pequenos e não-críticos, usamos sync direto (sem fila de markDirty)
+
+async function syncFuncionario(f) {
+    if (!sbClube?.id || !f) return;
+    try {
+        const row = _funcionarioToDb(f);
+        const { error } = await sb.from('funcionarios').upsert(row);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(f.id);
+    } catch(e) { console.error('[FUNCIONARIO sync]', e); throw e; }
+}
+
+async function deleteFuncionario(funcionarioId) {
+    if (!sbClube?.id || !funcionarioId) return;
+    try {
+        const { error } = await sb.from('funcionarios').delete().eq('id', funcionarioId);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(funcionarioId);
+    } catch(e) { console.error('[FUNCIONARIO delete]', e); throw e; }
+}
+
+async function syncTorneioDealer(td) {
+    if (!sbClube?.id || !td) return;
+    try {
+        const row = _torneioDealerToDb(td);
+        const { error } = await sb.from('torneio_dealers').upsert(row);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(td.id);
+    } catch(e) { console.error('[TORNEIO_DEALER sync]', e); throw e; }
+}
+
+async function deleteTorneioDealer(tdId) {
+    if (!sbClube?.id || !tdId) return;
+    try {
+        const { error } = await sb.from('torneio_dealers').delete().eq('id', tdId);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(tdId);
+    } catch(e) { console.error('[TORNEIO_DEALER delete]', e); throw e; }
+}
+
+async function syncCapile(c) {
+    if (!sbClube?.id || !c) return;
+    try {
+        const row = _capileToDb(c);
+        const { error } = await sb.from('torneio_capiles').upsert(row);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+    } catch(e) { console.error('[CAPILE sync]', e); throw e; }
+}
+
+async function deleteCapile(cId) {
+    if (!sbClube?.id || !cId) return;
+    try {
+        const { error } = await sb.from('torneio_capiles').delete().eq('id', cId);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(cId);
+    } catch(e) { console.error('[CAPILE delete]', e); throw e; }
+}
+
+// ============================================================
+// HELPERS: filtrar dealers e capilés por torneio
+// ============================================================
+function getDealersDoTorneio(torneioId) {
+    return torneioDealers.filter(td => td.torneioId === torneioId);
+}
+function getCapilesDoTorneio(torneioId) {
+    return torneioCapiles.filter(c => c.torneioId === torneioId);
+}
+function getFuncionarioById(id) {
+    return funcionarios.find(f => f.id === id) || null;
+}
+
+// Calcular ganhos do dealer em um torneio (diária + capilé proporcional ou direto)
+function calcularGanhosDealerNoTorneio(torneioId, funcionarioId) {
+    const td = torneioDealers.find(d => d.torneioId === torneioId && d.funcionarioId === funcionarioId);
+    const diaria = td ? Number(td.diariaValor || 0) : 0;
+    
+    const torneio = torneios.find(t => t.id === torneioId);
+    const modo = torneio?.capileModo || 'pote';
+    const todosCapiles = getCapilesDoTorneio(torneioId);
+    
+    let capile = 0;
+    if (modo === 'individual') {
+        // Cada capilé já tem o funcionário designado
+        capile = todosCapiles
+            .filter(c => c.funcionarioId === funcionarioId)
+            .reduce((s, c) => s + Number(c.valor), 0);
+    } else {
+        // Pote: dividir total igualmente entre todos os dealers do torneio
+        const totalPote = todosCapiles.reduce((s, c) => s + Number(c.valor), 0);
+        const dealersCount = getDealersDoTorneio(torneioId).length;
+        capile = dealersCount > 0 ? (totalPote / dealersCount) : 0;
+    }
+    
+    return { diaria, capile, total: diaria + capile, diariaPaga: !!td?.diariaPaga };
+}
+
+// ============================================================
+// TELA: FUNCIONÁRIOS (CRUD)
+// ============================================================
+
+const CARGOS_LABELS = {
+    dealer: 'Dealer',
+    gerente: 'Gerente',
+    garcom: 'Garçom',
+    caixa: 'Caixa',
+    recepcao: 'Recepção',
+    outro: 'Outro'
+};
+const CARGOS_CORES = {
+    dealer: '#10b981',     // verde
+    gerente: '#a855f7',    // roxo
+    garcom: '#f59e0b',     // amarelo
+    caixa: '#3b82f6',      // azul
+    recepcao: '#ec4899',   // rosa
+    outro: '#71717a'       // cinza
+};
+const CARGOS_ICONS = {
+    dealer: 'fa-spade',
+    gerente: 'fa-user-tie',
+    garcom: 'fa-utensils',
+    caixa: 'fa-cash-register',
+    recepcao: 'fa-headset',
+    outro: 'fa-user'
+};
+
+function renderFuncionarios() {
+    const lista = document.getElementById('lista-funcionarios');
+    if (!lista) return;
+    
+    const busca = (document.getElementById('filtro-funcionario-busca')?.value || '').toLowerCase().trim();
+    const cargoFiltro = document.getElementById('filtro-funcionario-cargo')?.value || '';
+    const statusFiltro = document.getElementById('filtro-funcionario-status')?.value;
+    
+    let filtrados = [...funcionarios];
+    if (busca) filtrados = filtrados.filter(f => (f.nome || '').toLowerCase().includes(busca));
+    if (cargoFiltro) filtrados = filtrados.filter(f => f.cargo === cargoFiltro);
+    if (statusFiltro) filtrados = filtrados.filter(f => f.status === statusFiltro);
+    
+    if (filtrados.length === 0) {
+        lista.innerHTML = `<div style="grid-column:1/-1;padding:3rem;text-align:center;color:#71717a;background:#0f0f12;border:1px dashed #27272a;border-radius:.75rem;">
+            <i class="fa-solid fa-id-card-clip" style="font-size:2rem;color:#3f3f46;margin-bottom:.75rem;"></i>
+            <div style="font-size:.95rem;font-weight:600;margin-bottom:.25rem;">${funcionarios.length === 0 ? 'Nenhum funcionário cadastrado' : 'Nenhum funcionário encontrado'}</div>
+            <div style="font-size:.8rem;">${funcionarios.length === 0 ? 'Click em "Novo Funcionário" para começar' : 'Tente outro filtro'}</div>
+        </div>`;
+        return;
+    }
+    
+    lista.innerHTML = filtrados.map(f => {
+        const cor = CARGOS_CORES[f.cargo] || '#71717a';
+        const icon = CARGOS_ICONS[f.cargo] || 'fa-user';
+        const inativo = f.status === 'inativo';
+        return `<div onclick="abrirModalFuncionario('${f.id}')" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.75rem;padding:1.1rem 1.2rem;cursor:pointer;transition:all .15s;${inativo?'opacity:.55;':''}" onmouseover="this.style.borderColor='${cor}'" onmouseout="this.style.borderColor='#1e1e23'">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;margin-bottom:.4rem;">
+                <div style="display:flex;align-items:center;gap:.6rem;flex:1;min-width:0;">
+                    <div style="width:38px;height:38px;border-radius:50%;background:${cor}22;color:${cor};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
+                        <i class="fa-solid ${icon}"></i>
+                    </div>
+                    <div style="min-width:0;flex:1;">
+                        <div style="font-weight:700;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(f.nome)}</div>
+                        <div style="font-size:.7rem;color:${cor};font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:.15rem;">${CARGOS_LABELS[f.cargo] || f.cargo}</div>
+                    </div>
+                </div>
+                ${inativo?'<span style="font-size:.6rem;color:#71717a;background:#27272a;padding:.15rem .4rem;border-radius:.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Inativo</span>':''}
+            </div>
+            ${f.telefone || f.cpf ? `<div style="font-size:.75rem;color:#a1a1aa;margin-top:.4rem;display:flex;flex-direction:column;gap:.2rem;">
+                ${f.telefone?`<div><i class="fa-solid fa-phone" style="color:#52525b;margin-right:.35rem;width:12px;"></i>${escapeHtml(f.telefone)}</div>`:''}
+                ${f.cpf?`<div><i class="fa-solid fa-id-card" style="color:#52525b;margin-right:.35rem;width:12px;"></i>${escapeHtml(f.cpf)}</div>`:''}
+            </div>`:''}
+            ${f.diariaPadrao>0?`<div style="font-size:.75rem;color:var(--gold);margin-top:.4rem;font-weight:700;">
+                <i class="fa-solid fa-money-bill-wave" style="margin-right:.35rem;"></i>Diária: R$ ${Number(f.diariaPadrao).toFixed(2).replace('.',',')}
+            </div>`:''}
+        </div>`;
+    }).join('');
+}
+
+function abrirModalFuncionario(id) {
+    const editando = !!id;
+    const f = id ? getFuncionarioById(id) : null;
+    
+    document.getElementById('modal-func-titulo').innerHTML = editando 
+        ? '<i class="fa-solid fa-pen" style="color:var(--gold);"></i> Editar Funcionário'
+        : '<i class="fa-solid fa-id-card-clip" style="color:var(--gold);"></i> Novo Funcionário';
+    
+    document.getElementById('func-id').value = id || '';
+    document.getElementById('func-nome').value = f?.nome || '';
+    document.getElementById('func-cargo').value = f?.cargo || 'dealer';
+    document.getElementById('func-status').value = f?.status || 'ativo';
+    document.getElementById('func-cpf').value = f?.cpf || '';
+    document.getElementById('func-telefone').value = f?.telefone || '';
+    document.getElementById('func-email').value = f?.email || '';
+    document.getElementById('func-diaria-padrao').value = f?.diariaPadrao || 0;
+    document.getElementById('func-obs').value = f?.observacoes || '';
+    
+    document.getElementById('func-btn-deletar').style.display = editando ? 'block' : 'none';
+    
+    openModal('modal-funcionario');
+    setTimeout(() => document.getElementById('func-nome').focus(), 100);
+}
+
+async function salvarFuncionarioModal() {
+    const id = document.getElementById('func-id').value || _genUuid();
+    const editando = !!document.getElementById('func-id').value;
+    
+    const nome = document.getElementById('func-nome').value.trim();
+    if (!nome) { showToast('⚠️ Nome é obrigatório'); return; }
+    
+    const obj = {
+        id,
+        nome,
+        cargo: document.getElementById('func-cargo').value,
+        status: document.getElementById('func-status').value,
+        cpf: document.getElementById('func-cpf').value.trim() || null,
+        telefone: document.getElementById('func-telefone').value.trim() || null,
+        email: document.getElementById('func-email').value.trim() || null,
+        diariaPadrao: parseFloat(document.getElementById('func-diaria-padrao').value) || 0,
+        observacoes: document.getElementById('func-obs').value.trim() || null,
+        criadoEm: editando ? (getFuncionarioById(id)?.criadoEm || Date.now()) : Date.now(),
+    };
+    
+    // Atualiza cache local primeiro (otimista)
+    if (editando) {
+        const idx = funcionarios.findIndex(x => x.id === id);
+        if (idx >= 0) funcionarios[idx] = obj;
+        else funcionarios.push(obj);
+    } else {
+        funcionarios.push(obj);
+    }
+    localStorage.setItem('ps_funcionarios', JSON.stringify(funcionarios));
+    
+    try {
+        await syncFuncionario(obj);
+        if (typeof logAudit === 'function') logAudit(editando ? 'FUNC_EDIT' : 'FUNC_NEW', `${editando?'Editou':'Criou'} funcionário ${nome}`);
+        showToast(`✓ Funcionário ${editando ? 'atualizado' : 'cadastrado'}!`);
+        closeModal('modal-funcionario');
+        renderFuncionarios();
+    } catch(e) {
+        showToast('⚠️ Erro ao salvar: ' + (e.message || e));
+    }
+}
+
+async function deletarFuncionarioModal() {
+    const id = document.getElementById('func-id').value;
+    if (!id) return;
+    const f = getFuncionarioById(id);
+    if (!f) return;
+    
+    // Verificar se este funcionário está vinculado a algum torneio
+    const vinculos = torneioDealers.filter(td => td.funcionarioId === id).length;
+    
+    let msg = `Tem certeza que deseja DELETAR o funcionário "${f.nome}"?`;
+    if (vinculos > 0) {
+        msg += `\n\n⚠️ Este funcionário está vinculado a ${vinculos} torneio(s). Os vínculos serão removidos permanentemente.`;
+    }
+    msg += '\n\nEsta ação não pode ser desfeita.';
+    
+    if (!confirm(msg)) return;
+    
+    funcionarios = funcionarios.filter(x => x.id !== id);
+    torneioDealers = torneioDealers.filter(td => td.funcionarioId !== id);
+    localStorage.setItem('ps_funcionarios', JSON.stringify(funcionarios));
+    localStorage.setItem('ps_torneio_dealers', JSON.stringify(torneioDealers));
+    
+    try {
+        await deleteFuncionario(id);
+        if (typeof logAudit === 'function') logAudit('FUNC_DELETE', `Deletou funcionário ${f.nome}`);
+        showToast('✓ Funcionário removido');
+        closeModal('modal-funcionario');
+        renderFuncionarios();
+    } catch(e) {
+        showToast('⚠️ Erro: ' + (e.message || e));
+    }
+}
+
+// ============================================================
+// ABA DEALERS NO TORNEIO
+// ============================================================
+
+function renderTabDealers() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    // Modo de capilé
+    const select = document.getElementById('capile-modo-select');
+    if (select) select.value = t.capileModo || 'pote';
+    
+    // Lista de dealers do torneio
+    const container = document.getElementById('lista-dealers-torneio');
+    const dealers = getDealersDoTorneio(t.id);
+    
+    if (!container) return;
+    
+    if (dealers.length === 0) {
+        container.innerHTML = `<div style="padding:1.5rem;text-align:center;color:#71717a;background:#0a0a0c;border:1px dashed #27272a;border-radius:.5rem;font-size:.85rem;">
+            <i class="fa-solid fa-spade" style="font-size:1.5rem;color:#3f3f46;margin-bottom:.5rem;display:block;"></i>
+            Nenhum dealer vinculado. Click em <strong>Adicionar Dealer</strong> para começar.
+        </div>`;
+    } else {
+        container.innerHTML = dealers.map(td => {
+            const f = getFuncionarioById(td.funcionarioId);
+            if (!f) return '';
+            const cor = CARGOS_CORES[f.cargo] || '#71717a';
+            return `<div onclick="abrirModalAdicionarDealer('${td.id}')" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.75rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.75rem;transition:all .15s;" onmouseover="this.style.borderColor='${cor}'" onmouseout="this.style.borderColor='#1e1e23'">
+                <div style="width:32px;height:32px;border-radius:50%;background:${cor}22;color:${cor};display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;">
+                    <i class="fa-solid ${CARGOS_ICONS[f.cargo] || 'fa-user'}"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:.9rem;">${escapeHtml(f.nome)}</div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.1rem;">
+                        Diária: <span style="color:var(--gold);font-weight:700;">R$ ${Number(td.diariaValor).toFixed(2).replace('.',',')}</span>
+                        ${td.diariaPaga ? '<span style="color:#10b981;margin-left:.5rem;"><i class="fa-solid fa-check-circle"></i> Paga</span>' : ''}
+                    </div>
+                </div>
+                <i class="fa-solid fa-chevron-right" style="color:#52525b;font-size:.7rem;"></i>
+            </div>`;
+        }).join('');
+    }
+    
+    // Lista de capilés
+    renderCapilesTorneio();
+    // Resumo de ganhos
+    renderResumoDealers();
+}
+
+function renderCapilesTorneio() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const container = document.getElementById('lista-capiles-torneio');
+    if (!container) return;
+    
+    const capiles = getCapilesDoTorneio(t.id);
+    const totalCapile = capiles.reduce((s, c) => s + Number(c.valor), 0);
+    
+    if (capiles.length === 0) {
+        container.innerHTML = `<div style="padding:1rem;text-align:center;color:#71717a;background:#0a0a0c;border:1px dashed #27272a;border-radius:.5rem;font-size:.8rem;">
+            Nenhum capilé registrado neste torneio.
+        </div>`;
+    } else {
+        container.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .85rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:.4rem;margin-bottom:.4rem;">
+                <span style="font-size:.7rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Total arrecadado</span>
+                <span style="font-size:1.1rem;color:var(--gold);font-weight:800;font-family:monospace;">R$ ${totalCapile.toFixed(2).replace('.',',')}</span>
+            </div>
+            ${capiles.slice().reverse().map(c => {
+                const f = c.funcionarioId ? getFuncionarioById(c.funcionarioId) : null;
+                const dt = new Date(c.criadoEm).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+                return `<div style="background:#0a0a0c;border:1px solid #1e1e23;border-radius:.4rem;padding:.55rem .85rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;font-size:.8rem;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;color:var(--gold);font-family:monospace;">R$ ${Number(c.valor).toFixed(2).replace('.',',')}</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">
+                            ${f ? '<span style="color:#a1a1aa;">→ ' + escapeHtml(f.nome) + '</span>' : '<span style="color:#52525b;">Pote</span>'}
+                            ${c.jogadorNome ? ' · de ' + escapeHtml(c.jogadorNome) : ''}
+                            · ${dt}
+                        </div>
+                        ${c.observacoes ? '<div style="font-size:.7rem;color:#52525b;margin-top:.15rem;font-style:italic;">"' + escapeHtml(c.observacoes) + '"</div>' : ''}
+                    </div>
+                    <button onclick="deletarCapileLine('${c.id}')" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.3rem;font-size:.85rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'" title="Remover capilé">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>`;
+            }).join('')}
+        `;
+    }
+}
+
+function renderResumoDealers() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const container = document.getElementById('resumo-dealers-torneio');
+    if (!container) return;
+    
+    const dealers = getDealersDoTorneio(t.id);
+    if (dealers.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const linhas = dealers.map(td => {
+        const f = getFuncionarioById(td.funcionarioId);
+        if (!f) return '';
+        const ganhos = calcularGanhosDealerNoTorneio(t.id, td.funcionarioId);
+        return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.75rem;align-items:center;padding:.55rem .85rem;border-bottom:1px solid #1e1e23;font-size:.85rem;">
+            <div style="font-weight:700;">${escapeHtml(f.nome)}</div>
+            <div style="font-family:monospace;color:#a1a1aa;font-size:.8rem;">Diária R$ ${ganhos.diaria.toFixed(2).replace('.',',')}</div>
+            <div style="font-family:monospace;color:#a1a1aa;font-size:.8rem;">Capilé R$ ${ganhos.capile.toFixed(2).replace('.',',')}</div>
+            <div style="font-family:monospace;color:var(--gold);font-weight:800;">R$ ${ganhos.total.toFixed(2).replace('.',',')}</div>
+        </div>`;
+    }).join('');
+    
+    const totalGeral = dealers.reduce((s, td) => s + calcularGanhosDealerNoTorneio(t.id, td.funcionarioId).total, 0);
+    
+    container.innerHTML = `<div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.75rem;overflow:hidden;">
+        <div style="padding:.85rem 1rem;background:rgba(245,158,11,.05);border-bottom:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:.7rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;"><i class="fa-solid fa-receipt"></i> Resumo de Ganhos</div>
+            <div style="font-size:.95rem;font-weight:800;color:var(--gold);font-family:monospace;">Total: R$ ${totalGeral.toFixed(2).replace('.',',')}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.75rem;padding:.5rem .85rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;border-bottom:1px solid #1e1e23;">
+            <div>Dealer</div>
+            <div style="text-align:right;">Diária</div>
+            <div style="text-align:right;">Capilé</div>
+            <div style="text-align:right;">Total</div>
+        </div>
+        ${linhas}
+    </div>`;
+}
+
+async function alterarCapileModo() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const novoModo = document.getElementById('capile-modo-select').value;
+    
+    // Se há capilés individuais e mudou pra pote, avisar
+    const capiles = getCapilesDoTorneio(t.id);
+    const temIndividual = capiles.some(c => c.funcionarioId);
+    if (novoModo === 'pote' && temIndividual) {
+        if (!confirm('⚠️ Você tem capilés individuais registrados. Mudar pra "Pote" vai dividir todos eles igualmente entre os dealers do torneio.\n\nContinuar?')) {
+            document.getElementById('capile-modo-select').value = t.capileModo || 'pote';
+            return;
+        }
+    }
+    
+    t.capileModo = novoModo;
+    if (typeof _markDirty === 'function') _markDirty('torneios', t.id);
+    saveData();
+    renderTabDealers();
+    showToast(`✓ Modo de capilé: ${novoModo === 'pote' ? 'Pote' : 'Individual'}`);
+}
+
+function abrirModalAdicionarDealer(id) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const editando = !!id;
+    const td = id ? torneioDealers.find(d => d.id === id) : null;
+    
+    document.getElementById('dealer-torneio-titulo').innerHTML = editando 
+        ? '<i class="fa-solid fa-pen" style="color:var(--gold);"></i> Editar Dealer'
+        : '<i class="fa-solid fa-spade" style="color:var(--gold);"></i> Adicionar Dealer';
+    document.getElementById('td-id').value = id || '';
+    
+    // Popular select com funcionários ativos NÃO já vinculados (a menos que esteja editando)
+    const sel = document.getElementById('td-funcionario');
+    const dealersDoTorn = getDealersDoTorneio(t.id);
+    const idsVinculados = new Set(dealersDoTorn.map(d => d.funcionarioId));
+    
+    sel.innerHTML = '<option value="">Selecione um funcionário ativo...</option>';
+    funcionarios
+        .filter(f => f.status === 'ativo')
+        .filter(f => !idsVinculados.has(f.id) || (editando && td && f.id === td.funcionarioId))
+        .forEach(f => {
+            sel.innerHTML += `<option value="${f.id}" data-diaria="${f.diariaPadrao || 0}">${escapeHtml(f.nome)} (${CARGOS_LABELS[f.cargo] || f.cargo})</option>`;
+        });
+    
+    if (editando && td) {
+        sel.value = td.funcionarioId;
+        sel.disabled = true;
+        document.getElementById('td-diaria-valor').value = td.diariaValor || 0;
+        document.getElementById('td-diaria-paga').checked = !!td.diariaPaga;
+        document.getElementById('td-obs').value = td.observacoes || '';
+        document.getElementById('td-btn-deletar').style.display = 'block';
+    } else {
+        sel.disabled = false;
+        document.getElementById('td-diaria-valor').value = 0;
+        document.getElementById('td-diaria-paga').checked = false;
+        document.getElementById('td-obs').value = '';
+        document.getElementById('td-btn-deletar').style.display = 'none';
+    }
+    
+    openModal('modal-dealer-torneio');
+}
+
+function onSelecionarDealerNoTorneio() {
+    const sel = document.getElementById('td-funcionario');
+    const opt = sel.options[sel.selectedIndex];
+    const diariaPadrao = opt?.getAttribute('data-diaria') || 0;
+    if (diariaPadrao > 0 && !document.getElementById('td-id').value) {
+        // Sugerir diária padrão se for novo
+        document.getElementById('td-diaria-valor').value = diariaPadrao;
+    }
+}
+
+async function salvarDealerNoTorneio() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    const id = document.getElementById('td-id').value || _genUuid();
+    const editando = !!document.getElementById('td-id').value;
+    const funcionarioId = document.getElementById('td-funcionario').value;
+    
+    if (!funcionarioId) { showToast('⚠️ Selecione um funcionário'); return; }
+    
+    const td = {
+        id,
+        torneioId: t.id,
+        funcionarioId,
+        diariaValor: parseFloat(document.getElementById('td-diaria-valor').value) || 0,
+        diariaPaga: document.getElementById('td-diaria-paga').checked,
+        observacoes: document.getElementById('td-obs').value.trim() || null,
+        criadoEm: editando ? (torneioDealers.find(x => x.id === id)?.criadoEm || Date.now()) : Date.now(),
+    };
+    
+    if (editando) {
+        const idx = torneioDealers.findIndex(x => x.id === id);
+        if (idx >= 0) torneioDealers[idx] = td;
+    } else {
+        torneioDealers.push(td);
+    }
+    localStorage.setItem('ps_torneio_dealers', JSON.stringify(torneioDealers));
+    
+    try {
+        await syncTorneioDealer(td);
+        const f = getFuncionarioById(funcionarioId);
+        if (typeof logAudit === 'function') logAudit('DEALER_TORNEIO', `${editando?'Editou':'Adicionou'} dealer ${f?.nome || ''} no torneio ${t.nome}`);
+        showToast(`✓ Dealer ${editando?'atualizado':'adicionado'}!`);
+        closeModal('modal-dealer-torneio');
+        renderTabDealers();
+    } catch(e) {
+        showToast('⚠️ Erro: ' + (e.message || e));
+    }
+}
+
+async function removerDealerDoTorneioModal() {
+    const id = document.getElementById('td-id').value;
+    if (!id) return;
+    const td = torneioDealers.find(x => x.id === id);
+    if (!td) return;
+    const f = getFuncionarioById(td.funcionarioId);
+    
+    if (!confirm(`Remover ${f?.nome || 'este dealer'} do torneio?`)) return;
+    
+    torneioDealers = torneioDealers.filter(x => x.id !== id);
+    localStorage.setItem('ps_torneio_dealers', JSON.stringify(torneioDealers));
+    
+    try {
+        await deleteTorneioDealer(id);
+        showToast('✓ Dealer removido do torneio');
+        closeModal('modal-dealer-torneio');
+        renderTabDealers();
+    } catch(e) {
+        showToast('⚠️ Erro: ' + (e.message || e));
+    }
+}
+
+function abrirModalRegistrarCapile() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    const modo = t.capileModo || 'pote';
+    const wrapFunc = document.getElementById('cap-funcionario-wrap');
+    const infoModo = document.getElementById('cap-info-modo');
+    
+    if (modo === 'individual') {
+        // Mostrar select de dealer
+        wrapFunc.style.display = 'block';
+        const sel = document.getElementById('cap-funcionario');
+        const dealers = getDealersDoTorneio(t.id);
+        sel.innerHTML = '<option value="">Selecione...</option>';
+        dealers.forEach(td => {
+            const f = getFuncionarioById(td.funcionarioId);
+            if (f) sel.innerHTML += `<option value="${f.id}">${escapeHtml(f.nome)}</option>`;
+        });
+        if (dealers.length === 0) {
+            showToast('⚠️ Adicione dealers no torneio primeiro');
+            return;
+        }
+        infoModo.style.background = 'rgba(59,130,246,.08)';
+        infoModo.style.border = '1px solid rgba(59,130,246,.2)';
+        infoModo.style.color = '#93c5fd';
+        infoModo.innerHTML = '<i class="fa-solid fa-circle-info"></i> Modo <strong>individual</strong>: capilé vai direto pro dealer selecionado.';
+    } else {
+        wrapFunc.style.display = 'none';
+        infoModo.style.background = 'rgba(245,158,11,.05)';
+        infoModo.style.border = '1px solid rgba(245,158,11,.2)';
+        infoModo.style.color = 'var(--gold)';
+        infoModo.innerHTML = '<i class="fa-solid fa-circle-info"></i> Modo <strong>pote</strong>: capilé entra no pote do torneio (dividido igualmente entre os dealers).';
+    }
+    
+    document.getElementById('cap-id').value = '';
+    document.getElementById('cap-valor').value = '';
+    document.getElementById('cap-jogador-nome').value = '';
+    document.getElementById('cap-obs').value = '';
+    
+    openModal('modal-capile');
+    setTimeout(() => document.getElementById('cap-valor').focus(), 100);
+}
+
+async function salvarCapile() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    const valor = parseFloat(document.getElementById('cap-valor').value);
+    if (!valor || valor <= 0) { showToast('⚠️ Informe um valor válido'); return; }
+    
+    const modo = t.capileModo || 'pote';
+    let funcionarioId = null;
+    if (modo === 'individual') {
+        funcionarioId = document.getElementById('cap-funcionario').value;
+        if (!funcionarioId) { showToast('⚠️ Selecione o dealer beneficiário'); return; }
+    }
+    
+    const capile = {
+        id: _genUuid(),
+        torneioId: t.id,
+        funcionarioId,
+        jogadorId: null,
+        jogadorNome: document.getElementById('cap-jogador-nome').value.trim() || null,
+        valor,
+        modo,
+        observacoes: document.getElementById('cap-obs').value.trim() || null,
+        criadoEm: Date.now(),
+    };
+    
+    torneioCapiles.push(capile);
+    localStorage.setItem('ps_torneio_capiles', JSON.stringify(torneioCapiles));
+    
+    try {
+        await syncCapile(capile);
+        if (typeof logAudit === 'function') logAudit('CAPILE_NEW', `Capilé R$ ${valor.toFixed(2)} no torneio ${t.nome}`);
+        showToast(`✓ Capilé R$ ${valor.toFixed(2).replace('.',',')} registrado`);
+        closeModal('modal-capile');
+        renderTabDealers();
+    } catch(e) {
+        showToast('⚠️ Erro: ' + (e.message || e));
+    }
+}
+
+// ============================================================
+// COMPARTILHAR LINK PÚBLICO DO TORNEIO
+// ============================================================
+
+function _gerarUrlPublicaTorneio() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !sbClube?.id) return null;
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/torneio?clube=${sbClube.id}&id=${t.id}`;
+}
+
+async function copiarLinkRanking() {
+    const url = _gerarUrlPublicaTorneio();
+    if (!url) return showToast('⚠️ Não foi possível gerar o link');
+    
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('✓ Link copiado! Cole onde quiser compartilhar.', 2500);
+    } catch(e) {
+        // Fallback antigo
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast('✓ Link copiado!'); }
+        catch { prompt('Copie o link:', url); }
+        document.body.removeChild(ta);
+    }
+}
+
+function compartilharWhatsApp() {
+    const t = torneios[activeTorneioIdx];
+    const url = _gerarUrlPublicaTorneio();
+    if (!url || !t) return showToast('⚠️ Não foi possível gerar o link');
+    
+    const ativos = (t.entries || []).length - (t.eliminados || []).length;
+    const totalEntries = (t.entries || []).length;
+    const buyin = Number(t.buyin || 0);
+    const rakePct = Number(t.rake || 0);
+    const prizePool = totalEntries * buyin * (1 - rakePct/100);
+    
+    let msg = `🏆 *${t.nome}*\n\n`;
+    if (sbClube?.nome) msg += `🎰 ${sbClube.nome}\n\n`;
+    msg += `📊 Status atualizado:\n`;
+    msg += `• ${totalEntries} inscritos\n`;
+    msg += `• ${ativos} ainda na disputa\n`;
+    if (prizePool > 0) msg += `• Prize Pool: R$ ${prizePool.toFixed(2).replace('.', ',')}\n`;
+    msg += `\n🔗 Veja o ranking completo ao vivo:\n${url}`;
+    
+    const wppUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(wppUrl, '_blank', 'noopener,noreferrer');
 }
 
 
@@ -8351,6 +9400,7 @@ function showPage(page) {
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
     if (page === 'usuarios')  renderUsuarios();
+    if (page === 'funcionarios') renderFuncionarios();
     if (page === 'config')    renderConfig();
     if (page === 'assinatura') renderAssinatura();
     if (page === 'caixa')     renderCaixa();
@@ -8374,6 +9424,7 @@ function switchTab(tabId, btn) {
     if (tabId === 'tab-mesas')     renderTabMesas();
     if (tabId === 'tab-financeiro') renderTabFinanceiro();
     if (tabId === 'tab-blinds')    renderTabBlinds();
+    if (tabId === 'tab-dealers')   renderTabDealers();
 }
 
 // ============================================================

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ranking do Torneio · StackOS</title>
+<meta name="description" content="Ranking ao vivo do torneio">
+<meta property="og:title" content="Ranking do Torneio">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root {
+  --bg: #050605;
+  --bg-card: #0f1410;
+  --gold: #d4af37;
+  --gold-light: #f4d76e;
+  --text: #f5e6c8;
+  --text-muted: #6b7261;
+  --border: rgba(212,175,55,.15);
+  --green: #10b981;
+  --red: #dc2626;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Manrope', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  background-image: 
+    radial-gradient(ellipse at top, rgba(19, 55, 32, 0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at bottom right, rgba(212, 175, 55, 0.05) 0%, transparent 50%);
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+/* === HEADER === */
+.tour-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.club-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.club-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--gold);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.club-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.club-logo i {
+  font-size: 1.5rem;
+  color: var(--gold);
+}
+.club-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: left;
+}
+.club-tagline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-top: 0.15rem;
+}
+
+.tour-name {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(120deg, var(--text) 30%, var(--gold) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.tour-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.4rem;
+  font-weight: 700;
+}
+.tour-status.em_andamento {
+  background: rgba(16,185,129,.15);
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+.tour-status.encerrado {
+  background: rgba(212,175,55,.15);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+}
+.tour-status.aguardando, .tour-status.agendado {
+  background: rgba(107,114,97,.15);
+  color: var(--text-muted);
+  border: 1px solid var(--text-muted);
+}
+
+.live-dot {
+  width: 8px; height: 8px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* === STATS GRID === */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.85rem 0.5rem;
+  text-align: center;
+}
+.stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+.stat-value.gold { color: var(--gold); }
+
+/* === TABLES === */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0 0.5rem;
+}
+.section-title {
+  font-size: 0.7rem;
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.section-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.table-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+.row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(212,175,55,.05);
+  font-size: 0.95rem;
+}
+.row:last-child { border-bottom: none; }
+.row.top1 {
+  background: linear-gradient(90deg, rgba(212,175,55,.15), transparent);
+}
+
+.rank {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-align: center;
+}
+.rank.top1 { color: var(--gold); font-size: 1.3rem; }
+.rank.top2 { color: #d3d3d3; }
+.rank.top3 { color: #cd7f32; }
+.player-name {
+  font-weight: 700;
+}
+.player-name.eliminated {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.player-extras {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.player-prize {
+  color: var(--gold);
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* === LOADING/ERROR === */
+.fullscreen {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-icon {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: rgba(220,38,38,.15);
+  color: var(--red);
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* === FOOTER === */
+.footer {
+  text-align: center;
+  padding: 2rem 1rem 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.footer .gold { color: var(--gold); font-weight: 700; }
+.footer a { color: inherit; text-decoration: none; }
+.footer a:hover { color: var(--gold); }
+
+</style>
+</head>
+<body>
+
+<div id="screen-loading" class="fullscreen">
+  <div class="spinner"></div>
+  <p style="color: var(--text-muted);">Carregando ranking...</p>
+</div>
+
+<div id="screen-error" class="fullscreen" style="display:none;">
+  <div class="error-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+  <h1 style="font-size:1.5rem;margin-bottom:0.5rem;">Não foi possível carregar</h1>
+  <p id="error-msg" style="color: var(--text-muted);max-width:400px;line-height:1.5;">URL inválida ou torneio inexistente.</p>
+</div>
+
+<div id="screen-content" class="container" style="display:none;">
+  
+  <!-- HEADER -->
+  <div class="tour-header">
+    <div class="club-row">
+      <div class="club-logo">
+        <img id="club-logo-img" src="" alt="" style="display:none;">
+        <i id="club-logo-fallback" class="fa-solid fa-trophy"></i>
+      </div>
+      <div>
+        <div class="club-tagline">Ranking ao vivo</div>
+        <div class="club-name" id="club-name">—</div>
+      </div>
+    </div>
+    
+    <h1 class="tour-name" id="tour-name">—</h1>
+    <div id="tour-status-wrap"></div>
+  </div>
+  
+  <!-- STATS -->
+  <div class="stats-grid" id="stats-grid"></div>
+  
+  <!-- ATIVOS -->
+  <div class="section-header">
+    <div class="section-title"><i class="fa-solid fa-users" style="margin-right:0.25rem;"></i>Jogadores Ativos</div>
+    <div class="section-count" id="ativos-count">0</div>
+  </div>
+  <div class="table-panel" id="ativos-panel"></div>
+  
+  <!-- PREMIADOS -->
+  <div class="section-header">
+    <div class="section-title"><i class="fa-solid fa-medal" style="color:#cd7f32;margin-right:0.25rem;"></i>Premiados</div>
+    <div class="section-count" id="premiados-count">0</div>
+  </div>
+  <div class="table-panel" id="premiados-panel"></div>
+  
+  <!-- FOOTER -->
+  <div class="footer">
+    Atualizado em <span id="updated-at">—</span><br><br>
+    Powered by <a href="/" class="gold">StackOS</a> · Sistema de gestão para clubes de poker
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
+
+const params = new URLSearchParams(window.location.search);
+const clubeId = params.get('clube');
+const torneioId = params.get('id');
+
+const STATUS_LABEL = {
+  aguardando: 'Aguardando início',
+  agendado: 'Agendado',
+  em_andamento: 'Em andamento',
+  encerrado: 'Encerrado',
+  pausado: 'Pausado',
+};
+
+window.addEventListener('DOMContentLoaded', boot);
+
+async function boot() {
+  if (!clubeId || !torneioId) {
+    return mostrarErro('Link inválido. Use o link compartilhado pelo clube.');
+  }
+  await carregarRanking();
+  // Atualizar a cada 30 segundos
+  setInterval(carregarRanking, 30000);
+}
+
+async function carregarRanking() {
+  try {
+    const { data, error } = await sb.rpc('publico_torneio_ranking', {
+      p_clube_id: clubeId,
+      p_torneio_id: torneioId,
+    });
+    if (error) throw error;
+    if (!data || data.erro) {
+      return mostrarErro('Torneio não encontrado. Verifique o link com o clube.');
+    }
+    renderizar(data);
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('screen-content').style.display = 'block';
+  } catch(e) {
+    console.error('[ranking]', e);
+    mostrarErro('Erro ao carregar dados. Tente novamente em alguns segundos.');
+  }
+}
+
+function mostrarErro(msg) {
+  document.getElementById('screen-loading').style.display = 'none';
+  document.getElementById('screen-content').style.display = 'none';
+  const errEl = document.getElementById('screen-error');
+  errEl.style.display = 'flex';
+  document.getElementById('error-msg').textContent = msg;
+}
+
+function renderizar(data) {
+  const { clube, torneio, entries, eliminados } = data;
+  
+  // Header
+  document.getElementById('club-name').textContent = clube.nome;
+  if (clube.logo_url) {
+    const img = document.getElementById('club-logo-img');
+    img.src = clube.logo_url;
+    img.style.display = 'block';
+    document.getElementById('club-logo-fallback').style.display = 'none';
+  }
+  
+  document.getElementById('tour-name').textContent = torneio.nome;
+  
+  const statusKey = torneio.status || 'aguardando';
+  const statusLabel = STATUS_LABEL[statusKey] || statusKey;
+  const statusHtml = `<span class="tour-status ${statusKey}">
+    ${statusKey === 'em_andamento' ? '<span class="live-dot"></span>' : ''}
+    ${statusLabel}
+  </span>`;
+  document.getElementById('tour-status-wrap').innerHTML = statusHtml;
+  
+  // Stats
+  const totalEntries = entries.length;
+  const ativos = entries.filter(e => !eliminados.some(el => el.jogador_id === e.jogador_id)).length;
+  const eliminados_count = eliminados.length;
+  const buyin = Number(torneio.buyin || 0);
+  const rakePct = Number(torneio.rake || 0);
+  const totalArrecadado = totalEntries * buyin;
+  const prizePool = totalArrecadado * (1 - rakePct/100);
+  
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Inscritos</div>
+      <div class="stat-value gold">${totalEntries}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Ativos</div>
+      <div class="stat-value">${ativos}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Prize Pool</div>
+      <div class="stat-value gold" style="font-size:1rem;">R$ ${formatMoney(prizePool)}</div>
+    </div>
+  `;
+  
+  // ATIVOS (entries que não foram eliminados)
+  const eliminadosIds = new Set(eliminados.map(el => el.jogador_id));
+  const ativosList = entries.filter(e => !eliminadosIds.has(e.jogador_id));
+  
+  // Dedup por jogador (mantém só primeira entrada)
+  const seen = new Set();
+  const ativosDedup = [];
+  for (const e of ativosList) {
+    if (!seen.has(e.jogador_id)) { seen.add(e.jogador_id); ativosDedup.push(e); }
+  }
+  
+  document.getElementById('ativos-count').textContent = ativosDedup.length;
+  const ativosPanel = document.getElementById('ativos-panel');
+  if (ativosDedup.length === 0) {
+    ativosPanel.innerHTML = '<div class="empty-state">Nenhum jogador ativo no momento</div>';
+  } else {
+    ativosPanel.innerHTML = ativosDedup.map((e, i) => {
+      const rebuyCount = entries.filter(x => x.jogador_id === e.jogador_id && (x.tipo === 'rebuy_simples' || x.tipo === 'rebuy_duplo' || x.tipo === 'reentry')).length;
+      return `<div class="row ${i === 0 ? 'top1' : ''}">
+        <div class="rank ${i === 0 ? 'top1' : (i === 1 ? 'top2' : (i === 2 ? 'top3' : ''))}">${i + 1}</div>
+        <div>
+          <div class="player-name">${escapeHtml(e.nome)}</div>
+          ${rebuyCount > 0 ? `<div class="player-extras">${rebuyCount} rebuy${rebuyCount > 1 ? 's' : ''}</div>` : ''}
+        </div>
+        <div></div>
+      </div>`;
+    }).join('');
+  }
+  
+  // PREMIADOS (eliminados ordenados por posição ascending = melhor primeiro)
+  const eliminadosSorted = [...eliminados].sort((a, b) => (a.posicao || 999) - (b.posicao || 999));
+  document.getElementById('premiados-count').textContent = eliminadosSorted.length;
+  const premiadosPanel = document.getElementById('premiados-panel');
+  if (eliminadosSorted.length === 0) {
+    premiadosPanel.innerHTML = '<div class="empty-state">Nenhum eliminado ainda</div>';
+  } else {
+    premiadosPanel.innerHTML = eliminadosSorted.map(el => {
+      const prize = Number(el.bounty_pago || 0); // o premio real está em outro campo, mas API atual retorna bounty
+      return `<div class="row">
+        <div class="rank ${el.posicao === 1 ? 'top1' : (el.posicao === 2 ? 'top2' : (el.posicao === 3 ? 'top3' : ''))}">${el.posicao || '—'}º</div>
+        <div>
+          <div class="player-name eliminated">${escapeHtml(el.nome)}</div>
+        </div>
+        <div></div>
+      </div>`;
+    }).join('');
+  }
+  
+  // Updated at
+  document.getElementById('updated-at').textContent = new Date().toLocaleString('pt-BR');
+}
+
+function formatMoney(v) {
+  return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>
