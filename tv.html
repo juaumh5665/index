@@ -1014,7 +1014,16 @@ function montarCarouselPremiacao(d) {
     }
 
     // Auto-recovery: mantém conexão com pai; se pai fechou, tenta reabrir
+    // (APENAS no modo popup — pula em modo público /tv/SLUG onde não há parent)
     setInterval(() => {
+        // Detectar modo público
+        const params = new URLSearchParams(window.location.search);
+        const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+        const pathParts = path.split('/').filter(Boolean);
+        const ehPublico = !!params.get('slug') || !!params.get('clube') || 
+                          (pathParts.length >= 2 && (pathParts[0] === 'tv' || pathParts[0] === 'tv.html'));
+        if (ehPublico) return;  // No modo público, não há parent — não mostra "Conexão perdida"
+        
         if (!window.opener || window.opener.closed) {
             // Pai fechou — mostra mensagem de reconexão
             const recoverEl = document.getElementById('kiosk-recover');
