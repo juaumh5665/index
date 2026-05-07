@@ -1189,15 +1189,14 @@ function montarCarouselPremiacao(d) {
   function _calcularTempoRestante(t) {
     if (!t) return 0;
     
-    // Se tem tempo_alvo (rodando), calcula a partir do timestamp
-    if (t.tempo_alvo && t.rodando) {
+    // Se tem tempo_alvo (rodando ou em break ativo), calcula a partir do timestamp
+    // Isso cobre: torneio rodando normal + intervalo automático (rodando=true, is_break=true)
+    if (t.tempo_alvo) {
       const alvoMs = new Date(t.tempo_alvo).getTime();
-      // Ajusta com drift do servidor
       const agoraServidor = Date.now() + pubState.serverDriftMs;
       const restanteMs = alvoMs - agoraServidor;
       const restanteSec = Math.max(0, Math.round(restanteMs / 1000));
       
-      // DEBUG (remover depois): mostra cálculo no console quando há divergência grande
       if (window._debugTimer) {
         console.log('[TIMER]', {
           tempo_alvo: t.tempo_alvo,
@@ -1205,13 +1204,15 @@ function montarCarouselPremiacao(d) {
           agoraServidor,
           restanteSec,
           serverDriftMs: pubState.serverDriftMs,
+          rodando: t.rodando,
+          is_break: t.is_break,
         });
       }
       
       return restanteSec;
     }
     
-    // Pausado/aguardando: usa o valor congelado
+    // Sem tempo_alvo (pausado completo): usa o valor congelado
     return Number(t.tempo_restante || 0);
   }
   
