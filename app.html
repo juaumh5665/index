@@ -2645,15 +2645,17 @@
                 <span id="fc-total" style="font-size:1.25rem;font-weight:800;color:#22c55e;font-family:'Space Mono',monospace;"></span>
             </div>
 
-            <div>
-                <label class="inp-label">Valor pago R$</label>
-                <input id="fc-valor-pago" type="number" step="0.01" class="inp" oninput="validarValorAcerto()">
-                <div id="fc-valor-aviso" style="font-size:.7rem;color:#71717a;margin-top:.35rem;"></div>
-            </div>
-
-            <div>
-                <label class="inp-label">Forma de Pagamento</label>
-                <div id="fc-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
+            <!-- ÁREA DE PAGAMENTOS (1 ou múltiplas formas) -->
+            <div id="fc-pagamentos-wrap">
+                <label class="inp-label" style="display:flex;justify-content:space-between;align-items:center;">
+                    <span>Forma(s) de Pagamento</span>
+                    <span id="fc-pp-status" style="font-size:.65rem;color:#71717a;font-weight:600;text-transform:none;letter-spacing:0;"></span>
+                </label>
+                <div id="fc-pp-lista" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+                <button id="fc-pp-add-btn" onclick="fcAddSplit()" style="width:100%;margin-top:.5rem;background:transparent;border:1px dashed #3f3f46;color:#a1a1aa;border-radius:.5rem;padding:.55rem;font-weight:700;font-size:.78rem;cursor:pointer;font-family:'Manrope',sans-serif;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#3f3f46';this.style.color='#a1a1aa'">
+                    <i class="fa-solid fa-plus"></i> Adicionar outra forma de pagamento
+                </button>
+                <div id="fc-valor-aviso" style="font-size:.72rem;color:#71717a;margin-top:.5rem;text-align:center;"></div>
             </div>
 
             <button onclick="fecharComandaConfirm()" style="width:100%;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.25)'" onmouseout="this.style.background='rgba(34,197,94,.15)'">
@@ -13715,17 +13717,28 @@ function renderPagarConta() {
                 <span id="pj-total-display" style="font-family:'Space Mono',monospace;font-weight:800;color:#ef4444;font-size:1.5rem;">${formatMoney(totalSugerido)}</span>
             </div>
         </div>
-        <label class="inp-label">Valor do Pagamento R$</label>
-        <input id="pj-pagar-valor" type="number" step="0.01" min="0" value="${totalSugerido}" class="inp" oninput="validarValorPagamento()">
-        <div id="pj-pagar-aviso" style="font-size:.7rem;color:#71717a;margin-top:.35rem;"></div>
-        <label class="inp-label" style="margin-top:1rem;">Forma de Pagamento</label>
-        <div id="pj-pagar-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;"></div>
+        
+        <!-- Splits de pagamento -->
+        <label class="inp-label" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Forma(s) de Pagamento</span>
+            <span id="pj-pp-status" style="font-size:.65rem;color:#71717a;font-weight:600;text-transform:none;letter-spacing:0;"></span>
+        </label>
+        <div id="pj-pp-lista" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+        <button onclick="pjAddSplit()" style="width:100%;margin-top:.5rem;background:transparent;border:1px dashed #3f3f46;color:#a1a1aa;border-radius:.5rem;padding:.55rem;font-weight:700;font-size:.78rem;cursor:pointer;font-family:'Manrope',sans-serif;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#3f3f46';this.style.color='#a1a1aa'">
+            <i class="fa-solid fa-plus"></i> Adicionar outra forma de pagamento
+        </button>
+        <div id="pj-pagar-aviso" style="font-size:.72rem;color:#71717a;margin-top:.5rem;text-align:center;"></div>
+        
         <label class="inp-label" style="margin-top:1rem;">Observação</label>
         <input id="pj-pagar-obs" class="inp" placeholder="Opcional">
         <button onclick="confirmarPagamentoConta()" class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;margin-top:1.25rem;">
             <i class="fa-solid fa-check"></i> Confirmar Pagamento
         </button>`;
-    renderMetodosPagamento('pj-pagar-metodos', 'pagar', true);
+    
+    // Inicializa splits com 1 entrada cobrindo o total sugerido
+    _pjSplits = [{ valor: totalSugerido, metodo: 'dinheiro' }];
+    _pjTotalSugerido = totalSugerido;
+    pjRenderSplits();
 }
 
 // Atualiza total quando toggle "incluir comandas" muda
@@ -13737,19 +13750,115 @@ function atualizarTotalComComandas() {
 
     const incluir = (document.getElementById('pj-incluir-comandas') || {}).checked;
     const total = divida + (incluir ? totalComandas : 0);
-
-    const inp = document.getElementById('pj-pagar-valor');
-    if (inp) inp.value = total.toFixed(2);
-
+    
+    _pjTotalSugerido = total;
+    
     const disp = document.getElementById('pj-total-display');
     if (disp) disp.innerText = formatMoney(total);
 
     // Mostra/oculta linha de comandas
     const linha = document.getElementById('pj-linha-comandas');
     if (linha) linha.style.opacity = incluir ? '1' : '.4';
+    
+    // Reset splits (1 entrada com total)
+    _pjSplits = [{ valor: total, metodo: 'dinheiro' }];
+    pjRenderSplits();
 }
 
+// ============================================================
+// PJ SPLITS — pagamento múltiplo no caixa
+// ============================================================
+let _pjSplits = [{ valor: 0, metodo: 'dinheiro' }];
+let _pjTotalSugerido = 0;
+
+function pjRenderSplits() {
+    const lista = document.getElementById('pj-pp-lista');
+    if (!lista) return;
+    
+    const isMulti = _pjSplits.length > 1;
+    
+    lista.innerHTML = _pjSplits.map((s, idx) => {
+        const podeRemover = isMulti;
+        return `<div style="display:flex;gap:.5rem;align-items:center;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;padding:.5rem .65rem;">
+            <input type="number" step="0.01" value="${s.valor.toFixed(2)}" 
+                onchange="pjAtualizarSplit(${idx}, 'valor', this.value)"
+                oninput="pjAtualizarSplit(${idx}, 'valor', this.value, true)"
+                class="inp" style="flex:1;min-width:90px;font-family:'Space Mono',monospace;font-weight:700;font-size:.85rem;padding:.4rem .6rem;">
+            <select onchange="pjAtualizarSplit(${idx}, 'metodo', this.value)" class="inp" style="flex:1;min-width:130px;font-size:.8rem;padding:.4rem .6rem;">
+                <option value="dinheiro" ${s.metodo==='dinheiro'?'selected':''}>💵 Dinheiro</option>
+                <option value="pix" ${s.metodo==='pix'?'selected':''}>📱 PIX</option>
+                <option value="debito" ${s.metodo==='debito'?'selected':''}>💳 Débito</option>
+                <option value="credito" ${s.metodo==='credito'?'selected':''}>💳 Crédito</option>
+            </select>
+            ${podeRemover ? `<button onclick="pjRemoverSplit(${idx})" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.3rem .4rem;font-size:.85rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'" title="Remover"><i class="fa-solid fa-xmark"></i></button>` : ''}
+        </div>`;
+    }).join('');
+    
+    pjAtualizarStatus();
+}
+
+function pjAtualizarSplit(idx, campo, valor, soUiUpdate) {
+    if (campo === 'valor') {
+        _pjSplits[idx].valor = parseFloat(valor) || 0;
+    } else {
+        _pjSplits[idx].metodo = valor;
+    }
+    pjAtualizarStatus();
+}
+
+function pjAddSplit() {
+    const total = _pjTotalSugerido || 0;
+    const somaAtual = _pjSplits.reduce((s, p) => s + (p.valor || 0), 0);
+    const restante = Math.max(0, total - somaAtual);
+    _pjSplits.push({ valor: restante, metodo: 'pix' });
+    pjRenderSplits();
+}
+
+function pjRemoverSplit(idx) {
+    if (_pjSplits.length <= 1) return;
+    _pjSplits.splice(idx, 1);
+    if (_pjSplits.length === 1) {
+        _pjSplits[0].valor = _pjTotalSugerido || 0;
+    }
+    pjRenderSplits();
+}
+
+function pjAtualizarStatus() {
+    const total = _pjTotalSugerido || 0;
+    const somaPaga = _pjSplits.reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const diff = total - somaPaga;
+    
+    const status = document.getElementById('pj-pp-status');
+    const aviso = document.getElementById('pj-pagar-aviso');
+    if (!status || !aviso) return;
+    
+    const isMulti = _pjSplits.length > 1;
+    
+    if (isMulti) {
+        status.innerHTML = `<span style="color:#a1a1aa;">Pago: ${formatMoney(somaPaga)} / ${formatMoney(total)}</span>`;
+    } else {
+        status.innerText = '';
+    }
+    
+    if (Math.abs(diff) < 0.01) {
+        aviso.innerHTML = '<span style="color:#22c55e;">✓ Pagamento total — conta será quitada</span>';
+    } else if (somaPaga > total) {
+        aviso.innerHTML = `<span style="color:#22c55e;">💰 Excedente de ${formatMoney(somaPaga - total)} vira crédito</span>`;
+    } else if (somaPaga > 0 && somaPaga < total) {
+        aviso.innerHTML = `<span style="color:#f59e0b;">⚠️ Pagamento parcial — restará ${formatMoney(diff)} em aberto</span>`;
+    } else if (somaPaga === 0) {
+        aviso.innerHTML = '<span style="color:#ef4444;">🚫 Sem pagamento informado</span>';
+    } else {
+        aviso.innerText = '';
+    }
+}
+
+// Compat
 function validarValorPagamento() {
+    pjAtualizarStatus();
+}
+
+function _validarValorPagamentoOLD() {
     const saldo = getSaldoJogador(pagamentoJogadorId);
     const divida = Math.abs(saldo);
     const valor = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
@@ -13772,53 +13881,62 @@ function confirmarPagamentoConta() {
 }
 
 function _confirmarPagamentoContaImpl() {
-    const valorBase = parseFloat(document.getElementById('pj-pagar-valor').value) || 0;
+    // ===== NOVA LÓGICA: usa _pjSplits =====
+    const splits = _pjSplits.filter(p => Number(p.valor) > 0);
+    if (splits.length === 0) return showToast('⚠️ Informe ao menos uma forma de pagamento');
+    
+    const valorBase = splits.reduce((s, p) => s + Number(p.valor), 0);
     if (valorBase <= 0) return showToast('⚠️ Valor inválido');
-    const metodo = (document.querySelector('input[name="metodo-pagar"]:checked') || {}).value;
-    if (!metodo) return showToast('⚠️ Selecione a forma de pagamento');
+    
     const obs = document.getElementById('pj-pagar-obs').value.trim();
     const j = jogadores.find(x => x.id === pagamentoJogadorId);
-
-    // Aplicar taxa se configurado
-    const taxaInfo = calcularTaxa(valorBase, metodo);
+    
     const cfgFin = getConfigFinanceiro();
-    let valor = valorBase;
-    let taxaAplicada = 0;
-    if (taxaInfo.pct > 0) {
-        if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[metodo].label} tem taxa de ${taxaInfo.pct}%.
-
-Valor: ${formatMoney(valorBase)}
-Taxa: ${formatMoney(taxaInfo.taxa)}
-Total a cobrar: ${formatMoney(taxaInfo.total)}
-
-Aplicar taxa?`)) {
-            valor = taxaInfo.total;
-            taxaAplicada = taxaInfo.taxa;
-        }
-    }
-
-    // Registra taxa como débito separado (se aplicada)
-    if (taxaAplicada > 0) {
-        registrarTransacao({
-            jogadorId: pagamentoJogadorId,
-            tipo: 'taxa',
-            valor: -taxaAplicada,
-            descricao: `Taxa ${PAYMENT_METHODS[metodo].label} ${taxaInfo.pct}%`,
-            origem: 'caixa',
-        });
-    }
-
+    const isMulti = splits.length > 1;
+    
     // === Marcador de tempo para identificar transações criadas nesta operação (usado pelo undo) ===
     const tMarcador = Date.now();
-
-    registrarTransacao({
-        jogadorId: pagamentoJogadorId,
-        tipo: 'pagamento',
-        valor: valor,
-        descricao: `Pagamento via ${PAYMENT_METHODS[metodo].label}${obs?' — '+obs:''}${taxaAplicada>0?' (c/ taxa)':''}`,
-        metodo: metodo,
-        origem: 'caixa',
+    
+    // Para cada split, registrar pagamento + taxa (se houver)
+    const metodosUsados = [];
+    splits.forEach(p => {
+        const taxaInfo = calcularTaxa(p.valor, p.metodo);
+        let valorCobrado = p.valor;
+        let taxa = 0;
+        
+        if (taxaInfo.pct > 0) {
+            if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[p.metodo].label}: pagamento de ${formatMoney(p.valor)} tem taxa de ${taxaInfo.pct}% (${formatMoney(taxaInfo.taxa)}).\n\nAplicar taxa?`)) {
+                taxa = taxaInfo.taxa;
+            }
+        }
+        
+        // Pagamento
+        registrarTransacao({
+            jogadorId: pagamentoJogadorId,
+            tipo: 'pagamento',
+            valor: valorCobrado,
+            descricao: `Pagamento via ${PAYMENT_METHODS[p.metodo].label}${isMulti ? ' (parcial)' : ''}${obs?' — '+obs:''}`,
+            metodo: p.metodo,
+            origem: 'caixa',
+        });
+        
+        // Taxa
+        if (taxa > 0) {
+            registrarTransacao({
+                jogadorId: pagamentoJogadorId,
+                tipo: 'taxa',
+                valor: -taxa,
+                descricao: `Taxa ${PAYMENT_METHODS[p.metodo].label} ${taxaInfo.pct}%`,
+                origem: 'caixa',
+            });
+        }
+        
+        if (!metodosUsados.includes(p.metodo)) metodosUsados.push(p.metodo);
     });
+    
+    const valor = valorBase;  // pra log audit
+    const metodo = metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo';
+    const taxaAplicada = 0;  // taxa já registrada acima
 
     // Se o operador marcou "incluir comandas" e existe checkbox marcada, fecha as comandas abertas
     const incCheckbox = document.getElementById('pj-incluir-comandas');
@@ -13852,6 +13970,7 @@ Aplicar taxa?`)) {
             c.status = 'fechada';
             c.fechadoEm = Date.now();
             c.pagamento = metodo;
+            c.formasPagamento = splits.map(p => ({ valor: Number(p.valor), metodo: p.metodo }));
             c.total = totalC;
             c.fechadaPeloCaixa = true;
             // Anti-loop: marca como mudança nossa pra realtime não reverter
@@ -14402,8 +14521,10 @@ function openFecharComanda() {
     const ttl = document.getElementById('fc-titulo');
     if (ttl) ttl.innerHTML = '<i class="fa-solid fa-check-circle" style="color:#22c55e;"></i> Acerto de Conta';
     
+    // Reset splits
+    _fcSplits = [{ valor: 0, metodo: 'dinheiro' }];
+    
     atualizarTotalAcerto();
-    renderMetodosPagamento('fc-metodos', 'fc', false);
     openModal('modal-fechar-comanda');
 }
 
@@ -14449,15 +14570,23 @@ function cobrarSomenteBar() {
     // Título dinâmico
     const ttl = document.getElementById('fc-titulo');
     if (ttl) ttl.innerHTML = '<i class="fa-solid fa-mug-hot" style="color:#f59e0b;"></i> Cobrar somente Bar';
+    
+    // Reset splits
+    _fcSplits = [{ valor: 0, metodo: 'dinheiro' }];
 
     atualizarTotalAcerto();
-    renderMetodosPagamento('fc-metodos', 'fc', false);
     openModal('modal-fechar-comanda');
     
     if (pendencias > 0) {
         showToast(`💰 Cobrando só Bar: R$ ${totalComanda.toFixed(2).replace('.',',')} (pendência de R$ ${pendencias.toFixed(2).replace('.',',')} permanece)`, 4000);
     }
 }
+
+// ============================================================
+// PAGAMENTO COM SPLIT (uma ou múltiplas formas)
+// ============================================================
+// Estado: array de {valor, metodo}. Inicia com 1 item (modo simples).
+let _fcSplits = [{ valor: 0, metodo: 'dinheiro' }];
 
 function atualizarTotalAcerto() {
     const incluirPend = (document.getElementById('fc-incluir-pendencias') || {}).checked !== false;
@@ -14476,62 +14605,139 @@ function atualizarTotalAcerto() {
         </div>`;
     }
     document.getElementById('fc-breakdown').innerHTML = html;
-
     document.getElementById('fc-total').innerText = formatMoney(total);
-    document.getElementById('fc-valor-pago').value = total.toFixed(2);
-    validarValorAcerto();
+
+    // Reset splits: 1 só forma com valor total
+    _fcSplits = [{ valor: total, metodo: 'dinheiro' }];
+    fcRenderSplits();
 }
 
-function validarValorAcerto() {
-    const pago = parseFloat(document.getElementById('fc-valor-pago').value) || 0;
-    const total = _fcEstadoAcerto.total;
-    const aviso = document.getElementById('fc-valor-aviso');
+function fcRenderSplits() {
+    const lista = document.getElementById('fc-pp-lista');
+    if (!lista) return;
+    
+    const total = _fcEstadoAcerto.total || 0;
+    const isMulti = _fcSplits.length > 1;
+    
+    lista.innerHTML = _fcSplits.map((s, idx) => {
+        const podeRemover = isMulti;
+        return `<div style="display:flex;gap:.5rem;align-items:center;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;padding:.5rem .65rem;">
+            <input type="number" step="0.01" value="${s.valor.toFixed(2)}" 
+                onchange="fcAtualizarSplit(${idx}, 'valor', this.value)"
+                oninput="fcAtualizarSplit(${idx}, 'valor', this.value, true)"
+                class="inp" style="flex:1;min-width:90px;font-family:'Space Mono',monospace;font-weight:700;font-size:.85rem;padding:.4rem .6rem;">
+            <select onchange="fcAtualizarSplit(${idx}, 'metodo', this.value)" class="inp" style="flex:1;min-width:130px;font-size:.8rem;padding:.4rem .6rem;">
+                <option value="dinheiro" ${s.metodo==='dinheiro'?'selected':''}>💵 Dinheiro</option>
+                <option value="pix" ${s.metodo==='pix'?'selected':''}>📱 PIX</option>
+                <option value="debito" ${s.metodo==='debito'?'selected':''}>💳 Débito</option>
+                <option value="credito" ${s.metodo==='credito'?'selected':''}>💳 Crédito</option>
+            </select>
+            ${podeRemover ? `<button onclick="fcRemoverSplit(${idx})" style="background:none;border:none;color:#52525b;cursor:pointer;padding:.3rem .4rem;font-size:.85rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'" title="Remover"><i class="fa-solid fa-xmark"></i></button>` : ''}
+        </div>`;
+    }).join('');
+    
+    fcAtualizarStatusPagamento();
+}
 
-    if (pago === total) {
-        aviso.innerHTML = '<span style="color:#22c55e;">✓ Acerto total — conta quitada</span>';
-    } else if (pago > total) {
-        aviso.innerHTML = `<span style="color:#22c55e;">💰 Excedente de ${formatMoney(pago - total)} vira crédito</span>`;
-    } else if (pago > 0 && pago < total) {
-        aviso.innerHTML = `<span style="color:#f59e0b;">⚠️ Pagamento parcial — restará ${formatMoney(total - pago)} pendente</span>`;
-    } else if (pago === 0) {
+function fcAtualizarSplit(idx, campo, valor, soUiUpdate) {
+    if (campo === 'valor') {
+        _fcSplits[idx].valor = parseFloat(valor) || 0;
+    } else if (campo === 'metodo') {
+        _fcSplits[idx].metodo = valor;
+    }
+    // soUiUpdate: chamado a cada digitação — só atualiza status (não re-renderiza)
+    if (soUiUpdate) {
+        fcAtualizarStatusPagamento();
+    } else {
+        fcAtualizarStatusPagamento();
+    }
+}
+
+function fcAddSplit() {
+    const total = _fcEstadoAcerto.total || 0;
+    const somaAtual = _fcSplits.reduce((s, p) => s + (p.valor || 0), 0);
+    const restante = Math.max(0, total - somaAtual);
+    
+    // Adiciona um novo método pré-preenchido com o restante
+    _fcSplits.push({ valor: restante, metodo: 'pix' });
+    fcRenderSplits();
+}
+
+function fcRemoverSplit(idx) {
+    if (_fcSplits.length <= 1) return;
+    _fcSplits.splice(idx, 1);
+    
+    // Se ficou só 1, ajusta valor pra cobrir total
+    if (_fcSplits.length === 1) {
+        _fcSplits[0].valor = _fcEstadoAcerto.total || 0;
+    }
+    fcRenderSplits();
+}
+
+function fcAtualizarStatusPagamento() {
+    const total = _fcEstadoAcerto.total || 0;
+    const somaPaga = _fcSplits.reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const diff = total - somaPaga;
+    
+    const status = document.getElementById('fc-pp-status');
+    const aviso = document.getElementById('fc-valor-aviso');
+    if (!status || !aviso) return;
+    
+    const isMulti = _fcSplits.length > 1;
+    
+    // Status no header
+    if (isMulti) {
+        status.innerHTML = `<span style="color:#a1a1aa;">Pago: ${formatMoney(somaPaga)} / ${formatMoney(total)}</span>`;
+    } else {
+        status.innerText = '';
+    }
+    
+    // Aviso central
+    if (Math.abs(diff) < 0.01) {
+        aviso.innerHTML = '<span style="color:#22c55e;">✓ Total quitado</span>';
+    } else if (somaPaga > total) {
+        aviso.innerHTML = `<span style="color:#22c55e;">💰 Excedente de ${formatMoney(somaPaga - total)} vira crédito</span>`;
+    } else if (somaPaga > 0 && somaPaga < total) {
+        aviso.innerHTML = `<span style="color:#f59e0b;">⚠️ Pagamento parcial — faltará ${formatMoney(diff)} pendente</span>`;
+    } else if (somaPaga === 0) {
         aviso.innerHTML = '<span style="color:#ef4444;">🚫 Lançar totalmente a crédito/fiado</span>';
     } else {
         aviso.innerText = '';
     }
 }
 
+// Compatibilidade: validarValorAcerto agora delega ao novo sistema
+function validarValorAcerto() {
+    fcAtualizarStatusPagamento();
+}
+
 function fecharComandaConfirm() {
     const c = _fcEstadoAcerto.comanda;
     if (!c) return;
-    let pago = parseFloat(document.getElementById('fc-valor-pago').value) || 0;
+    
     const incluirPend = (document.getElementById('fc-incluir-pendencias') || {}).checked !== false;
-    const metodoSel = document.querySelector('input[name="metodo-fc"]:checked');
-    const metodo = metodoSel ? metodoSel.value : 'dinheiro';
-
-    // Suspender realtime durante fechamento (12s) pra evitar que outro evento
-    // recarregue a comanda do banco em estado antigo (race condition)
+    
+    // ===== NOVA LÓGICA: usa _fcSplits (uma ou múltiplas formas) =====
+    // Limpa entradas com valor zero ou negativo
+    const splits = _fcSplits.filter(p => Number(p.valor) > 0);
+    if (splits.length === 0) {
+        if (!confirm('Nenhum pagamento informado. Deseja lançar TUDO a fiado/crédito do jogador?')) return;
+    }
+    
+    const totalPago = splits.reduce((s, p) => s + Number(p.valor), 0);
+    const totalConta = _fcEstadoAcerto.total;
+    
+    // Suspender realtime durante fechamento
     if (typeof _suspenderRealtime === 'function') _suspenderRealtime(12000);
     if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
-
-    // Aplica taxa, se configurado
-    const taxaInfo = calcularTaxa(pago, metodo);
-    const cfgFin = getConfigFinanceiro();
-    let valorCobrado = pago;
-    let taxaAplicada = 0;
-    if (taxaInfo.pct > 0) {
-        if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[metodo].label} tem taxa de ${taxaInfo.pct}%.
-
-Valor: ${formatMoney(pago)}
-Taxa: ${formatMoney(taxaInfo.taxa)}
-Total: ${formatMoney(taxaInfo.total)}
-
-Aplicar taxa ao jogador?`)) {
-            valorCobrado = taxaInfo.total;
-            taxaAplicada = taxaInfo.taxa;
-        }
+    
+    // Aviso se há saldo restante (fica como pendência)
+    const saldoRestante = totalConta - totalPago;
+    if (saldoRestante > 0.01 && splits.length > 0) {
+        if (!confirm(`Faltam ${formatMoney(saldoRestante)} pra completar.\n\nDeseja continuar? O valor restante ficará como pendência do jogador.`)) return;
     }
-
-    // 1) Registrar débito da comanda (débito normal)
+    
+    // 1) Registrar débito da comanda (sempre o total da comanda)
     registrarTransacao({
         jogadorId: c.jogadorId,
         tipo: 'bar',
@@ -14540,38 +14746,58 @@ Aplicar taxa ao jogador?`)) {
         origem: 'bar',
         refId: c.id,
     });
-
-    // 1.5) Taxa extra se houver
-    if (taxaAplicada > 0) {
-        registrarTransacao({
-            jogadorId: c.jogadorId,
-            tipo: 'taxa',
-            valor: -taxaAplicada,
-            descricao: `Taxa ${PAYMENT_METHODS[metodo].label} ${taxaInfo.pct}%`,
-            origem: 'bar',
-            refId: c.id,
-        });
-    }
-
-    // 2) Registrar pagamento (positivo) — quita o total escolhido
-    if (valorCobrado > 0) {
+    
+    // 2) Para cada split, calcular taxa e registrar pagamento + taxa
+    const cfgFin = getConfigFinanceiro();
+    let totalTaxas = 0;
+    const metodosUsados = [];
+    const isMulti = splits.length > 1;
+    
+    splits.forEach(p => {
+        const taxaInfo = calcularTaxa(p.valor, p.metodo);
+        let valorCobrado = p.valor;
+        let taxa = 0;
+        
+        if (taxaInfo.pct > 0) {
+            if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[p.metodo].label}: pagamento de ${formatMoney(p.valor)} tem taxa de ${taxaInfo.pct}% (${formatMoney(taxaInfo.taxa)}).\n\nAplicar taxa ao jogador?`)) {
+                taxa = taxaInfo.taxa;
+                totalTaxas += taxa;
+            }
+        }
+        
+        // Pagamento
         registrarTransacao({
             jogadorId: c.jogadorId,
             tipo: 'pagamento',
             valor: valorCobrado,
-            descricao: `Acerto bar via ${PAYMENT_METHODS[metodo].label}${incluirPend && _fcEstadoAcerto.pendencias>0 ? ' (c/ pendências)' : ''}${taxaAplicada > 0 ? ' (c/ taxa)' : ''}`,
-            metodo,
+            descricao: `Acerto bar via ${PAYMENT_METHODS[p.metodo].label}${isMulti ? ' (parcial)' : ''}${incluirPend && _fcEstadoAcerto.pendencias>0 ? ' (c/ pendências)' : ''}`,
+            metodo: p.metodo,
             origem: 'bar',
             refId: c.id,
         });
-    }
-
+        
+        // Taxa, se aplicada
+        if (taxa > 0) {
+            registrarTransacao({
+                jogadorId: c.jogadorId,
+                tipo: 'taxa',
+                valor: -taxa,
+                descricao: `Taxa ${PAYMENT_METHODS[p.metodo].label} ${taxaInfo.pct}%`,
+                origem: 'bar',
+                refId: c.id,
+            });
+        }
+        
+        if (!metodosUsados.includes(p.metodo)) metodosUsados.push(p.metodo);
+    });
+    
     // Atualiza comanda
     c.status     = 'fechada';
     c.fechadoEm  = Date.now();
-    c.pagamento  = metodo;
+    c.pagamento  = metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo';
+    c.formasPagamento = splits.map(p => ({ valor: Number(p.valor), metodo: p.metodo }));
     c.total      = _fcEstadoAcerto.totalComanda;
-    c.valorPago  = pago;
+    c.valorPago  = totalPago;
     c.incluiuPendencias = incluirPend && _fcEstadoAcerto.pendencias > 0;
     c.pendenciasValor = incluirPend ? _fcEstadoAcerto.pendencias : 0;
     c.turnoBarId = barCaixa.abertoEm || null;
@@ -14580,7 +14806,6 @@ Aplicar taxa ao jogador?`)) {
     saveData();
     
     // Força sync IMEDIATO ao banco (não esperar debounce)
-    // Isso garante que outras telas/dispositivos vejam a comanda como fechada na hora
     if (typeof sincronizarEstado === 'function') {
         sincronizarEstado().catch(err => console.warn('[CLOSE] sync falhou:', err));
     }
