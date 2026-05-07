@@ -1232,16 +1232,49 @@ function montarCarouselPremiacao(d) {
     // Iniciar realtime
     iniciarPubRealtime();
     
-    // Timer local pra suavidade visual (atualiza só o número do timer, não re-renderiza tudo)
-    pubState.timerLocalInterval = setInterval(tickLocalTimer, 1000);
+    // Timer local com Web Worker (imune a throttling de background)
+    let workerInstalado = false;
+    try {
+      const workerCode = `
+        let intervalId = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(() => self.postMessage('tick'), 1000);
+          }
+        };
+      `;
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      pubState.timerWorker = new Worker(URL.createObjectURL(blob));
+      pubState.timerWorker.onmessage = (e) => {
+        if (e.data === 'tick') tickLocalTimer();
+      };
+      pubState.timerWorker.postMessage('start');
+      workerInstalado = true;
+      console.log('[TV PUBLIC] Web Worker ativo (timer não trava em background)');
+    } catch(e) {
+      console.warn('[TV PUBLIC] Worker indisponível, usando setInterval', e);
+    }
+    
+    // Fallback: setInterval normal (caso worker falhe)
+    if (!workerInstalado) {
+      pubState.timerLocalInterval = setInterval(tickLocalTimer, 1000);
+    }
+    
+    // Re-sincronizar imediatamente quando aba voltar a ser visível
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        tickLocalTimer();      // refresh imediato do display
+        carregarPubData();     // refresh dos dados
+      }
+    });
   }
   
-  // Hash leve pra detectar mudanças "estruturais" (não-timer normal)
-  // Inclui tempo_restante arredondado em 30s — captura ajustes manuais (+1min, -1min)
-  // mas ignora ticks segundo-a-segundo
+  // Hash leve pra detectar mudanças "estruturais"
+  // Usa tempo_alvo (timestamp absoluto) — assim só re-renderiza quando MUDA o alvo
+  // (ajuste manual de tempo, pause/resume, level change)
   function _hashEstrutural(t) {
     if (!t) return '';
-    const tempoArred = Math.round((t.tempo_restante || 0) / 30) * 30;
     return JSON.stringify({
       id: t.id,
       status: t.status,
@@ -1253,7 +1286,7 @@ function montarCarouselPremiacao(d) {
       entriesQtd: (t.entries || []).length,
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
-      tempoArred: tempoArred,
+      tempoAlvo: t.tempo_alvo,  // timestamp absoluto — só muda em pause/resume/+1min
     });
   }
   

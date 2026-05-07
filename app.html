@@ -11006,25 +11006,71 @@ function _recalcTempoAlvo(t) {
     }
 }
 
-setInterval(() => {
+// === WEB WORKER PARA TIMER EM BACKGROUND ===
+// Browsers throttlam setInterval de abas em background (até 1x/min).
+// Web Worker roda em thread separada e NÃO é throttlado.
+let _timerWorker = null;
+try {
+    const workerCode = `
+        let intervalId = null;
+        self.onmessage = function(e) {
+            if (e.data === 'start') {
+                if (intervalId) clearInterval(intervalId);
+                intervalId = setInterval(() => self.postMessage('tick'), 1000);
+            } else if (e.data === 'stop') {
+                if (intervalId) { clearInterval(intervalId); intervalId = null; }
+            }
+        };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    _timerWorker = new Worker(URL.createObjectURL(blob));
+    _timerWorker.postMessage('start');
+} catch(e) {
+    console.warn('[TIMER] Web Worker não disponível, usando setInterval', e);
+}
+
+// Re-sincronizar imediatamente quando a aba voltar a ser visível
+// (caso o setInterval tenha sido throttlado)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        // Forçar recálculo imediato pra atualizar tempos e UI
+        _executarTickGlobal();
+    }
+});
+
+function _executarTickGlobal() {
     let changed = false;
-    let mudancaImportante = false;  // pause, level change, etc.
+    let mudancaImportante = false;
     
     torneios.forEach((t, i) => {
-        if (t.rodando && t.tempoRestante > 0) {
-            t.tempoRestante--;
+        // ESTRATÉGIA: tempo calculado a partir de tempoAlvo (timestamp absoluto)
+        // Imune a throttling de aba em background
+        if (t.rodando && t.tempoAlvo) {
+            const restanteReal = Math.max(0, Math.round((t.tempoAlvo - Date.now()) / 1000));
+            
+            if (restanteReal !== t.tempoRestante) {
+                t.tempoRestante = restanteReal;
+                changed = true;
+                if (activeTorneioIdx === i) updateModalTorneio();
+                updateTV(i);
+                checarAlertasTorneio(t);
+                if (t.tempoRestante % 30 === 0) renderTorneiosList();
+            }
+            
+            if (t.tempoRestante <= 0) {
+                nextLevel(i);
+                changed = true;
+                mudancaImportante = true;
+            }
+        } else if (t.rodando && !t.tempoAlvo && t.tempoRestante > 0) {
+            // Migração: torneios antigos sem tempoAlvo — gera o alvo agora
+            _recalcTempoAlvo(t);
             changed = true;
-            if (activeTorneioIdx === i) updateModalTorneio();
-            updateTV(i);
-            checarAlertasTorneio(t);
-            if (t.tempoRestante % 30 === 0) renderTorneiosList();
         } else if (t.rodando && t.tempoRestante <= 0) {
-            // Quando tempo esgota, avança - se era break, o próximo é nível normal
             nextLevel(i);
             changed = true;
-            mudancaImportante = true;  // mudou de nível — sync já
+            mudancaImportante = true;
         } else if (t.iniciadoEm && t.status !== 'finished') {
-            // Atualiza TV mesmo pausado para manter tempo decorrido em tempo real
             updateTV(i);
         }
     });
@@ -11034,16 +11080,26 @@ setInterval(() => {
         const ehHoraDeSync = (agora - _ultimoSyncTimer) >= SYNC_TIMER_INTERVAL_MS;
         
         if (mudancaImportante || ehHoraDeSync) {
-            // Sync completo (vai pro banco)
-            // Recalcula tempoAlvo de todos torneios rodando antes de sincronizar
-            torneios.forEach(t => { if (t.rodando) _recalcTempoAlvo(t); });
             _ultimoSyncTimer = agora;
             saveData();
         } else {
-            // Tick comum: só salva localStorage (sem sync remoto)
             saveDataLocal();
         }
     }
+}
+
+// Worker tick → executa lógica do timer
+if (_timerWorker) {
+    _timerWorker.onmessage = (e) => {
+        if (e.data === 'tick') _executarTickGlobal();
+    };
+}
+
+// Fallback: setInterval normal (caso Worker falhe)
+setInterval(() => {
+    // Se tem worker, ele já está cuidando — não duplicar
+    if (_timerWorker) return;
+    _executarTickGlobal();
 
     // Re-render cash mesas every ~30s to refresh "tempo em mesa" counters
     if (document.getElementById('page-cash') && document.getElementById('page-cash').style.display !== 'none') {
