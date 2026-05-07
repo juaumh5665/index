@@ -1216,6 +1216,23 @@ function montarCarouselPremiacao(d) {
     pubState.timerLocalInterval = setInterval(tickLocalTimer, 1000);
   }
   
+  // Hash leve pra detectar mudanças "estruturais" (não-timer)
+  function _hashEstrutural(t) {
+    if (!t) return '';
+    return JSON.stringify({
+      id: t.id,
+      status: t.status,
+      rodando: t.rodando,
+      is_break: t.is_break,
+      nivel_atual: t.nivel_atual,
+      tv_layout: t.tv_layout,
+      tv_show_prize: t.tv_show_prize,
+      entriesQtd: (t.entries || []).length,
+      eliminadosQtd: (t.eliminados || []).length,
+      jackpotQtd: (t.jackpot_compras || []).length,
+    });
+  }
+  
   async function carregarPubData() {
     try {
       const { data, error } = await sb.rpc('tv_dados_torneios', {
@@ -1233,13 +1250,11 @@ function montarCarouselPremiacao(d) {
       );
       
       // FILTRO: apenas torneios efetivamente RODANDO (running, paused, break)
-      // - waiting/aguardando NÃO aparece (ainda não começou)
       const rodando = todosAtivos.filter(t => 
         t.status === 'running' || t.status === 'paused' || t.status === 'break' || t.rodando === true
       );
       
       if (rodando.length === 0) {
-        // Nenhum em andamento — mostra empty state (mas se tem aguardando, dá uma dica)
         return showPublicEmpty(pubState.clube, todosAtivos.length > 0);
       }
       
@@ -1250,13 +1265,27 @@ function montarCarouselPremiacao(d) {
         return tsB - tsA;
       });
       
-      pubState.torneios = rodando;
-      pubState.activeIdx = 0;  // sempre o primeiro (mais recente)
+      // Detectar se só mudou o timer (sincroniza local) — evita re-render completo
+      const novoTorneio = rodando[0];
+      const torneioAtual = pubState.torneios[pubState.activeIdx];
+      const hashAntes = _hashEstrutural(torneioAtual);
+      const hashDepois = _hashEstrutural(novoTorneio);
       
-      // Esconder overlay de empty state se estiver aparecendo
+      pubState.torneios = rodando;
+      pubState.activeIdx = 0;
+      
       hidePublicEmpty();
       
-      // Renderizar via mesmo postMessage que a popup recebe
+      if (hashAntes && hashAntes === hashDepois && torneioAtual?.id === novoTorneio.id) {
+        // Só ressincroniza tempo_restante (sem re-render completo)
+        // Isso evita o flicker quando o app salva o tempo a cada segundo
+        torneioAtual.tempo_restante = novoTorneio.tempo_restante;
+        torneioAtual.tempo_total = novoTorneio.tempo_total;
+        // Re-render do timer já será feito pelo tickLocalTimer
+        return;
+      }
+      
+      // Mudança estrutural — renderiza completo via postMessage
       renderizarPubTorneioAtivo();
     } catch(e) {
       console.error('[TV PUBLIC] erro carregar:', e);
@@ -1270,18 +1299,36 @@ function montarCarouselPremiacao(d) {
         event: '*', schema: 'public', table: 'torneios',
         filter: `clube_id=eq.${pubState.clubeId}` 
       }, () => {
-        console.log('[TV PUBLIC] torneio atualizado (realtime)');
-        carregarPubData();
+        agendarReload();
       })
       .on('postgres_changes', { 
         event: '*', schema: 'public', table: 'torneio_entries' 
-      }, () => carregarPubData())
+      }, () => agendarReload())
       .on('postgres_changes', { 
         event: '*', schema: 'public', table: 'torneio_eliminados' 
-      }, () => carregarPubData())
+      }, () => agendarReload())
       .subscribe((status) => {
         console.log('[TV PUBLIC] realtime:', status);
       });
+  }
+  
+  // Debounce + throttle: agrupa eventos próximos e limita freq de fetches
+  let _reloadTimer = null;
+  let _ultimoReload = 0;
+  const MIN_INTERVAL_MS = 2500; // mínimo 2.5s entre fetches
+  
+  function agendarReload() {
+    if (_reloadTimer) clearTimeout(_reloadTimer);
+    
+    const agora = Date.now();
+    const tempoDesdeUltimo = agora - _ultimoReload;
+    const delay = tempoDesdeUltimo >= MIN_INTERVAL_MS ? 1200 : (MIN_INTERVAL_MS - tempoDesdeUltimo);
+    
+    _reloadTimer = setTimeout(() => {
+      _reloadTimer = null;
+      _ultimoReload = Date.now();
+      carregarPubData();
+    }, delay);
   }
   
   function tickLocalTimer() {
@@ -1311,10 +1358,8 @@ function montarCarouselPremiacao(d) {
       barEl.style.background = pct < 20 ? '#ef4444' : '';
     }
     
-    // Quando chegar a zero, dispara um refresh completo (próximo nível)
-    if (ts === 0) {
-      setTimeout(() => carregarPubData(), 800);
-    }
+    // Quando chegar a zero, o realtime vai disparar quando o app
+    // mudar de nível. Não precisamos forçar fetch aqui (evita chamadas extras)
   }
   
   let _renderLock = false;
