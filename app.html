@@ -2051,6 +2051,9 @@
                                 </div>
                                 <!-- Ações da comanda -->
                                 <div style="display:flex;gap:.5rem;">
+                                    <button onclick="abrirExtratoComandaAtual()" style="flex:0 0 auto;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);color:var(--gold);border-radius:.6rem;padding:.75rem 1rem;font-weight:700;font-size:.8rem;cursor:pointer;" title="Ver extrato detalhado">
+                                        <i class="fa-solid fa-receipt"></i>
+                                    </button>
                                     <button onclick="imprimirComandaAtual()" style="flex:0 0 auto;background:rgba(255,255,255,.05);border:1px solid #27272a;color:#a1a1aa;border-radius:.6rem;padding:.75rem 1rem;font-weight:700;font-size:.8rem;cursor:pointer;" title="Imprimir comanda">
                                         <i class="fa-solid fa-print"></i>
                                     </button>
@@ -2592,6 +2595,23 @@
 </div>
 
 <!-- MODAL: FECHAR COMANDA -->
+<!-- MODAL: EXTRATO DE COMANDA (aberta ou fechada) -->
+<div id="modal-extrato-comanda" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-receipt" style="color:var(--gold);"></i> Extrato da Comanda</h3>
+            <button onclick="closeModal('modal-extrato-comanda')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div id="extrato-comanda-conteudo" style="display:flex;flex-direction:column;gap:1rem;"></div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e1e23;">
+            <button onclick="imprimirExtratoAtual()" class="btn-ghost" style="padding:.6rem 1.25rem;border-radius:.5rem;font-size:.85rem;">
+                <i class="fa-solid fa-print"></i> Imprimir / Salvar PDF
+            </button>
+            <button onclick="closeModal('modal-extrato-comanda')" class="btn-gold" style="padding:.6rem 1.25rem;border-radius:.5rem;font-size:.85rem;font-weight:700;">Fechar</button>
+        </div>
+    </div>
+</div>
+
 <div id="modal-fechar-comanda" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
@@ -3802,6 +3822,10 @@ function saveData() {
         if (typeof cashMesas !== 'undefined') cashMesas.forEach(m => _markDirty('cashMesas', m.id));
         if (typeof barProdutos !== 'undefined') barProdutos.forEach(p => _markDirty('barProdutos', p.id));
         if (typeof barComandas !== 'undefined') barComandas.forEach(c => _markDirty('barComandas', c.id));
+        // Grupos: marca todos pra sync (são poucos, é rápido)
+        if (typeof barGrupos !== 'undefined') {
+            barGrupos.forEach(g => _markDirty('barGrupos', g));
+        }
         // Apenas as últimas transações (otimização)
         if (typeof transacoes !== 'undefined') {
             transacoes.slice(-10).forEach(tx => _markDirty('transacoes', tx.id));
@@ -4457,10 +4481,19 @@ async function _processarMudancaRealtime(tipo, payload) {
                     }
                     barComandas = cRows.map(c => {
                         const obj = _comandaFromDb(c);
-                        obj.itens = itRows.filter(i => i.comanda_id === c.id).map(i => ({
-                            produtoId: i.produto_id, nome: i.nome, qtd: i.qtd,
-                            valor: parseFloat(i.valor_unit), ts: new Date(i.ts).getTime(),
-                        }));
+                        obj.itens = itRows.filter(i => i.comanda_id === c.id).map(i => {
+                            const qtd = Number(i.qtd || 1);
+                            const valorUnit = parseFloat(i.valor_unit || 0);
+                            return {
+                                id: i.id,
+                                produtoId: i.produto_id,
+                                nome: i.nome,
+                                qtd,
+                                valor: valorUnit,           // valor unitário
+                                subtotal: qtd * valorUnit,  // subtotal calculado
+                                ts: new Date(i.ts).getTime(),
+                            };
+                        });
                         return obj;
                     });
                     localStorage.setItem('ps_bar_comandas', JSON.stringify(barComandas));
@@ -4956,15 +4989,26 @@ async function sincronizarEstado() {
                             if (c.itens && c.itens.length) {
                                 const itensRows = c.itens.map(it => {
                                     const prod = barProdutos.find(p => p.id === it.produtoId);
+                                    // Calcular valor unitário corretamente
+                                    // Local: { produtoId, qtd, subtotal } — valor unitário = subtotal / qtd
+                                    let valorUnit = 0;
+                                    if (it.valor && it.valor > 0) {
+                                        valorUnit = Number(it.valor);
+                                    } else if (it.subtotal && it.qtd) {
+                                        valorUnit = Number(it.subtotal) / Number(it.qtd);
+                                    } else if (prod) {
+                                        valorUnit = Number(prod.valor || 0);
+                                    }
+                                    const qtd = Number(it.qtd || 1);
                                     return {
-                                        id: _genUuid(),
+                                        id: it.id || _genUuid(),
                                         comanda_id: c.id,
                                         clube_id: sbClube.id,
                                         produto_id: it.produtoId || null,
                                         nome: prod ? prod.nome : (it.nome || '?'),
-                                        qtd: it.qtd || 1,
-                                        valor_unit: it.valor || (prod ? prod.valor : 0),
-                                        subtotal: (it.qtd || 1) * (it.valor || (prod ? prod.valor : 0)),
+                                        qtd,
+                                        valor_unit: valorUnit,
+                                        subtotal: qtd * valorUnit,
                                         ts: it.ts ? new Date(it.ts).toISOString() : new Date().toISOString(),
                                     };
                                 });
@@ -5087,13 +5131,19 @@ async function carregarEstadoDoSupabase() {
                     .select('*').in('comanda_id', cRows.map(c => c.id));
                 if (itRows) {
                     barComandas.forEach(c => {
-                        c.itens = itRows.filter(i => i.comanda_id === c.id).map(i => ({
-                            produtoId: i.produto_id,
-                            nome: i.nome,
-                            qtd: i.qtd,
-                            valor: parseFloat(i.valor_unit),
-                            ts: new Date(i.ts).getTime(),
-                        }));
+                        c.itens = itRows.filter(i => i.comanda_id === c.id).map(i => {
+                            const qtd = Number(i.qtd || 1);
+                            const valorUnit = parseFloat(i.valor_unit || 0);
+                            return {
+                                id: i.id,
+                                produtoId: i.produto_id,
+                                nome: i.nome,
+                                qtd,
+                                valor: valorUnit,
+                                subtotal: qtd * valorUnit,
+                                ts: new Date(i.ts).getTime(),
+                            };
+                        });
                     });
                 }
             }
@@ -11688,18 +11738,37 @@ function addItemComanda() {
     const prod   = barProdutos.find(p => p.id === prodId);
     if (!prod) return showToast('⚠️ Produto inválido');
     if (prod.estoque < qtd) return showToast(`⚠️ Estoque insuficiente (${prod.estoque} disponível)`);
+    
+    // Suspender realtime durante operação pra evitar sobrescrever dados antes do sync
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
 
     // Desconta estoque
     prod.estoque -= qtd;
 
     // Agrupa itens iguais
+    const valorUnit = Number(prod.valor || 0);
     const existente = c.itens.find(it => it.produtoId === prodId);
     if (existente) {
         existente.qtd += qtd;
-        existente.subtotal = existente.qtd * prod.valor;
+        existente.valor = valorUnit;  // garante valor unitário consistente
+        existente.subtotal = existente.qtd * valorUnit;
     } else {
-        c.itens.push({ produtoId: prodId, qtd, subtotal: qtd * prod.valor });
+        c.itens.push({
+            id: _genUuid(),
+            produtoId: prodId,
+            nome: prod.nome,
+            qtd,
+            valor: valorUnit,
+            subtotal: qtd * valorUnit,
+            ts: Date.now(),
+        });
     }
+    
+    // Recalcula total da comanda
+    c.total = c.itens.reduce((s, it) => s + Number(it.subtotal || 0), 0);
+    
+    // Marca anti-loop
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
 
     document.getElementById('cd-qtd').value = 1;
     saveData();
@@ -11724,7 +11793,132 @@ function removeItemComanda(itemIdx) {
 }
 
 function calcTotalComanda(c) {
-    return c.itens.reduce((s, it) => s + it.subtotal, 0);
+    if (!c || !c.itens) return 0;
+    return c.itens.reduce((s, it) => {
+        // Se tem subtotal, usa ele
+        if (it.subtotal != null && !isNaN(it.subtotal)) return s + Number(it.subtotal);
+        // Senão, calcula a partir de qtd * valor
+        const qtd = Number(it.qtd || 0);
+        const valor = Number(it.valor || 0);
+        return s + (qtd * valor);
+    }, 0);
+}
+
+// ============================================================
+// EXTRATO DE COMANDA (aberta ou fechada)
+// ============================================================
+let _extratoComandaIdAtual = null;
+
+function abrirExtratoComandaAtual() {
+    if (!activeComandaId) return showToast('⚠️ Selecione uma comanda');
+    abrirExtratoComanda(activeComandaId);
+}
+
+function abrirExtratoComanda(comandaId) {
+    const c = barComandas.find(x => x.id === comandaId);
+    if (!c) return showToast('⚠️ Comanda não encontrada');
+    
+    _extratoComandaIdAtual = comandaId;
+    
+    const j = jogadores.find(x => x.id === c.jogadorId);
+    const total = calcTotalComanda(c);
+    
+    const itensOrdenados = [...(c.itens || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    
+    const isFechada = c.status === 'fechada';
+    const corStatus = isFechada ? '#71717a' : '#22c55e';
+    const labelStatus = isFechada ? 'FECHADA' : 'ABERTA';
+    const dtAbertura = c.abertoEm ? new Date(c.abertoEm).toLocaleString('pt-BR') : '—';
+    const dtFechamento = c.fechadoEm ? new Date(c.fechadoEm).toLocaleString('pt-BR') : '—';
+    
+    const itensHtml = itensOrdenados.length === 0 
+        ? '<div style="padding:1.5rem;text-align:center;color:#71717a;font-size:.85rem;">Nenhum item adicionado</div>'
+        : itensOrdenados.map((it, i) => {
+            const valorUnit = Number(it.valor || 0);
+            const qtd = Number(it.qtd || 0);
+            const subtotal = Number(it.subtotal != null ? it.subtotal : qtd * valorUnit);
+            const dt = it.ts ? new Date(it.ts).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+            const nome = it.nome || (barProdutos.find(p => p.id === it.produtoId) || {}).nome || '?';
+            return `<div style="display:grid;grid-template-columns:32px 1fr auto;gap:.75rem;align-items:center;padding:.6rem .85rem;border-bottom:1px solid rgba(30,30,35,.5);">
+                <div style="background:#0a0a0c;border:1px solid #1e1e23;border-radius:.4rem;padding:.25rem;text-align:center;font-size:.7rem;color:#71717a;font-weight:700;font-family:'Space Mono',monospace;">${i+1}</div>
+                <div>
+                    <div style="font-size:.85rem;font-weight:700;">${escapeHtml(nome)}</div>
+                    <div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">
+                        ${qtd}x &middot; R$ ${valorUnit.toFixed(2).replace('.', ',')} cada${dt ? ' &middot; ' + dt : ''}
+                    </div>
+                </div>
+                <div style="font-family:'Space Mono',monospace;font-weight:800;color:var(--gold);font-size:.95rem;">
+                    R$ ${subtotal.toFixed(2).replace('.', ',')}
+                </div>
+            </div>`;
+        }).join('');
+    
+    const pagamentoHtml = isFechada && c.pagamento ? `
+        <div style="display:flex;justify-content:space-between;padding:.6rem .85rem;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:.5rem;font-size:.85rem;">
+            <span style="color:#71717a;">Pagamento:</span>
+            <span style="font-weight:700;">${(PAYMENT_METHODS[c.pagamento] || {}).label || c.pagamento}</span>
+        </div>` : '';
+    
+    const conteudo = `
+        <!-- Cabeçalho -->
+        <div style="background:#0a0a0c;border:1px solid #1e1e23;border-radius:.6rem;padding:.85rem 1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+                <div>
+                    <div style="font-weight:800;font-size:1rem;">${escapeHtml(j ? j.nome : '?')}</div>
+                    <div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">${escapeHtml(j ? (j.apelido || '') : '')}</div>
+                </div>
+                <span style="background:${corStatus}22;color:${corStatus};padding:.25rem .65rem;border-radius:.4rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;">${labelStatus}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.75rem;color:#a1a1aa;border-top:1px solid #1e1e23;padding-top:.5rem;margin-top:.4rem;">
+                <div>
+                    <div style="color:#52525b;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Aberta em</div>
+                    <div style="margin-top:.15rem;">${dtAbertura}</div>
+                </div>
+                ${isFechada ? `<div>
+                    <div style="color:#52525b;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Fechada em</div>
+                    <div style="margin-top:.15rem;">${dtFechamento}</div>
+                </div>` : ''}
+            </div>
+        </div>
+        
+        <!-- Itens -->
+        <div>
+            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">
+                <i class="fa-solid fa-list-ul"></i> Itens (${itensOrdenados.length})
+            </div>
+            <div style="background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;overflow:hidden;">
+                ${itensHtml}
+            </div>
+        </div>
+        
+        <!-- Total -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:rgba(212,175,55,.05);border:1px solid rgba(212,175,55,.25);border-radius:.6rem;">
+            <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);">Total</span>
+            <span style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.4rem;color:var(--gold);">R$ ${total.toFixed(2).replace('.', ',')}</span>
+        </div>
+        
+        ${pagamentoHtml}
+    `;
+    
+    document.getElementById('extrato-comanda-conteudo').innerHTML = conteudo;
+    openModal('modal-extrato-comanda');
+}
+
+function imprimirExtratoAtual() {
+    if (!_extratoComandaIdAtual) return;
+    const c = barComandas.find(x => x.id === _extratoComandaIdAtual);
+    if (!c) return;
+    
+    // Reaproveitar imprimirComanda se existir
+    const j = jogadores.find(x => x.id === c.jogadorId);
+    const comandaPrint = {
+        ...c,
+        clienteNome: j ? j.nome : '?',
+        clienteApelido: j ? (j.apelido || '') : '',
+    };
+    if (typeof imprimirComanda === 'function') {
+        imprimirComanda(comandaPrint);
+    }
 }
 
 function abrirComanda() {
@@ -11796,7 +11990,7 @@ function renderHistorico() {
         const j = jogadores.find(j => j.id === c.jogadorId);
         const mLbl = (PAYMENT_METHODS[c.pagamento] && PAYMENT_METHODS[c.pagamento].label) || c.pagamento;
         return `
-        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+        <div onclick="abrirExtratoComanda('${c.id}')" style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'" title="Clique pra ver extrato detalhado">
             <div>
                 <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}</div>
                 <div style="font-size:.75rem;color:#52525b;">
@@ -11807,6 +12001,7 @@ function renderHistorico() {
             <span class="tag" style="background:#18181b;color:#71717a;font-size:.65rem;"><i class="fa-solid ${pgtoIcon[c.pagamento]||'fa-circle'}"></i> ${mLbl}</span>
             <span style="font-family:'Space Mono',monospace;font-size:.75rem;color:#71717a;">Pago: ${formatMoney(c.valorPago||c.total)}</span>
             <span style="font-family:'Space Mono',monospace;font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(c.total)}</span>
+            <i class="fa-solid fa-receipt" style="color:var(--gold);font-size:.85rem;"></i>
         </div>`;
     }).join('');
 }
