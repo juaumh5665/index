@@ -4482,6 +4482,12 @@ async function _processarMudancaRealtime(tipo, payload) {
                         const r = await sb.from('bar_comanda_itens').select('*').in('comanda_id', ids);
                         itRows = r.data || [];
                     }
+                    
+                    // Mapa local pra preservar fechamentos recentes
+                    // Se localmente a comanda está FECHADA mas no banco vem ABERTA,
+                    // mantém local (provável race: fechou local + sync ainda não terminou)
+                    const localPorId = new Map((barComandas || []).map(c => [c.id, c]));
+                    
                     barComandas = cRows.map(c => {
                         const obj = _comandaFromDb(c);
                         obj.itens = itRows.filter(i => i.comanda_id === c.id).map(i => {
@@ -4497,6 +4503,21 @@ async function _processarMudancaRealtime(tipo, payload) {
                                 ts: new Date(i.ts).getTime(),
                             };
                         });
+                        
+                        // 🔒 PRESERVA fechamento local se estiver mais avançado que o banco
+                        const local = localPorId.get(c.id);
+                        if (local && local.status === 'fechada' && obj.status === 'aberta') {
+                            console.log('[REALTIME] preservando comanda fechada localmente:', c.id);
+                            obj.status = 'fechada';
+                            obj.fechadoEm = local.fechadoEm;
+                            obj.pagamento = local.pagamento;
+                            obj.valorPago = local.valorPago;
+                            obj.total = local.total;
+                            obj.fechadaPeloCaixa = local.fechadaPeloCaixa;
+                            obj.incluiuPendencias = local.incluiuPendencias;
+                            obj.pendenciasValor = local.pendenciasValor;
+                        }
+                        
                         return obj;
                     });
                     localStorage.setItem('ps_bar_comandas', JSON.stringify(barComandas));
@@ -4786,6 +4807,9 @@ function _comandaToDb(c) {
         fechado_em: c.fechadoEm ? new Date(c.fechadoEm).toISOString() : null,
         pagamento: c.pagamento || null,
         total: c.total || 0,
+        valor_pago: c.valorPago != null ? c.valorPago : null,
+        incluiu_pendencias: !!c.incluiuPendencias,
+        pendencias_valor: c.pendenciasValor || 0,
         fechada_pelo_caixa: !!c.fechadaPeloCaixa,
         operador: c.operador || null,
     };
@@ -5370,6 +5394,9 @@ function _comandaFromDb(r) {
         status: r.status, abertoEm: r.aberto_em ? new Date(r.aberto_em).getTime() : Date.now(),
         fechadoEm: r.fechado_em ? new Date(r.fechado_em).getTime() : null,
         pagamento: r.pagamento, total: parseFloat(r.total || 0),
+        valorPago: r.valor_pago != null ? parseFloat(r.valor_pago) : null,
+        incluiuPendencias: !!r.incluiu_pendencias,
+        pendenciasValor: parseFloat(r.pendencias_valor || 0),
         fechadaPeloCaixa: !!r.fechada_pelo_caixa,
         operador: r.operador, itens: [],
     };
@@ -13827,9 +13854,13 @@ Aplicar taxa?`)) {
             c.pagamento = metodo;
             c.total = totalC;
             c.fechadaPeloCaixa = true;
+            // Anti-loop: marca como mudança nossa pra realtime não reverter
+            if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
             comandasFechadas++;
         });
         if (comandasFechadas > 0) {
+            // Suspende realtime durante a janela de sync
+            if (typeof _suspenderRealtime === 'function') _suspenderRealtime(12000);
             showToast(`🧾 ${comandasFechadas} comanda${comandasFechadas>1?'s':''} fechada${comandasFechadas>1?'s':''} automaticamente`);
         }
     }
@@ -13852,6 +13883,12 @@ Aplicar taxa?`)) {
 
     showToast(`✅ Pagamento de ${formatMoney(valor)} registrado para ${j.nome}`);
     saveData();
+    
+    // Força sync IMEDIATO ao banco (não esperar debounce)
+    // Garante que comandas fechadas no caixa não voltem a aparecer abertas
+    if (typeof sincronizarEstado === 'function') {
+        sincronizarEstado().catch(err => console.warn('[CAIXA] sync falhou:', err));
+    }
 
     // === UNDO COMPLETO: desfaz pagamento + reabre comandas ===
     const jogIdUndo = pagamentoJogadorId;
@@ -14471,6 +14508,11 @@ function fecharComandaConfirm() {
     const metodoSel = document.querySelector('input[name="metodo-fc"]:checked');
     const metodo = metodoSel ? metodoSel.value : 'dinheiro';
 
+    // Suspender realtime durante fechamento (12s) pra evitar que outro evento
+    // recarregue a comanda do banco em estado antigo (race condition)
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(12000);
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+
     // Aplica taxa, se configurado
     const taxaInfo = calcularTaxa(pago, metodo);
     const cfgFin = getConfigFinanceiro();
@@ -14536,6 +14578,13 @@ Aplicar taxa ao jogador?`)) {
     activeComandaId = null;
 
     saveData();
+    
+    // Força sync IMEDIATO ao banco (não esperar debounce)
+    // Isso garante que outras telas/dispositivos vejam a comanda como fechada na hora
+    if (typeof sincronizarEstado === 'function') {
+        sincronizarEstado().catch(err => console.warn('[CLOSE] sync falhou:', err));
+    }
+    
     closeModal('modal-fechar-comanda');
     document.getElementById('bar-comanda-detalhe').style.display = 'none';
     renderComandas();
