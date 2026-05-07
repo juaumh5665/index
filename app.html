@@ -2050,15 +2050,18 @@
                                     <span id="cd-total" style="font-size:1.1rem;font-weight:800;color:#22c55e;font-family:'Space Mono',monospace;">R$ 0,00</span>
                                 </div>
                                 <!-- Ações da comanda -->
-                                <div style="display:flex;gap:.5rem;">
+                                <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                                     <button onclick="abrirExtratoComandaAtual()" style="flex:0 0 auto;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);color:var(--gold);border-radius:.6rem;padding:.75rem 1rem;font-weight:700;font-size:.8rem;cursor:pointer;" title="Ver extrato detalhado">
                                         <i class="fa-solid fa-receipt"></i>
                                     </button>
                                     <button onclick="imprimirComandaAtual()" style="flex:0 0 auto;background:rgba(255,255,255,.05);border:1px solid #27272a;color:#a1a1aa;border-radius:.6rem;padding:.75rem 1rem;font-weight:700;font-size:.8rem;cursor:pointer;" title="Imprimir comanda">
                                         <i class="fa-solid fa-print"></i>
                                     </button>
-                                    <button onclick="openFecharComanda()" style="flex:1;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#22c55e;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.85rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.1)'">
-                                        <i class="fa-solid fa-check"></i> Fechar Comanda
+                                    <button onclick="cobrarSomenteBar()" style="flex:1;min-width:140px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#f59e0b;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.85rem;cursor:pointer;" onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.1)'" title="Cobrar apenas itens do bar (ignora pendências)">
+                                        <i class="fa-solid fa-mug-hot"></i> Cobrar Bar
+                                    </button>
+                                    <button onclick="openFecharComanda()" style="flex:1;min-width:140px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:#22c55e;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.85rem;cursor:pointer;" onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.1)'" title="Acerto completo (com pendências)">
+                                        <i class="fa-solid fa-check"></i> Acerto Total
                                     </button>
                                 </div>
                             </div>
@@ -2615,7 +2618,7 @@
 <div id="modal-fechar-comanda" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-check-circle" style="color:#22c55e;"></i> Acerto de Conta</h3>
+            <h3 id="fc-titulo" style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-check-circle" style="color:#22c55e;"></i> Acerto de Conta</h3>
             <button onclick="closeModal('modal-fechar-comanda')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
@@ -14354,9 +14357,69 @@ function openFecharComanda() {
         document.getElementById('fc-pendencias-wrap').style.display = 'none';
     }
 
+    // Reset checkbox: vem marcado por padrão (acerto completo)
+    const cbPend = document.getElementById('fc-incluir-pendencias');
+    if (cbPend) cbPend.checked = true;
+    
+    // Título: acerto completo
+    const ttl = document.getElementById('fc-titulo');
+    if (ttl) ttl.innerHTML = '<i class="fa-solid fa-check-circle" style="color:#22c55e;"></i> Acerto de Conta';
+    
     atualizarTotalAcerto();
     renderMetodosPagamento('fc-metodos', 'fc', false);
     openModal('modal-fechar-comanda');
+}
+
+// "Cobrar Bar" — abre o modal já com pendências DESMARCADAS
+// Cobra só os itens da comanda, ignorando saldos devedores de torneios/cash
+function cobrarSomenteBar() {
+    const c = barComandas.find(c => c.id === activeComandaId);
+    if (!c) return;
+    if (!c.itens.length) return showToast('⚠️ Comanda vazia');
+
+    const j = jogadores.find(j => j.id === c.jogadorId);
+    const totalComanda = calcTotalComanda(c);
+    const saldoAtual = getSaldoJogador(c.jogadorId);
+    const pendencias = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
+
+    _fcEstadoAcerto = { totalComanda, pendencias, comanda: c, total: totalComanda };
+
+    document.getElementById('fc-jogador').innerText = j ? j.nome : '?';
+
+    if (pendencias > 0) {
+        const pendTxs = transacoes.filter(t => t.jogadorId === c.jogadorId && !t.fechamentoId);
+        const porOrigem = {};
+        pendTxs.forEach(t => {
+            porOrigem[t.origem || 'outro'] = (porOrigem[t.origem || 'outro'] || 0) + t.valor;
+        });
+        const origemLabels = { torneio:'Torneios', cash:'Cash Game', bar:'Bar', caixa:'Caixa', outro:'Outros' };
+        const detalhes = Object.entries(porOrigem)
+            .filter(([k,v]) => v < 0)
+            .map(([k,v]) => `${origemLabels[k]||k}: ${formatMoney(Math.abs(v))}`)
+            .join(' &bull; ');
+
+        document.getElementById('fc-pendencias-wrap').style.display = 'block';
+        document.getElementById('fc-pendencias-detalhe').innerHTML = (detalhes || `Saldo devedor de ${formatMoney(pendencias)}`) + 
+            ` <span style="color:#f59e0b;font-weight:700;">— NÃO incluído</span>`;
+    } else {
+        document.getElementById('fc-pendencias-wrap').style.display = 'none';
+    }
+
+    // 🔑 DESMARCA o checkbox de pendências (cobra só o bar)
+    const cbPend = document.getElementById('fc-incluir-pendencias');
+    if (cbPend) cbPend.checked = false;
+    
+    // Título dinâmico
+    const ttl = document.getElementById('fc-titulo');
+    if (ttl) ttl.innerHTML = '<i class="fa-solid fa-mug-hot" style="color:#f59e0b;"></i> Cobrar somente Bar';
+
+    atualizarTotalAcerto();
+    renderMetodosPagamento('fc-metodos', 'fc', false);
+    openModal('modal-fechar-comanda');
+    
+    if (pendencias > 0) {
+        showToast(`💰 Cobrando só Bar: R$ ${totalComanda.toFixed(2).replace('.',',')} (pendência de R$ ${pendencias.toFixed(2).replace('.',',')} permanece)`, 4000);
+    }
 }
 
 function atualizarTotalAcerto() {
