@@ -4962,6 +4962,42 @@ async function sincronizarEstado() {
             }
         }
 
+        // === BAR GRUPOS
+        if (_syncQueue.barGrupos.size) {
+            try {
+                // Estratégia: substituir a lista inteira (são poucos registros)
+                // 1. Pegar todos os grupos atuais no banco
+                const { data: gAtuais } = await sb.from('bar_grupos').select('nome').eq('clube_id', sbClube.id);
+                const nomesAtuais = new Set((gAtuais || []).map(g => g.nome));
+                const nomesLocais = new Set(barGrupos);
+                
+                // 2. Inserir novos (que estão local mas não no banco)
+                const novosParaInserir = barGrupos
+                    .filter(nome => !nomesAtuais.has(nome))
+                    .map((nome, i) => ({
+                        clube_id: sbClube.id,
+                        nome: nome,
+                        ordem: barGrupos.indexOf(nome),
+                    }));
+                if (novosParaInserir.length) {
+                    const { error: errIns } = await sb.from('bar_grupos').insert(novosParaInserir);
+                    if (errIns) console.warn('[SYNC] bar_grupos insert:', errIns);
+                }
+                
+                // 3. Remover grupos que sumiram localmente
+                const removidos = [...nomesAtuais].filter(n => !nomesLocais.has(n));
+                if (removidos.length) {
+                    const { error: errDel } = await sb.from('bar_grupos')
+                        .delete()
+                        .eq('clube_id', sbClube.id)
+                        .in('nome', removidos);
+                    if (errDel) console.warn('[SYNC] bar_grupos delete:', errDel);
+                }
+                
+                _syncQueue.barGrupos.clear();
+            } catch(e) { console.warn('[SYNC] bar_grupos:', e); }
+        }
+
         // === BAR PRODUTOS
         if (_syncQueue.barProdutos.size) {
             const ids = [..._syncQueue.barProdutos];
@@ -6188,6 +6224,18 @@ async function carregarUsuarioEClube(authUser) {
     console.log('🔐 SESSÃO INICIADA:');
     console.log('   Usuário:', usuario.email, '(papel:', usuario.papel + ')');
     console.log('   Clube:', clube.nome, '— ID:', clube.id);
+    
+    // Carregar barCaixa do banco (sincroniza entre dispositivos)
+    if (clube.bar_caixa) {
+        try {
+            const bc = typeof clube.bar_caixa === 'string' ? JSON.parse(clube.bar_caixa) : clube.bar_caixa;
+            if (bc && typeof bc === 'object') {
+                barCaixa = bc;
+                localStorage.setItem('ps_bar_caixa', JSON.stringify(barCaixa));
+                console.log('   ✅ Caixa do bar:', barCaixa.status);
+            }
+        } catch(e) { console.warn('Erro ao carregar barCaixa do banco:', e); }
+    }
 
     return { usuario, clube };
 }
@@ -14205,6 +14253,7 @@ function abrirBarCaixa() {
     barCaixa.abertoEm = Date.now();
     barCaixa.abertoPor = currentUser ? currentUser.nome : 'Sistema';
     saveData();
+    _syncBarCaixaDb();  // persiste no banco
     renderBarCaixaBanner();
     showToast('🔓 Caixa do bar aberto!');
 }
@@ -14239,10 +14288,22 @@ function fecharBarCaixa() {
     barCaixa.abertoPor = null;
 
     saveData();
+    _syncBarCaixaDb();  // persiste no banco
     renderBarCaixaBanner();
     renderHistorico();
     renderRelatorio();
     showToast(`🔒 Caixa fechado. Total: ${formatMoney(totalTurno)}`);
+}
+
+// Persiste o objeto barCaixa no banco (campo JSONB em clubes)
+async function _syncBarCaixaDb() {
+    if (!sb || !sbClube?.id) return;
+    try {
+        const { error } = await sb.from('clubes')
+            .update({ bar_caixa: barCaixa })
+            .eq('id', sbClube.id);
+        if (error) console.warn('[SYNC] bar_caixa:', error);
+    } catch(e) { console.warn('[SYNC] bar_caixa exception:', e); }
 }
 
 // ============================================================
