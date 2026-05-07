@@ -1180,7 +1180,27 @@ function montarCarouselPremiacao(d) {
     timerLocalInterval: null,
     pausedToggle: false,
     pausedToggleTimer: null,
+    // Drift entre relógio servidor e cliente (ms)
+    serverDriftMs: 0,
   };
+  
+  // Calcula tempo restante REAL usando tempo_alvo (timestamp absoluto)
+  // Sincroniza perfeitamente entre app e TV pública
+  function _calcularTempoRestante(t) {
+    if (!t) return 0;
+    
+    // Se tem tempo_alvo (rodando), calcula a partir do timestamp
+    if (t.tempo_alvo && t.rodando) {
+      const alvoMs = new Date(t.tempo_alvo).getTime();
+      // Ajusta com drift do servidor
+      const agoraServidor = Date.now() + pubState.serverDriftMs;
+      const restanteMs = alvoMs - agoraServidor;
+      return Math.max(0, Math.round(restanteMs / 1000));
+    }
+    
+    // Pausado/aguardando: usa o valor congelado
+    return Number(t.tempo_restante || 0);
+  }
   
   async function publicBoot() {
     if (slug) {
@@ -1239,12 +1259,22 @@ function montarCarouselPremiacao(d) {
   
   async function carregarPubData() {
     try {
+      const t0 = Date.now();
       const { data, error } = await sb.rpc('tv_dados_torneios', {
         p_clube_id: pubState.clubeId,
         p_token: pubState.token,
       });
+      const t1 = Date.now();
       if (error) throw error;
       if (!data || data.erro) return showPublicError('Token inválido. Peça uma URL nova.');
+      
+      // Calcular drift entre relógio do servidor e do cliente
+      // Compensa metade do round-trip (estimativa do tempo de resposta da rede)
+      if (data.server_now) {
+        const serverMs = new Date(data.server_now).getTime();
+        const clientMidpoint = (t0 + t1) / 2;
+        pubState.serverDriftMs = serverMs - clientMidpoint;
+      }
       
       pubState.clube = data.clube;
       
@@ -1333,17 +1363,15 @@ function montarCarouselPremiacao(d) {
   }
   
   function tickLocalTimer() {
-    // Decrementar tempo local pra suavidade visual entre fetches
-    // IMPORTANTE: durante intervalo (is_break) o timer também decrementa
-    // (intervalo tem duração definida e precisa contar)
     const t = pubState.torneios[pubState.activeIdx];
-    if (!t || !t.rodando || !(t.tempo_restante > 0)) return;
+    if (!t) return;
     
-    t.tempo_restante = Math.max(0, t.tempo_restante - 1);
+    // Calcular tempo restante REAL usando tempo_alvo (sincronia perfeita)
+    const ts = _calcularTempoRestante(t);
     
-    // Atualizar APENAS o display do timer — não refazer payload todo
-    // (evita flicker e race conditions)
-    const ts = t.tempo_restante;
+    // Atualizar o estado local pra hash funcionar
+    t.tempo_restante = ts;
+    
     const m = Math.floor(ts / 60);
     const s = ts % 60;
     const timerStr = m.toString().padStart(2,'0') + ':' + s.toString().padStart(2,'0');
@@ -1389,9 +1417,6 @@ function montarCarouselPremiacao(d) {
         elapsedEls.forEach(el => { if (el) el.textContent = elapsedStr; });
       }
     }
-    
-    // Quando chegar a zero, o realtime vai disparar quando o app
-    // mudar de nível. Não precisamos forçar fetch aqui (evita chamadas extras)
   }
   
   let _renderLock = false;

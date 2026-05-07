@@ -4682,6 +4682,7 @@ function _torneioToDb(t) {
         nivel_atual: t.nivelAtual || 0,
         tempo_total: t.tempoTotal || 0,
         tempo_restante: t.tempoRestante || 0,
+        tempo_alvo: t.tempoAlvo ? new Date(t.tempoAlvo).toISOString() : null,
         status: t.status || 'aguardando',
         rodando: !!t.rodando,
         is_break: !!t.isBreak,
@@ -5187,6 +5188,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         nivelAtual: r.nivel_atual || 0,
         tempoTotal: r.tempo_total || 0,
         tempoRestante: r.tempo_restante || 0,
+        tempoAlvo: r.tempo_alvo ? new Date(r.tempo_alvo).getTime() : null,
         status: r.status,
         rodando: !!r.rodando,
         isBreak: !!r.is_break,
@@ -10215,6 +10217,9 @@ function toggleTimer(idx) {
         t.status = 'paused';
     }
     
+    // Atualiza tempoAlvo (timestamp absoluto pra TV pública sincronizar)
+    _recalcTempoAlvo(t);
+    
     // Marca como mudança nossa (anti-loop fica protegido)
     if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
     
@@ -10225,6 +10230,7 @@ function toggleTimer(idx) {
 
 function adjTime(idx, v) {
     torneios[idx].tempoRestante = Math.max(0, torneios[idx].tempoRestante + v);
+    _recalcTempoAlvo(torneios[idx]);
     saveData();
     updateModalTorneio();
     updateTV(idx);
@@ -10235,6 +10241,7 @@ function prevLevel(idx) {
     if (t.nivelAtual > 0) {
         t.nivelAtual--;
         aplicarTempoNivel(t);
+        _recalcTempoAlvo(t);
         saveData();
         updateModalTorneio();
         updateTV(idx);
@@ -10262,6 +10269,7 @@ function nextLevel(idx) {
             }
             showToast(`⬆️ Nível: ${b.sb}/${b.bb}${b.ante?' (ante '+b.ante+')':''}`);
         }
+        _recalcTempoAlvo(t);
         saveData();
         updateModalTorneio();
         updateTV(idx);
@@ -10294,6 +10302,7 @@ function toggleBreak(idx) {
         t.tempoTotal     = t.tempoNivel * 60;
         t.status         = t.rodando ? 'running' : 'paused';
     }
+    _recalcTempoAlvo(t);
     saveData();
     updateModalTorneio();
     updateTV(idx);
@@ -10986,6 +10995,17 @@ function salvarConfigStatsTV() {
 let _ultimoSyncTimer = 0;
 const SYNC_TIMER_INTERVAL_MS = 15000; // sync remoto a cada 15s
 
+// Helper: recalcula tempoAlvo baseado em tempoRestante e estado rodando
+// Quando rodando: tempoAlvo = now + tempoRestante * 1000
+// Quando pausado/aguardando: tempoAlvo = null (tempoRestante é o congelado)
+function _recalcTempoAlvo(t) {
+    if (t.rodando && t.tempoRestante > 0) {
+        t.tempoAlvo = Date.now() + (t.tempoRestante * 1000);
+    } else {
+        t.tempoAlvo = null;
+    }
+}
+
 setInterval(() => {
     let changed = false;
     let mudancaImportante = false;  // pause, level change, etc.
@@ -11015,6 +11035,8 @@ setInterval(() => {
         
         if (mudancaImportante || ehHoraDeSync) {
             // Sync completo (vai pro banco)
+            // Recalcula tempoAlvo de todos torneios rodando antes de sincronizar
+            torneios.forEach(t => { if (t.rodando) _recalcTempoAlvo(t); });
             _ultimoSyncTimer = agora;
             saveData();
         } else {
