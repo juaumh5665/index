@@ -1334,8 +1334,10 @@ function montarCarouselPremiacao(d) {
   
   function tickLocalTimer() {
     // Decrementar tempo local pra suavidade visual entre fetches
+    // IMPORTANTE: durante intervalo (is_break) o timer também decrementa
+    // (intervalo tem duração definida e precisa contar)
     const t = pubState.torneios[pubState.activeIdx];
-    if (!t || !t.rodando || t.is_break || !(t.tempo_restante > 0)) return;
+    if (!t || !t.rodando || !(t.tempo_restante > 0)) return;
     
     t.tempo_restante = Math.max(0, t.tempo_restante - 1);
     
@@ -1353,6 +1355,7 @@ function montarCarouselPremiacao(d) {
       document.getElementById('pw-timer'),    // Pro Live
       document.getElementById('mz-timer'),    // Minimalista (se houver)
       document.getElementById('feltro-timer'),// Feltro (se houver)
+      document.getElementById('break-timer'), // Tela de intervalo (break)
     ];
     timerEls.forEach(el => { if (el) el.textContent = timerStr; });
     
@@ -1456,14 +1459,15 @@ function montarCarouselPremiacao(d) {
     const jackpotsQtd = jackpotCompras.length;  // cada linha = 1 compra
     const jackpotFichas = jackpotCompras.reduce((s, j) => s + Number(j.fichas || 0), 0);
     
-    // Stats strip
+    // Stats strip — espelha EXATAMENTE a lógica do app (sempre mostra cards configurados)
     const statsStrip = [];
     statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
     if (reentriesQtd) statsStrip.push({ label: 'RE-ENTRY', value: reentriesQtd });
     if (Number(t.jackpot_valor || 0) > 0) statsStrip.push({ label: 'JACKPOT', value: jackpotsQtd });
-    if (rebuysSimplesQtd) statsStrip.push({ label: 'REBUY ' + (t.rebuy_valor || ''), value: rebuysSimplesQtd });
-    if (rebuysDuplosQtd) statsStrip.push({ label: 'REBUY ' + (t.rebuy_duplo_valor || '') + ' (DUPLO)', value: rebuysDuplosQtd });
-    if (addonsQtd) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
+    // REBUY/ADD-ON: mostra se está configurado no torneio (mesmo com 0 entries)
+    if (Number(t.rebuy_valor || 0) > 0) statsStrip.push({ label: 'REBUY ' + t.rebuy_valor, value: rebuysSimplesQtd });
+    if (Number(t.rebuy_duplo_valor || 0) > 0) statsStrip.push({ label: 'REBUY ' + t.rebuy_duplo_valor + ' (DUPLO)', value: rebuysDuplosQtd });
+    if (Number(t.addon_fichas || 0) > 0) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
     
     // === CHIP COUNT (replicando EXATAMENTE a lógica do app) ===
     // Cada entry recebe fichas de acordo com seu tipo:
