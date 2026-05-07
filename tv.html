@@ -1206,13 +1206,13 @@ function montarCarouselPremiacao(d) {
     
     await carregarPubData();
     
-    // Polling backup a cada 5s
-    pubState.pollingInterval = setInterval(carregarPubData, 5000);
+    // Polling backup a cada 30s (realtime cuida do tempo real)
+    pubState.pollingInterval = setInterval(carregarPubData, 30000);
     
     // Iniciar realtime
     iniciarPubRealtime();
     
-    // Timer local pra suavizar
+    // Timer local pra suavidade visual (atualiza só o número do timer, não re-renderiza tudo)
     pubState.timerLocalInterval = setInterval(tickLocalTimer, 1000);
   }
   
@@ -1287,16 +1287,54 @@ function montarCarouselPremiacao(d) {
   function tickLocalTimer() {
     // Decrementar tempo local pra suavidade visual entre fetches
     const t = pubState.torneios[pubState.activeIdx];
-    if (t && t.rodando && !t.is_break && t.tempo_restante > 0) {
-      t.tempo_restante = Math.max(0, t.tempo_restante - 1);
-      // Re-render só timer (não tudo)
-      renderizarPubTorneioAtivo();
+    if (!t || !t.rodando || t.is_break || !(t.tempo_restante > 0)) return;
+    
+    t.tempo_restante = Math.max(0, t.tempo_restante - 1);
+    
+    // Atualizar APENAS o display do timer — não refazer payload todo
+    // (evita flicker e race conditions)
+    const ts = t.tempo_restante;
+    const m = Math.floor(ts / 60);
+    const s = ts % 60;
+    const timerStr = m.toString().padStart(2,'0') + ':' + s.toString().padStart(2,'0');
+    
+    // Atualizar diretamente os elementos do DOM (sem disparar postMessage)
+    const timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.textContent = timerStr;
+    
+    // Atualizar barra de progresso
+    const tempoTotal = Number(t.tempo_total || (Number(t.tempo_nivel || 15) * 60));
+    const pct = tempoTotal > 0 ? (ts / tempoTotal) * 100 : 100;
+    const barEl = document.getElementById('bar');
+    if (barEl) {
+      barEl.style.width = pct + '%';
+      barEl.style.background = pct < 20 ? '#ef4444' : '';
+    }
+    
+    // Quando chegar a zero, dispara um refresh completo (próximo nível)
+    if (ts === 0) {
+      setTimeout(() => carregarPubData(), 800);
     }
   }
+  
+  let _renderLock = false;
   
   // Constrói o payload no MESMO formato que updateTV() do app envia,
   // e dispara a mesma função onmessage (já existente neste tv.html)
   function renderizarPubTorneioAtivo() {
+    if (_renderLock) return;
+    _renderLock = true;
+    try {
+      _renderInternal();
+    } catch(e) {
+      console.error('[TV PUBLIC] erro renderizar:', e);
+    } finally {
+      // Libera o lock no próximo tick
+      setTimeout(() => { _renderLock = false; }, 50);
+    }
+  }
+  
+  function _renderInternal() {
     const t = pubState.torneios[pubState.activeIdx];
     if (!t) return;
     
@@ -1338,24 +1376,47 @@ function montarCarouselPremiacao(d) {
     const rebuysDuplosQtd = entries.filter(e => e.tipo === 'rebuy_duplo').length;
     const rebuysQtd = rebuysSimplesQtd + rebuysDuplosQtd;
     const addonsQtd = entries.filter(e => e.tipo === 'addon').length;
-    const jackpotsQtd = 0; // TODO: somar de torneio_jackpot_compras se quiser na TV pública
+    
+    // Jackpot: somar do array jackpot_compras
+    const jackpotCompras = Array.isArray(t.jackpot_compras) ? t.jackpot_compras : [];
+    const jackpotsQtd = jackpotCompras.reduce((s, j) => s + Number(j.qtd || 1), 0);
+    const jackpotFichas = jackpotCompras.reduce((s, j) => s + Number(j.fichas || 0), 0);
     
     // Stats strip
     const statsStrip = [];
     statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
     if (reentriesQtd) statsStrip.push({ label: 'RE-ENTRY', value: reentriesQtd });
+    if (Number(t.jackpot_valor || 0) > 0) statsStrip.push({ label: 'JACKPOT', value: jackpotsQtd });
     if (rebuysSimplesQtd) statsStrip.push({ label: 'REBUY ' + (t.rebuy_valor || ''), value: rebuysSimplesQtd });
+    if (rebuysDuplosQtd) statsStrip.push({ label: 'REBUY ' + (t.rebuy_duplo_valor || '') + ' (DUPLO)', value: rebuysDuplosQtd });
     if (addonsQtd) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
     
-    // Chip count: stack inicial * buyins + ajustes por rebuy/addon
+    // === CHIP COUNT (replicando EXATAMENTE a lógica do app) ===
+    // Cada entry recebe fichas de acordo com seu tipo:
+    //   buyin/reentry → stack
+    //   rebuy_simples → rebuy_fichas (ou stack como fallback)
+    //   rebuy_duplo   → rebuy_duplo_fichas (ou stack*2)
+    //   addon         → addon_fichas
     const stackInicial = Number(t.stack || 0);
-    let chipCount = (totalEntries) * stackInicial;
-    chipCount += rebuysSimplesQtd * Number(t.rebuy_fichas || stackInicial);
-    chipCount += rebuysDuplosQtd * (Number(t.rebuy_fichas || stackInicial) * 2);
-    chipCount += addonsQtd * Number(t.addon_fichas || 0);
+    const rebuySimplesFichas = Number(t.rebuy_fichas || stackInicial);
+    const rebuyDuploFichas = Number(t.rebuy_duplo_fichas || stackInicial * 2);
+    const addonFichasQtd = Number(t.addon_fichas || 0);
+    
+    let totalFichas = entries.reduce((s, e) => {
+      if (e.tipo === 'rebuy_simples') return s + rebuySimplesFichas;
+      if (e.tipo === 'rebuy_duplo')   return s + rebuyDuploFichas;
+      if (e.tipo === 'addon')         return s + addonFichasQtd;
+      return s + stackInicial;  // buyin, reentry
+    }, 0);
+    
+    // Adiciona jackpot chips
+    const chipCount = totalFichas + jackpotFichas;
+    
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
-    const bbAtual = blindsRef.bb || 1;
-    const avgBBs = avg > 0 ? Math.round(avg / bbAtual) : 0;
+    
+    // Avg em BBs — usar bb do nível atual (não do break)
+    const bbAtual = (blindsRef.bb && !blindsRef.isBreak) ? blindsRef.bb : 1;
+    const avgBBs = avg > 0 && bbAtual > 0 ? Math.round(avg / bbAtual) : 0;
     
     // Prize pool
     const buyin = Number(t.buyin || 0);
