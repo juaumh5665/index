@@ -5031,6 +5031,13 @@ const _saveDataOriginal = (typeof saveData === 'function') ? saveData : null;
 async function carregarEstadoDoSupabase() {
     if (!sbClube) return;
     const clubeIdEsperado = sbClube.id;
+    
+    // Sincronizar relógio com servidor ANTES de carregar dados
+    // Garante que tempoAlvo seja calculado com referência correta
+    if (typeof _sincronizarRelogioServidor === 'function' && !_serverClockSynced) {
+        try { await _sincronizarRelogioServidor(); } catch(e) { /* ignora */ }
+    }
+    
     try {
         // Torneios — sempre filtra pelo clube_id atual (defesa em profundidade)
         const { data: tRowsRaw } = await sb.from('torneios').select('*').eq('clube_id', clubeIdEsperado).order('criado_em', { ascending: false });
@@ -10995,12 +11002,45 @@ function salvarConfigStatsTV() {
 let _ultimoSyncTimer = 0;
 const SYNC_TIMER_INTERVAL_MS = 15000; // sync remoto a cada 15s
 
+// === SERVER CLOCK OFFSET ===
+// Diferença entre relógio do servidor (Postgres NOW()) e relógio do cliente
+// Mantém sincronia entre todos dispositivos mesmo se relógio do app estiver fora
+let _serverClockOffsetMs = 0;
+let _serverClockSynced = false;
+
+async function _sincronizarRelogioServidor() {
+    if (!sb || !sbClube) return;
+    try {
+        const t0 = Date.now();
+        const { data, error } = await sb.rpc('calcular_tempo_alvo', { p_tempo_restante: 0 });
+        const t1 = Date.now();
+        if (error) throw error;
+        if (data) {
+            const serverNow = new Date(data).getTime();
+            const clientMidpoint = (t0 + t1) / 2;
+            _serverClockOffsetMs = serverNow - clientMidpoint;
+            _serverClockSynced = true;
+            console.log('[CLOCK] Sincronizado com servidor. Offset:', _serverClockOffsetMs + 'ms');
+        }
+    } catch(e) { 
+        console.warn('[CLOCK] Falha ao sincronizar com servidor:', e.message);
+    }
+}
+
+// Sincroniza ao inicializar imediatamente e a cada 2 minutos
+_sincronizarRelogioServidor();
+setInterval(_sincronizarRelogioServidor, 2 * 60 * 1000);
+
+// "Now" do servidor calculado localmente (sem chamada de rede)
+function _nowServidor() {
+    return Date.now() + _serverClockOffsetMs;
+}
+
 // Helper: recalcula tempoAlvo baseado em tempoRestante e estado rodando
-// Quando rodando: tempoAlvo = now + tempoRestante * 1000
-// Quando pausado/aguardando: tempoAlvo = null (tempoRestante é o congelado)
+// USA RELÓGIO DO SERVIDOR — garante sincronia entre todos dispositivos
 function _recalcTempoAlvo(t) {
     if (t.rodando && t.tempoRestante > 0) {
-        t.tempoAlvo = Date.now() + (t.tempoRestante * 1000);
+        t.tempoAlvo = _nowServidor() + (t.tempoRestante * 1000);
     } else {
         t.tempoAlvo = null;
     }
@@ -11042,11 +11082,13 @@ function _executarTickGlobal() {
     let changed = false;
     let mudancaImportante = false;
     
+    const agoraServer = _nowServidor();  // tempo do servidor (mesma referência que tempoAlvo)
+    
     torneios.forEach((t, i) => {
         // ESTRATÉGIA: tempo calculado a partir de tempoAlvo (timestamp absoluto)
-        // Imune a throttling de aba em background
+        // Imune a throttling de aba em background + sincronizado com servidor
         if (t.rodando && t.tempoAlvo) {
-            const restanteReal = Math.max(0, Math.round((t.tempoAlvo - Date.now()) / 1000));
+            const restanteReal = Math.max(0, Math.round((t.tempoAlvo - agoraServer) / 1000));
             
             if (restanteReal !== t.tempoRestante) {
                 t.tempoRestante = restanteReal;
@@ -11066,6 +11108,7 @@ function _executarTickGlobal() {
             // Migração: torneios antigos sem tempoAlvo — gera o alvo agora
             _recalcTempoAlvo(t);
             changed = true;
+            mudancaImportante = true;  // força sync imediato pra TV pública pegar
         } else if (t.rodando && t.tempoRestante <= 0) {
             nextLevel(i);
             changed = true;

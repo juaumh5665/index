@@ -1195,7 +1195,20 @@ function montarCarouselPremiacao(d) {
       // Ajusta com drift do servidor
       const agoraServidor = Date.now() + pubState.serverDriftMs;
       const restanteMs = alvoMs - agoraServidor;
-      return Math.max(0, Math.round(restanteMs / 1000));
+      const restanteSec = Math.max(0, Math.round(restanteMs / 1000));
+      
+      // DEBUG (remover depois): mostra cálculo no console quando há divergência grande
+      if (window._debugTimer) {
+        console.log('[TIMER]', {
+          tempo_alvo: t.tempo_alvo,
+          alvoMs,
+          agoraServidor,
+          restanteSec,
+          serverDriftMs: pubState.serverDriftMs,
+        });
+      }
+      
+      return restanteSec;
     }
     
     // Pausado/aguardando: usa o valor congelado
