@@ -3809,6 +3809,14 @@ function saveData() {
     }
 }
 
+// Versão LEVE pro timer: só localStorage (não dispara sync remoto)
+// Sync remoto será feito periodicamente ou em mudanças significativas
+function saveDataLocal() {
+    try {
+        localStorage.setItem('ps_torneios', JSON.stringify(torneios));
+    } catch(e) { /* ignora */ }
+}
+
 
 // ============================================================
 // CORE
@@ -10975,8 +10983,13 @@ function salvarConfigStatsTV() {
 // ============================================================
 // TIMER GLOBAL
 // ============================================================
+let _ultimoSyncTimer = 0;
+const SYNC_TIMER_INTERVAL_MS = 15000; // sync remoto a cada 15s
+
 setInterval(() => {
     let changed = false;
+    let mudancaImportante = false;  // pause, level change, etc.
+    
     torneios.forEach((t, i) => {
         if (t.rodando && t.tempoRestante > 0) {
             t.tempoRestante--;
@@ -10989,12 +11002,26 @@ setInterval(() => {
             // Quando tempo esgota, avança - se era break, o próximo é nível normal
             nextLevel(i);
             changed = true;
+            mudancaImportante = true;  // mudou de nível — sync já
         } else if (t.iniciadoEm && t.status !== 'finished') {
             // Atualiza TV mesmo pausado para manter tempo decorrido em tempo real
             updateTV(i);
         }
     });
-    if (changed) saveData();
+    
+    if (changed) {
+        const agora = Date.now();
+        const ehHoraDeSync = (agora - _ultimoSyncTimer) >= SYNC_TIMER_INTERVAL_MS;
+        
+        if (mudancaImportante || ehHoraDeSync) {
+            // Sync completo (vai pro banco)
+            _ultimoSyncTimer = agora;
+            saveData();
+        } else {
+            // Tick comum: só salva localStorage (sem sync remoto)
+            saveDataLocal();
+        }
+    }
 
     // Re-render cash mesas every ~30s to refresh "tempo em mesa" counters
     if (document.getElementById('page-cash') && document.getElementById('page-cash').style.display !== 'none') {

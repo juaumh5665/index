@@ -1216,9 +1216,12 @@ function montarCarouselPremiacao(d) {
     pubState.timerLocalInterval = setInterval(tickLocalTimer, 1000);
   }
   
-  // Hash leve pra detectar mudanças "estruturais" (não-timer)
+  // Hash leve pra detectar mudanças "estruturais" (não-timer normal)
+  // Inclui tempo_restante arredondado em 30s — captura ajustes manuais (+1min, -1min)
+  // mas ignora ticks segundo-a-segundo
   function _hashEstrutural(t) {
     if (!t) return '';
+    const tempoArred = Math.round((t.tempo_restante || 0) / 30) * 30;
     return JSON.stringify({
       id: t.id,
       status: t.status,
@@ -1230,6 +1233,7 @@ function montarCarouselPremiacao(d) {
       entriesQtd: (t.entries || []).length,
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
+      tempoArred: tempoArred,
     });
   }
   
@@ -1271,21 +1275,18 @@ function montarCarouselPremiacao(d) {
       const hashAntes = _hashEstrutural(torneioAtual);
       const hashDepois = _hashEstrutural(novoTorneio);
       
+      if (hashAntes && hashAntes === hashDepois && torneioAtual?.id === novoTorneio.id) {
+        // MESMO nível, mesmo status → mantém timer LOCAL rodando
+        // Não sobrescreve tempo_restante (servidor pode ter dado desatualizado)
+        // Só atualiza dados secundários (entries qtd já está no hash, então não muda aqui)
+        return;
+      }
+      
+      // Mudança estrutural — recarrega e renderiza
       pubState.torneios = rodando;
       pubState.activeIdx = 0;
       
       hidePublicEmpty();
-      
-      if (hashAntes && hashAntes === hashDepois && torneioAtual?.id === novoTorneio.id) {
-        // Só ressincroniza tempo_restante (sem re-render completo)
-        // Isso evita o flicker quando o app salva o tempo a cada segundo
-        torneioAtual.tempo_restante = novoTorneio.tempo_restante;
-        torneioAtual.tempo_total = novoTorneio.tempo_total;
-        // Re-render do timer já será feito pelo tickLocalTimer
-        return;
-      }
-      
-      // Mudança estrutural — renderiza completo via postMessage
       renderizarPubTorneioAtivo();
     } catch(e) {
       console.error('[TV PUBLIC] erro carregar:', e);
@@ -1346,16 +1347,44 @@ function montarCarouselPremiacao(d) {
     const timerStr = m.toString().padStart(2,'0') + ':' + s.toString().padStart(2,'0');
     
     // Atualizar diretamente os elementos do DOM (sem disparar postMessage)
-    const timerEl = document.getElementById('timer');
-    if (timerEl) timerEl.textContent = timerStr;
+    // Cobre TODOS os layouts existentes
+    const timerEls = [
+      document.getElementById('timer'),       // layout clássico
+      document.getElementById('pw-timer'),    // Pro Live
+      document.getElementById('mz-timer'),    // Minimalista (se houver)
+      document.getElementById('feltro-timer'),// Feltro (se houver)
+    ];
+    timerEls.forEach(el => { if (el) el.textContent = timerStr; });
     
     // Atualizar barra de progresso
     const tempoTotal = Number(t.tempo_total || (Number(t.tempo_nivel || 15) * 60));
     const pct = tempoTotal > 0 ? (ts / tempoTotal) * 100 : 100;
-    const barEl = document.getElementById('bar');
-    if (barEl) {
-      barEl.style.width = pct + '%';
-      barEl.style.background = pct < 20 ? '#ef4444' : '';
+    const barEls = [
+      document.getElementById('bar'),
+      document.getElementById('pw-bar'),
+    ];
+    barEls.forEach(el => {
+      if (el) {
+        el.style.width = pct + '%';
+        if (pct < 20) el.style.background = '#ef4444';
+      }
+    });
+    
+    // Atualizar tempo decorrido (se tem iniciado_em)
+    if (t.iniciado_em) {
+      const elapsedMs = Date.now() - new Date(t.iniciado_em).getTime();
+      if (elapsedMs > 0) {
+        const total = Math.floor(elapsedMs / 1000);
+        const h = Math.floor(total / 3600);
+        const mm = Math.floor((total % 3600) / 60);
+        const ss = total % 60;
+        const elapsedStr = `${h.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
+        const elapsedEls = [
+          document.getElementById('elapsed-time'),
+          document.getElementById('pw-elapsed'),
+        ];
+        elapsedEls.forEach(el => { if (el) el.textContent = elapsedStr; });
+      }
     }
     
     // Quando chegar a zero, o realtime vai disparar quando o app
