@@ -1175,7 +1175,6 @@ function montarCarouselPremiacao(d) {
     clube: null,
     torneios: [],
     activeIdx: 0,
-    rotacaoInterval: null,
     pollingInterval: null,
     realtimeChannel: null,
     timerLocalInterval: null,
@@ -1227,27 +1226,38 @@ function montarCarouselPremiacao(d) {
       if (!data || data.erro) return showPublicError('Token inválido. Peça uma URL nova.');
       
       pubState.clube = data.clube;
-      pubState.torneios = (data.torneios || []).filter(t => 
+      
+      // Pegar TODOS os torneios não-encerrados (pra distinguir "rodando" de "aguardando")
+      const todosAtivos = (data.torneios || []).filter(t => 
         t.status !== 'finished' && t.status !== 'encerrado' && t.status !== 'cancelado'
       );
       
-      if (pubState.torneios.length === 0) {
-        return showPublicEmpty(pubState.clube);
+      // FILTRO: apenas torneios efetivamente RODANDO (running, paused, break)
+      // - waiting/aguardando NÃO aparece (ainda não começou)
+      const rodando = todosAtivos.filter(t => 
+        t.status === 'running' || t.status === 'paused' || t.status === 'break' || t.rodando === true
+      );
+      
+      if (rodando.length === 0) {
+        // Nenhum em andamento — mostra empty state (mas se tem aguardando, dá uma dica)
+        return showPublicEmpty(pubState.clube, todosAtivos.length > 0);
       }
       
-      // Garantir índice válido
-      if (pubState.activeIdx >= pubState.torneios.length) pubState.activeIdx = 0;
+      // Se múltiplos rodando, pega o mais recentemente iniciado
+      rodando.sort((a, b) => {
+        const tsA = a.iniciado_em ? new Date(a.iniciado_em).getTime() : 0;
+        const tsB = b.iniciado_em ? new Date(b.iniciado_em).getTime() : 0;
+        return tsB - tsA;
+      });
+      
+      pubState.torneios = rodando;
+      pubState.activeIdx = 0;  // sempre o primeiro (mais recente)
+      
+      // Esconder overlay de empty state se estiver aparecendo
+      hidePublicEmpty();
       
       // Renderizar via mesmo postMessage que a popup recebe
       renderizarPubTorneioAtivo();
-      
-      // Se tem múltiplos torneios, rotacionar a cada 15s
-      if (pubState.torneios.length > 1 && !pubState.rotacaoInterval) {
-        pubState.rotacaoInterval = setInterval(() => {
-          pubState.activeIdx = (pubState.activeIdx + 1) % pubState.torneios.length;
-          renderizarPubTorneioAtivo();
-        }, 15000);
-      }
     } catch(e) {
       console.error('[TV PUBLIC] erro carregar:', e);
     }
@@ -1446,14 +1456,34 @@ function montarCarouselPremiacao(d) {
     `;
   }
   
-  function showPublicEmpty(clube) {
-    document.body.style.cssText = 'background:#0a0a0c;color:#fafafa;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;text-align:center;padding:2rem;font-family:Manrope,sans-serif;';
-    document.body.innerHTML = `
+  function showPublicEmpty(clube, temAguardando) {
+    // Estratégia: mostrar overlay flutuante em vez de apagar o body,
+    // assim quando o torneio iniciar o realtime consegue renderizar normal
+    let overlay = document.getElementById('public-empty-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'public-empty-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0a0c;color:#fafafa;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem;font-family:Manrope,sans-serif;';
+      document.body.appendChild(overlay);
+    }
+    const subtitulo = temAguardando 
+      ? 'Aguardando torneio iniciar...' 
+      : 'Nenhum torneio em andamento';
+    const dica = temAguardando
+      ? 'A TV vai mostrar o torneio assim que começar.'
+      : 'A TV vai atualizar automaticamente quando começar.';
+    overlay.innerHTML = `
       <div style="font-size:5rem;margin-bottom:1rem;">🏆</div>
       <h1 style="font-size:2rem;margin-bottom:.5rem;color:#f5e6c8;">${clube?.nome || 'Clube'}</h1>
-      <p style="color:#a1a1aa;font-size:1.1rem;margin-bottom:.5rem;">Nenhum torneio em andamento</p>
-      <p style="color:#71717a;font-size:.9rem;">A TV vai atualizar automaticamente quando começar.</p>
+      <p style="color:#a1a1aa;font-size:1.1rem;margin-bottom:.5rem;">${subtitulo}</p>
+      <p style="color:#71717a;font-size:.9rem;">${dica}</p>
     `;
+    overlay.style.display = 'flex';
+  }
+  
+  function hidePublicEmpty() {
+    const overlay = document.getElementById('public-empty-overlay');
+    if (overlay) overlay.style.display = 'none';
   }
   
   // Bootar quando DOM estiver pronto
