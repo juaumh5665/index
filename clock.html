@@ -37,12 +37,16 @@ html,body{
 .app{
   width:100vw;
   height:100vh;
+  height:100dvh; /* dvh = dynamic viewport height, melhor pra Android com barra do navegador */
   background:
     radial-gradient(circle at center, rgba(139,92,246,0.14), transparent 45%),
     linear-gradient(135deg,#020617 0%,#020817 40%,#01030d 100%);
   position:relative;
   overflow:hidden;
-  padding:18px 28px;
+  padding:1.8vh 2vw;
+  display:grid;
+  grid-template-rows:auto 1fr auto auto;
+  gap:0;
 }
 .app::before{
   content:'';
@@ -78,6 +82,8 @@ html,body{
 .top{
   display:flex;justify-content:space-between;align-items:flex-start;
   position:relative;z-index:2;
+  height:14vh;
+  min-height:60px;
 }
 
 .card{
@@ -88,62 +94,72 @@ html,body{
 }
 
 .mesa-card{
-  width:110px;height:110px;border-radius:22px;padding:14px;
+  width:14vh;height:14vh;
+  min-width:60px;min-height:60px;
+  max-width:90px;max-height:90px;
+  border-radius:14px;padding:6px;
   display:flex;flex-direction:column;justify-content:center;align-items:center;
   cursor:pointer;transition:0.2s;
 }
 .mesa-card:active{transform:scale(0.96);}
-.mesa-card span{font-size:13px;font-weight:700;color:#c026d3;letter-spacing:1px;}
-.mesa-card strong{font-size:54px;line-height:1;font-weight:800;}
+.mesa-card span{font-size:10px;font-weight:700;color:#c026d3;letter-spacing:1px;}
+.mesa-card strong{font-size:6vh;line-height:1;font-weight:800;}
 
 .logo{position:absolute;left:50%;transform:translateX(-50%);text-align:center;}
 .logo h1{
-  font-size:56px;font-weight:800;letter-spacing:-3px;
+  font-size:5vh;font-weight:800;letter-spacing:-2px;
   background:linear-gradient(90deg,#ffffff,#8b5cf6);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;
 }
 .logo p{
-  font-size:15px;letter-spacing:8px;color:#9333ea;font-weight:700;
-  margin-top:-4px;
+  font-size:1.6vh;letter-spacing:6px;color:#9333ea;font-weight:700;
+  margin-top:2px;
 }
 
 .settings{
-  width:80px;height:80px;border-radius:22px;
+  width:11vh;height:11vh;
+  min-width:50px;min-height:50px;
+  max-width:80px;max-height:80px;
+  border-radius:14px;
   display:flex;justify-content:center;align-items:center;
-  cursor:pointer;transition:0.2s;font-size:32px;
+  cursor:pointer;transition:0.2s;font-size:4vh;
 }
 .settings:active{transform:scale(0.95);}
 
 /* === CENTRO (timer) === */
 .center{
-  position:absolute;
-  top:50%;left:50%;
-  transform:translate(-50%,-50%);
+  position:relative;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  width:90%;
+  width:100%;
+  z-index:2;
+  min-height:0;
 }
 
 .arrow{
   position:absolute;top:50%;transform:translateY(-50%);
-  font-size:120px;color:#7c3aed;font-weight:200;
+  font-size:9vh;color:#7c3aed;font-weight:200;
   cursor:pointer;transition:0.2s;
-  padding:20px;
+  padding:1.5vh 2vw;
   line-height:0.5;
+  z-index:3;
 }
 .arrow:active{transform:translateY(-50%) scale(0.85);color:#a855f7;}
 .arrow.left{left:0;}
 .arrow.right{right:0;}
 
 .timer{
-  font-size:280px;font-weight:800;letter-spacing:-16px;line-height:1;
+  font-size:30vh; /* escala com altura da tela */
+  font-weight:800;letter-spacing:-1.4vh;line-height:1;
   text-shadow:0 0 32px rgba(255,255,255,0.08);
   font-variant-numeric:tabular-nums;
   cursor:pointer;
 }
 
 .progress{
-  width:560px;max-width:90%;height:10px;border-radius:999px;
-  background:rgba(255,255,255,0.08);overflow:hidden;margin-top:14px;
+  width:60vw;max-width:560px;height:1vh;min-height:6px;max-height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);overflow:hidden;margin-top:1.2vh;
 }
 .progress-bar{
   height:100%;width:100%;
@@ -153,32 +169,40 @@ html,body{
 }
 
 .timebanks{
-  display:flex;gap:14px;margin-top:18px;justify-content:center;
+  display:flex;gap:1.6vw;margin-top:1.5vh;justify-content:center;
 }
 .tb{
-  width:28px;height:28px;border-radius:50%;
-  border:3px solid #9333ea;transition:0.2s;cursor:pointer;
+  width:3vh;height:3vh;
+  min-width:18px;min-height:18px;
+  max-width:32px;max-height:32px;
+  border-radius:50%;
+  border:2px solid #9333ea;transition:0.2s;cursor:pointer;
 }
 .tb.active{
   background:#9333ea;
-  box-shadow:0 0 18px #9333ea;
+  box-shadow:0 0 14px #9333ea;
 }
 .tb:active{transform:scale(0.85);}
 
 /* === BOTÕES === */
 .buttons{
-  position:absolute;bottom:62px;left:28px;right:28px;
   display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;
-  gap:14px;z-index:2;
+  gap:1.2vw;z-index:2;
+  margin-top:1vh;
+  height:11vh;
+  min-height:56px;
+  max-height:90px;
 }
 .btn{
-  height:80px;border:none;border-radius:22px;
+  height:100%;border:none;border-radius:14px;
   background:rgba(12,18,35,0.88);
   border:1px solid rgba(255,255,255,0.06);
-  color:white;font-size:18px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;gap:10px;
+  color:white;font-size:2.2vh;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:1vw;
   cursor:pointer;transition:0.15s;
   font-family:inherit;
+  padding:0 1vw;
+  white-space:nowrap;
 }
 .btn:active{transform:scale(0.97);}
 .btn.primary{
@@ -189,15 +213,18 @@ html,body{
   background:linear-gradient(135deg,#dc2626,#991b1b);
   box-shadow:0 0 30px rgba(220,38,38,0.4);
 }
-.btn svg{width:24px;height:24px;fill:white;}
+.btn svg{width:2.6vh;height:2.6vh;min-width:18px;min-height:18px;max-width:28px;max-height:28px;fill:white;flex-shrink:0;}
 
 /* === FOOTER === */
 .footer{
-  position:absolute;bottom:18px;left:28px;right:28px;
   display:flex;justify-content:space-between;align-items:center;
-  font-size:14px;color:rgba(255,255,255,0.55);z-index:2;
+  font-size:1.6vh;color:rgba(255,255,255,0.55);z-index:2;
+  margin-top:0.6vh;
+  padding:0 0.5vw;
+  height:3vh;
+  min-height:18px;
 }
-.footer-center{color:#a855f7;font-weight:600;cursor:pointer;font-size:14px;}
+.footer-center{color:#a855f7;font-weight:600;cursor:pointer;font-size:1.6vh;}
 .footer-center:active{opacity:0.6;}
 
 /* === ALERT TOAST === */
@@ -471,7 +498,7 @@ html,body{
 // ===== CONFIG SUPABASE =====
 // IMPORTANTE: substitua pela sua URL e ANON KEY do Supabase
 const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dmdka2pvaGZvbXVhZnNhZnN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNDIxODEsImV4cCI6MjA5MjcxODE4MX0.TH5PP6Ssc-fJFP8ajBY-5o8njkIzSQh1RH5LIAB1AnQ';
+const SUPABASE_ANON_KEY = 'COLE_AQUI_SUA_ANON_KEY';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
