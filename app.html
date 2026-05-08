@@ -3910,6 +3910,7 @@
 let jogadores  = JSON.parse(localStorage.getItem('ps_jogadores'))  || [];
 let torneios   = JSON.parse(localStorage.getItem('ps_torneios'))   || [];
 let barGrupos  = JSON.parse(localStorage.getItem('ps_bar_grupos')) || ['Refrigerantes','Cervejas','Salgados','Picolés','Outros'];
+let _barGruposMap = JSON.parse(localStorage.getItem('ps_bar_grupos_map') || 'null') || { nomeParaId: {}, idParaNome: {} };
 let barProdutos= JSON.parse(localStorage.getItem('ps_bar_produtos'))|| [];
 let barComandas= JSON.parse(localStorage.getItem('ps_bar_comandas'))|| [];
 let cashMesas  = JSON.parse(localStorage.getItem('ps_cash_mesas'))  || [];
@@ -4988,10 +4989,18 @@ function _cashToDb(m) {
 }
 
 function _produtoToDb(p) {
+    // Tradução: localmente trabalhamos com nome do grupo (string)
+    // No banco precisa do UUID (FK pra bar_grupos)
+    let grupoId = null;
+    if (p.grupoId) {
+        grupoId = p.grupoId;  // já tem (compatibilidade)
+    } else if (p.grupo && _barGruposMap.nomeParaId) {
+        grupoId = _barGruposMap.nomeParaId[p.grupo] || null;
+    }
     return {
         id: p.id,
         clube_id: sbClube ? sbClube.id : null,
-        grupo_id: p.grupoId || null,
+        grupo_id: grupoId,
         nome: p.nome,
         descricao: p.descricao || null,
         valor: p.valor || 0,
@@ -5199,33 +5208,59 @@ async function sincronizarEstado() {
         if (_syncQueue.barGrupos.size) {
             try {
                 // Estratégia: substituir a lista inteira (são poucos registros)
-                // 1. Pegar todos os grupos atuais no banco
-                const { data: gAtuais } = await sb.from('bar_grupos').select('nome').eq('clube_id', sbClube.id);
-                const nomesAtuais = new Set((gAtuais || []).map(g => g.nome));
+                // 1. Pegar todos os grupos atuais no banco (com IDs!)
+                const { data: gAtuais } = await sb.from('bar_grupos').select('id, nome').eq('clube_id', sbClube.id);
+                const mapaAtual = new Map((gAtuais || []).map(g => [g.nome, g.id]));
                 const nomesLocais = new Set(barGrupos);
                 
                 // 2. Inserir novos (que estão local mas não no banco)
                 const novosParaInserir = barGrupos
-                    .filter(nome => !nomesAtuais.has(nome))
+                    .filter(nome => !mapaAtual.has(nome))
                     .map((nome, i) => ({
                         clube_id: sbClube.id,
                         nome: nome,
                         ordem: barGrupos.indexOf(nome),
                     }));
                 if (novosParaInserir.length) {
-                    const { error: errIns } = await sb.from('bar_grupos').insert(novosParaInserir);
+                    const { data: inseridos, error: errIns } = await sb.from('bar_grupos')
+                        .insert(novosParaInserir)
+                        .select('id, nome');
                     if (errIns) console.warn('[SYNC] bar_grupos insert:', errIns);
+                    // Atualiza mapa nome ↔ id pra os recém-inseridos
+                    if (inseridos) {
+                        inseridos.forEach(g => {
+                            _barGruposMap.nomeParaId[g.nome] = g.id;
+                            _barGruposMap.idParaNome[g.id] = g.nome;
+                        });
+                    }
                 }
                 
                 // 3. Remover grupos que sumiram localmente
-                const removidos = [...nomesAtuais].filter(n => !nomesLocais.has(n));
+                const removidos = [...mapaAtual.keys()].filter(n => !nomesLocais.has(n));
                 if (removidos.length) {
                     const { error: errDel } = await sb.from('bar_grupos')
                         .delete()
                         .eq('clube_id', sbClube.id)
                         .in('nome', removidos);
                     if (errDel) console.warn('[SYNC] bar_grupos delete:', errDel);
+                    // Remove do mapa também
+                    removidos.forEach(nome => {
+                        const id = mapaAtual.get(nome);
+                        if (id) delete _barGruposMap.idParaNome[id];
+                        delete _barGruposMap.nomeParaId[nome];
+                    });
                 }
+                
+                // Garante que TODOS os grupos atuais estejam no mapa (caso já existam)
+                mapaAtual.forEach((id, nome) => {
+                    if (nomesLocais.has(nome)) {
+                        _barGruposMap.nomeParaId[nome] = id;
+                        _barGruposMap.idParaNome[id] = nome;
+                    }
+                });
+                
+                // Persiste o mapa
+                localStorage.setItem('ps_bar_grupos_map', JSON.stringify(_barGruposMap));
                 
                 _syncQueue.barGrupos.clear();
             } catch(e) { console.warn('[SYNC] bar_grupos:', e); }
@@ -5382,7 +5417,15 @@ async function carregarEstadoDoSupabase() {
         const { data: gRows } = await sb.from('bar_grupos').select('*').eq('clube_id', clubeIdEsperado).order('ordem');
         if (gRows && gRows.length) {
             barGrupos = gRows.map(g => g.nome);
+            // Mapa nome ↔ uuid pra conversão produtoToDb/FromDb
+            _barGruposMap.nomeParaId = {};
+            _barGruposMap.idParaNome = {};
+            gRows.forEach(g => {
+                _barGruposMap.nomeParaId[g.nome] = g.id;
+                _barGruposMap.idParaNome[g.id] = g.nome;
+            });
             localStorage.setItem('ps_bar_grupos', JSON.stringify(barGrupos));
+            localStorage.setItem('ps_bar_grupos_map', JSON.stringify(_barGruposMap));
         }
         const { data: pRows } = await sb.from('bar_produtos').select('*').eq('clube_id', clubeIdEsperado);
         if (pRows) {
@@ -5585,11 +5628,20 @@ function _cashFromDb(r) {
 }
 
 function _produtoFromDb(r) {
+    // Tradução: banco tem grupo_id (UUID), local usa grupo (nome)
+    const grupoNome = r.grupo_id && _barGruposMap.idParaNome 
+        ? (_barGruposMap.idParaNome[r.grupo_id] || '')
+        : '';
     return {
-        id: r.id, grupoId: r.grupo_id, nome: r.nome,
+        id: r.id,
+        grupoId: r.grupo_id,    // mantém UUID p/ futuras referências
+        grupo: grupoNome,        // nome usado pela UI local
+        nome: r.nome,
         descricao: r.descricao || '',
-        valor: parseFloat(r.valor), custo: parseFloat(r.custo),
-        estoque: r.estoque || 0, estoqueMin: r.estoque_min || 0,
+        valor: parseFloat(r.valor),
+        custo: parseFloat(r.custo),
+        estoque: r.estoque || 0,
+        estoqueMin: r.estoque_min || 0,
         ativo: r.ativo !== false,
     };
 }
