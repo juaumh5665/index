@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#020617" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="StackClock" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="screen-orientation" content="landscape" />
+
+<title>StackClock — Dealer</title>
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%237c3aed'/><text x='50' y='66' font-size='52' font-family='sans-serif' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>" />
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%237c3aed'/><text x='50' y='66' font-size='52' font-family='sans-serif' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>" />
+<link rel="manifest" href='data:application/manifest+json,{"name":"StackClock","short_name":"StackClock","start_url":".","display":"fullscreen","orientation":"landscape","theme_color":"%23020617","background_color":"%23000814","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><rect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%237c3aed%27/><text x=%2750%27 y=%2766%27 font-size=%2752%27 font-family=%27sans-serif%27 font-weight=%27800%27 text-anchor=%27middle%27 fill=%27white%27>S</text></svg>","sizes":"192x192","type":"image/svg+xml"}]}' />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;}
+
+html,body{
+  background:#000814;
+  font-family:'Inter',sans-serif;
+  height:100vh;
+  width:100vw;
+  overflow:hidden;
+  color:white;
+  overscroll-behavior:none;
+}
+
+.app{
+  width:100vw;
+  height:100vh;
+  background:
+    radial-gradient(circle at center, rgba(139,92,246,0.14), transparent 45%),
+    linear-gradient(135deg,#020617 0%,#020817 40%,#01030d 100%);
+  position:relative;
+  overflow:hidden;
+  padding:18px 28px;
+}
+.app::before{
+  content:'';
+  position:absolute;inset:0;
+  background:radial-gradient(circle at top left, rgba(59,130,246,0.08), transparent 30%);
+  pointer-events:none;
+}
+
+/* === ROTAÇÃO: aviso quando portrait === */
+.rotate-warn{
+  position:fixed;inset:0;
+  background:#000814;z-index:9999;
+  display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:32px;
+}
+.rotate-warn .icon{
+  font-size:80px;margin-bottom:24px;
+  animation:rotateAnim 2s ease-in-out infinite;
+}
+@keyframes rotateAnim{
+  0%,100%{transform:rotate(0);}
+  50%{transform:rotate(90deg);}
+}
+.rotate-warn h2{font-size:24px;margin-bottom:12px;color:#a855f7;}
+.rotate-warn p{font-size:14px;color:#9ca3af;}
+
+@media (orientation: portrait){
+  .rotate-warn{display:flex;}
+}
+
+/* === TOPO === */
+.top{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  position:relative;z-index:2;
+}
+
+.card{
+  background:rgba(12,18,35,0.88);
+  border:1px solid rgba(255,255,255,0.06);
+  backdrop-filter:blur(18px);
+  box-shadow:0 0 40px rgba(0,0,0,0.35);
+}
+
+.mesa-card{
+  width:110px;height:110px;border-radius:22px;padding:14px;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  cursor:pointer;transition:0.2s;
+}
+.mesa-card:active{transform:scale(0.96);}
+.mesa-card span{font-size:13px;font-weight:700;color:#c026d3;letter-spacing:1px;}
+.mesa-card strong{font-size:54px;line-height:1;font-weight:800;}
+
+.logo{position:absolute;left:50%;transform:translateX(-50%);text-align:center;}
+.logo h1{
+  font-size:56px;font-weight:800;letter-spacing:-3px;
+  background:linear-gradient(90deg,#ffffff,#8b5cf6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo p{
+  font-size:15px;letter-spacing:8px;color:#9333ea;font-weight:700;
+  margin-top:-4px;
+}
+
+.settings{
+  width:80px;height:80px;border-radius:22px;
+  display:flex;justify-content:center;align-items:center;
+  cursor:pointer;transition:0.2s;font-size:32px;
+}
+.settings:active{transform:scale(0.95);}
+
+/* === CENTRO (timer) === */
+.center{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:90%;
+}
+
+.arrow{
+  position:absolute;top:50%;transform:translateY(-50%);
+  font-size:120px;color:#7c3aed;font-weight:200;
+  cursor:pointer;transition:0.2s;
+  padding:20px;
+  line-height:0.5;
+}
+.arrow:active{transform:translateY(-50%) scale(0.85);color:#a855f7;}
+.arrow.left{left:0;}
+.arrow.right{right:0;}
+
+.timer{
+  font-size:280px;font-weight:800;letter-spacing:-16px;line-height:1;
+  text-shadow:0 0 32px rgba(255,255,255,0.08);
+  font-variant-numeric:tabular-nums;
+  cursor:pointer;
+}
+
+.progress{
+  width:560px;max-width:90%;height:10px;border-radius:999px;
+  background:rgba(255,255,255,0.08);overflow:hidden;margin-top:14px;
+}
+.progress-bar{
+  height:100%;width:100%;
+  background:linear-gradient(90deg,#7c3aed,#a855f7);
+  box-shadow:0 0 18px #9333ea;
+  transition:0.3s linear;
+}
+
+.timebanks{
+  display:flex;gap:14px;margin-top:18px;justify-content:center;
+}
+.tb{
+  width:28px;height:28px;border-radius:50%;
+  border:3px solid #9333ea;transition:0.2s;cursor:pointer;
+}
+.tb.active{
+  background:#9333ea;
+  box-shadow:0 0 18px #9333ea;
+}
+.tb:active{transform:scale(0.85);}
+
+/* === BOTÕES === */
+.buttons{
+  position:absolute;bottom:62px;left:28px;right:28px;
+  display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;
+  gap:14px;z-index:2;
+}
+.btn{
+  height:80px;border:none;border-radius:22px;
+  background:rgba(12,18,35,0.88);
+  border:1px solid rgba(255,255,255,0.06);
+  color:white;font-size:18px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;transition:0.15s;
+  font-family:inherit;
+}
+.btn:active{transform:scale(0.97);}
+.btn.primary{
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  box-shadow:0 0 30px rgba(124,58,237,0.35);
+}
+.btn.primary.running{
+  background:linear-gradient(135deg,#dc2626,#991b1b);
+  box-shadow:0 0 30px rgba(220,38,38,0.4);
+}
+.btn svg{width:24px;height:24px;fill:white;}
+
+/* === FOOTER === */
+.footer{
+  position:absolute;bottom:18px;left:28px;right:28px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:14px;color:rgba(255,255,255,0.55);z-index:2;
+}
+.footer-center{color:#a855f7;font-weight:600;cursor:pointer;font-size:14px;}
+.footer-center:active{opacity:0.6;}
+
+/* === ALERT TOAST === */
+.alert{
+  position:absolute;top:18px;left:50%;transform:translate(-50%,-30px);
+  padding:14px 24px;border-radius:14px;
+  background:#7c3aed;font-weight:700;font-size:14px;
+  opacity:0;transition:0.3s;z-index:10;
+  box-shadow:0 8px 24px rgba(124,58,237,0.5);
+  white-space:nowrap;
+}
+.alert.show{opacity:1;transform:translate(-50%,0);}
+.alert.success{background:#059669;box-shadow:0 8px 24px rgba(5,150,105,0.5);}
+.alert.danger{background:#dc2626;box-shadow:0 8px 24px rgba(220,38,38,0.5);}
+
+/* === PERIGO (timer baixo) === */
+.danger{
+  color:#ef4444 !important;
+  text-shadow:0 0 24px rgba(239,68,68,0.7);
+  animation:pulse 0.5s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.04);}
+}
+
+/* === MODAL OVERLAY === */
+.modal{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  z-index:100;padding:24px;
+}
+.modal.show{display:flex;}
+.modal-content{
+  background:#0c1223;border:1px solid rgba(255,255,255,0.1);
+  border-radius:24px;padding:24px;
+  width:100%;max-width:600px;max-height:90vh;overflow-y:auto;
+}
+.modal-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:16px;
+}
+.modal-header h3{font-size:22px;font-weight:700;}
+.modal-close{
+  background:rgba(255,255,255,0.08);border:none;color:white;
+  width:36px;height:36px;border-radius:10px;font-size:18px;cursor:pointer;
+}
+.modal-close:active{transform:scale(0.9);}
+
+.grid-mesas{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:10px;
+}
+.grid-pos{
+  display:grid;grid-template-columns:repeat(9,1fr);gap:10px;
+}
+.grid-cell{
+  background:#1a1a2e;border:1px solid #27272a;color:white;
+  padding:18px 4px;border-radius:12px;
+  font-size:22px;font-weight:700;cursor:pointer;
+  font-family:inherit;
+}
+.grid-cell:active{transform:scale(0.92);background:#7c3aed;}
+.grid-cell.selected{border-color:#a855f7;background:rgba(124,58,237,0.2);}
+
+.tipo-buttons{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  margin-top:12px;
+}
+.tipo-btn{
+  background:#1a1a2e;border:1px solid #27272a;color:white;
+  padding:24px 12px;border-radius:16px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  font-family:inherit;
+}
+.tipo-btn:active{transform:scale(0.95);}
+.tipo-btn .ico{font-size:42px;}
+.tipo-btn .lbl{font-size:18px;font-weight:700;}
+.tipo-btn .sub{font-size:12px;color:#9ca3af;}
+
+/* === LOGIN/TOKEN screen === */
+.login-screen{
+  position:fixed;inset:0;
+  background:linear-gradient(135deg,#020617,#01030d);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px;z-index:200;
+}
+.login-screen h1{
+  font-size:48px;font-weight:800;letter-spacing:-2px;
+  background:linear-gradient(90deg,#ffffff,#8b5cf6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:8px;
+}
+.login-screen p{font-size:14px;color:#9ca3af;margin-bottom:24px;text-align:center;}
+.login-screen input{
+  background:#0c1223;border:1px solid rgba(255,255,255,0.1);
+  color:white;font-size:16px;padding:14px 18px;
+  border-radius:12px;width:100%;max-width:360px;font-family:inherit;
+  margin-bottom:12px;
+}
+.login-screen input:focus{outline:none;border-color:#7c3aed;}
+.login-screen button{
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;
+  border:none;font-size:16px;font-weight:700;padding:14px 32px;
+  border-radius:12px;cursor:pointer;width:100%;max-width:360px;font-family:inherit;
+}
+.login-screen button:active{transform:scale(0.97);}
+.login-error{color:#ef4444;font-size:13px;margin-top:8px;display:none;}
+
+</style>
+</head>
+<body>
+
+<!-- AVISO DE ROTAÇÃO -->
+<div class="rotate-warn">
+  <div class="icon">📱</div>
+  <h2>Gire o aparelho</h2>
+  <p>O StackClock funciona apenas no modo paisagem.<br>Vire seu celular ou tablet.</p>
+</div>
+
+<!-- TELA DE LOGIN (token) -->
+<div class="login-screen" id="loginScreen">
+  <h1>StackClock</h1>
+  <p>Cole o token do clube pra começar</p>
+  <input id="tokenInput" type="text" placeholder="Token de acesso" autocomplete="off" />
+  <button id="loginBtn">Conectar</button>
+  <div class="login-error" id="loginError"></div>
+</div>
+
+<!-- APP PRINCIPAL -->
+<div class="app" id="app" style="display:none;">
+
+  <div class="top">
+    <div class="mesa-card card" id="mesaCard">
+      <span>MESA</span>
+      <strong id="numMesa">--</strong>
+    </div>
+
+    <div class="logo">
+      <h1>StackOS</h1>
+      <p>DEALER ♠</p>
+    </div>
+
+    <div class="settings card" id="settingsBtn">⚙️</div>
+  </div>
+
+  <div class="center">
+    <div class="arrow left" id="arrowLeft">‹</div>
+    <div class="arrow right" id="arrowRight">›</div>
+
+    <div class="timer" id="timer">00:30</div>
+
+    <div class="progress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="timebanks" id="tbContainer"></div>
+  </div>
+
+  <div class="buttons">
+    <button class="btn primary" id="startBtn">
+      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <span id="startLabel">INICIAR</span>
+    </button>
+    <button class="btn" id="reentryBtn">
+      <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14H7v-2h3v2zm0-4H7v-2h3v2zm0-4H7V7h3v2zm7 8h-5v-2h5v2zm0-4h-5v-2h5v2zm0-4h-5V7h5v2z"/></svg>
+      RE-ENTRY
+    </button>
+    <button class="btn" id="floorBtn">
+      <svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4z"/></svg>
+      FLOOR
+    </button>
+    <button class="btn" id="barBtn">
+      <svg viewBox="0 0 24 24"><path d="M21 5V3H3v2l8 9v5H6v2h12v-2h-5v-5l8-9z"/></svg>
+      BAR
+    </button>
+  </div>
+
+  <div class="footer">
+    <div id="connStatus">🟢 CONECTADO</div>
+    <div class="footer-center" id="trocarMesaBtn">⇄ TROCAR MESA</div>
+    <div id="relogio">--:--</div>
+  </div>
+
+  <div class="alert" id="alertBox"></div>
+</div>
+
+<!-- MODAL: TROCAR MESA -->
+<div class="modal" id="modalMesa">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Selecione a mesa</h3>
+      <button class="modal-close" onclick="fechar('modalMesa')">×</button>
+    </div>
+    <div class="grid-mesas" id="gridMesas"></div>
+  </div>
+</div>
+
+<!-- MODAL: POSIÇÃO RE-ENTRY -->
+<div class="modal" id="modalPos">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Re-entry — Qual posição?</h3>
+      <button class="modal-close" onclick="fechar('modalPos')">×</button>
+    </div>
+    <div class="grid-pos" id="gridPos"></div>
+  </div>
+</div>
+
+<!-- MODAL: TIPO RE-ENTRY -->
+<div class="modal" id="modalTipo">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Posição <span id="posEscolhida" style="color:#a855f7"></span> — Simples ou duplo?</h3>
+      <button class="modal-close" onclick="fechar('modalTipo')">×</button>
+    </div>
+    <div class="tipo-buttons">
+      <button class="tipo-btn" onclick="confirmarReentry('simples')">
+        <div class="ico">🃏</div>
+        <div class="lbl">Simples</div>
+        <div class="sub">1 stack</div>
+      </button>
+      <button class="tipo-btn" onclick="confirmarReentry('duplo')">
+        <div class="ico">🃏🃏</div>
+        <div class="lbl">Duplo</div>
+        <div class="sub">2 stacks</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CONFIGURAÇÕES -->
+<div class="modal" id="modalConfig">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Configurações</h3>
+      <button class="modal-close" onclick="fechar('modalConfig')">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;color:#e4e4e7;">
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Tempo de ação (s)</span>
+        <input type="number" id="cfgTempoAcao" min="5" max="120" style="width:80px;background:#1a1a2e;border:1px solid #27272a;color:white;padding:8px;border-radius:8px;text-align:center;font-family:inherit;">
+      </label>
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Tempo de TimeBank (s)</span>
+        <input type="number" id="cfgTempoBank" min="5" max="120" style="width:80px;background:#1a1a2e;border:1px solid #27272a;color:white;padding:8px;border-radius:8px;text-align:center;font-family:inherit;">
+      </label>
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>TimeBanks disponíveis</span>
+        <input type="number" id="cfgBankMax" min="0" max="10" style="width:80px;background:#1a1a2e;border:1px solid #27272a;color:white;padding:8px;border-radius:8px;text-align:center;font-family:inherit;">
+      </label>
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Som ao zerar</span>
+        <input type="checkbox" id="cfgSom" style="width:24px;height:24px;">
+      </label>
+      <label style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Vibração</span>
+        <input type="checkbox" id="cfgVibrar" style="width:24px;height:24px;">
+      </label>
+      <button onclick="salvarConfig()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border:none;padding:14px;border-radius:12px;font-weight:700;font-size:16px;font-family:inherit;cursor:pointer;margin-top:8px;">
+        Salvar
+      </button>
+      <button onclick="logoutClock()" style="background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:12px;border-radius:12px;font-family:inherit;cursor:pointer;font-size:14px;">
+        Sair (limpar token deste aparelho)
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG SUPABASE =====
+// IMPORTANTE: substitua pela sua URL e ANON KEY do Supabase
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dmdka2pvaGZvbXVhZnNhZnN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNDIxODEsImV4cCI6MjA5MjcxODE4MX0.TH5PP6Ssc-fJFP8ajBY-5o8njkIzSQh1RH5LIAB1AnQ';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ===== ESTADO =====
+let TOKEN = localStorage.getItem('stackclock_token') || '';
+let MESA = parseInt(localStorage.getItem('stackclock_mesa') || '0');
+let CLUBE_ID = null;
+let CONFIG = {
+  tempo_acao_seg: 30,
+  tempo_bank_seg: 30,
+  bank_max: 3,
+  som_ativo: true,
+  vibrar_ativo: true
+};
+
+let timerVal = 30;
+let timerInt = null;
+let timerActive = false;
+let banksRestantes = 3;
+let inBank = false;
+
+// ===== HELPERS =====
+const $ = (id) => document.getElementById(id);
+
+function showAlert(msg, type = 'default') {
+  const el = $('alertBox');
+  el.textContent = msg;
+  el.className = 'alert show' + (type ? ' ' + type : '');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function vibrate(ms = 200) {
+  if (CONFIG.vibrar_ativo && navigator.vibrate) navigator.vibrate(ms);
+}
+
+function beep(freq = 800, dur = 200) {
+  if (!CONFIG.som_ativo) return;
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.frequency.value = freq;
+    osc.connect(gain); gain.connect(ac.destination);
+    gain.gain.setValueAtTime(0.3, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + dur/1000);
+    osc.start(); osc.stop(ac.currentTime + dur/1000);
+  } catch(e) {}
+}
+
+function abrir(id) { $(id).classList.add('show'); }
+function fechar(id) { $(id).classList.remove('show'); }
+
+// ===== LOGIN =====
+$('loginBtn').onclick = async () => {
+  const tok = $('tokenInput').value.trim();
+  if (!tok) return;
+  await tentarLogin(tok);
+};
+$('tokenInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') $('loginBtn').click();
+});
+
+async function tentarLogin(tok) {
+  $('loginError').style.display = 'none';
+  try {
+    const { data, error } = await sb.rpc('stackclock_validar_token', { p_token: tok });
+    if (error) throw error;
+    if (!data || !data.ok) {
+      $('loginError').textContent = 'Token inválido ou revogado.';
+      $('loginError').style.display = 'block';
+      return;
+    }
+    TOKEN = tok;
+    CLUBE_ID = data.clube_id;
+    if (data.config) {
+      CONFIG = {
+        tempo_acao_seg: data.config.tempo_acao_seg || 30,
+        tempo_bank_seg: data.config.tempo_bank_seg || 30,
+        bank_max: data.config.bank_max || 3,
+        som_ativo: data.config.som_ativo !== false,
+        vibrar_ativo: data.config.vibrar_ativo !== false
+      };
+    }
+    localStorage.setItem('stackclock_token', tok);
+    iniciarApp();
+  } catch (err) {
+    console.error(err);
+    $('loginError').textContent = 'Erro de conexão. Verifique sua internet.';
+    $('loginError').style.display = 'block';
+  }
+}
+
+function logoutClock() {
+  localStorage.removeItem('stackclock_token');
+  localStorage.removeItem('stackclock_mesa');
+  location.reload();
+}
+
+// ===== INICIAR APP =====
+function iniciarApp() {
+  $('loginScreen').style.display = 'none';
+  $('app').style.display = 'block';
+
+  // se não tem mesa, pede pra escolher
+  if (!MESA || MESA < 1) {
+    abrirTrocarMesa();
+  } else {
+    $('numMesa').textContent = String(MESA).padStart(2, '0');
+  }
+
+  resetTimer();
+  renderTimebanks();
+  atualizarRelogio();
+  setInterval(atualizarRelogio, 1000);
+
+  // wake lock pra tela não desligar
+  if ('wakeLock' in navigator) {
+    navigator.wakeLock.request('screen').catch(() => {});
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        navigator.wakeLock.request('screen').catch(() => {});
+      }
+    });
+  }
+
+  // tenta forçar landscape (funciona quando instalado como PWA)
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape').catch(() => {});
+  }
+}
+
+// ===== TIMER =====
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+}
+
+function resetTimer() {
+  if (timerInt) clearInterval(timerInt);
+  timerVal = CONFIG.tempo_acao_seg;
+  timerActive = false;
+  inBank = false;
+  $('timer').textContent = fmtTime(timerVal);
+  $('timer').classList.remove('danger');
+  $('progressBar').style.width = '100%';
+  $('startBtn').classList.remove('running');
+  $('startLabel').textContent = 'INICIAR';
+}
+
+function startTimer() {
+  if (timerInt) clearInterval(timerInt);
+  timerActive = true;
+  $('startBtn').classList.add('running');
+  $('startLabel').textContent = 'PAUSAR';
+  const totalRef = inBank ? CONFIG.tempo_bank_seg : CONFIG.tempo_acao_seg;
+
+  timerInt = setInterval(() => {
+    if (!timerActive) return;
+    timerVal--;
+    $('timer').textContent = fmtTime(timerVal);
+    const pct = Math.max(0, (timerVal / totalRef) * 100);
+    $('progressBar').style.width = pct + '%';
+
+    if (timerVal <= 5 && timerVal > 0) {
+      $('timer').classList.add('danger');
+      beep(1000, 100);
+      vibrate(80);
+    }
+
+    if (timerVal <= 0) {
+      clearInterval(timerInt);
+      timerActive = false;
+      $('startBtn').classList.remove('running');
+      $('startLabel').textContent = 'INICIAR';
+      beep(400, 600);
+      vibrate(400);
+      showAlert('TEMPO ESGOTADO!', 'danger');
+      setTimeout(() => resetTimer(), 1500);
+    }
+  }, 1000);
+}
+
+function pauseTimer() {
+  timerActive = false;
+  if (timerInt) clearInterval(timerInt);
+  $('startBtn').classList.remove('running');
+  $('startLabel').textContent = 'CONTINUAR';
+}
+
+$('startBtn').onclick = () => {
+  if (!MESA) { abrirTrocarMesa(); return; }
+  if (timerActive) {
+    pauseTimer();
+  } else {
+    startTimer();
+  }
+};
+
+// toque no número também inicia/pausa
+$('timer').onclick = () => $('startBtn').click();
+
+// ===== TIMEBANK =====
+function renderTimebanks() {
+  const cont = $('tbContainer');
+  cont.innerHTML = '';
+  for (let i = 0; i < CONFIG.bank_max; i++) {
+    const d = document.createElement('div');
+    d.className = 'tb' + (i < banksRestantes ? ' active' : '');
+    d.onclick = () => usarTimebank(i);
+    cont.appendChild(d);
+  }
+}
+
+async function usarTimebank(idx) {
+  if (idx >= banksRestantes) return;
+  if (!MESA) return;
+  banksRestantes--;
+  inBank = true;
+  timerVal = CONFIG.tempo_bank_seg;
+  $('timer').textContent = fmtTime(timerVal);
+  $('progressBar').style.width = '100%';
+  $('timer').classList.remove('danger');
+  renderTimebanks();
+  if (!timerActive) startTimer();
+  showAlert('TIME BANK +' + CONFIG.tempo_bank_seg + 's');
+  vibrate(100);
+
+  // registra no banco (não bloqueia UI se falhar)
+  try {
+    await sb.rpc('stackclock_registrar_timecard', {
+      p_token: TOKEN, p_mesa: MESA, p_duracao: CONFIG.tempo_bank_seg
+    });
+  } catch (e) { console.warn('Erro registrando timecard:', e); }
+}
+
+// ===== TROCAR MESA =====
+$('mesaCard').onclick = () => abrirTrocarMesa();
+$('trocarMesaBtn').onclick = () => abrirTrocarMesa();
+
+function abrirTrocarMesa() {
+  const grid = $('gridMesas');
+  grid.innerHTML = '';
+  for (let i = 1; i <= 30; i++) {
+    const b = document.createElement('button');
+    b.className = 'grid-cell';
+    if (i === MESA) b.classList.add('selected');
+    b.textContent = i;
+    b.onclick = () => {
+      MESA = i;
+      localStorage.setItem('stackclock_mesa', String(i));
+      $('numMesa').textContent = String(i).padStart(2, '0');
+      banksRestantes = CONFIG.bank_max;
+      renderTimebanks();
+      resetTimer();
+      fechar('modalMesa');
+      showAlert('Mesa ' + i + ' selecionada', 'success');
+    };
+    grid.appendChild(b);
+  }
+  abrir('modalMesa');
+}
+
+// ===== RE-ENTRY =====
+let posEscolhida = null;
+
+$('reentryBtn').onclick = () => {
+  if (!MESA) { abrirTrocarMesa(); return; }
+  const grid = $('gridPos');
+  grid.innerHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    const b = document.createElement('button');
+    b.className = 'grid-cell';
+    b.textContent = i;
+    b.onclick = () => {
+      posEscolhida = i;
+      $('posEscolhida').textContent = i;
+      fechar('modalPos');
+      abrir('modalTipo');
+    };
+    grid.appendChild(b);
+  }
+  abrir('modalPos');
+};
+
+async function confirmarReentry(variante) {
+  fechar('modalTipo');
+  const txt = `Re-entry ${variante.toUpperCase()} • Pos ${posEscolhida} • Mesa ${MESA}`;
+  showAlert(txt, 'success');
+  vibrate(150);
+  try {
+    await sb.rpc('stackclock_registrar_alerta', {
+      p_token: TOKEN, p_mesa: MESA, p_tipo: 'reentry',
+      p_posicao: posEscolhida, p_variante: variante
+    });
+  } catch (e) { console.error('Erro alerta:', e); showAlert('Erro ao enviar alerta', 'danger'); }
+}
+
+// ===== FLOOR / BAR =====
+$('floorBtn').onclick = async () => {
+  if (!MESA) { abrirTrocarMesa(); return; }
+  showAlert('Floor chamado • Mesa ' + MESA, 'success');
+  vibrate(150);
+  try { await sb.rpc('stackclock_registrar_alerta', { p_token: TOKEN, p_mesa: MESA, p_tipo: 'floor' }); }
+  catch (e) { showAlert('Erro ao enviar', 'danger'); }
+};
+
+$('barBtn').onclick = async () => {
+  if (!MESA) { abrirTrocarMesa(); return; }
+  showAlert('Bar chamado • Mesa ' + MESA, 'success');
+  vibrate(150);
+  try { await sb.rpc('stackclock_registrar_alerta', { p_token: TOKEN, p_mesa: MESA, p_tipo: 'bar' }); }
+  catch (e) { showAlert('Erro ao enviar', 'danger'); }
+};
+
+// ===== CONFIGURAÇÕES =====
+$('settingsBtn').onclick = () => abrirConfig();
+$('arrowLeft').onclick = () => abrirConfig();
+$('arrowRight').onclick = () => abrirConfig();
+
+function abrirConfig() {
+  $('cfgTempoAcao').value = CONFIG.tempo_acao_seg;
+  $('cfgTempoBank').value = CONFIG.tempo_bank_seg;
+  $('cfgBankMax').value = CONFIG.bank_max;
+  $('cfgSom').checked = CONFIG.som_ativo;
+  $('cfgVibrar').checked = CONFIG.vibrar_ativo;
+  abrir('modalConfig');
+}
+
+function salvarConfig() {
+  CONFIG.tempo_acao_seg = parseInt($('cfgTempoAcao').value) || 30;
+  CONFIG.tempo_bank_seg = parseInt($('cfgTempoBank').value) || 30;
+  CONFIG.bank_max = parseInt($('cfgBankMax').value) || 3;
+  CONFIG.som_ativo = $('cfgSom').checked;
+  CONFIG.vibrar_ativo = $('cfgVibrar').checked;
+  banksRestantes = CONFIG.bank_max;
+  renderTimebanks();
+  resetTimer();
+  fechar('modalConfig');
+  showAlert('Configurações salvas', 'success');
+}
+
+// ===== RELÓGIO =====
+function atualizarRelogio() {
+  const d = new Date();
+  $('relogio').textContent = '🕒 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+// ===== INIT =====
+if (TOKEN) {
+  tentarLogin(TOKEN);
+} else {
+  // mostra tela de login (já está visível por padrão)
+}
+
+// fecha modal ao tocar no backdrop
+document.querySelectorAll('.modal').forEach(m => {
+  m.addEventListener('click', (e) => {
+    if (e.target === m) m.classList.remove('show');
+  });
+});
+
+</script>
+
+</body>
+</html>
