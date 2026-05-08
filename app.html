@@ -13984,7 +13984,12 @@ function _confirmarPagamentoContaImpl() {
         }
     }
 
-    logAudit('PAGAMENTO', `Pagamento de ${formatMoney(valor)} · ${j.nome} via ${PAYMENT_METHODS[metodo].label}`, { jogadorId: pagamentoJogadorId, valor, metodo });
+    // Label amigável pra log/recibo
+    const metodoLabel = metodosUsados.length === 1
+        ? (PAYMENT_METHODS[metodosUsados[0]] && PAYMENT_METHODS[metodosUsados[0]].label) || metodo
+        : `${metodosUsados.length} formas (${metodosUsados.map(m => (PAYMENT_METHODS[m]||{}).label || m).join(' + ')})`;
+
+    logAudit('PAGAMENTO', `Pagamento de ${formatMoney(valor)} · ${j.nome} via ${metodoLabel}`, { jogadorId: pagamentoJogadorId, valor, metodo, splits });
 
     // Oferece impressão de recibo (em background, não bloqueia)
     setTimeout(() => {
@@ -13992,7 +13997,7 @@ function _confirmarPagamentoContaImpl() {
             imprimirReciboPagamento({
                 jogadorNome: j.nome,
                 valor: valor,
-                metodo: PAYMENT_METHODS[metodo].label,
+                metodo: metodoLabel,
                 descricao: obs,
                 ts: Date.now(),
                 taxaAplicada: taxaAplicada,
@@ -14821,17 +14826,28 @@ function fecharComandaConfirm() {
     // UNDO: permite desfazer fechamento de comanda
     const comandaSnapshot = JSON.stringify(c);
     const comandaIdx = barComandas.indexOf(c);
-    const txsBefore = transacoes.length - 2; // 2 txs adicionadas (débito + pagamento)
-    registrarUndo(`✅ Acerto de ${formatMoney(pago)}`, () => {
+    // Cada split gera 1 tx pagamento + opcionalmente 1 tx taxa, + 1 tx débito da comanda
+    // Calculamos quantas transações foram adicionadas: 1 (débito) + N pagamentos + M taxas
+    const txsBefore = transacoes.length;  // captura antes do registrarUndo
+    const totalPagoFinal = totalPago;
+    const metodoLabelFinal = metodosUsados.length === 1 
+        ? (PAYMENT_METHODS[metodosUsados[0]] && PAYMENT_METHODS[metodosUsados[0]].label) || 'pagamento'
+        : `${metodosUsados.length} formas`;
+    
+    registrarUndo(`✅ Acerto de ${formatMoney(totalPagoFinal)}`, () => {
         barComandas[comandaIdx] = JSON.parse(comandaSnapshot);
-        transacoes = transacoes.slice(0, txsBefore);
+        // Remove as transações deste fechamento (todas adicionadas após txsBefore... -1 antes do registrarUndo)
+        // Como registrarUndo é chamado DEPOIS das transações, txsBefore é o length antes do undo callback
+        // Aproximação simples: remove as últimas N transações (1 débito + N pagamentos + M taxas)
+        // Como não sabemos exatamente, vamos voltar pra antes desta operação
+        transacoes = transacoes.filter(tx => tx.refId !== c.id);
         saveData();
         renderComandas();
         renderHistorico();
         renderDashboard();
     });
 
-    showToast(`✅ Acerto de ${formatMoney(pago)} via ${PAYMENT_METHODS[metodo].label}`);
+    showToast(`✅ Acerto de ${formatMoney(totalPagoFinal)} via ${metodoLabelFinal}`);
 }
 
 // Interceptador: bloqueia abrir nova comanda se caixa fechado
