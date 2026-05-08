@@ -2,15 +2,38 @@
     <meta charset="UTF-8">
     <title>StackOS TV</title>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Mono:wght@700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+    // Aplica fonte ANTES do CSS renderizar (lê do localStorage compartilhado com app principal)
+    (function(){
+        try {
+            var f = localStorage.getItem('ps_font_mono');
+            if (f) {
+                var fontMap = {
+                    'jetbrains': ["'JetBrains Mono', monospace", "'tnum', 'zero'"],
+                    'inter':     ["'Inter', sans-serif",         "'tnum'"],
+                    'dm-mono':   ["'DM Mono', monospace",        "'tnum'"],
+                    'ibm-plex':  ["'IBM Plex Mono', monospace",  "'tnum'"],
+                    'roboto':    ["'Roboto Mono', monospace",    "'tnum'"],
+                    'manrope':   ["'Manrope', sans-serif",       "'tnum'"],
+                };
+                var conf = fontMap[f];
+                if (conf) {
+                    document.documentElement.style.setProperty('--font-mono', conf[0]);
+                    document.documentElement.style.setProperty('--font-mono-features', conf[1]);
+                }
+            }
+        } catch(e){}
+    })();
+    </script>
     <style>
         *{box-sizing:border-box;}
-        :root { --font-mono: var(--font-mono); --font-mono-features: 'tnum', 'zero'; }
+        :root { --font-mono: 'JetBrains Mono', 'Space Mono', monospace; --font-mono-features: 'tnum', 'zero'; }
         html,body{margin:0;padding:0;height:100vh;overflow:hidden;font-family:'Manrope',sans-serif;transition:background .4s;}
         
-        /* Aplica números tabulares + zero com ponto em todos elementos com JetBrains/Space Mono */
-        [style*="JetBrains Mono"], [style*="Space Mono"] {
-            font-feature-settings: 'tnum', 'zero';
-            font-variant-numeric: tabular-nums slashed-zero;
+        /* Aplica números tabulares + zero com ponto em todos elementos com font mono */
+        [style*="var(--font-mono)"], [style*="JetBrains Mono"], [style*="Space Mono"], [style*="Inter"], [style*="DM Mono"], [style*="IBM Plex Mono"], [style*="Roboto Mono"] {
+            font-feature-settings: var(--font-mono-features);
+            font-variant-numeric: tabular-nums;
         }
         .mono{font-family:var(--font-mono);}
 
@@ -1043,6 +1066,24 @@ function montarCarouselPremiacao(d) {
         // Kiosk mode toggle
         if (d && d.__kiosk === true)  { enterKiosk(); return; }
         if (d && d.__kiosk === false) { exitKiosk(); return; }
+        
+        // Aplica fonte enviada do app (popup de torneio "Abrir TV")
+        if (d && d.fontMono) {
+            const fontMap = {
+                'jetbrains': ["'JetBrains Mono', monospace", "'tnum', 'zero'"],
+                'inter':     ["'Inter', sans-serif",         "'tnum'"],
+                'dm-mono':   ["'DM Mono', monospace",        "'tnum'"],
+                'ibm-plex':  ["'IBM Plex Mono', monospace",  "'tnum'"],
+                'roboto':    ["'Roboto Mono', monospace",    "'tnum'"],
+                'manrope':   ["'Manrope', sans-serif",       "'tnum'"],
+            };
+            const conf = fontMap[d.fontMono];
+            if (conf) {
+                document.documentElement.style.setProperty('--font-mono', conf[0]);
+                document.documentElement.style.setProperty('--font-mono-features', conf[1]);
+            }
+        }
+        
         if (!d || !d.timer) return;  // ignora mensagens sem dados de torneio
         const layout = d.layout || 'classico';
         document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '');
