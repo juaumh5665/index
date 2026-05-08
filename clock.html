@@ -169,7 +169,8 @@ html,body{
 }
 
 .timebanks{
-  display:flex;gap:1.6vw;margin-top:1.5vh;justify-content:center;
+  display:flex;gap:1.6vw;margin-top:1.5vh;justify-content:center;align-items:center;flex-wrap:wrap;
+  max-width:80vw;
 }
 .tb{
   width:3vh;height:3vh;
@@ -183,6 +184,23 @@ html,body{
   box-shadow:0 0 14px #9333ea;
 }
 .tb:active{transform:scale(0.85);}
+.tb-add{
+  width:3vh;height:3vh;
+  min-width:18px;min-height:18px;
+  max-width:32px;max-height:32px;
+  border-radius:50%;
+  border:2px dashed rgba(147,51,234,0.5);
+  color:#9333ea;
+  background:transparent;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2vh;line-height:1;font-weight:700;
+  font-family:inherit;
+  padding:0;
+  transition:0.2s;
+}
+.tb-add:hover{border-color:#9333ea;background:rgba(147,51,234,0.1);}
+.tb-add:active{transform:scale(0.85);}
 
 /* === BOTÕES === */
 .buttons{
@@ -427,7 +445,7 @@ html,body{
 <div class="modal" id="modalPos">
   <div class="modal-content">
     <div class="modal-header">
-      <h3>Re-entry — Qual posição?</h3>
+      <h3>Rebuy — Qual posição?</h3>
       <button class="modal-close" onclick="fechar('modalPos')">×</button>
     </div>
     <div class="grid-pos" id="gridPos"></div>
@@ -438,19 +456,17 @@ html,body{
 <div class="modal" id="modalTipo">
   <div class="modal-content">
     <div class="modal-header">
-      <h3>Posição <span id="posEscolhida" style="color:#a855f7"></span> — Simples ou duplo?</h3>
+      <h3>Posição <span id="posEscolhida" style="color:#a855f7"></span> — Rebuy</h3>
       <button class="modal-close" onclick="fechar('modalTipo')">×</button>
     </div>
     <div class="tipo-buttons">
       <button class="tipo-btn" onclick="confirmarReentry('simples')">
         <div class="ico">🃏</div>
-        <div class="lbl">Simples</div>
-        <div class="sub">1 stack</div>
+        <div class="lbl">Rebuy Simples</div>
       </button>
       <button class="tipo-btn" onclick="confirmarReentry('duplo')">
         <div class="ico">🃏🃏</div>
-        <div class="lbl">Duplo</div>
-        <div class="sub">2 stacks</div>
+        <div class="lbl">Rebuy Duplo</div>
       </button>
     </div>
   </div>
@@ -498,7 +514,7 @@ html,body{
 // ===== CONFIG SUPABASE =====
 // IMPORTANTE: substitua pela sua URL e ANON KEY do Supabase
 const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dmdka2pvaGZvbXVhZnNhZnN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNDIxODEsImV4cCI6MjA5MjcxODE4MX0.TH5PP6Ssc-fJFP8ajBY-5o8njkIzSQh1RH5LIAB1AnQ';
+const SUPABASE_ANON_KEY = 'COLE_AQUI_SUA_ANON_KEY';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -698,8 +714,28 @@ $('startBtn').onclick = () => {
   }
 };
 
-// toque no número também inicia/pausa
-$('timer').onclick = () => $('startBtn').click();
+// Toque simples no número = inicia/pausa
+// Duplo toque (rápido) = reset pro tempo padrão
+let lastTimerTap = 0;
+$('timer').onclick = (e) => {
+  const now = Date.now();
+  if (now - lastTimerTap < 350) {
+    // duplo toque detectado: reset
+    resetTimer();
+    showAlert('Timer resetado', 'success');
+    vibrate(80);
+    lastTimerTap = 0;
+    return;
+  }
+  lastTimerTap = now;
+  // dá um pequeno delay pra ver se vem segundo toque
+  setTimeout(() => {
+    if (Date.now() - lastTimerTap >= 340) {
+      // foi mesmo único, executa start/pause
+      $('startBtn').click();
+    }
+  }, 360);
+};
 
 // ===== TIMEBANK =====
 function renderTimebanks() {
@@ -711,6 +747,18 @@ function renderTimebanks() {
     d.onclick = () => usarTimebank(i);
     cont.appendChild(d);
   }
+  // botão + pra adicionar mais timebank
+  const addBtn = document.createElement('button');
+  addBtn.className = 'tb-add';
+  addBtn.textContent = '+';
+  addBtn.title = 'Adicionar TimeBank';
+  addBtn.onclick = () => {
+    CONFIG.bank_max++;
+    banksRestantes++;
+    renderTimebanks();
+    showAlert('TimeBank adicionado (' + CONFIG.bank_max + ' total)', 'success');
+  };
+  cont.appendChild(addBtn);
 }
 
 async function usarTimebank(idx) {
@@ -786,7 +834,7 @@ $('reentryBtn').onclick = () => {
 
 async function confirmarReentry(variante) {
   fechar('modalTipo');
-  const txt = `Re-entry ${variante.toUpperCase()} • Pos ${posEscolhida} • Mesa ${MESA}`;
+  const txt = `Rebuy ${variante.toUpperCase()} • Pos ${posEscolhida} • Mesa ${MESA}`;
   showAlert(txt, 'success');
   vibrate(150);
   try {
