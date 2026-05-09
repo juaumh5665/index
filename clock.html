@@ -512,14 +512,24 @@ html,body{
 
 <script>
 // ===== CONFIG SUPABASE =====
-// IMPORTANTE: substitua pela sua URL e ANON KEY do Supabase
 const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dmdka2pvaGZvbXVhZnNhZnN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNDIxODEsImV4cCI6MjA5MjcxODE4MX0.TH5PP6Ssc-fJFP8ajBY-5o8njkIzSQh1RH5LIAB1AnQ';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ===== ESTADO =====
-let TOKEN = localStorage.getItem('stackclock_token') || '';
+// PRIORIDADE: ?t=XXX na URL > localStorage > vazio (mostra tela de login)
+const _urlParams = new URLSearchParams(window.location.search);
+const _tokenUrl = _urlParams.get('t') || _urlParams.get('token') || '';
+let TOKEN = _tokenUrl || localStorage.getItem('stackclock_token') || '';
+
+// se veio token novo na URL e é diferente do salvo, prioriza o da URL e atualiza
+if (_tokenUrl && _tokenUrl !== localStorage.getItem('stackclock_token')) {
+  localStorage.setItem('stackclock_token', _tokenUrl);
+  // limpa mesa salva (token novo = clube possivelmente diferente)
+  localStorage.removeItem('stackclock_mesa');
+}
+
 let MESA = parseInt(localStorage.getItem('stackclock_mesa') || '0');
 let CLUBE_ID = null;
 let CONFIG = {
