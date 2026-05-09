@@ -78,6 +78,77 @@ html,body{
   .rotate-warn{display:flex;}
 }
 
+/* === BANNER DE INSTALAÇÃO PWA === */
+.install-banner{
+  position:fixed;
+  top:14px;left:50%;transform:translateX(-50%) translateY(-200px);
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:18px;
+  padding:14px 18px;
+  display:flex;align-items:center;gap:14px;
+  z-index:500;
+  box-shadow:0 12px 40px rgba(124,58,237,0.5);
+  max-width:92vw;
+  transition:transform 0.4s cubic-bezier(.2,.9,.3,1.4);
+}
+.install-banner.show{transform:translateX(-50%) translateY(0);}
+.install-banner .ico{font-size:30px;}
+.install-banner .content{flex:1;min-width:0;}
+.install-banner .ttl{font-size:14px;font-weight:700;color:#fff;line-height:1.2;}
+.install-banner .sub{font-size:11px;color:rgba(255,255,255,0.8);margin-top:2px;}
+.install-banner .btns{display:flex;gap:6px;flex-shrink:0;}
+.install-banner button{
+  border:none;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:700;
+  cursor:pointer;font-family:inherit;
+}
+.install-banner .btn-install{background:#fff;color:#6d28d9;}
+.install-banner .btn-install:active{transform:scale(0.95);}
+.install-banner .btn-skip{background:rgba(255,255,255,0.15);color:#fff;}
+.install-banner .btn-skip:active{transform:scale(0.95);}
+
+/* === AVISO PWA (overlay quando aberto direto no navegador) === */
+.pwa-hint{
+  position:fixed;inset:0;
+  background:rgba(2,6,23,0.96);backdrop-filter:blur(10px);
+  z-index:9990;display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  padding:24px;text-align:center;
+}
+.pwa-hint.show{display:flex;}
+.pwa-hint .icon{font-size:64px;margin-bottom:18px;}
+.pwa-hint h2{
+  font-size:24px;font-weight:800;letter-spacing:-1px;margin-bottom:10px;
+  background:linear-gradient(90deg,#fff,#a855f7);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.pwa-hint p{font-size:14px;color:#9ca3af;max-width:520px;margin-bottom:18px;line-height:1.5;}
+.pwa-hint .steps{
+  display:flex;gap:14px;justify-content:center;flex-wrap:wrap;
+  background:#0c1223;border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;padding:18px 22px;margin-bottom:22px;
+  max-width:90vw;
+}
+.pwa-hint .step{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  font-size:11px;color:#9ca3af;max-width:140px;
+}
+.pwa-hint .step .num{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:#fff;
+}
+.pwa-hint .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.pwa-hint button{
+  border:none;border-radius:12px;padding:13px 22px;font-size:14px;font-weight:700;
+  cursor:pointer;font-family:inherit;
+}
+.pwa-hint .btn-install-now{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;}
+.pwa-hint .btn-install-now:active{transform:scale(0.97);}
+.pwa-hint .btn-continue{background:rgba(255,255,255,0.08);color:#9ca3af;border:1px solid rgba(255,255,255,0.1);}
+.pwa-hint .btn-continue:active{transform:scale(0.97);}
+
 /* === TOPO === */
 .top{
   display:flex;justify-content:space-between;align-items:flex-start;
@@ -363,6 +434,44 @@ html,body{
   <p>O StackClock funciona apenas no modo paisagem.<br>Vire seu celular ou tablet.</p>
 </div>
 
+<!-- AVISO PWA: aparece se aberto direto no navegador (não instalado) -->
+<div class="pwa-hint" id="pwaHint">
+  <div class="icon">⚡</div>
+  <h2>Instale o StackClock</h2>
+  <p>Para experiência fullscreen sem barra do navegador, instale como app na tela inicial do seu celular.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div>Toque no menu do navegador <strong>(⋮)</strong></div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div>Toque em <strong>"Instalar app"</strong> ou <strong>"Adicionar à tela inicial"</strong></div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div>Abra pelo <strong>ícone novo</strong> que aparecer na tela do celular</div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn-install-now" id="btnInstallNow">📲 Instalar agora</button>
+    <button class="btn-continue" onclick="document.getElementById('pwaHint').classList.remove('show'); localStorage.setItem('stackclock_pwa_skip','1');">Continuar pelo navegador</button>
+  </div>
+</div>
+
+<!-- BANNER discreto que aparece depois (caso usuário pulou o hint mas pode instalar) -->
+<div class="install-banner" id="installBanner">
+  <div class="ico">📱</div>
+  <div class="content">
+    <div class="ttl">Instalar como app</div>
+    <div class="sub">Fullscreen sem barra do navegador</div>
+  </div>
+  <div class="btns">
+    <button class="btn-install" id="bannerInstall">Instalar</button>
+    <button class="btn-skip" id="bannerSkip">Depois</button>
+  </div>
+</div>
+
 <!-- TELA DE LOGIN (token) -->
 <div class="login-screen" id="loginScreen">
   <h1>StackClock</h1>
@@ -511,7 +620,72 @@ html,body{
 </div>
 
 <script>
-// ===== CONFIG SUPABASE =====
+// ===== PWA: detecção e instalação =====
+let deferredInstallPrompt = null;
+
+function isPwaInstalled() {
+  return window.matchMedia('(display-mode: fullscreen)').matches ||
+         window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true;
+}
+
+// captura o evento de "pode instalar" do Chrome/Edge
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // se ainda não instalado e não pulou recentemente, mostra banner discreto
+  if (!isPwaInstalled() && !sessionStorage.getItem('stackclock_banner_dismissed')) {
+    setTimeout(() => {
+      const banner = document.getElementById('installBanner');
+      if (banner) banner.classList.add('show');
+    }, 3500);
+  }
+});
+
+// quando dispara o prompt nativo
+async function dispararInstall() {
+  if (!deferredInstallPrompt) {
+    // Safari iOS não tem o prompt — mostra hint detalhado
+    const hint = document.getElementById('pwaHint');
+    if (hint) hint.classList.add('show');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  try {
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice && choice.outcome === 'accepted') {
+      const banner = document.getElementById('installBanner');
+      const hint   = document.getElementById('pwaHint');
+      if (banner) banner.classList.remove('show');
+      if (hint)   hint.classList.remove('show');
+    }
+  } catch(e) {}
+  deferredInstallPrompt = null;
+}
+
+// botões
+document.addEventListener('DOMContentLoaded', () => {
+  const btnInstall  = document.getElementById('bannerInstall');
+  const btnSkip     = document.getElementById('bannerSkip');
+  const btnInstNow  = document.getElementById('btnInstallNow');
+  if (btnInstall) btnInstall.onclick = dispararInstall;
+  if (btnInstNow) btnInstNow.onclick = dispararInstall;
+  if (btnSkip) btnSkip.onclick = () => {
+    document.getElementById('installBanner').classList.remove('show');
+    sessionStorage.setItem('stackclock_banner_dismissed', '1');
+  };
+
+  // se aberto direto pelo navegador (não instalado) e usuário não pulou: mostra hint
+  if (!isPwaInstalled() && !localStorage.getItem('stackclock_pwa_skip')) {
+    setTimeout(() => {
+      // só mostra se ainda não logou (pra não atrapalhar quem já tá usando)
+      const loginVisible = document.getElementById('loginScreen').style.display !== 'none';
+      if (loginVisible) {
+        document.getElementById('pwaHint').classList.add('show');
+      }
+    }, 600);
+  }
+});
 const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
 
