@@ -4622,6 +4622,47 @@ function iniciarRealtime() {
             filter: `clube_id=eq.${clubeId}` 
         }, (payload) => _onRealtimeEvent('cash_mesa', payload))
         
+        // === CLUBES (mudança de plano feita pelo super admin) ===
+        .on('postgres_changes', { 
+            event: 'UPDATE', schema: 'public', table: 'clubes',
+            filter: `id=eq.${clubeId}` 
+        }, async (payload) => {
+            console.log('[REALTIME] Clube atualizado pelo super admin:', payload.new);
+            const novoClube = payload.new;
+            const planoMudou = sbClube?.plano !== novoClube.plano || sbClube?.plano_atual !== novoClube.plano_atual;
+            const statusMudou = sbClube?.status !== novoClube.status || sbClube?.bloqueado !== novoClube.bloqueado;
+            
+            // atualiza estado local
+            sbClube = { ...sbClube, ...novoClube };
+            window.sbClube = sbClube; // [STACKCLOCK]
+            
+            // se status virou bloqueado/inativo, força logout
+            if (novoClube.bloqueado || novoClube.status !== 'ativo') {
+                alert('⚠️ Seu acesso foi alterado pelo administrador. Faça login novamente.');
+                try { await sb.auth.signOut(); } catch(_) {}
+                location.reload();
+                return;
+            }
+            
+            // se mudou plano, mostra aviso e atualiza UI
+            if (planoMudou) {
+                if (typeof showToast === 'function') {
+                    showToast('🔔 Seu plano foi atualizado pelo administrador');
+                }
+                // re-renderiza tela de assinatura se estiver aberta
+                if (typeof renderAssinaturaResumo === 'function') {
+                    try { renderAssinaturaResumo(); } catch(_){}
+                }
+                if (typeof renderMeuClubeCard === 'function') {
+                    try { renderMeuClubeCard(); } catch(_){}
+                }
+                // re-aplica permissões/UI baseadas no plano
+                if (typeof applyAccessControl === 'function') {
+                    try { applyAccessControl(); } catch(_){}
+                }
+            }
+        })
+        
         .subscribe((status) => {
             console.log('[REALTIME] status:', status);
             if (status === 'SUBSCRIBED') {
@@ -8999,20 +9040,30 @@ function renderBannerGlobalAssinatura() {
 
 
 async function adminVerificarAcessoEMostrar() {
+    // ESCONDE TUDO IMEDIATAMENTE antes de validar (proteção visual)
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('signup-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('admin-screen').style.display = 'none';
+    // tela neutra de "validando"
+    document.body.style.background = '#0a0a0b';
+
     // Verifica se usuário é super admin via RPC
     try {
         const { data: isAdmin, error } = await sb.rpc('is_super_admin');
         if (error) throw error;
         if (!isAdmin) {
-            alert('Acesso negado: você não é super admin.');
-            window._goToAdmin = false;
+            // BLOQUEIO TOTAL: não mostra nada, faz logout e redireciona pra /app limpo
+            console.warn('[ADMIN] Tentativa de acesso negada — não é super admin.');
+            try { await sb.auth.signOut(); } catch(_) {}
+            // remove ?admin=1 e recarrega como /app limpo
+            const cleanUrl = window.location.origin + window.location.pathname;
+            window.location.replace(cleanUrl);
             return false;
         }
         // É super admin -> mostrar painel
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('signup-screen').style.display = 'none';
-        document.getElementById('main-app').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'block';
+        document.body.style.background = '';
         
         // Atualizar info do usuário no header
         const email = currentUser ? currentUser.email : (sbSession?.user?.email || '—');
@@ -9023,7 +9074,10 @@ async function adminVerificarAcessoEMostrar() {
         return true;
     } catch(e) {
         console.error('[ADMIN] Erro:', e);
-        alert('Erro ao verificar permissões: ' + (e.message || e));
+        // erro na verificação = bloqueio também (defesa em profundidade)
+        try { await sb.auth.signOut(); } catch(_) {}
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.location.replace(cleanUrl);
         return false;
     }
 }
@@ -11503,8 +11557,59 @@ document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
         // Forçar recálculo imediato pra atualizar tempos e UI
         _executarTickGlobal();
+        // Revalidar plano/status do clube (caso tenha mudado em outro dispositivo
+        // ou tenha sido alterado pelo super admin enquanto a aba estava no background)
+        _revalidarClubeAtual();
     }
 });
+
+// Helper que busca o estado atual do clube no banco e detecta mudanças.
+// Chamado: ao voltar do background, periodicamente (5min) e em pontos críticos.
+async function _revalidarClubeAtual() {
+    if (!sbClube || !sbClube.id) return;
+    try {
+        const { data, error } = await sb
+            .from('clubes')
+            .select('*')
+            .eq('id', sbClube.id)
+            .maybeSingle();
+        if (error || !data) return;
+        
+        const planoMudou  = sbClube.plano !== data.plano || sbClube.plano_atual !== data.plano_atual;
+        const statusMudou = sbClube.status !== data.status || !!sbClube.bloqueado !== !!data.bloqueado;
+        
+        // sincroniza estado
+        sbClube = { ...sbClube, ...data };
+        window.sbClube = sbClube;
+        
+        if (data.bloqueado || data.status !== 'ativo') {
+            alert('⚠️ Seu acesso foi alterado pelo administrador.\nFaça login novamente.');
+            try { await sb.auth.signOut(); } catch(_) {}
+            location.reload();
+            return;
+        }
+        
+        if (planoMudou) {
+            console.log('[CLUBE] Plano atualizado:', data.plano);
+            if (typeof showToast === 'function') {
+                showToast('🔔 Seu plano foi atualizado: ' + (data.plano || data.plano_atual || ''));
+            }
+            if (typeof renderAssinaturaResumo === 'function') {
+                try { renderAssinaturaResumo(); } catch(_){}
+            }
+            if (typeof renderMeuClubeCard === 'function') {
+                try { renderMeuClubeCard(); } catch(_){}
+            }
+            if (typeof applyAccessControl === 'function') {
+                try { applyAccessControl(); } catch(_){}
+            }
+        }
+    } catch(e) {
+        console.warn('[CLUBE] erro revalidar:', e);
+    }
+}
+// Revalida automaticamente a cada 5 minutos
+setInterval(_revalidarClubeAtual, 5 * 60 * 1000);
 
 function _executarTickGlobal() {
     let changed = false;
