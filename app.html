@@ -1252,6 +1252,8 @@
                             <button onclick="abrirNovoTorneioComTemplates()" class="btn-gold">+ Novo Torneio</button>
                         </div>
                     </div>
+                    <!-- [LIMITE-TORNEIOS] Indicador X/Y torneios este mês -->
+                    <div id="indicador-torneios-mes" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:.7rem 1rem;margin-bottom:1rem;display:none;"></div>
                     <div id="torneios-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
                     <div id="sem-torneios" style="text-align:center;padding:4rem;color:#3f3f46;">
                         <i class="fa-solid fa-trophy" style="font-size:3rem;margin-bottom:1rem;display:block;"></i>
@@ -7933,6 +7935,12 @@ async function gerarConvite() {
         showToast('⚠️ E-mail inválido');
         return;
     }
+    
+    // [LIMITE-USUARIOS] Verifica limite do plano antes de gerar convite
+    if (typeof _verificarLimiteUsuarios === 'function') {
+        const podeAdicionar = await _verificarLimiteUsuarios();
+        if (!podeAdicionar) return; // bloqueado, modal já mostrado
+    }
 
     const btn = document.getElementById('btn-gerar-convite');
     const txt = btn.innerHTML;
@@ -8001,6 +8009,8 @@ async function gerarConvite() {
         openModal('modal-convite-link');
         renderMeuClubeCard();  // refresh tabela de convites
         logAudit && logAudit('CONVITE_GERA', `Convite enviado: ${email} (${papel})`);
+        // [LIMITE-USUARIOS] invalida cache pra próxima checagem buscar novo count
+        _limiteUsuariosCache = null;
     } catch (e) {
         console.error('Gerar convite:', e);
         showToast('⚠️ Erro: ' + (e.message || 'Falha ao gerar convite'));
@@ -8486,7 +8496,173 @@ window.applyAccessControl = function() {
     if (typeof _renderSidebarLocks === 'function') {
         try { _renderSidebarLocks(); } catch(_){}
     }
+    // Re-renderiza indicador de torneios mensais (se a página atual mostra)
+    if (typeof _renderIndicadorTorneios === 'function') {
+        try { _renderIndicadorTorneios(); } catch(_){}
+    }
 };
+
+// ============================================================
+// LIMITES DE USO (torneios mensais e usuários)
+// ============================================================
+let _limiteTorneiosCache = null;  // {count, limite, restantes, pode_criar, ts}
+let _limiteUsuariosCache = null;
+
+async function _carregarLimiteTorneios(forcar = false) {
+    // cache de 30s pra não martelar o banco
+    const agora = Date.now();
+    if (!forcar && _limiteTorneiosCache && (agora - _limiteTorneiosCache.ts < 30000)) {
+        return _limiteTorneiosCache;
+    }
+    try {
+        const { data, error } = await sb.rpc('contar_torneios_mes');
+        if (error) throw error;
+        if (!data || !data.ok) return null;
+        _limiteTorneiosCache = { ...data, ts: agora };
+        return _limiteTorneiosCache;
+    } catch(e) {
+        console.warn('[LIMITES] erro torneios:', e);
+        return null;
+    }
+}
+
+async function _carregarLimiteUsuarios(forcar = false) {
+    const agora = Date.now();
+    if (!forcar && _limiteUsuariosCache && (agora - _limiteUsuariosCache.ts < 30000)) {
+        return _limiteUsuariosCache;
+    }
+    try {
+        const { data, error } = await sb.rpc('contar_usuarios_clube');
+        if (error) throw error;
+        if (!data || !data.ok) return null;
+        _limiteUsuariosCache = { ...data, ts: agora };
+        return _limiteUsuariosCache;
+    } catch(e) {
+        console.warn('[LIMITES] erro usuarios:', e);
+        return null;
+    }
+}
+
+// Bloqueio antes de iniciar um torneio. Mostra modal e retorna false se bloqueado.
+async function _verificarLimiteTorneiosMensal() {
+    if (!FEATURES_BLOCK_ENABLED) return true;
+    if (sbClube?.status === 'trial') return true;
+    
+    const info = await _carregarLimiteTorneios(true); // sempre revalida ao iniciar
+    if (!info) return true;             // se falhou, libera (fail-open)
+    if (info.limite == null) return true; // ilimitado
+    if (info.pode_criar) return true;
+    
+    // BLOQUEADO — mostra modal
+    _mostrarModalLimiteTorneios(info);
+    return false;
+}
+
+function _mostrarModalLimiteTorneios(info) {
+    const old = document.getElementById('modal-limite-torn');
+    if (old) old.remove();
+    
+    const html = `
+        <div id="modal-limite-torn" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Manrope','Inter',system-ui,sans-serif;">
+            <div style="background:#0c1223;border:1px solid rgba(245,158,11,0.3);border-radius:18px;padding:32px;max-width:480px;width:100%;text-align:center;">
+                <div style="font-size:56px;margin-bottom:14px;">🏆</div>
+                <h3 style="font-size:22px;font-weight:800;margin-bottom:10px;color:#f59e0b;letter-spacing:-0.5px;">Limite mensal atingido</h3>
+                <p style="font-size:14px;color:#9ca3af;margin-bottom:20px;line-height:1.5;">
+                    Você atingiu <strong style="color:#fff;">${info.count}/${info.limite}</strong> torneios deste mês no seu plano atual.
+                </p>
+                <div style="background:#1a1a2e;border-radius:12px;padding:14px;margin-bottom:22px;font-size:13px;color:#d4d4d8;line-height:1.6;">
+                    <strong style="color:#a855f7;">⬆️ Faça upgrade pra desbloquear mais torneios:</strong><br>
+                    • <strong>Premium:</strong> 20 torneios/mês<br>
+                    • <strong>Pro:</strong> torneios ilimitados
+                </div>
+                <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                    <button onclick="document.getElementById('modal-limite-torn').remove(); if (typeof showPage==='function') showPage('assinatura');"
+                            style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        ⚡ Ver Planos
+                    </button>
+                    <button onclick="document.getElementById('modal-limite-torn').remove();"
+                            style="background:rgba(255,255,255,0.08);color:#9ca3af;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+// Indicador visual "X/Y torneios este mês" na página de torneios
+async function _renderIndicadorTorneios() {
+    const cont = document.getElementById('indicador-torneios-mes');
+    if (!cont) return; // a página de torneios pode nem estar aberta
+    
+    const info = await _carregarLimiteTorneios();
+    if (!info) { cont.style.display = 'none'; return; }
+    
+    if (info.limite == null) {
+        cont.style.display = 'none'; // ilimitado, não precisa mostrar
+        return;
+    }
+    
+    const pct = Math.min(100, (info.count / info.limite) * 100);
+    const cor = pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : '#22c55e';
+    cont.style.display = 'block';
+    cont.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:.78rem;">
+            <span style="color:#a1a1aa;font-weight:600;">🏆 Torneios deste mês</span>
+            <span style="color:${cor};font-weight:800;">${info.count}/${info.limite}</span>
+        </div>
+        <div style="background:#27272a;border-radius:999px;height:6px;overflow:hidden;">
+            <div style="background:${cor};height:100%;width:${pct}%;transition:width .4s ease;"></div>
+        </div>
+    `;
+}
+
+// Bloqueio antes de criar usuário. Retorna false se bloqueado (e mostra modal).
+async function _verificarLimiteUsuarios() {
+    if (!FEATURES_BLOCK_ENABLED) return true;
+    if (sbClube?.status === 'trial') return true;
+    
+    const info = await _carregarLimiteUsuarios(true);
+    if (!info) return true;
+    if (info.limite == null) return true;
+    if (info.pode_criar) return true;
+    
+    _mostrarModalLimiteUsuarios(info);
+    return false;
+}
+
+function _mostrarModalLimiteUsuarios(info) {
+    const old = document.getElementById('modal-limite-usr');
+    if (old) old.remove();
+    const html = `
+        <div id="modal-limite-usr" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Manrope','Inter',system-ui,sans-serif;">
+            <div style="background:#0c1223;border:1px solid rgba(168,85,247,0.3);border-radius:18px;padding:32px;max-width:480px;width:100%;text-align:center;">
+                <div style="font-size:56px;margin-bottom:14px;">👥</div>
+                <h3 style="font-size:22px;font-weight:800;margin-bottom:10px;color:#a855f7;letter-spacing:-0.5px;">Limite de usuários atingido</h3>
+                <p style="font-size:14px;color:#9ca3af;margin-bottom:20px;line-height:1.5;">
+                    Você já tem <strong style="color:#fff;">${info.count}/${info.limite}</strong> usuários no seu plano atual.
+                </p>
+                <div style="background:#1a1a2e;border-radius:12px;padding:14px;margin-bottom:22px;font-size:13px;color:#d4d4d8;line-height:1.6;">
+                    <strong style="color:#a855f7;">⬆️ Faça upgrade pra adicionar mais usuários:</strong><br>
+                    • <strong>Premium:</strong> 10 usuários<br>
+                    • <strong>Pro:</strong> usuários ilimitados
+                </div>
+                <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                    <button onclick="document.getElementById('modal-limite-usr').remove(); if (typeof showPage==='function') showPage('assinatura');"
+                            style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        ⚡ Ver Planos
+                    </button>
+                    <button onclick="document.getElementById('modal-limite-usr').remove();"
+                            style="background:rgba(255,255,255,0.08);color:#9ca3af;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
 
 
 async function carregarAssinaturaAtual() {
@@ -9619,7 +9795,7 @@ function adminAbrirModalPlano(planoId) {
             
             <!-- Limites técnicos -->
             <div style="font-size:.85rem;color:#a1a1aa;font-weight:700;margin:1.5rem 0 .75rem 0;border-top:1px solid #27272a;padding-top:1rem;">📊 Limites técnicos <span style="font-weight:400;color:#71717a;">(deixe vazio = ilimitado)</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.75rem;margin-bottom:1rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
                 <div>
                     <label style="font-size:.7rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Max Jogadores</label>
                     <input type="number" id="pl-max-jog" value="${plano?.max_jogadores ?? ''}" min="0" placeholder="∞" style="width:100%;padding:.55rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.85rem;">
@@ -9635,6 +9811,16 @@ function adminAbrirModalPlano(planoId) {
                 <div>
                     <label style="font-size:.7rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">Max TVs</label>
                     <input type="number" id="pl-max-tvs" value="${plano?.max_tvs ?? ''}" min="0" placeholder="∞" style="width:100%;padding:.55rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.85rem;">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
+                <div>
+                    <label style="font-size:.7rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">🏆 Max Torneios/mês <span style="color:#71717a;font-weight:400;">(iniciados)</span></label>
+                    <input type="number" id="pl-max-torn-mes" value="${plano?.max_torneios_mensal ?? ''}" min="0" placeholder="∞" style="width:100%;padding:.55rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.85rem;">
+                </div>
+                <div>
+                    <label style="font-size:.7rem;color:#a1a1aa;font-weight:600;display:block;margin-bottom:.35rem;">👥 Max Usuários <span style="color:#71717a;font-weight:400;">(todos os papéis)</span></label>
+                    <input type="number" id="pl-max-usuarios" value="${plano?.max_usuarios ?? ''}" min="0" placeholder="∞" style="width:100%;padding:.55rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:.85rem;">
                 </div>
             </div>
             
@@ -9718,6 +9904,8 @@ async function adminSalvarPlano(novo) {
         const maxOp = parseOrNull('pl-max-op');
         const maxClubes = parseOrNull('pl-max-clubes');
         const maxTvs = parseOrNull('pl-max-tvs');
+        const maxTornMes = parseOrNull('pl-max-torn-mes');
+        const maxUsuarios = parseOrNull('pl-max-usuarios');
         
         const planoData = {
             id,
@@ -9730,6 +9918,8 @@ async function adminSalvarPlano(novo) {
             max_operadores: maxOp,
             max_clubes: maxClubes,
             max_tvs: maxTvs,
+            max_torneios_mensal: maxTornMes,
+            max_usuarios: maxUsuarios,
             feature_bar_comandas: document.getElementById('pl-feature_bar_comandas').checked,
             feature_fechamento_dia: document.getElementById('pl-feature_fechamento_dia').checked,
             feature_relatorios_avancados: document.getElementById('pl-feature_relatorios_avancados').checked,
@@ -10200,6 +10390,10 @@ function showPage(page) {
         // Garantir subtab ativo correto
         const ativaBtn = document.querySelector('#torntab-btn-ativos');
         if (ativaBtn && !ativaBtn.classList.contains('open')) switchTornTab('torn-ativos', ativaBtn);
+        // [LIMITE-TORNEIOS] atualiza indicador X/Y
+        if (typeof _renderIndicadorTorneios === 'function') {
+            setTimeout(() => { try { _renderIndicadorTorneios(); } catch(_){} }, 100);
+        }
     }
     if (page === 'dashboard') renderDashboard();
     if (page === 'bar')       renderBarProdutos();
@@ -10889,9 +11083,17 @@ function calcPayout(n, prize) {
 // ============================================================
 // TORNEIO — CONTROLES
 // ============================================================
-function toggleTimer(idx) {
+async function toggleTimer(idx) {
     const t = torneios[idx];
     if (!t) return;
+    
+    // [LIMITE-TORNEIOS] Bloqueio quando vai INICIAR pela primeira vez
+    // (rodando passando de false → true E ainda não tem iniciadoEm).
+    // Torneios já iniciados podem pausar/retomar à vontade — só conta a primeira vez.
+    if (!t.rodando && !t.iniciadoEm) {
+        const podeIniciar = await _verificarLimiteTorneiosMensal();
+        if (!podeIniciar) return; // bloqueado, modal já foi mostrado
+    }
     
     // Suspende realtime pra evitar que outro operador (ou eco do realtime)
     // sobrescreva o estado local antes do save concluir
@@ -10900,7 +11102,11 @@ function toggleTimer(idx) {
     t.rodando = !t.rodando;
     if (t.rodando) {
         t.status = 'running';
-        if (!t.iniciadoEm) t.iniciadoEm = Date.now();
+        if (!t.iniciadoEm) {
+            t.iniciadoEm = Date.now();
+            // Atualiza o indicador visual de "X/Y torneios" na barra superior
+            setTimeout(() => { try { _renderIndicadorTorneios(); } catch(_){} }, 1000);
+        }
     } else {
         t.status = 'paused';
     }
