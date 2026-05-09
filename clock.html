@@ -12,9 +12,9 @@
 
 <title>StackClock — Dealer</title>
 
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%237c3aed'/><text x='50' y='66' font-size='52' font-family='sans-serif' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>" />
-<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%237c3aed'/><text x='50' y='66' font-size='52' font-family='sans-serif' font-weight='800' text-anchor='middle' fill='white'>S</text></svg>" />
-<link rel="manifest" href='data:application/manifest+json,{"name":"StackClock","short_name":"StackClock","start_url":".","display":"fullscreen","orientation":"landscape","theme_color":"%23020617","background_color":"%23000814","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><rect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%237c3aed%27/><text x=%2750%27 y=%2766%27 font-size=%2752%27 font-family=%27sans-serif%27 font-weight=%27800%27 text-anchor=%27middle%27 fill=%27white%27>S</text></svg>","sizes":"192x192","type":"image/svg+xml"}]}' />
+<link rel="icon" type="image/png" href="/icons/icon-192.png" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.json" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -652,6 +652,16 @@ html,body{
 <script>
 // ===== PWA: detecção e instalação =====
 let deferredInstallPrompt = null;
+let pwaPromptCapturado = false; // sabemos que o Chrome topou ofertar instalação
+
+// REGISTRAR SERVICE WORKER (necessário pro Chrome considerar PWA "instalável")
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('[StackClock] SW registrado:', reg.scope))
+      .catch(err => console.warn('[StackClock] SW erro:', err));
+  });
+}
 
 function isPwaInstalled() {
   return window.matchMedia('(display-mode: fullscreen)').matches ||
@@ -663,6 +673,8 @@ function isPwaInstalled() {
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
+  pwaPromptCapturado = true;
+  console.log('[StackClock] PWA pronto pra instalar!');
   // se ainda não instalado e não pulou recentemente, mostra banner discreto
   if (!isPwaInstalled() && !sessionStorage.getItem('stackclock_banner_dismissed')) {
     setTimeout(() => {
@@ -672,25 +684,48 @@ window.addEventListener('beforeinstallprompt', (e) => {
   }
 });
 
+// detecta se já foi instalado (depois do clique)
+window.addEventListener('appinstalled', () => {
+  console.log('[StackClock] App instalado com sucesso!');
+  const banner = document.getElementById('installBanner');
+  const hint   = document.getElementById('pwaHint');
+  if (banner) banner.classList.remove('show');
+  if (hint)   hint.classList.remove('show');
+  deferredInstallPrompt = null;
+});
+
 // quando dispara o prompt nativo
 async function dispararInstall() {
-  if (!deferredInstallPrompt) {
-    // Safari iOS não tem o prompt — mostra hint detalhado
-    const hint = document.getElementById('pwaHint');
-    if (hint) hint.classList.add('show');
+  // CASO 1: Chrome já capturou e oferece prompt direto
+  if (deferredInstallPrompt) {
+    try {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        const banner = document.getElementById('installBanner');
+        const hint   = document.getElementById('pwaHint');
+        if (banner) banner.classList.remove('show');
+        if (hint)   hint.classList.remove('show');
+      }
+    } catch(e) {
+      console.warn('[StackClock] erro no prompt:', e);
+    }
+    deferredInstallPrompt = null;
     return;
   }
-  deferredInstallPrompt.prompt();
-  try {
-    const choice = await deferredInstallPrompt.userChoice;
-    if (choice && choice.outcome === 'accepted') {
-      const banner = document.getElementById('installBanner');
-      const hint   = document.getElementById('pwaHint');
-      if (banner) banner.classList.remove('show');
-      if (hint)   hint.classList.remove('show');
-    }
-  } catch(e) {}
-  deferredInstallPrompt = null;
+
+  // CASO 2: Chrome ainda não capturou — mostra instruções manuais
+  const ua = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua) && !window.MSStream;
+  const isSafari = isIOS || (/safari/.test(ua) && !/chrome|crios|fxios/.test(ua));
+
+  let msg = '';
+  if (isIOS || isSafari) {
+    msg = 'No iPhone/Safari:\n\n1. Toque no botão Compartilhar (quadrado com seta ↑)\n2. Role pra baixo\n3. Toque em "Adicionar à Tela de Início"';
+  } else {
+    msg = 'O navegador ainda não está pronto pra instalar.\n\nFaça isso manualmente:\n\n1. Toque nos 3 pontinhos (⋮) no canto superior direito\n2. Toque em "Instalar app" ou "Adicionar à tela inicial"\n3. Confirme\n\nSe aparecer "Criar atalho" em vez de "Instalar app": aguarde alguns segundos e tente de novo.';
+  }
+  alert(msg);
 }
 
 // botões
