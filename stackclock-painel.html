@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StackClock — Painel</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:linear-gradient(135deg,#020617 0%,#01030d 100%);
+  font-family:'Inter',sans-serif;
+  color:#e4e4e7;
+  min-height:100vh;
+  padding:24px 16px;
+}
+.container{max-width:880px;margin:0 auto;}
+
+.header{
+  text-align:center;margin-bottom:32px;
+}
+.header h1{
+  font-size:42px;font-weight:800;letter-spacing:-2px;
+  background:linear-gradient(90deg,#ffffff,#8b5cf6);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.header p{font-size:14px;color:#9ca3af;margin-top:4px;}
+
+.card{
+  background:rgba(12,18,35,0.88);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:18px;
+  padding:24px;
+  margin-bottom:20px;
+}
+.card h2{
+  font-size:16px;font-weight:700;color:#a855f7;
+  margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+
+.token-display{
+  background:#0a0e1a;border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px 18px;
+  font-family:'Courier New',monospace;font-size:13px;color:#a855f7;
+  word-break:break-all;margin-bottom:12px;
+}
+.link-display{
+  background:#0a0e1a;border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px 18px;
+  font-family:'Courier New',monospace;font-size:12px;color:#86efac;
+  word-break:break-all;margin-bottom:12px;
+}
+
+.btn{
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;
+  border:none;border-radius:10px;padding:12px 20px;
+  font-size:14px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:transform .15s;
+}
+.btn:hover{transform:translateY(-1px);}
+.btn:active{transform:scale(.97);}
+.btn.secondary{background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#a855f7;}
+.btn.danger{background:linear-gradient(135deg,#dc2626,#991b1b);}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;}
+
+.input-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+  gap:14px;
+}
+.input-row:last-child{border:0;}
+.input-row label{font-size:14px;color:#d4d4d8;}
+.input-row .desc{font-size:12px;color:#71717a;margin-top:2px;}
+input[type=number]{
+  background:#0a0e1a;border:1px solid rgba(255,255,255,0.1);
+  color:#fff;padding:8px 12px;border-radius:8px;
+  width:100px;text-align:center;font-family:inherit;font-size:14px;
+}
+input[type=checkbox]{
+  width:20px;height:20px;cursor:pointer;accent-color:#7c3aed;
+}
+
+.stat-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:14px;
+}
+.stat{
+  background:#0a0e1a;border:1px solid rgba(255,255,255,0.05);
+  border-radius:12px;padding:16px;text-align:center;
+}
+.stat .num{font-size:28px;font-weight:800;color:#a855f7;}
+.stat .lbl{font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+
+.routing{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:8px;
+}
+.role-box{
+  background:#0a0e1a;border:1px solid rgba(255,255,255,0.05);
+  border-radius:10px;padding:12px;
+}
+.role-box .role-name{font-size:12px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.role-box label{display:flex;align-items:center;gap:8px;font-size:13px;color:#d4d4d8;cursor:pointer;padding:4px 0;}
+
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#059669;color:#fff;padding:14px 24px;border-radius:12px;
+  font-weight:600;font-size:14px;opacity:0;transition:.3s;z-index:100;
+  box-shadow:0 10px 30px rgba(5,150,105,0.4);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.error{background:#dc2626;box-shadow:0 10px 30px rgba(220,38,38,0.4);}
+
+.loading{text-align:center;padding:40px;color:#71717a;font-size:14px;}
+.error-screen{text-align:center;padding:60px 20px;color:#ef4444;}
+
+@media(max-width:600px){
+  .header h1{font-size:32px;}
+  .card{padding:18px;}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>StackClock</h1>
+    <p>Painel de Configuração</p>
+  </div>
+
+  <div id="loadingScreen" class="card loading">Carregando...</div>
+
+  <div id="errorScreen" class="card error-screen" style="display:none;">
+    <h2>⚠️ Acesso negado</h2>
+    <p style="margin-top:8px;color:#9ca3af;font-size:13px;">Você precisa estar logado no StackOS como admin ou gerente do clube.</p>
+    <a href="app.html" class="btn" style="display:inline-block;margin-top:16px;text-decoration:none;">Ir para o StackOS</a>
+  </div>
+
+  <div id="painelMain" style="display:none;">
+
+    <!-- TOKEN -->
+    <div class="card">
+      <h2>🔗 Link de acesso para os dealers</h2>
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:14px;">
+        Compartilhe este link com os dealers do clube. Eles abrem 1 vez no celular e instalam como app na home screen.
+      </div>
+      <div id="linkBox" class="link-display">—</div>
+      <div class="btn-row">
+        <button class="btn" onclick="copiarLink()">📋 Copiar Link</button>
+        <button class="btn secondary" onclick="copiarToken()">🔑 Copiar só o token</button>
+        <button class="btn danger" onclick="revogarToken()">⟲ Revogar e gerar novo</button>
+      </div>
+      <div id="tokenBox" class="token-display" style="margin-top:12px;font-size:11px;color:#71717a;">—</div>
+    </div>
+
+    <!-- ESTATÍSTICAS -->
+    <div class="card">
+      <h2>📊 Atividade</h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="num" id="statHoje">0</div><div class="lbl">Alertas hoje</div></div>
+        <div class="stat"><div class="num" id="statSemana">0</div><div class="lbl">Esta semana</div></div>
+        <div class="stat"><div class="num" id="statTimecards">0</div><div class="lbl">Timecards usados</div></div>
+        <div class="stat"><div class="num" id="statPendentes">0</div><div class="lbl">Pendentes agora</div></div>
+      </div>
+    </div>
+
+    <!-- CONFIGURAÇÕES -->
+    <div class="card">
+      <h2>⚙️ Configurações do cronômetro</h2>
+      <div class="input-row">
+        <div>
+          <label>Tempo de ação</label>
+          <div class="desc">Tempo padrão pra cada jogada (segundos)</div>
+        </div>
+        <input type="number" id="cfgTempoAcao" min="5" max="180">
+      </div>
+      <div class="input-row">
+        <div>
+          <label>Tempo de TimeBank</label>
+          <div class="desc">Quantos segundos cada timebank consumido adiciona</div>
+        </div>
+        <input type="number" id="cfgTempoBank" min="5" max="180">
+      </div>
+      <div class="input-row">
+        <div>
+          <label>TimeBanks padrão</label>
+          <div class="desc">Quantidade inicial de bolinhas (dealer pode adicionar mais no app)</div>
+        </div>
+        <input type="number" id="cfgBankMax" min="0" max="20">
+      </div>
+      <div class="input-row">
+        <div>
+          <label>Som ao zerar</label>
+          <div class="desc">Beep no celular do dealer</div>
+        </div>
+        <input type="checkbox" id="cfgSom">
+      </div>
+      <div class="input-row">
+        <div>
+          <label>Vibração</label>
+          <div class="desc">Vibrar nos últimos 5 segundos</div>
+        </div>
+        <input type="checkbox" id="cfgVibrar">
+      </div>
+    </div>
+
+    <!-- ROTEAMENTO -->
+    <div class="card">
+      <h2>🎯 Roteamento de alertas por papel</h2>
+      <div style="font-size:13px;color:#9ca3af;margin-bottom:14px;">
+        Quais alertas cada papel recebe no StackOS. Marque os tipos que cada função deve ver.
+      </div>
+      <div id="routingBox" class="routing"></div>
+    </div>
+
+    <!-- SALVAR -->
+    <div class="card" style="text-align:center;background:transparent;border:0;">
+      <button class="btn" style="font-size:16px;padding:14px 32px;" onclick="salvarTudo()">💾 Salvar configurações</button>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+
+const CLOCK_BASE_URL = 'https://project-2na3n.vercel.app/clock.html';
+const PAPEIS = ['admin','gerente','caixa','bar','operador'];
+const TIPOS = [
+  {id:'reentry', label:'🃏 Re-entry'},
+  {id:'floor',   label:'👮 Floor'},
+  {id:'bar',     label:'🍻 Bar'},
+];
+
+let CLUBE_ID = null;
+let TOKEN = null;
+let CONFIG_LOCAL = {};
+
+function $(id){ return document.getElementById(id); }
+function show(id){ $(id).style.display = 'block'; }
+function hide(id){ $(id).style.display = 'none'; }
+
+function toast(msg, isError=false){
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=> t.className = 'toast', 2600);
+}
+
+// =====================================================
+// INIT
+// =====================================================
+async function init(){
+  try {
+    const { data:{ user } } = await sb.auth.getUser();
+    if (!user){
+      hide('loadingScreen');
+      show('errorScreen');
+      return;
+    }
+    const { data: usr } = await sb
+      .from('usuarios')
+      .select('clube_id, papel')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!usr || !['admin','gerente'].includes((usr.papel||'').toLowerCase())){
+      hide('loadingScreen');
+      show('errorScreen');
+      return;
+    }
+    CLUBE_ID = usr.clube_id;
+
+    await Promise.all([carregarToken(), carregarConfig(), carregarStats()]);
+
+    hide('loadingScreen');
+    show('painelMain');
+  } catch (err) {
+    console.error(err);
+    hide('loadingScreen');
+    show('errorScreen');
+  }
+}
+
+// =====================================================
+// TOKEN
+// =====================================================
+async function carregarToken(){
+  const { data, error } = await sb.rpc('stackclock_obter_token_clube');
+  if (error || !data || !data.ok){
+    $('linkBox').textContent = 'Erro ao obter token: ' + (data && data.erro || error?.message || 'desconhecido');
+    return;
+  }
+  TOKEN = data.token;
+  $('tokenBox').textContent = TOKEN;
+  $('linkBox').textContent = `${CLOCK_BASE_URL}?t=${TOKEN}`;
+}
+
+async function copiarLink(){
+  if (!TOKEN) return;
+  const link = `${CLOCK_BASE_URL}?t=${TOKEN}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    toast('Link copiado!');
+  } catch {
+    toast('Erro ao copiar', true);
+  }
+}
+
+async function copiarToken(){
+  if (!TOKEN) return;
+  try {
+    await navigator.clipboard.writeText(TOKEN);
+    toast('Token copiado!');
+  } catch {
+    toast('Erro ao copiar', true);
+  }
+}
+
+async function revogarToken(){
+  if (!confirm('Isso vai invalidar o token atual e gerar um novo. Os dealers que já estiverem usando precisarão reconectar com o novo link. Continuar?')) return;
+  const { data, error } = await sb.rpc('stackclock_revogar_e_gerar_token');
+  if (error || !data?.ok){
+    toast('Erro ao revogar', true);
+    return;
+  }
+  TOKEN = data.token;
+  $('tokenBox').textContent = TOKEN;
+  $('linkBox').textContent = `${CLOCK_BASE_URL}?t=${TOKEN}`;
+  toast('Novo token gerado!');
+}
+
+// =====================================================
+// CONFIG
+// =====================================================
+async function carregarConfig(){
+  const { data: cfg } = await sb
+    .from('stackclock_config')
+    .select('*')
+    .eq('clube_id', CLUBE_ID)
+    .maybeSingle();
+
+  CONFIG_LOCAL = cfg || {
+    clube_id: CLUBE_ID,
+    tempo_acao_seg: 30,
+    tempo_bank_seg: 30,
+    bank_max: 3,
+    som_ativo: true,
+    vibrar_ativo: true,
+    roteamento: {
+      admin:['reentry','floor','bar'],
+      gerente:['reentry','floor','bar'],
+      caixa:['reentry'],
+      bar:['bar'],
+      operador:['floor','bar']
+    }
+  };
+  $('cfgTempoAcao').value = CONFIG_LOCAL.tempo_acao_seg;
+  $('cfgTempoBank').value = CONFIG_LOCAL.tempo_bank_seg;
+  $('cfgBankMax').value   = CONFIG_LOCAL.bank_max;
+  $('cfgSom').checked     = CONFIG_LOCAL.som_ativo;
+  $('cfgVibrar').checked  = CONFIG_LOCAL.vibrar_ativo;
+
+  renderRoteamento();
+}
+
+function renderRoteamento(){
+  const box = $('routingBox');
+  const r = CONFIG_LOCAL.roteamento || {};
+  box.innerHTML = PAPEIS.map(papel => {
+    const tiposDoPapel = r[papel] || [];
+    const checks = TIPOS.map(t => `
+      <label>
+        <input type="checkbox" data-papel="${papel}" data-tipo="${t.id}"
+               ${tiposDoPapel.includes(t.id) ? 'checked' : ''}>
+        ${t.label}
+      </label>
+    `).join('');
+    return `
+      <div class="role-box">
+        <div class="role-name">${papel}</div>
+        ${checks}
+      </div>
+    `;
+  }).join('');
+}
+
+async function salvarTudo(){
+  // recolhe roteamento
+  const novoRoteamento = {};
+  PAPEIS.forEach(p => novoRoteamento[p] = []);
+  document.querySelectorAll('#routingBox input[type=checkbox]').forEach(cb => {
+    if (cb.checked) novoRoteamento[cb.dataset.papel].push(cb.dataset.tipo);
+  });
+
+  const payload = {
+    clube_id: CLUBE_ID,
+    tempo_acao_seg: parseInt($('cfgTempoAcao').value) || 30,
+    tempo_bank_seg: parseInt($('cfgTempoBank').value) || 30,
+    bank_max:       parseInt($('cfgBankMax').value)   || 3,
+    som_ativo:      $('cfgSom').checked,
+    vibrar_ativo:   $('cfgVibrar').checked,
+    roteamento:     novoRoteamento,
+    atualizado_em:  new Date().toISOString()
+  };
+
+  const { error } = await sb
+    .from('stackclock_config')
+    .upsert(payload, { onConflict: 'clube_id' });
+
+  if (error){
+    toast('Erro ao salvar: ' + error.message, true);
+    return;
+  }
+  CONFIG_LOCAL = payload;
+  toast('Configurações salvas!');
+}
+
+// =====================================================
+// STATS
+// =====================================================
+async function carregarStats(){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const semanaAtras = new Date(); semanaAtras.setDate(semanaAtras.getDate()-7);
+
+  // alertas hoje
+  const { count: countHoje } = await sb
+    .from('stackclock_alertas')
+    .select('id', { count: 'exact', head: true })
+    .eq('clube_id', CLUBE_ID)
+    .gte('criado_em', hoje.toISOString());
+
+  // alertas semana
+  const { count: countSemana } = await sb
+    .from('stackclock_alertas')
+    .select('id', { count: 'exact', head: true })
+    .eq('clube_id', CLUBE_ID)
+    .gte('criado_em', semanaAtras.toISOString());
+
+  // pendentes
+  const { count: countPend } = await sb
+    .from('stackclock_alertas')
+    .select('id', { count: 'exact', head: true })
+    .eq('clube_id', CLUBE_ID)
+    .eq('status', 'pendente');
+
+  // timecards hoje
+  const { count: countTC } = await sb
+    .from('stackclock_timecards_uso')
+    .select('id', { count: 'exact', head: true })
+    .eq('clube_id', CLUBE_ID)
+    .gte('criado_em', hoje.toISOString());
+
+  $('statHoje').textContent      = countHoje || 0;
+  $('statSemana').textContent    = countSemana || 0;
+  $('statPendentes').textContent = countPend || 0;
+  $('statTimecards').textContent = countTC || 0;
+}
+
+// expor pra onclick
+window.copiarLink     = copiarLink;
+window.copiarToken    = copiarToken;
+window.revogarToken   = revogarToken;
+window.salvarTudo     = salvarTudo;
+
+init();
+</script>
+
+</body>
+</html>

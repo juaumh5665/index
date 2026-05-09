@@ -1083,6 +1083,9 @@
             <div onclick="showPage('config')" id="nav-config" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-gear" style="width:16px;"></i> Configurações
             </div>
+            <a href="stackclock-painel.html" id="nav-stackclock" target="_blank" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;text-decoration:none;">
+                <i class="fa-solid fa-stopwatch" style="width:16px;color:#a855f7;"></i> StackClock
+            </a>
             <div onclick="showPage('assinatura')" id="nav-assinatura" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#52525b;">
                 <i class="fa-solid fa-credit-card" style="width:16px;"></i> Minha Assinatura
                 <span id="nav-assinatura-badge" style="display:none;margin-left:auto;background:#dc2626;color:white;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;"></span>
@@ -4005,7 +4008,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','usuarios','funcionarios','config','relatorios','assinatura'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','usuarios','funcionarios','config','relatorios','assinatura','stackclock'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
@@ -6516,6 +6519,11 @@ async function carregarUsuarioEClube(authUser) {
         clube_id: usuario.clube_id,
     };
 
+    // 👇 [STACKCLOCK] expõe globais pro stackclock-operador.js poder ler
+    window.sbClube = sbClube;
+    window.currentUser = currentUser;
+    window.dispatchEvent(new CustomEvent('stackos:logged-in'));
+
     // Sincronizar config.clube (localStorage) com dados FRESCOS do Supabase
     // Isso garante que CNPJ/telefone/endereco sempre venham do banco (fonte da verdade)
     try {
@@ -6577,6 +6585,7 @@ async function solicitarResetSenha() {
 sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
         sbSession = null; sbClube = null; currentUser = null;
+        window.sbClube = null; window.currentUser = null; // [STACKCLOCK]
         sessionStorage.clear();
         if (typeof _limparEstadoClube === 'function') _limparEstadoClube();  // 🛡️ SEGURANÇA
         const ls = document.getElementById('login-screen');
@@ -7829,6 +7838,7 @@ async function salvarEditarClube() {
             .single();
         if (error) throw error;
         sbClube = { ...sbClube, ...data };
+        window.sbClube = sbClube; // [STACKCLOCK] mantém global sincronizado
         renderMeuClubeCard();
         closeModal('modal-editar-clube');
         showToast('✅ Dados do clube atualizados!');
@@ -9886,6 +9896,7 @@ function applyPermissions() {
         'nav-funcionarios': 'funcionarios',
         'nav-usuarios':  'usuarios',
         'nav-config':    'config',
+        'nav-stackclock':'stackclock',
         'nav-assinatura':'assinatura',
         'nav-caixa':     'caixa',
         'nav-fechamento':'fechamento',
@@ -18415,5 +18426,9 @@ window.debugSync = async function() {
 })();
 
 </script>
+
+<!-- [STACKCLOCK] alertas em tempo real do app dealer -->
+<script src="stackclock-operador.js" defer></script>
+
 </body>
 </html>
