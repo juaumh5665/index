@@ -8386,6 +8386,109 @@ let _assinaturaAtual = null;
 let _planosCache = null;
 let _bloqueioAtivo = false; // true quando assinatura expirada/suspensa
 
+// ============================================================
+// SISTEMA DE FEATURES (controle de acesso por plano)
+// ============================================================
+// Flag mestre: enquanto false, NADA é bloqueado (modo seguro pra testar).
+// Quando ligar = true, restrições por plano passam a valer.
+let FEATURES_BLOCK_ENABLED = true;
+
+// Mapa de páginas → feature obrigatória.
+// Páginas não listadas são livres pra todos os planos.
+const FEATURE_REQUIREMENTS = {
+    'bar':         'feature_bar_comandas',
+    'fechamento':  'feature_fechamento_dia',
+    'relatorios':  'feature_relatorios_avancados',
+    'stackclock':  'feature_stackclock',
+};
+
+// Retorna o objeto do plano atual do clube (ou null)
+function _planoAtualObj() {
+    if (!_planosCache || !_assinaturaAtual) return null;
+    return _planosCache.find(p => p.id === _assinaturaAtual.plano_id) || null;
+}
+
+// Verifica se o clube atual tem a feature.
+// Aceita nome com ou sem prefixo: 'stackclock' ou 'feature_stackclock'
+window.hasFeature = function(name) {
+    // Modo seguro: tudo liberado se a chave estiver desligada
+    if (!FEATURES_BLOCK_ENABLED) return true;
+    
+    // Super admin sempre tem tudo
+    if (currentUser && (currentUser.role === 'admin' || currentUser.papel === 'admin' || currentUser.papel === 'administrador')) {
+        // Mesmo admin precisa ser do clube; mas se tem a sessão admin global, libera
+    }
+    
+    // Em trial, libera tudo (cliente conhece o produto completo durante o trial)
+    if (sbClube?.status === 'trial') return true;
+    
+    // Se ainda não carregou cache, libera (fail-open temporário; depois recarrega correto)
+    if (!_planosCache || _planosCache.length === 0) return true;
+    
+    const plano = _planoAtualObj();
+    if (!plano) return true; // sem plano definido = libera (fail-open)
+    
+    const key = name.startsWith('feature_') ? name : 'feature_' + name;
+    return !!plano[key];
+};
+
+// Se a página requer uma feature, retorna o nome dela. Senão retorna null.
+function _featureRequiredFor(page) {
+    return FEATURE_REQUIREMENTS[page] || null;
+}
+
+// Atalho usado em vários lugares: pode acessar a página?
+window.podeAcessarPagina = function(page) {
+    const req = _featureRequiredFor(page);
+    if (!req) return true;
+    return hasFeature(req);
+};
+
+// Modal genérico de upgrade: chamado quando clica em algo bloqueado
+window.mostrarModalUpgrade = function(featureNomeAmigavel) {
+    const nomeF = featureNomeAmigavel || 'Esse recurso';
+    if (typeof showModal === 'function') {
+        // se o app já tem um sistema de modal, usa
+    }
+    const html = `
+        <div id="modal-upgrade-feat" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Manrope','Inter',system-ui,sans-serif;">
+            <div style="background:#0c1223;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:32px;max-width:440px;width:100%;text-align:center;">
+                <div style="font-size:56px;margin-bottom:14px;">🔒</div>
+                <h3 style="font-size:22px;font-weight:800;margin-bottom:10px;color:#fff;letter-spacing:-0.5px;">Recurso premium</h3>
+                <p style="font-size:14px;color:#9ca3af;margin-bottom:22px;line-height:1.5;">
+                    <strong style="color:#fff;">${nomeF}</strong> não está incluso no seu plano atual.<br>
+                    Faça upgrade pra desbloquear esse e outros recursos.
+                </p>
+                <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                    <button onclick="document.getElementById('modal-upgrade-feat').remove(); if (typeof showPage==='function') showPage('assinatura');"
+                            style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        ⚡ Ver Planos
+                    </button>
+                    <button onclick="document.getElementById('modal-upgrade-feat').remove();"
+                            style="background:rgba(255,255,255,0.08);color:#9ca3af;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">
+                        Mais tarde
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    // remove modal anterior se existir
+    const old = document.getElementById('modal-upgrade-feat');
+    if (old) old.remove();
+    document.body.insertAdjacentHTML('beforeend', html);
+};
+
+// Re-aplica controle de acesso (sidebar, página atual, etc)
+// Chamado: depois de carregar plano, depois de mudança de plano via realtime
+window.applyAccessControl = function() {
+    // chamado também por _revalidarClubeAtual (linha 11556 área)
+    // Re-aplica visibilidade da sidebar e cadeados
+    if (typeof _renderSidebarLocks === 'function') {
+        try { _renderSidebarLocks(); } catch(_){}
+    }
+};
+
+
 async function carregarAssinaturaAtual() {
     // Carrega assinatura do clube atual + planos disponíveis
     try {
@@ -8419,6 +8522,11 @@ async function carregarAssinaturaAtual() {
         
         // Atualizar badge no menu
         atualizarBadgeAssinatura();
+        
+        // Re-aplica cadeados na sidebar (agora que plano/features carregaram)
+        if (typeof applyAccessControl === 'function') {
+            try { applyAccessControl(); } catch(_){}
+        }
         
         return _assinaturaAtual;
     } catch(e) {
@@ -8568,6 +8676,7 @@ function renderPlanosGrid() {
         if (p.feature_suporte_prioritario) features.push('✓ Suporte prioritário');
         if (p.feature_api) features.push('✓ API');
         if (p.feature_white_label) features.push('✓ White-label');
+        if (p.feature_stackclock) features.push('✓ StackClock (Dealer App)');
         
         return `<div style="background:${isAtual ? cor + '22' : '#0d0d0f'};border:2px solid ${isAtual ? cor : '#27272a'};padding:1.5rem;border-radius:.75rem;position:relative;">
             ${isAtual ? `<div style="position:absolute;top:-10px;right:1rem;background:${cor};color:white;padding:.2rem .75rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;border-radius:.25rem;">PLANO ATUAL</div>` : ''}
@@ -9401,6 +9510,7 @@ async function adminCarregarPlanos() {
             if (p.feature_suporte_prioritario) features.push('Suporte+');
             if (p.feature_api) features.push('API');
             if (p.feature_white_label) features.push('White-label');
+            if (p.feature_stackclock) features.push('StackClock');
             
             // Cor por id conhecido OU baseada na ordem (cores rotativas pra planos novos)
             const coresFixas = { basic: '#10b981', premium: '#f59e0b', pro: '#dc2626' };
@@ -9543,6 +9653,7 @@ function adminAbrirModalPlano(planoId) {
                     {key:'feature_suporte_prioritario', label:'Suporte Prioritário'},
                     {key:'feature_api', label:'Acesso à API'},
                     {key:'feature_white_label', label:'White-label'},
+                    {key:'feature_stackclock', label:'StackClock (Dealer App)'},
                 ].map(f => `<label style="display:flex;align-items:center;gap:.5rem;background:#18181b;border:1px solid #27272a;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.85rem;">
                     <input type="checkbox" id="pl-${f.key}" ${plano?.[f.key] ? 'checked' : ''} style="cursor:pointer;width:16px;height:16px;">
                     <span>${f.label}</span>
@@ -9630,6 +9741,7 @@ async function adminSalvarPlano(novo) {
             feature_suporte_prioritario: document.getElementById('pl-feature_suporte_prioritario').checked,
             feature_api: document.getElementById('pl-feature_api').checked,
             feature_white_label: document.getElementById('pl-feature_white_label').checked,
+            feature_stackclock: document.getElementById('pl-feature_stackclock').checked,
             ativo: document.getElementById('pl-ativo').checked,
             updated_at: new Date().toISOString(),
         };
@@ -9959,7 +10071,18 @@ function applyPermissions() {
     };
     Object.entries(navMap).forEach(([navId, page]) => {
         const el = document.getElementById(navId);
-        if (el) el.style.display = hasAccess(page) ? 'flex' : 'none';
+        if (!el) return;
+        const podePapel    = hasAccess(page);
+        const podeFeature  = (typeof podeAcessarPagina === 'function') ? podeAcessarPagina(page) : true;
+        
+        if (!podePapel) {
+            el.style.display = 'none';
+            return;
+        }
+        el.style.display = 'flex';
+        
+        // Aplica cadeado se o papel permite mas o plano não inclui a feature
+        _aplicarCadeadoSidebar(el, podeFeature, page);
     });
 
     // Show divider only if usuarios visible
@@ -9970,17 +10093,95 @@ function applyPermissions() {
     const btnReset = document.getElementById('btn-resetar-db');
     if (btnReset) btnReset.style.display = currentUser.role === 'admin' ? 'block' : 'none';
 
-    // Redirect to first allowed page
-    const firstAllowed = ROLES[currentUser.role].pages[0];
+    // Redirect to first allowed page (que ALÉM de papel, tenha feature)
+    const allowed = ROLES[currentUser.role].pages.filter(p => {
+        return (typeof podeAcessarPagina === 'function') ? podeAcessarPagina(p) : true;
+    });
+    const firstAllowed = allowed[0] || ROLES[currentUser.role].pages[0] || 'dashboard';
     showPage(firstAllowed);
+}
+
+// Aplica/remove o cadeado visual num item da sidebar.
+// Mantém uma referência do onClick original pra restaurar quando desbloquear.
+function _aplicarCadeadoSidebar(el, liberado, page) {
+    const featureLabels = {
+        'bar': 'Bar e Comandas',
+        'fechamento': 'Fechamento de Dia',
+        'relatorios': 'Relatórios Avançados',
+        'stackclock': 'StackClock',
+    };
+    
+    if (liberado) {
+        // remove cadeado se tiver
+        const lock = el.querySelector('.feat-lock');
+        if (lock) lock.remove();
+        el.style.opacity = '';
+        el.style.cursor  = '';
+        // restaura onclick original (tava em data-original-click)
+        if (el.dataset.originalClick) {
+            const orig = el.dataset.originalClick;
+            el.setAttribute('onclick', orig);
+            delete el.dataset.originalClick;
+        }
+        return;
+    }
+    
+    // BLOQUEADO: adiciona cadeado e troca onclick pra mostrar modal
+    if (!el.querySelector('.feat-lock')) {
+        const lock = document.createElement('span');
+        lock.className = 'feat-lock';
+        lock.innerText = '🔒';
+        lock.style.cssText = 'margin-left:auto;font-size:14px;opacity:0.7;';
+        el.appendChild(lock);
+    }
+    el.style.opacity = '0.55';
+    el.style.cursor  = 'not-allowed';
+    
+    // salva onclick original e troca pelo modal
+    if (!el.dataset.originalClick && el.getAttribute('onclick')) {
+        el.dataset.originalClick = el.getAttribute('onclick');
+    }
+    const featLabel = featureLabels[page] || page;
+    el.setAttribute('onclick', `mostrarModalUpgrade(${JSON.stringify(featLabel)})`);
+}
+
+// Re-renderiza cadeados sem refazer toda a sidebar
+function _renderSidebarLocks() {
+    if (!currentUser) return;
+    const navMap = {
+        'nav-bar':         'bar',
+        'nav-fechamento':  'fechamento',
+        'nav-relatorios':  'relatorios',
+        'nav-stackclock':  'stackclock',
+    };
+    Object.entries(navMap).forEach(([navId, page]) => {
+        const el = document.getElementById(navId);
+        if (!el || el.style.display === 'none') return;
+        const liberado = (typeof podeAcessarPagina === 'function') ? podeAcessarPagina(page) : true;
+        _aplicarCadeadoSidebar(el, liberado, page);
+    });
 }
 
 function showPage(page) {
     if (page === 'fechamento') setTimeout(inicializarFechamento, 50);
 
-    // Gate by permission
+    // Gate by permission (papel)
     if (currentUser && !hasAccess(page)) {
         showToast('🔒 Você não tem permissão para acessar esta página');
+        return;
+    }
+    
+    // Gate by feature do plano
+    if (typeof podeAcessarPagina === 'function' && !podeAcessarPagina(page)) {
+        const featureLabels = {
+            'bar': 'Bar e Comandas',
+            'fechamento': 'Fechamento de Dia',
+            'relatorios': 'Relatórios Avançados',
+            'stackclock': 'StackClock',
+        };
+        if (typeof mostrarModalUpgrade === 'function') {
+            mostrarModalUpgrade(featureLabels[page] || page);
+        }
         return;
     }
     document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
