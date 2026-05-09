@@ -738,27 +738,28 @@ $('startBtn').onclick = () => {
   }
 };
 
-// Toque simples no número = inicia/pausa
-// Duplo toque (rápido) = reset pro tempo padrão
-let lastTimerTap = 0;
-$('timer').onclick = (e) => {
-  const now = Date.now();
-  if (now - lastTimerTap < 350) {
-    // duplo toque detectado: reset
+// Toque no timer:
+//  - 1 toque  = inicia / pausa
+//  - 2 toques rápidos = reset pra 30s
+let tapCount = 0;
+let tapTimer = null;
+$('timer').onclick = () => {
+  tapCount++;
+  if (tapCount === 1) {
+    // espera 280ms pra ver se vem segundo toque
+    tapTimer = setTimeout(() => {
+      // foi único toque: start/pause
+      if (timerActive) pauseTimer(); else startTimer();
+      tapCount = 0;
+    }, 280);
+  } else if (tapCount === 2) {
+    // duplo toque detectado: cancela o start/pause pendente e RESETA
+    clearTimeout(tapTimer);
+    tapCount = 0;
     resetTimer();
     showAlert('Timer resetado', 'success');
     vibrate(80);
-    lastTimerTap = 0;
-    return;
   }
-  lastTimerTap = now;
-  // dá um pequeno delay pra ver se vem segundo toque
-  setTimeout(() => {
-    if (Date.now() - lastTimerTap >= 340) {
-      // foi mesmo único, executa start/pause
-      $('startBtn').click();
-    }
-  }, 360);
 };
 
 // ===== TIMEBANK =====
