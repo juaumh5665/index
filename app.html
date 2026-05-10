@@ -3435,10 +3435,15 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
                     <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de Blinds</div>
                     <div style="display:flex;gap:.35rem;">
+                        <button onclick="abrirModalFaixas()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;color:#a855f7;border-color:rgba(168,85,247,.3);" title="Definir tempos por faixa de níveis"><i class="fa-solid fa-layer-group"></i> Faixas de tempo</button>
                         <button onclick="addBlindRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;">+ Nível</button>
                         <button onclick="addIntervaloRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;color:#06b6d4;border-color:rgba(6,182,212,.3);"><i class="fa-solid fa-pause"></i> + Intervalo</button>
                     </div>
                 </div>
+                
+                <!-- Indicador de faixas ativas (mostra resumo se houver) -->
+                <div id="faixas-resumo" style="display:none;padding:.5rem .75rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(124,58,237,.05));border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.7rem;color:#a855f7;"></div>
+                
                 <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;padding:0 .5rem;">
                     <span></span>
                     <span style="font-size:.6rem;color:#52525b;text-align:center;">SB</span>
@@ -3448,6 +3453,29 @@
                     <span></span>
                 </div>
                 <div id="blinds-setup" style="display:flex;flex-direction:column;gap:.3rem;max-height:280px;overflow-y:auto;padding-right:.25rem;"></div>
+                
+                <!-- RESUMO DO TORNEIO (calculado em tempo real) -->
+                <div id="torneio-resumo" style="margin-top:.5rem;padding:.85rem 1rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(245,158,11,.05));border:1px solid rgba(255,255,255,.06);border-radius:.6rem;">
+                    <div style="font-size:.6rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📊 Resumo do Torneio</div>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;">
+                        <div>
+                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">⏱ Tempo total</div>
+                            <div id="resumo-tempo" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">📊 Níveis</div>
+                            <div id="resumo-niveis" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">⏸ Intervalos</div>
+                            <div id="resumo-intervalos" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">💰 Stack inicial</div>
+                            <div id="resumo-stack" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <button onclick="saveTournament()" class="btn-gold" style="width:100%;padding:1rem;font-size:1rem;border-radius:.75rem;margin-top:1.5rem;">CRIAR E ABRIR TORNEIO</button>
@@ -10996,21 +11024,32 @@ function renderBlindsInputs() {
             <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:2rem 1fr 3rem 2rem;gap:.35rem;background:rgba(6,182,212,.08);border:1px dashed rgba(6,182,212,.35);padding:.4rem .5rem;border-radius:.35rem;">
                 <span style="font-size:.75rem;color:#06b6d4;font-weight:800;"><i class="fa-solid fa-pause"></i></span>
                 <span style="font-size:.75rem;color:#06b6d4;font-weight:700;align-self:center;">INTERVALO</span>
-                <input type="number" value="${b.tempo || 10}" min="1" onchange="blindStructure[${i}].tempo=parseInt(this.value)||10" style="padding:.25rem .4rem;font-size:.8rem;font-family:var(--font-mono);text-align:center;background:#0f0f12;border:1px solid rgba(6,182,212,.3);border-radius:.3rem;color:#06b6d4;font-weight:700;" title="Tempo em minutos">
+                <input type="number" value="${b.tempo || 10}" min="1" onchange="blindStructure[${i}].tempo=parseInt(this.value)||10; _atualizarResumoTorneio()" style="padding:.25rem .4rem;font-size:.8rem;font-family:var(--font-mono);text-align:center;background:#0f0f12;border:1px solid rgba(6,182,212,.3);border-radius:.3rem;color:#06b6d4;font-weight:700;" title="Tempo em minutos">
                 <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
             </div>`;
         }
         numNivel++;
+        // se o tempo veio de uma faixa (não foi setado manualmente nesse nível), destaca em roxo
+        const tempoSource = b._tempoSource || (b.tempo ? 'manual' : null);
+        const tempoCor = tempoSource === 'faixa' ? '#a855f7' 
+                       : tempoSource === 'manual' ? '#fff' 
+                       : '#52525b';
+        const tempoBorda = tempoSource === 'faixa' ? 'rgba(168,85,247,.4)' 
+                         : tempoSource === 'manual' ? 'rgba(255,255,255,.15)' 
+                         : 'rgba(255,255,255,.08)';
         return `
         <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;">
             <span style="font-size:.7rem;color:#52525b;font-weight:700;">${numNivel}</span>
-            <input type="number" value="${b.sb}"   onchange="blindStructure[${i}].sb=parseInt(this.value)||0">
-            <input type="number" value="${b.bb}"   onchange="blindStructure[${i}].bb=parseInt(this.value)||0">
+            <input type="number" value="${b.sb}"   onchange="blindStructure[${i}].sb=parseInt(this.value)||0; _atualizarResumoTorneio()">
+            <input type="number" value="${b.bb}"   onchange="blindStructure[${i}].bb=parseInt(this.value)||0; _atualizarResumoTorneio()">
             <input type="number" value="${b.ante}" onchange="blindStructure[${i}].ante=parseInt(this.value)||0">
-            <input type="number" value="${b.tempo || ''}" placeholder="—" onchange="blindStructure[${i}].tempo=parseInt(this.value)||null" style="text-align:center;" title="Tempo personalizado em min (vazio = usar padrão)">
+            <input type="number" value="${b.tempo || ''}" placeholder="—" onchange="blindStructure[${i}].tempo=parseInt(this.value)||null; blindStructure[${i}]._tempoSource='manual'; _atualizarResumoTorneio()" style="text-align:center;color:${tempoCor};border-color:${tempoBorda};" title="Tempo personalizado em min (vazio = usar padrão)">
             <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
         </div>`;
     }).join('');
+    
+    // Atualiza resumo após renderizar
+    setTimeout(_atualizarResumoTorneio, 50);
 }
 
 function addBlindRow() {
@@ -11034,6 +11073,227 @@ function removeBlindRow(i) {
     blindStructure.splice(i, 1);
     renderBlindsInputs();
 }
+
+// ============================================================
+// FAIXAS DE TEMPO POR NÍVEL
+// ============================================================
+// Cliente define faixas tipo: 1-10=20min, 11-16=15min, 17+=10min
+// Sistema aplica automaticamente nos níveis correspondentes
+// Salva no torneio pra reaplicar quando adicionar mais níveis depois
+// ============================================================
+
+let _faixasAtivas = []; // ex: [{ ate: 10, tempo: 20 }, { ate: 16, tempo: 15 }, { ate: null, tempo: 10 }]
+
+function abrirModalFaixas() {
+    let modal = document.getElementById('modal-faixas-tempo');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-faixas-tempo';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:10002;display:none;align-items:center;justify-content:center;padding:20px;font-family:Manrope,Inter,system-ui,sans-serif;';
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+    }
+    
+    // Se nunca foram definidas, sugere as 3 faixas padrão brasileiras
+    if (_faixasAtivas.length === 0) {
+        _faixasAtivas = [
+            { ate: 10, tempo: 20 },
+            { ate: 16, tempo: 15 },
+            { ate: null, tempo: 10 }  // ate=null significa "do anterior em diante"
+        ];
+    }
+    
+    _renderModalFaixas(modal);
+    modal.style.display = 'flex';
+}
+
+function _renderModalFaixas(modal) {
+    let html = `
+        <div style="background:#0c1223;border:1px solid rgba(255,255,255,0.1);border-radius:18px;max-width:540px;width:100%;max-height:85vh;overflow-y:auto;">
+            <div style="padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                    <h2 style="font-size:20px;font-weight:800;margin:0;color:#a855f7;">⏱ Faixas de Tempo</h2>
+                    <p style="font-size:13px;color:#9ca3af;margin:6px 0 0 0;line-height:1.5;">Defina tempos diferentes para grupos de níveis.<br><strong style="color:#fff;">Padrão BR:</strong> 1-10 = 20min · 11-16 = 15min · 17+ = 10min</p>
+                </div>
+                <button onclick="document.getElementById('modal-faixas-tempo').style.display='none'" 
+                        style="background:rgba(255,255,255,0.08);border:none;color:#fff;width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1;flex-shrink:0;">×</button>
+            </div>
+            <div style="padding:20px 28px;">
+                <div id="faixas-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+    `;
+    
+    _faixasAtivas.forEach((f, i) => {
+        const isUltima = (i === _faixasAtivas.length - 1);
+        const minNivel = i === 0 ? 1 : (_faixasAtivas[i-1].ate || 0) + 1;
+        html += `
+            <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#1a1a2e;border:1px solid rgba(255,255,255,0.06);border-radius:10px;">
+                <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">Do nível</span>
+                <strong style="font-size:14px;color:#a855f7;min-width:30px;text-align:center;">${minNivel}</strong>
+                <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">até</span>
+                ${isUltima 
+                    ? `<strong style="font-size:14px;color:#a855f7;min-width:50px;text-align:center;">final</strong>`
+                    : `<input type="number" min="${minNivel}" value="${f.ate || ''}" placeholder="?" 
+                              onchange="_faixasAtivas[${i}].ate=parseInt(this.value)||null"
+                              style="background:#0c1223;border:1px solid rgba(168,85,247,.4);color:#fff;padding:6px 10px;border-radius:6px;width:60px;font-size:13px;text-align:center;font-family:var(--font-mono);">`
+                }
+                <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">=</span>
+                <input type="number" min="1" value="${f.tempo}" 
+                       onchange="_faixasAtivas[${i}].tempo=parseInt(this.value)||10"
+                       style="background:#0c1223;border:1px solid rgba(168,85,247,.4);color:#a855f7;padding:6px 10px;border-radius:6px;width:60px;font-size:13px;text-align:center;font-family:var(--font-mono);font-weight:700;">
+                <span style="font-size:11px;color:#9ca3af;flex-shrink:0;">min</span>
+                ${_faixasAtivas.length > 1 ? `
+                <button onclick="_removerFaixa(${i})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;margin-left:auto;">✕</button>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+                <button onclick="_adicionarFaixa()" style="width:100%;background:rgba(168,85,247,.1);border:1px dashed rgba(168,85,247,.4);color:#a855f7;padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:16px;">+ Adicionar faixa</button>
+                
+                <div style="display:flex;gap:10px;">
+                    <button onclick="_resetarFaixasPadrao()" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#9ca3af;padding:12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;" title="Restaurar 1-10=20min, 11-16=15min, 17+=10min">
+                        ↻ Padrão BR
+                    </button>
+                    <button onclick="_aplicarFaixas()" style="flex:2;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;border:none;padding:12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        ✓ Aplicar nos níveis
+                    </button>
+                </div>
+                
+                <div style="margin-top:12px;font-size:11px;color:#71717a;text-align:center;">
+                    ℹ️ Aplicar substitui o tempo de todos os níveis pelos das faixas. Você pode sobrescrever tempos individuais depois.
+                </div>
+            </div>
+        </div>
+    `;
+    
+    modal.innerHTML = html;
+}
+
+function _adicionarFaixa() {
+    // Insere antes da última (que é a "final")
+    const ult = _faixasAtivas.length - 1;
+    const ateAnterior = ult > 0 ? (_faixasAtivas[ult-1].ate || 1) : 1;
+    _faixasAtivas.splice(ult, 0, { ate: ateAnterior + 5, tempo: 15 });
+    _renderModalFaixas(document.getElementById('modal-faixas-tempo'));
+}
+
+function _removerFaixa(i) {
+    if (_faixasAtivas.length <= 1) return;
+    _faixasAtivas.splice(i, 1);
+    _renderModalFaixas(document.getElementById('modal-faixas-tempo'));
+}
+
+function _resetarFaixasPadrao() {
+    _faixasAtivas = [
+        { ate: 10, tempo: 20 },
+        { ate: 16, tempo: 15 },
+        { ate: null, tempo: 10 }
+    ];
+    _renderModalFaixas(document.getElementById('modal-faixas-tempo'));
+}
+
+function _aplicarFaixas() {
+    // Aplica os tempos das faixas nos níveis correspondentes
+    let numNivel = 0;
+    blindStructure.forEach((b, i) => {
+        if (b.isBreak) return; // não aplica em intervalos
+        numNivel++;
+        // acha qual faixa esse nível pertence
+        const faixa = _faixasAtivas.find(f => f.ate === null || numNivel <= f.ate);
+        if (faixa) {
+            b.tempo = faixa.tempo;
+            b._tempoSource = 'faixa';
+        }
+    });
+    
+    document.getElementById('modal-faixas-tempo').style.display = 'none';
+    renderBlindsInputs();
+    _atualizarFaixasResumo();
+    showToast('⏱ Faixas aplicadas em todos os níveis');
+}
+
+function _atualizarFaixasResumo() {
+    const cont = document.getElementById('faixas-resumo');
+    if (!cont) return;
+    if (!_faixasAtivas.length) { cont.style.display = 'none'; return; }
+    
+    // Verifica se alguma faixa foi aplicada
+    const temFaixaAplicada = blindStructure.some(b => !b.isBreak && b._tempoSource === 'faixa');
+    if (!temFaixaAplicada) { cont.style.display = 'none'; return; }
+    
+    cont.style.display = 'block';
+    const partes = _faixasAtivas.map((f, i) => {
+        const minNivel = i === 0 ? 1 : (_faixasAtivas[i-1].ate || 0) + 1;
+        const maxNivel = f.ate ? f.ate : '∞';
+        return `<strong>${minNivel}${f.ate ? '-'+f.ate : '+'}</strong>=${f.tempo}min`;
+    }).join(' · ');
+    cont.innerHTML = `<i class="fa-solid fa-layer-group"></i> Faixas ativas: ${partes} <button onclick="abrirModalFaixas()" style="background:none;border:none;color:#a855f7;text-decoration:underline;cursor:pointer;padding:0 .25rem;font-size:.7rem;">editar</button>`;
+}
+
+// ============================================================
+// RESUMO DO TORNEIO (calculado em tempo real)
+// ============================================================
+function _atualizarResumoTorneio() {
+    // Calcula tempo total
+    const tempoPadrao = parseInt(document.getElementById('t-tempo')?.value) || 15;
+    let totalMin = 0;
+    let totalNiveis = 0;
+    let totalIntervalos = 0;
+    let totalMinIntervalos = 0;
+    
+    blindStructure.forEach(b => {
+        if (b.isBreak) {
+            totalIntervalos++;
+            totalMinIntervalos += (b.tempo || 10);
+            totalMin += (b.tempo || 10);
+        } else {
+            totalNiveis++;
+            totalMin += (b.tempo || tempoPadrao);
+        }
+    });
+    
+    // Atualiza UI
+    const fmt = (min) => {
+        if (min < 60) return min + ' min';
+        const h = Math.floor(min / 60);
+        const m = min % 60;
+        return m === 0 ? `${h}h` : `${h}h ${m}min`;
+    };
+    
+    const elTempo = document.getElementById('resumo-tempo');
+    const elNiveis = document.getElementById('resumo-niveis');
+    const elIntervalos = document.getElementById('resumo-intervalos');
+    const elStack = document.getElementById('resumo-stack');
+    
+    if (elTempo) elTempo.textContent = totalMin > 0 ? fmt(totalMin) : '—';
+    if (elNiveis) elNiveis.textContent = totalNiveis;
+    if (elIntervalos) elIntervalos.textContent = totalIntervalos > 0 
+        ? `${totalIntervalos} (${totalMinIntervalos}m)` 
+        : '0';
+    
+    // Stack inicial em BBs (se tem stack + primeiro blind)
+    const stack = parseInt(document.getElementById('t-stack')?.value) || 0;
+    const primeiroBlind = blindStructure.find(b => !b.isBreak);
+    if (elStack) {
+        if (stack > 0 && primeiroBlind && primeiroBlind.bb > 0) {
+            const bbs = Math.round(stack / primeiroBlind.bb);
+            elStack.textContent = `${stack.toLocaleString('pt-BR')} (${bbs} BB)`;
+        } else {
+            elStack.textContent = stack > 0 ? stack.toLocaleString('pt-BR') : '—';
+        }
+    }
+    
+    _atualizarFaixasResumo();
+}
+
+// Auto-atualiza resumo quando muda tempo padrão ou stack
+document.addEventListener('input', (e) => {
+    if (e.target && (e.target.id === 't-tempo' || e.target.id === 't-stack')) {
+        _atualizarResumoTorneio();
+    }
+});
 
 function saveTournament() {
     const nome = document.getElementById('t-nome').value.trim() || 'Torneio StackOS';
