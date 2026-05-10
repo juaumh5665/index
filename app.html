@@ -3444,7 +3444,8 @@
                 <!-- Indicador de faixas ativas (mostra resumo se houver) -->
                 <div id="faixas-resumo" style="display:none;padding:.5rem .75rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(124,58,237,.05));border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.7rem;color:#a855f7;"></div>
                 
-                <div style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;padding:0 .5rem;">
+                <div style="display:grid;grid-template-columns:1.25rem 2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;padding:0 .5rem;">
+                    <span></span>
                     <span></span>
                     <span style="font-size:.6rem;color:#52525b;text-align:center;">SB</span>
                     <span style="font-size:.6rem;color:#52525b;text-align:center;">BB</span>
@@ -11017,15 +11018,35 @@ function renderBlindsInputs() {
     const c = document.getElementById('blinds-setup');
     // Numeração só conta níveis "normais" (não intervalos)
     let numNivel = 0;
+    const total = blindStructure.length;
     c.innerHTML = blindStructure.map((b, i) => {
+        const podeSubir  = i > 0;
+        const podeDescer = i < total - 1;
+        // botões ↑↓ empilhados
+        const btnsReorder = `
+            <div style="display:flex;flex-direction:column;gap:1px;justify-content:center;align-items:center;">
+                <button onclick="moverBlind(${i}, -1)" ${podeSubir ? '' : 'disabled'} 
+                        style="background:transparent;border:none;color:${podeSubir ? '#71717a' : '#27272a'};cursor:${podeSubir ? 'pointer' : 'not-allowed'};font-size:.65rem;padding:0;line-height:.9;width:16px;height:12px;display:flex;align-items:center;justify-content:center;" 
+                        onmouseover="if(!this.disabled) this.style.color='#a855f7'" 
+                        onmouseout="if(!this.disabled) this.style.color='#71717a'"
+                        title="Subir">▴</button>
+                <button onclick="moverBlind(${i}, 1)" ${podeDescer ? '' : 'disabled'} 
+                        style="background:transparent;border:none;color:${podeDescer ? '#71717a' : '#27272a'};cursor:${podeDescer ? 'pointer' : 'not-allowed'};font-size:.65rem;padding:0;line-height:.9;width:16px;height:12px;display:flex;align-items:center;justify-content:center;" 
+                        onmouseover="if(!this.disabled) this.style.color='#a855f7'" 
+                        onmouseout="if(!this.disabled) this.style.color='#71717a'"
+                        title="Descer">▾</button>
+            </div>
+        `;
+        
         if (b.isBreak) {
             // Linha de intervalo
             return `
-            <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:2rem 1fr 3rem 2rem;gap:.35rem;background:rgba(6,182,212,.08);border:1px dashed rgba(6,182,212,.35);padding:.4rem .5rem;border-radius:.35rem;">
-                <span style="font-size:.75rem;color:#06b6d4;font-weight:800;"><i class="fa-solid fa-pause"></i></span>
+            <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:1.25rem 2rem 1fr 3rem 2rem;gap:.35rem;background:rgba(6,182,212,.08);border:1px dashed rgba(6,182,212,.35);padding:.4rem .5rem;border-radius:.35rem;">
+                ${btnsReorder}
+                <span style="font-size:.75rem;color:#06b6d4;font-weight:800;align-self:center;"><i class="fa-solid fa-pause"></i></span>
                 <span style="font-size:.75rem;color:#06b6d4;font-weight:700;align-self:center;">INTERVALO</span>
                 <input type="number" value="${b.tempo || 10}" min="1" onchange="blindStructure[${i}].tempo=parseInt(this.value)||10; _atualizarResumoTorneio()" style="padding:.25rem .4rem;font-size:.8rem;font-family:var(--font-mono);text-align:center;background:#0f0f12;border:1px solid rgba(6,182,212,.3);border-radius:.3rem;color:#06b6d4;font-weight:700;" title="Tempo em minutos">
-                <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
+                <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;align-self:center;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
             </div>`;
         }
         numNivel++;
@@ -11038,18 +11059,39 @@ function renderBlindsInputs() {
                          : tempoSource === 'manual' ? 'rgba(255,255,255,.15)' 
                          : 'rgba(255,255,255,.08)';
         return `
-        <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;">
-            <span style="font-size:.7rem;color:#52525b;font-weight:700;">${numNivel}</span>
+        <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:1.25rem 2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;">
+            ${btnsReorder}
+            <span style="font-size:.7rem;color:#52525b;font-weight:700;align-self:center;">${numNivel}</span>
             <input type="number" value="${b.sb}"   onchange="blindStructure[${i}].sb=parseInt(this.value)||0; _atualizarResumoTorneio()">
             <input type="number" value="${b.bb}"   onchange="blindStructure[${i}].bb=parseInt(this.value)||0; _atualizarResumoTorneio()">
             <input type="number" value="${b.ante}" onchange="blindStructure[${i}].ante=parseInt(this.value)||0">
             <input type="number" value="${b.tempo || ''}" placeholder="—" onchange="blindStructure[${i}].tempo=parseInt(this.value)||null; blindStructure[${i}]._tempoSource='manual'; _atualizarResumoTorneio()" style="text-align:center;color:${tempoCor};border-color:${tempoBorda};" title="Tempo personalizado em min (vazio = usar padrão)">
-            <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
+            <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;align-self:center;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
         </div>`;
     }).join('');
     
     // Atualiza resumo após renderizar
     setTimeout(_atualizarResumoTorneio, 50);
+}
+
+// ============================================================
+// REORDENAR NÍVEIS/INTERVALOS COM BOTÕES ↑↓
+// ============================================================
+function moverBlind(indice, direcao) {
+    // direcao: -1 = sobe (troca com anterior), +1 = desce (troca com próximo)
+    const novoIndice = indice + direcao;
+    if (novoIndice < 0 || novoIndice >= blindStructure.length) return;
+    
+    // Swap entre o item atual e o vizinho
+    const tmp = blindStructure[indice];
+    blindStructure[indice] = blindStructure[novoIndice];
+    blindStructure[novoIndice] = tmp;
+    
+    // Quando move um nível, o _tempoSource pode ficar inconsistente com a nova posição
+    // (se tinha faixa aplicada e mudou a posição na sequência).
+    // Não vou re-aplicar automático pra não confundir o usuário; ele clica "Aplicar faixas" se quiser.
+    
+    renderBlindsInputs();
 }
 
 function addBlindRow() {
