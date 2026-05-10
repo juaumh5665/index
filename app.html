@@ -7595,6 +7595,302 @@ function abrirNovoTorneioComTemplates() {
 const TEMPLATES_KEY = 'ps_torneio_templates';
 let torneioTemplates = (function(){ try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY)) || []; } catch(e){ return []; } })();
 
+// ============================================================
+// TEMPLATES NATIVOS DO STACKOS — biblioteca curada
+// ============================================================
+// Baseados em estruturas de PokerStars, GGPoker, WSOP e BSOP
+// Adaptados para o mercado brasileiro (R$ e tempos realistas)
+// ============================================================
+const TEMPLATES_NATIVOS = [
+    // ===== SIT & GO =====
+    {
+        id: 'sng_hyper',
+        nome: '⚡ Hyper Turbo SnG',
+        categoria: 'sng',
+        descricao: 'Sit & Go ultra-rápido para 6 jogadores. Estrutura inspirada no PokerStars Hyper. Ideal para abertura/encerramento de noite.',
+        destaque: true,
+        config: {
+            tipo: 'normal', buyin: 30, rake: 3, stack: 1500, tempoNivel: 5, reentryAte: 0,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 0, rebuyFichas: 0,
+            rebuyDuploValor: 0, rebuyDuploFichas: 0,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:10,bb:20,ante:0}, {sb:15,bb:30,ante:0}, {sb:25,bb:50,ante:5},
+                {sb:50,bb:100,ante:10}, {sb:75,bb:150,ante:15}, {sb:100,bb:200,ante:25},
+                {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75},
+                {sb:500,bb:1000,ante:100}, {sb:800,bb:1600,ante:200}, {sb:1500,bb:3000,ante:400},
+            ],
+        },
+    },
+    {
+        id: 'sng_turbo',
+        nome: '🎯 Turbo SnG 9-max',
+        categoria: 'sng',
+        descricao: 'Sit & Go turbo de 9 jogadores. Inspirado no GGPoker Turbo. Duração ~1h30.',
+        destaque: true,
+        config: {
+            tipo: 'normal', buyin: 50, rake: 5, stack: 3000, tempoNivel: 8, reentryAte: 0,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 0, rebuyFichas: 0,
+            rebuyDuploValor: 0, rebuyDuploFichas: 0,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:25,bb:50,ante:0}, {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:25},
+                {sb:100,bb:200,ante:25}, {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50},
+                {sb:300,bb:600,ante:75}, {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100},
+                {sb:600,bb:1200,ante:150}, {sb:800,bb:1600,ante:200}, {sb:1000,bb:2000,ante:200},
+                {sb:1500,bb:3000,ante:300}, {sb:2000,bb:4000,ante:400},
+            ],
+        },
+    },
+    {
+        id: 'sng_classico',
+        nome: '🃏 Clássico SnG 9-max',
+        categoria: 'sng',
+        descricao: 'Estrutura WSOP-style com níveis de 12 minutos. Para clubes que valorizam jogo técnico.',
+        destaque: false,
+        config: {
+            tipo: 'normal', buyin: 100, rake: 10, stack: 5000, tempoNivel: 12, reentryAte: 0,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 0, rebuyFichas: 0,
+            rebuyDuploValor: 0, rebuyDuploFichas: 0,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:25,bb:50,ante:0}, {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:0},
+                {sb:100,bb:200,ante:25}, {sb:150,bb:300,ante:25}, {sb:200,bb:400,ante:50},
+                {sb:300,bb:600,ante:75}, {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100},
+                {sb:700,bb:1400,ante:150}, {sb:1000,bb:2000,ante:200}, {sb:1500,bb:3000,ante:300},
+                {sb:2000,bb:4000,ante:500}, {sb:3000,bb:6000,ante:750}, {sb:5000,bb:10000,ante:1000},
+            ],
+        },
+    },
+
+    // ===== MTT (Multi-Table Tournament) =====
+    {
+        id: 'mtt_daily',
+        nome: '📅 Daily Tournament',
+        categoria: 'mtt',
+        descricao: 'Torneio diário padrão de clube. Re-entry nos 4 primeiros níveis. ~3h de duração.',
+        destaque: true,
+        config: {
+            tipo: 'normal', buyin: 100, rake: 10, stack: 10000, tempoNivel: 15, reentryAte: 4,
+            addonValor: 50, addonFichas: 5000,
+            rebuyValor: 100, rebuyFichas: 10000,
+            rebuyDuploValor: 200, rebuyDuploFichas: 25000,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 10,
+            blinds: [
+                {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:0}, {sb:100,bb:200,ante:25},
+                {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75},
+                {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100}, {sb:700,bb:1400,ante:200},
+                {sb:1000,bb:2000,ante:300}, {sb:1500,bb:3000,ante:400}, {sb:2000,bb:4000,ante:500},
+                {sb:3000,bb:6000,ante:750}, {sb:4000,bb:8000,ante:1000}, {sb:5000,bb:10000,ante:1500},
+                {sb:8000,bb:16000,ante:2000}, {sb:10000,bb:20000,ante:3000},
+            ],
+        },
+    },
+    {
+        id: 'mtt_sunday',
+        nome: '🌟 Sunday Major',
+        categoria: 'mtt',
+        descricao: 'Torneio principal do domingo. Inspirado no BSOP. Re-entry estendido, addon, ranking 15%.',
+        destaque: true,
+        config: {
+            tipo: 'normal', buyin: 200, rake: 20, stack: 20000, tempoNivel: 20, reentryAte: 6,
+            addonValor: 100, addonFichas: 10000,
+            rebuyValor: 200, rebuyFichas: 20000,
+            rebuyDuploValor: 400, rebuyDuploFichas: 50000,
+            jackpotValor: 50, jackpotFichas: 5000,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 15,
+            blinds: [
+                {sb:100,bb:200,ante:0}, {sb:150,bb:300,ante:0}, {sb:200,bb:400,ante:50},
+                {sb:300,bb:600,ante:75}, {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100},
+                {sb:700,bb:1400,ante:200}, {sb:1000,bb:2000,ante:300}, {sb:1500,bb:3000,ante:400},
+                {sb:2000,bb:4000,ante:500}, {sb:3000,bb:6000,ante:750}, {sb:4000,bb:8000,ante:1000},
+                {sb:5000,bb:10000,ante:1500}, {sb:7000,bb:14000,ante:2000}, {sb:10000,bb:20000,ante:3000},
+                {sb:15000,bb:30000,ante:4000}, {sb:20000,bb:40000,ante:5000}, {sb:30000,bb:60000,ante:7500},
+            ],
+        },
+    },
+    {
+        id: 'mtt_reentry',
+        nome: '🚀 Re-entry Aggressive',
+        categoria: 'mtt',
+        descricao: 'Re-entry liberado nos 8 primeiros níveis. Ideal para clubes com bastante ação.',
+        destaque: false,
+        config: {
+            tipo: 'normal', buyin: 100, rake: 10, stack: 10000, tempoNivel: 12, reentryAte: 8,
+            addonValor: 100, addonFichas: 15000,
+            rebuyValor: 100, rebuyFichas: 10000,
+            rebuyDuploValor: 200, rebuyDuploFichas: 25000,
+            jackpotValor: 30, jackpotFichas: 3000,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 10,
+            blinds: [
+                {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:0}, {sb:100,bb:200,ante:25},
+                {sb:150,bb:300,ante:25}, {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75},
+                {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100}, {sb:700,bb:1400,ante:200},
+                {sb:1000,bb:2000,ante:200}, {sb:1500,bb:3000,ante:300}, {sb:2000,bb:4000,ante:500},
+                {sb:3000,bb:6000,ante:750}, {sb:5000,bb:10000,ante:1000}, {sb:8000,bb:16000,ante:2000},
+            ],
+        },
+    },
+
+    // ===== BOUNTY / KNOCKOUT =====
+    {
+        id: 'bounty_ko',
+        nome: '🎯 Knockout R$ 30',
+        categoria: 'bounty',
+        descricao: 'Bounty acessível R$ 30 + R$ 30 (50% pra quem elimina, 50% prêmio). Inspirado no PokerStars KO.',
+        destaque: true,
+        config: {
+            tipo: 'bounty', buyin: 30, rake: 3, stack: 5000, tempoNivel: 12, reentryAte: 4,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 30, rebuyFichas: 5000,
+            rebuyDuploValor: 60, rebuyDuploFichas: 12000,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 30, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:25,bb:50,ante:0}, {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:25},
+                {sb:100,bb:200,ante:25}, {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50},
+                {sb:300,bb:600,ante:75}, {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100},
+                {sb:700,bb:1400,ante:200}, {sb:1000,bb:2000,ante:300}, {sb:1500,bb:3000,ante:400},
+                {sb:2000,bb:4000,ante:500},
+            ],
+        },
+    },
+    {
+        id: 'bounty_premium',
+        nome: '💰 Bounty Premium',
+        categoria: 'bounty',
+        descricao: 'Bounty grande R$ 100 + R$ 100. Inspirado no GGPoker Bounty. Para públicos mais avançados.',
+        destaque: false,
+        config: {
+            tipo: 'bounty', buyin: 100, rake: 10, stack: 10000, tempoNivel: 15, reentryAte: 6,
+            addonValor: 50, addonFichas: 5000,
+            rebuyValor: 100, rebuyFichas: 10000,
+            rebuyDuploValor: 200, rebuyDuploFichas: 25000,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 100, bountyKoSplit: 50,
+            rankingRakePct: 5,
+            blinds: [
+                {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:25}, {sb:100,bb:200,ante:25},
+                {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75},
+                {sb:400,bb:800,ante:100}, {sb:500,bb:1000,ante:100}, {sb:700,bb:1400,ante:200},
+                {sb:1000,bb:2000,ante:300}, {sb:1500,bb:3000,ante:400}, {sb:2000,bb:4000,ante:500},
+                {sb:3000,bb:6000,ante:750}, {sb:5000,bb:10000,ante:1000},
+            ],
+        },
+    },
+    {
+        id: 'bounty_mystery',
+        nome: '🔮 Mystery Bounty',
+        categoria: 'bounty',
+        descricao: 'Bounty surpresa: cada eliminação revela prêmio aleatório (R$ 50 a R$ 500). Modo "evento" do clube.',
+        destaque: false,
+        config: {
+            tipo: 'bounty', buyin: 150, rake: 15, stack: 10000, tempoNivel: 15, reentryAte: 5,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 150, rebuyFichas: 10000,
+            rebuyDuploValor: 300, rebuyDuploFichas: 25000,
+            jackpotValor: 50, jackpotFichas: 5000,
+            bountyValor: 100, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:0}, {sb:100,bb:200,ante:25},
+                {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75},
+                {sb:500,bb:1000,ante:100}, {sb:800,bb:1600,ante:200}, {sb:1200,bb:2400,ante:300},
+                {sb:2000,bb:4000,ante:500}, {sb:3000,bb:6000,ante:750}, {sb:5000,bb:10000,ante:1000},
+            ],
+        },
+    },
+
+    // ===== OUTROS =====
+    {
+        id: 'outros_freeroll',
+        nome: '🎁 Freeroll Promocional',
+        categoria: 'outros',
+        descricao: 'Torneio sem buy-in para atrair novos jogadores. Premiação custeada pelo clube.',
+        destaque: false,
+        config: {
+            tipo: 'normal', buyin: 0, rake: 0, stack: 5000, tempoNivel: 10, reentryAte: 0,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 0, rebuyFichas: 0,
+            rebuyDuploValor: 0, rebuyDuploFichas: 0,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:25,bb:50,ante:0}, {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:25},
+                {sb:100,bb:200,ante:25}, {sb:150,bb:300,ante:50}, {sb:200,bb:400,ante:50},
+                {sb:300,bb:600,ante:75}, {sb:500,bb:1000,ante:100}, {sb:800,bb:1600,ante:200},
+                {sb:1200,bb:2400,ante:300}, {sb:2000,bb:4000,ante:500},
+            ],
+        },
+    },
+    {
+        id: 'outros_satellite',
+        nome: '🎫 Satellite p/ Sunday',
+        categoria: 'outros',
+        descricao: 'Garante vagas no Sunday Major. Cada R$ 200 de prêmio = 1 ticket.',
+        destaque: false,
+        config: {
+            tipo: 'normal', buyin: 50, rake: 5, stack: 5000, tempoNivel: 10, reentryAte: 3,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 50, rebuyFichas: 5000,
+            rebuyDuploValor: 100, rebuyDuploFichas: 12000,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:25,bb:50,ante:0}, {sb:50,bb:100,ante:0}, {sb:75,bb:150,ante:25},
+                {sb:100,bb:200,ante:25}, {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75},
+                {sb:500,bb:1000,ante:100}, {sb:800,bb:1600,ante:200}, {sb:1500,bb:3000,ante:400},
+                {sb:2500,bb:5000,ante:500},
+            ],
+        },
+    },
+    {
+        id: 'outros_headsup',
+        nome: '👑 Heads-Up Championship',
+        categoria: 'outros',
+        descricao: 'Torneio em chaveamento 1v1. 8 jogadores. Premiação concentrada no campeão.',
+        destaque: false,
+        config: {
+            tipo: 'normal', buyin: 200, rake: 20, stack: 10000, tempoNivel: 10, reentryAte: 0,
+            addonValor: 0, addonFichas: 0,
+            rebuyValor: 0, rebuyFichas: 0,
+            rebuyDuploValor: 0, rebuyDuploFichas: 0,
+            jackpotValor: 0, jackpotFichas: 0,
+            bountyValor: 0, bountyKoSplit: 50,
+            rankingRakePct: 0,
+            blinds: [
+                {sb:50,bb:100,ante:0}, {sb:100,bb:200,ante:0}, {sb:150,bb:300,ante:0},
+                {sb:200,bb:400,ante:50}, {sb:300,bb:600,ante:75}, {sb:500,bb:1000,ante:100},
+                {sb:800,bb:1600,ante:200}, {sb:1500,bb:3000,ante:300}, {sb:2500,bb:5000,ante:500},
+            ],
+        },
+    },
+];
+
+// Categorias com labels e ordem de exibição
+const TEMPLATE_CATEGORIAS = [
+    {id:'sng',    nome:'Sit & Go', icone:'⚡'},
+    {id:'mtt',    nome:'MTT',      icone:'📅'},
+    {id:'bounty', nome:'Bounty',   icone:'🎯'},
+    {id:'outros', nome:'Outros',   icone:'➕'},
+];
+
 function salvarTemplatesStorage() {
     try {
         localStorage.setItem(TEMPLATES_KEY, JSON.stringify(torneioTemplates));
@@ -7692,6 +7988,18 @@ function aplicarTemplate(id) {
     logAudit && logAudit('TEMPLATE_USA', `Template aplicado: ${t.nome}`);
 }
 
+// Aplica template NATIVO (do StackOS)
+function aplicarTemplateNativo(id) {
+    const t = TEMPLATES_NATIVOS.find(x => x.id === id);
+    if (!t) return showToast('⚠️ Template não encontrado');
+    _aplicarConfigTorneio(t.config);
+    showToast(`⭐ Template "${t.nome}" aplicado`);
+    logAudit && logAudit('TEMPLATE_NATIVO_USA', `Template nativo aplicado: ${t.nome}`);
+    // Fecha o modal "Ver todos" se estiver aberto
+    const m = document.getElementById('modal-templates-nativos');
+    if (m) m.style.display = 'none';
+}
+
 function deletarTemplate(id) {
     const t = torneioTemplates.find(x => x.id === id);
     if (!t) return;
@@ -7706,16 +8014,123 @@ function deletarTemplate(id) {
 function renderTemplatesBar() {
     const list = document.getElementById('template-list');
     if (!list) return;
-    if (!torneioTemplates.length) {
-        list.innerHTML = '<span style="font-size:.7rem;color:#52525b;font-style:italic;">Nenhum template salvo ainda</span>';
-        return;
+    
+    // 1) Templates NATIVOS em destaque (3-4 marcados como destaque:true)
+    const destaques = TEMPLATES_NATIVOS.filter(t => t.destaque);
+    let html = destaques.map(t => `
+        <div style="display:inline-flex;align-items:center;gap:.3rem;background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(124,58,237,.15));border:1px solid rgba(168,85,247,.4);border-radius:.4rem;padding:.25rem .65rem;font-size:.7rem;cursor:pointer;transition:all .15s;" 
+             onclick="aplicarTemplateNativo('${t.id}')" 
+             onmouseover="this.style.transform='translateY(-1px)';this.style.borderColor='rgba(168,85,247,.7)'" 
+             onmouseout="this.style.transform='';this.style.borderColor='rgba(168,85,247,.4)'"
+             title="${esc(t.descricao)}">
+            <span style="color:#a855f7;font-weight:700;font-family:'Manrope',sans-serif;">${t.nome}</span>
+        </div>
+    `).join('');
+    
+    // 2) Botão "Ver todos"
+    html += `
+        <button onclick="abrirModalTemplatesNativos()" 
+                style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.15);border-radius:.4rem;padding:.25rem .65rem;font-size:.7rem;color:#a1a1aa;cursor:pointer;font-family:'Manrope',sans-serif;font-weight:600;transition:all .15s;"
+                onmouseover="this.style.background='rgba(255,255,255,.08)';this.style.color='#fff'"
+                onmouseout="this.style.background='rgba(255,255,255,.04)';this.style.color='#a1a1aa'">
+            <i class="fa-solid fa-grip"></i> Ver todos (${TEMPLATES_NATIVOS.length})
+        </button>
+    `;
+    
+    // 3) Separador visual se tiver templates do cliente
+    if (torneioTemplates.length) {
+        html += '<span style="color:#3f3f46;font-size:.85rem;margin:0 .15rem;">|</span>';
     }
-    list.innerHTML = torneioTemplates.map(t => `
+    
+    // 4) Templates DO CLIENTE
+    html += torneioTemplates.map(t => `
         <div style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.2rem .35rem .2rem .65rem;font-size:.7rem;">
-            <button onclick="aplicarTemplate(${t.id})" style="background:none;border:none;color:var(--gold);font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;padding:0;font-size:.7rem;" title="${t.descricao || ''}">${t.nome}</button>
+            <button onclick="aplicarTemplate(${t.id})" style="background:none;border:none;color:var(--gold);font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;padding:0;font-size:.7rem;" title="${esc(t.descricao || '')}">${esc(t.nome)}</button>
             <button onclick="deletarTemplate(${t.id})" style="background:none;border:none;color:#52525b;cursor:pointer;padding:0 .2rem;font-size:.65rem;" title="Excluir" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-times"></i></button>
         </div>
     `).join('');
+    
+    list.innerHTML = html;
+}
+
+// Helper de escape (caso não exista global)
+function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
+// ============================================================
+// MODAL "Ver todos os templates nativos"
+// ============================================================
+function abrirModalTemplatesNativos() {
+    let modal = document.getElementById('modal-templates-nativos');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-templates-nativos';
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:10001;display:none;align-items:center;justify-content:center;padding:20px;font-family:Manrope,Inter,system-ui,sans-serif;';
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+    }
+    
+    // Renderiza conteúdo
+    let html = `
+        <div style="background:#0c1223;border:1px solid rgba(255,255,255,0.1);border-radius:18px;max-width:920px;width:100%;max-height:85vh;overflow-y:auto;">
+            <div style="padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#0c1223;z-index:1;">
+                <div>
+                    <h2 style="font-size:20px;font-weight:800;margin:0;background:linear-gradient(90deg,#fff,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">⭐ Biblioteca de Templates</h2>
+                    <p style="font-size:13px;color:#9ca3af;margin:4px 0 0 0;">Estruturas prontas baseadas em padrões PokerStars, GGPoker, WSOP e BSOP</p>
+                </div>
+                <button onclick="document.getElementById('modal-templates-nativos').style.display='none'" 
+                        style="background:rgba(255,255,255,0.08);border:none;color:#fff;width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1;">×</button>
+            </div>
+            <div style="padding:24px 28px;">
+    `;
+    
+    // Itera categorias
+    TEMPLATE_CATEGORIAS.forEach(cat => {
+        const desta = TEMPLATES_NATIVOS.filter(t => t.categoria === cat.id);
+        if (desta.length === 0) return;
+        
+        html += `
+            <div style="margin-bottom:24px;">
+                <h3 style="font-size:14px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:1px;margin:0 0 12px 0;display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:18px;">${cat.icone}</span> ${cat.nome}
+                </h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+        `;
+        
+        desta.forEach(t => {
+            const niveis = t.config.blinds.length;
+            const stackBB = Math.round(t.config.stack / (t.config.blinds[0]?.bb || 100));
+            html += `
+                <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;gap:8px;"
+                     onmouseover="this.style.borderColor='rgba(168,85,247,0.5)';this.style.transform='translateY(-2px)'"
+                     onmouseout="this.style.borderColor='rgba(255,255,255,0.06)';this.style.transform=''"
+                     onclick="aplicarTemplateNativo('${t.id}')">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                        <strong style="font-size:14px;color:#fff;line-height:1.3;">${esc(t.nome)}</strong>
+                        ${t.destaque ? '<span style="background:rgba(168,85,247,0.2);color:#a855f7;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:.5px;flex-shrink:0;">POPULAR</span>' : ''}
+                    </div>
+                    <p style="font-size:12px;color:#9ca3af;margin:0;line-height:1.4;">${esc(t.descricao)}</p>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#71717a;margin-top:4px;border-top:1px solid rgba(255,255,255,0.05);padding-top:8px;">
+                        <span><strong style="color:#fff;">Buy-in:</strong> R$ ${t.config.buyin}</span>
+                        <span><strong style="color:#fff;">Stack:</strong> ${t.config.stack.toLocaleString('pt-BR')}</span>
+                        <span><strong style="color:#fff;">Nível:</strong> ${t.config.tempoNivel}min</span>
+                        <span><strong style="color:#fff;">Níveis:</strong> ${niveis}</span>
+                    </div>
+                    <button style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;">
+                        📋 Usar este template
+                    </button>
+                </div>
+            `;
+        });
+        
+        html += '</div></div>';
+    });
+    
+    html += '</div></div>';
+    modal.innerHTML = html;
+    modal.style.display = 'flex';
 }
 
 
