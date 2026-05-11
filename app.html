@@ -4679,8 +4679,11 @@ function iniciarRealtime() {
             sbClube = { ...sbClube, ...novoClube };
             window.sbClube = sbClube; // [STACKCLOCK]
             
-            // se status virou bloqueado/inativo, força logout
-            if (novoClube.bloqueado || novoClube.status !== 'ativo') {
+            // Lista de status permitidos no app (mesmo do login)
+            const STATUSES_PERMITIDOS_RT1 = ['ativo', 'trial', 'expirado'];
+            
+            // se status virou bloqueado ou status proibido (suspenso, cancelado, etc), força logout
+            if (novoClube.bloqueado || !STATUSES_PERMITIDOS_RT1.includes(novoClube.status)) {
                 alert('⚠️ Seu acesso foi alterado pelo administrador. Faça login novamente.');
                 try { await sb.auth.signOut(); } catch(_) {}
                 location.reload();
@@ -6589,9 +6592,19 @@ async function carregarUsuarioEClube(authUser) {
         await sb.auth.signOut();
         throw new Error('Clube não encontrado.');
     }
-    if (clube.status !== 'ativo') {
+    // Status permitidos pra login:
+    //  - 'ativo'    → cliente pagante
+    //  - 'trial'    → cliente em período de teste (banner + acesso completo)
+    //  - 'expirado' → trial venceu (libera login mas mostra modal "trial expirou")
+    // Bloqueia apenas: 'suspenso', 'cancelado', 'banido', etc.
+    const STATUSES_PERMITIDOS = ['ativo', 'trial', 'expirado'];
+    if (!STATUSES_PERMITIDOS.includes(clube.status)) {
         await sb.auth.signOut();
-        throw new Error('Clube com status "' + clube.status + '". Contate o suporte.');
+        throw new Error('Clube ' + (
+            clube.status === 'suspenso' ? 'suspenso. Contate o suporte para regularizar.' :
+            clube.status === 'cancelado' ? 'cancelado. Para reativar, contate o suporte.' :
+            'com status "' + clube.status + '". Contate o suporte.'
+        ));
     }
 
     sbClube = clube;
@@ -12898,7 +12911,10 @@ async function _revalidarClubeAtual() {
         sbClube = { ...sbClube, ...data };
         window.sbClube = sbClube;
         
-        if (data.bloqueado || data.status !== 'ativo') {
+        // Lista de status permitidos
+        const STATUSES_PERMITIDOS_RT2 = ['ativo', 'trial', 'expirado'];
+        
+        if (data.bloqueado || !STATUSES_PERMITIDOS_RT2.includes(data.status)) {
             alert('⚠️ Seu acesso foi alterado pelo administrador.\nFaça login novamente.');
             try { await sb.auth.signOut(); } catch(_) {}
             location.reload();
