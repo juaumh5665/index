@@ -12347,6 +12347,15 @@ function balancearMesas(idx) {
 function updateTV(idx) {
     try {
     if (!tvWindow || tvWindow.closed) return;
+    
+    // CORREÇÃO BUG: re-resolver idx via ID estável se houver dessincronização
+    if (activeTorneioId) {
+        const idxReal = torneios.findIndex(t => t && t.id === activeTorneioId);
+        if (idxReal >= 0 && idxReal !== idx) {
+            idx = idxReal;
+        }
+    }
+    
     const t     = torneios[idx];
     if (!t) return;
     if (!t.blinds || !t.blinds.length) return;
@@ -12497,6 +12506,22 @@ function formatElapsed(ms) {
 }
 
 function abrirTV(idx) {
+    // CORREÇÃO BUG: idx pode estar dessincronizado se torneios foi recarregado.
+    // Sempre re-resolver o índice via ID estável (activeTorneioId).
+    if (activeTorneioId) {
+        const idxReal = torneios.findIndex(t => t && t.id === activeTorneioId);
+        if (idxReal >= 0 && idxReal !== idx) {
+            console.log(`[abrirTV] Corrigindo idx ${idx} → ${idxReal} (torneio: ${torneios[idxReal]?.nome})`);
+            idx = idxReal;
+        }
+    }
+    
+    // Valida que o torneio existe
+    if (!torneios[idx]) {
+        showToast('⚠️ Torneio não encontrado');
+        return;
+    }
+    
     tvWindow = window.open('/tv.html', 'PokerTV', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
     if (!tvWindow) {
         showToast('⚠️ Permita popups pra usar a TV');
