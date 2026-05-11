@@ -11711,25 +11711,39 @@ function renderTabMesas() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
     const grid = document.getElementById('mt-mesas-grid');
-    if (!t.mesas.length) {
+    if (!t.mesas || !t.mesas.length) {
         grid.innerHTML = '<div style="color:#3f3f46;font-size:.85rem;grid-column:1/-1;">Nenhuma mesa criada. Registre entradas primeiro.</div>';
         return;
     }
-    grid.innerHTML = t.mesas.map((m, mi) => `
+    grid.innerHTML = t.mesas.map((m, mi) => {
+        // Compat: suporta formato antigo (seats) e novo (jogadores)
+        const numeroMesa = m.numero || m.id || (mi + 1);
+        const jogadoresIds = Array.isArray(m.jogadores) 
+            ? m.jogadores 
+            : (m.seats || []).filter(Boolean);
+        const totalLugares = 9;
+        const cadeiras = [];
+        for (let i = 0; i < totalLugares; i++) {
+            cadeiras.push(jogadoresIds[i] || null);
+        }
+        const ocupadas = jogadoresIds.length;
+        
+        return `
         <div class="mesa-card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
-                <span style="font-size:.75rem;font-weight:800;">Mesa ${m.id}</span>
-                <span style="font-size:.7rem;color:#52525b;">${m.seats.filter(Boolean).length}/9 cadeiras</span>
+                <span style="font-size:.75rem;font-weight:800;">Mesa ${numeroMesa}</span>
+                <span style="font-size:.7rem;color:#52525b;">${ocupadas}/${totalLugares} cadeiras</span>
             </div>
             <div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;">
-                ${m.seats.map((s, si) => {
+                ${cadeiras.map((s, si) => {
                     const j = s ? jogadores.find(j => j.id === s) : null;
                     const elim = s && t.eliminados.some(e => e.jogadorId === s);
                     return `<div class="seat ${s ? (elim ? 'eliminado' : 'ocupado') : 'livre'}" title="${j ? j.nome : `Cadeira ${si+1}`}">${si+1}</div>`;
                 }).join('')}
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function renderTabFinanceiro() {
@@ -12302,21 +12316,46 @@ function _confirmarEliminacaoImpl() {
 // ============================================================
 // MESAS
 // ============================================================
+// Formato unificado: { numero: int, jogadores: [jogadorId, ...] }
+// (mesmo formato salvo na tabela torneio_mesas)
+// ============================================================
 function alocarJogadorMesa(t, jogadorId) {
-    let mesaLivre = t.mesas.find(m => m.seats.filter(Boolean).length < 9);
+    // Inicializa se não existir
+    if (!Array.isArray(t.mesas)) t.mesas = [];
+    
+    // ---- compat layer: converte mesas no formato antigo {id, seats} para o novo {numero, jogadores} ----
+    t.mesas = t.mesas.map(m => {
+        if (m && m.seats && !m.jogadores) {
+            return { numero: m.numero || m.id || 1, jogadores: (m.seats || []).filter(Boolean) };
+        }
+        return { numero: m.numero || m.id || 1, jogadores: m.jogadores || [] };
+    });
+    
+    // Acha mesa com vaga (menos de 9 jogadores)
+    let mesaLivre = t.mesas.find(m => (m.jogadores || []).length < 9);
     if (!mesaLivre) {
-        const novaMesa = { id: t.mesas.length + 1, seats: Array(9).fill(null) };
+        const novaMesa = { numero: t.mesas.length + 1, jogadores: [] };
         t.mesas.push(novaMesa);
         mesaLivre = novaMesa;
     }
-    const cadeira = mesaLivre.seats.findIndex(s => !s);
-    if (cadeira !== -1) mesaLivre.seats[cadeira] = jogadorId;
+    
+    // Adiciona o jogador (se ainda não está lá)
+    if (!mesaLivre.jogadores.includes(jogadorId)) {
+        mesaLivre.jogadores.push(jogadorId);
+    }
 }
 
 function removerJogadorMesa(t, jogadorId) {
+    if (!Array.isArray(t.mesas)) return;
     t.mesas.forEach(m => {
-        const idx = m.seats.findIndex(s => s === jogadorId);
-        if (idx !== -1) m.seats[idx] = null;
+        // Compat: pode estar no formato antigo {seats} ou novo {jogadores}
+        if (m.seats) {
+            const idx = m.seats.findIndex(s => s === jogadorId);
+            if (idx !== -1) m.seats[idx] = null;
+        }
+        if (Array.isArray(m.jogadores)) {
+            m.jogadores = m.jogadores.filter(jid => jid !== jogadorId);
+        }
     });
 }
 
@@ -12328,13 +12367,12 @@ function balancearMesas(idx) {
 
     // Remover mesas vazias e redistribuir
     const qtdMesas = Math.ceil(ativos.length / 9);
-    t.mesas = Array.from({length: qtdMesas}, (_, i) => ({ id: i+1, seats: Array(9).fill(null) }));
+    t.mesas = Array.from({length: qtdMesas}, (_, i) => ({ numero: i+1, jogadores: [] }));
     // Embaralhar ativos
     const shuffled = [...ativos].sort(() => Math.random() - .5);
     shuffled.forEach((jid, i) => {
-        const mesa  = Math.floor(i / 9);
-        const cadeira = i % 9;
-        t.mesas[mesa].seats[cadeira] = jid;
+        const mesa = Math.floor(i / 9);
+        t.mesas[mesa].jogadores.push(jid);
     });
     saveData();
     renderTabMesas();
