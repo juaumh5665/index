@@ -598,6 +598,17 @@
 </style>
 </head>
 <body class="overflow-hidden">
+
+<!-- ============================================================ -->
+<!-- BANNER DE TRIAL (persistente, topo da tela)                  -->
+<!-- ============================================================ -->
+<!-- Mostrado quando assinatura tem status='trial' OU status='expirada' -->
+<!-- Cores: azul (>7d), amarelo (3-7d), vermelho (<=3d) ou cinza-escuro (expirado) -->
+<div id="trial-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;padding:.5rem 1rem;font-family:'Manrope',sans-serif;font-size:.8rem;font-weight:600;color:#fff;text-align:center;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.2);box-shadow:0 2px 8px rgba(0,0,0,.3);transition:background .3s;">
+    <span id="trial-banner-icon">🎁</span>
+    <span id="trial-banner-text" style="margin:0 .5rem;"></span>
+    <button id="trial-banner-btn" onclick="event.stopPropagation(); _abrirEscolhaPlano()" style="background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.3);color:#fff;padding:.2rem .8rem;border-radius:.3rem;font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit;margin-left:.5rem;transition:background .2s;" onmouseover="this.style.background='rgba(0,0,0,.4)'" onmouseout="this.style.background='rgba(0,0,0,.25)'">Escolher plano →</button>
+</div>
 <script>
 // Aplica tema E fonte IMEDIATAMENTE (antes do conteúdo renderizar) pra evitar flash
 (function(){
@@ -9177,6 +9188,9 @@ async function carregarAssinaturaAtual() {
 }
 
 function atualizarBadgeAssinatura() {
+    // === LOTE 2 TRIAL: renderiza banner também ===
+    _renderBannerTrial();
+    
     const badge = document.getElementById('nav-assinatura-badge');
     if (!badge) return;
     
@@ -9214,6 +9228,100 @@ function atualizarBadgeAssinatura() {
     } else {
         badge.style.display = 'none';
     }
+}
+
+// ============================================================
+// LOTE 2 TRIAL — Banner persistente no topo
+// ============================================================
+function _renderBannerTrial() {
+    const banner = document.getElementById('trial-banner');
+    if (!banner) return;
+    
+    // Esconde se não tem assinatura
+    if (!_assinaturaAtual) {
+        banner.style.display = 'none';
+        document.body.style.paddingTop = '0';
+        return;
+    }
+    
+    const status = _assinaturaAtual.status;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const validade = _assinaturaAtual.data_validade ? new Date(_assinaturaAtual.data_validade) : null;
+    
+    // Só mostra banner se trial ou expirada
+    if (status !== 'trial' && status !== 'expirada') {
+        banner.style.display = 'none';
+        document.body.style.paddingTop = '0';
+        return;
+    }
+    
+    const dias = validade ? Math.ceil((validade - hoje) / (1000*60*60*24)) : -1;
+    
+    const icon = document.getElementById('trial-banner-icon');
+    const text = document.getElementById('trial-banner-text');
+    const btn  = document.getElementById('trial-banner-btn');
+    
+    // ===== TRIAL EXPIRADO =====
+    if (status === 'expirada' || dias < 0) {
+        banner.style.background = 'linear-gradient(90deg, #7f1d1d, #991b1b)';
+        if (icon) icon.textContent = '🚨';
+        if (text) text.innerHTML = '<strong>Seu trial terminou!</strong> Escolha um plano para continuar usando o StackOS.';
+        if (btn) btn.textContent = 'Assinar agora →';
+    }
+    // ===== ÚLTIMO DIA / 1 DIA =====
+    else if (dias <= 1) {
+        banner.style.background = 'linear-gradient(90deg, #b91c1c, #dc2626)';
+        if (icon) icon.textContent = '🚨';
+        if (text) text.innerHTML = dias === 0 
+            ? '<strong>ÚLTIMO DIA do trial!</strong> Garanta seu plano antes do bloqueio.'
+            : '<strong>Falta apenas 1 dia</strong> para o trial acabar.';
+        if (btn) btn.textContent = 'Assinar agora →';
+    }
+    // ===== 2-3 DIAS (URGENTE - vermelho claro) =====
+    else if (dias <= 3) {
+        banner.style.background = 'linear-gradient(90deg, #b45309, #d97706)';
+        if (icon) icon.textContent = '⏰';
+        if (text) text.innerHTML = `<strong>Seu trial acaba em ${dias} dias.</strong> Não perca o acesso ao seu clube!`;
+        if (btn) btn.textContent = 'Escolher plano →';
+    }
+    // ===== 4-7 DIAS (AMARELO) =====
+    else if (dias <= 7) {
+        banner.style.background = 'linear-gradient(90deg, #92400e, #b45309)';
+        if (icon) icon.textContent = '⏰';
+        if (text) text.innerHTML = `<strong>Trial: ${dias} dias restantes.</strong> Conheça nossos planos.`;
+        if (btn) btn.textContent = 'Ver planos →';
+    }
+    // ===== 8+ DIAS (AZUL - relaxado) =====
+    else {
+        banner.style.background = 'linear-gradient(90deg, #1d4ed8, #2563eb)';
+        if (icon) icon.textContent = '🎁';
+        if (text) text.innerHTML = `<strong>Você está no trial.</strong> ${dias} dias restantes com todos os recursos liberados.`;
+        if (btn) btn.textContent = 'Ver planos →';
+    }
+    
+    banner.style.display = 'block';
+    
+    // Ajusta padding do body pra não cobrir o conteúdo
+    // Usa requestAnimationFrame pra esperar o banner renderizar e medir altura real
+    requestAnimationFrame(() => {
+        const altura = banner.offsetHeight;
+        if (altura > 0) {
+            document.body.style.paddingTop = altura + 'px';
+        }
+    });
+}
+
+// Abre o modal de escolha de plano (reutiliza o que já existe no app)
+function _abrirEscolhaPlano() {
+    // Tenta navegar pra página de Assinatura primeiro (que já tem cards de plano)
+    if (typeof showPage === 'function') {
+        try {
+            showPage('assinatura');
+            return;
+        } catch(_) {}
+    }
+    // Fallback: scrolla pro topo
+    window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 async function renderAssinatura() {
