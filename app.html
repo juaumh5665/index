@@ -10288,12 +10288,68 @@ function adminRenderClubes(clubes) {
             <td style="padding:.75rem 1rem;text-align:center;font-weight:700;color:${corDias};">${dias}</td>
             <td style="padding:.75rem 1rem;text-align:right;font-weight:600;">${valor}</td>
             <td style="padding:.75rem 1rem;text-align:center;">
-                <button onclick="adminAcoesClube('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')" style="padding:.4rem .75rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.35rem;font-size:.75rem;cursor:pointer;">
-                    <i class="fa-solid fa-gear"></i> Ações
-                </button>
+                <div style="display:flex;gap:.25rem;justify-content:center;flex-wrap:wrap;">
+                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', 7)" 
+                            style="padding:.3rem .55rem;background:#1e3a8a;border:1px solid #3b82f6;color:#fff;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;" 
+                            title="Adicionar 7 dias de validade">
+                        +7d
+                    </button>
+                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', 30)" 
+                            style="padding:.3rem .55rem;background:#14532d;border:1px solid #22c55e;color:#fff;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;" 
+                            title="Adicionar 30 dias de validade (1 mês)">
+                        +30d
+                    </button>
+                    <button onclick="adminAcoesClube('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')" 
+                            style="padding:.3rem .55rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.3rem;font-size:.7rem;cursor:pointer;" 
+                            title="Mais ações">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
             </td>
         </tr>`;
     }).join('');
+}
+
+// ============================================================
+// LOTE 4B — Estender trial rápido (botões direto na tabela)
+// ============================================================
+async function adminEstenderTrialRapido(clubeId, nome, dias) {
+    // Confirma pra evitar clique acidental
+    if (!confirm(`Estender +${dias} dias de validade para "${nome}"?`)) return;
+    
+    try {
+        // Calcula nova data: usa data_validade atual se for futura, senão usa hoje
+        const clube = _adminClubesCache.find(c => c.id === clubeId);
+        if (!clube) { alert('Clube não encontrado em cache'); return; }
+        
+        const base = clube.data_validade ? new Date(clube.data_validade) : new Date();
+        if (base < new Date()) base.setTime(Date.now()); // se já venceu, parte de hoje
+        base.setDate(base.getDate() + dias);
+        const novaData = base.toISOString().split('T')[0];
+        
+        const { error } = await sb.rpc('estender_validade', { 
+            p_clube_id: clubeId, 
+            p_nova_data: novaData 
+        });
+        if (error) throw error;
+        
+        // Feedback visual
+        const dataFmt = new Date(novaData).toLocaleDateString('pt-BR');
+        if (typeof showToast === 'function') {
+            showToast(`✓ "${nome}" estendido +${dias}d até ${dataFmt}`);
+        } else {
+            alert(`✓ Validade estendida até ${dataFmt}`);
+        }
+        
+        // Recarrega tabela e dashboard
+        await adminCarregarClubes();
+        if (typeof adminCarregarDashboard === 'function') {
+            await adminCarregarDashboard();
+        }
+    } catch(e) {
+        console.error('[ADMIN] Erro ao estender:', e);
+        alert('Erro ao estender validade: ' + (e.message || e));
+    }
 }
 
 async function adminAcoesClube(clubeId, nome) {
