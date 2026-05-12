@@ -1844,6 +1844,33 @@
                         </div>
                         <button onclick="salvarTravasPadrao()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Travas</button>
                     </div>
+
+                    <!-- LOTE 4: Padrão de rake sobre Jackpot/Last Chance -->
+                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-percent"></i> Rake sobre Compras Extras (Padrão do Clube)</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
+                            Define se <strong>Jackpot</strong> e <strong>Last Chance</strong> pagam rake do clube por padrão.
+                            <br>Cada torneio pode <strong>sobrescrever</strong> esse padrão ao criar/editar.
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:.75rem;">
+                            <label style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;cursor:pointer;">
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-gem" style="color:var(--gold);"></i> Jackpot paga rake</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Se marcado: o valor do Jackpot entra no cálculo do rake. Se desmarcado: vai 100% pro prize pool.</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="cfg-jackpot-paga-rake"><span class="slider"></span></label>
+                            </label>
+                            <label style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;cursor:pointer;">
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-star" style="color:#a78bfa;"></i> Last Chance paga rake</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Se marcado: o valor do Last Chance entra no cálculo do rake. Se desmarcado: vai 100% pro prize pool.</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="cfg-last-chance-paga-rake"><span class="slider"></span></label>
+                            </label>
+                        </div>
+                        <button onclick="salvarRakeExtras()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Padrões de Rake</button>
+                    </div>
+                    
                     <div class="stat-card" style="padding:1rem;margin-top:.75rem;background:rgba(59,130,246,.05);border-color:rgba(59,130,246,.2);">
                         <div style="font-size:.78rem;color:#93c5fd;line-height:1.6;">
                             <i class="fa-solid fa-info-circle"></i> <strong>Exemplo prático:</strong> Configurando "Compras até nível 10" e "Add-on até nível 10":
@@ -3464,6 +3491,14 @@
                         <div><label class="inp-label">Valor R$</label><input id="t-jackpot-valor" type="number" value="0" class="inp" placeholder="0 = sem jackpot"></div>
                         <div><label class="inp-label">Fichas entregues</label><input id="t-jackpot-fichas" type="number" value="0" class="inp"></div>
                     </div>
+                    <div style="margin-top:.6rem;">
+                        <label class="inp-label">Rake sobre Jackpot</label>
+                        <select id="t-jackpot-paga-rake" class="inp">
+                            <option value="">Usar padrão do clube</option>
+                            <option value="1">Paga rake (entra no cálculo)</option>
+                            <option value="0">Sem rake (vai 100% pro prize)</option>
+                        </select>
+                    </div>
                     <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Jogador paga R$ X e recebe Y fichas extras. Pode ser comprado múltiplas vezes.</div>
                 </div>
 
@@ -3477,6 +3512,14 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
                             <div><label class="inp-label">Valor R$</label><input id="t-last-chance-valor" type="number" value="200" class="inp" placeholder="Ex: 200"></div>
                             <div><label class="inp-label">Fichas entregues</label><input id="t-last-chance-fichas" type="number" value="150000" class="inp" placeholder="Ex: 150000"></div>
+                        </div>
+                        <div style="margin-top:.6rem;">
+                            <label class="inp-label">Rake sobre Last Chance</label>
+                            <select id="t-last-chance-paga-rake" class="inp">
+                                <option value="">Usar padrão do clube</option>
+                                <option value="1">Paga rake (entra no cálculo)</option>
+                                <option value="0">Sem rake (vai 100% pro prize)</option>
+                            </select>
                         </div>
                         <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.4;">Compra liberada <strong>após o nível de add-on</strong>. Mesma mecânica do Jackpot: pode comprar múltiplas vezes.</div>
                     </div>
@@ -5190,9 +5233,11 @@ function _torneioToDb(t) {
         rebuy_duplo_fichas: t.rebuyDuploFichas || 0,
         jackpot_valor: t.jackpotValor || 0,
         jackpot_fichas: t.jackpotFichas || 0,
+        jackpot_paga_rake: (t.jackpot_paga_rake === null || t.jackpot_paga_rake === undefined) ? null : (t.jackpot_paga_rake ? 1 : 0),
         last_chance_ativo: !!t.last_chance_ativo,
         last_chance_valor: Number(t.last_chance_valor) || 0,
         last_chance_fichas: parseInt(t.last_chance_fichas) || 0,
+        last_chance_paga_rake: (t.last_chance_paga_rake === null || t.last_chance_paga_rake === undefined) ? null : (t.last_chance_paga_rake ? 1 : 0),
         bounty_valor: t.bountyValor || 0,
         bounty_ko_split: t.bountyKoSplit || 50,
         capile_modo: t.capileModo || 'pote',
@@ -5806,9 +5851,11 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         rebuyDuploFichas: r.rebuy_duplo_fichas || 0,
         jackpotValor: parseFloat(r.jackpot_valor || 0),
         jackpotFichas: r.jackpot_fichas || 0,
+        jackpot_paga_rake: r.jackpot_paga_rake === null || r.jackpot_paga_rake === undefined ? null : Number(r.jackpot_paga_rake),
         last_chance_ativo: !!r.last_chance_ativo,
         last_chance_valor: parseFloat(r.last_chance_valor || 0),
         last_chance_fichas: parseInt(r.last_chance_fichas || 0),
+        last_chance_paga_rake: r.last_chance_paga_rake === null || r.last_chance_paga_rake === undefined ? null : Number(r.last_chance_paga_rake),
         bountyValor: parseFloat(r.bounty_valor || 0),
         bountyKoSplit: parseFloat(r.bounty_ko_split || 50),
         rankingId: r.ranking_id,
@@ -8128,10 +8175,20 @@ function _capturarConfigTorneio() {
         rebuyDuploFichas: parseInt((document.getElementById('t-rebuy-duplo-fichas') || {}).value) || 0,
         jackpotValor:   parseFloat((document.getElementById('t-jackpot-valor') || {}).value) || 0,
         jackpotFichas:  parseInt((document.getElementById('t-jackpot-fichas') || {}).value) || 0,
+        jackpot_paga_rake: (function() {
+            const v = (document.getElementById('t-jackpot-paga-rake') || {}).value;
+            if (v === '' || v == null) return null;
+            return Number(v); // 0 ou 1
+        })(),
         // Last Chance
         last_chance_ativo: (document.getElementById('t-last-chance-ativo') || {}).checked || false,
         last_chance_valor: parseFloat((document.getElementById('t-last-chance-valor') || {}).value) || 0,
         last_chance_fichas: parseInt((document.getElementById('t-last-chance-fichas') || {}).value) || 0,
+        last_chance_paga_rake: (function() {
+            const v = (document.getElementById('t-last-chance-paga-rake') || {}).value;
+            if (v === '' || v == null) return null;
+            return Number(v);
+        })(),
         bountyValor:    parseFloat((document.getElementById('t-bounty-valor') || {}).value) || 0,
         bountyKoSplit:  parseFloat((document.getElementById('t-bounty-ko-split') || {}).value) || 50,
         rankingRakePct: parseFloat((document.getElementById('t-ranking-rake-pct') || {}).value) || 0,
@@ -8160,6 +8217,11 @@ function _aplicarConfigTorneio(cfg) {
     set('t-rebuy-duplo-fichas', cfg.rebuyDuploFichas);
     set('t-jackpot-valor', cfg.jackpotValor);
     set('t-jackpot-fichas', cfg.jackpotFichas);
+    // Paga rake do jackpot — tri-state
+    const selJR = document.getElementById('t-jackpot-paga-rake');
+    if (selJR) {
+        selJR.value = (cfg.jackpot_paga_rake === null || cfg.jackpot_paga_rake === undefined) ? '' : String(cfg.jackpot_paga_rake);
+    }
     // Last Chance
     const cbLC = document.getElementById('t-last-chance-ativo');
     if (cbLC) {
@@ -8168,6 +8230,11 @@ function _aplicarConfigTorneio(cfg) {
     }
     set('t-last-chance-valor', cfg.last_chance_valor);
     set('t-last-chance-fichas', cfg.last_chance_fichas);
+    // Paga rake do last chance — tri-state
+    const selLR = document.getElementById('t-last-chance-paga-rake');
+    if (selLR) {
+        selLR.value = (cfg.last_chance_paga_rake === null || cfg.last_chance_paga_rake === undefined) ? '' : String(cfg.last_chance_paga_rake);
+    }
     set('t-bounty-valor', cfg.bountyValor);
     set('t-bounty-ko-split', cfg.bountyKoSplit);
     set('t-ranking-rake-pct', cfg.rankingRakePct);
@@ -11884,6 +11951,17 @@ function saveTournament() {
         last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
         last_chance_valor:  parseFloat(document.getElementById('t-last-chance-valor')?.value) || 0,
         last_chance_fichas: parseInt(document.getElementById('t-last-chance-fichas')?.value) || 0,
+        // Opt-in pra rake (NULL = usa padrão do clube)
+        jackpot_paga_rake: (function() {
+            const v = document.getElementById('t-jackpot-paga-rake')?.value;
+            if (v === '' || v == null) return null;
+            return Number(v);
+        })(),
+        last_chance_paga_rake: (function() {
+            const v = document.getElementById('t-last-chance-paga-rake')?.value;
+            if (v === '' || v == null) return null;
+            return Number(v);
+        })(),
         // KO config
         bountyValor:    parseFloat(document.getElementById('t-bounty-valor').value) || 0,
         pkoSplit:       parseFloat(document.getElementById('t-pko-split').value) || 50,
@@ -12368,11 +12446,15 @@ function renderTabFinanceiro() {
     
     // === EXTRAS ===
     if (jackpotQtd > 0) {
-        linhas.push({ label: 'Jackpots', sub: `${jackpotQtd} × ${formatMoney(t.jackpotValor || 0)}`, val: formatMoney(jackpotTotal), tipo: 'extra' });
+        const jackPaga = _jackpotPagaRake(t);
+        const label = jackPaga ? 'Jackpots' : 'Jackpots <span style="color:#52525b;font-weight:400;font-size:.7rem;">(sem rake)</span>';
+        linhas.push({ label, sub: `${jackpotQtd} × ${formatMoney(t.jackpotValor || 0)}`, val: formatMoney(jackpotTotal), tipo: 'extra' });
     }
     
     if (t.last_chance_ativo || lcEntries.length > 0) {
-        linhas.push({ label: 'Last Chance', sub: `${lcEntries.length} × ${formatMoney(t.last_chance_valor || 0)}`, val: formatMoney(lcTotal), tipo: 'extra' });
+        const lcPaga = _lastChancePagaRake(t);
+        const label = lcPaga ? 'Last Chance' : 'Last Chance <span style="color:#52525b;font-weight:400;font-size:.7rem;">(sem rake)</span>';
+        linhas.push({ label, sub: `${lcEntries.length} × ${formatMoney(t.last_chance_valor || 0)}`, val: formatMoney(lcTotal), tipo: 'extra' });
     }
     
     // === TOTAIS ===
@@ -13670,12 +13752,10 @@ function getAtivos(t) {
 //   Prize:   8.000 - 240 = 7.760
 // ============================================================
 
-// Soma TUDO que entrou no torneio (incluindo extras)
+// Soma TUDO que entrou no torneio (incluindo extras) — usado em relatórios/exibição
 function getBrutoTotal(t) {
     if (!t) return 0;
     // Entradas (buy-in + rebuy + reentry + addon + last_chance)
-    // Last Chance JÁ entra em t.entries (registrado em confirmarLastChance), 
-    // então NÃO somamos t.lastChanceCompras separadamente pra evitar duplicação.
     const entriesTotal = (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
     // Jackpot (esse fica fora de entries, então soma à parte)
     const jackpotTotal = (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
@@ -13688,25 +13768,89 @@ function getBrutoEntradas(t) {
     return (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
 }
 
+// ============================================================
+// LOTE 4 — Helpers de opt-in pra rake
+// ============================================================
+// Tri-state com fallback:
+//   torneio.X (1=sim, 0=não, NULL/undefined=usa padrão)
+//   → padrão do clube (sbClube.cfg_X_paga_rake)
+//   → false (default global)
+function _jackpotPagaRake(t) {
+    if (t && (t.jackpot_paga_rake === 1 || t.jackpot_paga_rake === true)) return true;
+    if (t && (t.jackpot_paga_rake === 0 || t.jackpot_paga_rake === false)) return false;
+    // null/undefined → usa padrão do clube
+    if (sbClube && sbClube.cfg_jackpot_paga_rake === true) return true;
+    return false;
+}
+function _lastChancePagaRake(t) {
+    if (t && (t.last_chance_paga_rake === 1 || t.last_chance_paga_rake === true)) return true;
+    if (t && (t.last_chance_paga_rake === 0 || t.last_chance_paga_rake === false)) return false;
+    if (sbClube && sbClube.cfg_last_chance_paga_rake === true) return true;
+    return false;
+}
+
+// Bruto que ENTRA no cálculo do rake (depende dos opt-ins)
+function _getBrutoParaRake(t) {
+    if (!t) return 0;
+    let total = 0;
+    
+    // Entradas: buyin/rebuy/reentry/addon SEMPRE pagam rake.
+    // Last Chance: depende do opt-in.
+    const lcPaga = _lastChancePagaRake(t);
+    (t.entries || []).forEach(e => {
+        if (e.tipo === 'last_chance' && !lcPaga) return; // skip
+        total += Number(e.valor) || 0;
+    });
+    
+    // Jackpot: depende do opt-in
+    if (_jackpotPagaRake(t)) {
+        total += (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
+    }
+    
+    return total;
+}
+
+// Bruto que NÃO entra no cálculo do rake (vai 100% pro prize)
+function _getBrutoSemRake(t) {
+    if (!t) return 0;
+    let total = 0;
+    
+    // Last Chance "sem rake"
+    if (!_lastChancePagaRake(t)) {
+        total += (t.entries || [])
+            .filter(e => e.tipo === 'last_chance')
+            .reduce((s, e) => s + (Number(e.valor) || 0), 0);
+    }
+    
+    // Jackpot "sem rake"
+    if (!_jackpotPagaRake(t)) {
+        total += (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
+    }
+    
+    return total;
+}
+
 function getRake(t) {
-    // Rake incide sobre o BRUTO TOTAL (tudo que entrou)
-    const bruto = getBrutoTotal(t);
+    // Rake incide só sobre o que está marcado pra pagar rake
+    const bruto = _getBrutoParaRake(t);
     return bruto * ((Number(t.rake) || 0) / 100);
 }
 
 function getStaff(t) {
     // Staff: % EM CASCATA sobre o que sobrou DEPOIS do rake do clube
-    const bruto = getBrutoTotal(t);
-    const sobra = bruto - getRake(t);
+    // Staff incide só sobre o que pagou rake (cascata coerente)
+    const brutoComRake = _getBrutoParaRake(t);
+    const sobra = brutoComRake - getRake(t);
     return sobra * ((Number(t.staffPct) || 0) / 100);
 }
 
 function getPrize(t) {
-    // Prize = Bruto - Rake - Staff
-    const bruto = getBrutoTotal(t);
+    // Prize = (Bruto_comRake - Rake - Staff) + Bruto_semRake
+    const brutoComRake = _getBrutoParaRake(t);
+    const brutoSemRake = _getBrutoSemRake(t);
     const rake = getRake(t);
     const staff = getStaff(t);
-    const liquido = bruto - rake - staff;
+    const liquido = (brutoComRake - rake - staff) + brutoSemRake;
     
     if (t.tipo === 'knockout') {
         // 100% em bounties, nada no prize pool final
@@ -15533,6 +15677,12 @@ function renderConfigTorneios() {
     const inpAddon = document.getElementById('cfg-trn-max-addon');
     if (inpCompras) inpCompras.value = sbClube.cfg_nivel_max_compras != null ? sbClube.cfg_nivel_max_compras : '';
     if (inpAddon)   inpAddon.value   = sbClube.cfg_nivel_max_addon   != null ? sbClube.cfg_nivel_max_addon   : '';
+    
+    // LOTE 4: Checkboxes de rake extras (Jackpot/Last Chance)
+    const cbJack = document.getElementById('cfg-jackpot-paga-rake');
+    const cbLC = document.getElementById('cfg-last-chance-paga-rake');
+    if (cbJack) cbJack.checked = !!sbClube.cfg_jackpot_paga_rake;
+    if (cbLC)   cbLC.checked   = !!sbClube.cfg_last_chance_paga_rake;
 }
 
 async function salvarTravasPadrao() {
@@ -15569,6 +15719,43 @@ async function salvarTravasPadrao() {
         showToast('✓ Travas salvas');
     } catch(e) {
         console.error('[CONFIG-TORNEIOS-TRAVAS] erro:', e);
+        showToast('⚠️ Erro ao salvar: ' + (e.message || e));
+    }
+}
+
+// LOTE 4 — Salvar padrão de rake sobre Jackpot/Last Chance
+async function salvarRakeExtras() {
+    if (!sbClube || !sbClube.id) return showToast('⚠️ Clube não carregado');
+    
+    const cbJack = document.getElementById('cfg-jackpot-paga-rake');
+    const cbLC = document.getElementById('cfg-last-chance-paga-rake');
+    
+    const jackPaga = !!(cbJack && cbJack.checked);
+    const lcPaga = !!(cbLC && cbLC.checked);
+    
+    try {
+        const { error } = await sb.from('clubes').update({
+            cfg_jackpot_paga_rake: jackPaga,
+            cfg_last_chance_paga_rake: lcPaga,
+            atualizado_em: new Date().toISOString(),
+        }).eq('id', sbClube.id);
+        
+        if (error) throw error;
+        
+        // Atualiza cache local
+        sbClube.cfg_jackpot_paga_rake = jackPaga;
+        sbClube.cfg_last_chance_paga_rake = lcPaga;
+        window.sbClube = sbClube;
+        
+        // Re-renderiza torneios pra atualizar UI com novo padrão
+        if (typeof updateModalTorneio === 'function') updateModalTorneio();
+        if (typeof renderTabFinanceiro === 'function') {
+            try { renderTabFinanceiro(); } catch(e) {}
+        }
+        
+        showToast(`✓ Padrões de rake salvos · Jackpot: ${jackPaga?'paga':'sem'} · Last Chance: ${lcPaga?'paga':'sem'}`);
+    } catch(e) {
+        console.error('[CONFIG-RAKE-EXTRAS] erro:', e);
         showToast('⚠️ Erro ao salvar: ' + (e.message || e));
     }
 }
