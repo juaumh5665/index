@@ -1688,6 +1688,7 @@
                     <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this)"><i class="fa-solid fa-trophy"></i> Torneios</button>
                     <button class="tab-btn"        id="cfgtab-btn-cash"        onclick="switchConfigTab('cfg-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
                     <button class="tab-btn"        id="cfgtab-btn-fichas"      onclick="switchConfigTab('cfg-fichas', this)"><i class="fa-solid fa-circle"></i> Fichas</button>
+                    <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this); renderConfigTorneios();"><i class="fa-solid fa-trophy"></i> Torneios</button>
                     <button class="tab-btn"        id="cfgtab-btn-financeiro"  onclick="switchConfigTab('cfg-financeiro', this)"><i class="fa-solid fa-sack-dollar"></i> Financeiro</button>
                     <button class="tab-btn"        id="cfgtab-btn-seguranca"   onclick="switchConfigTab('cfg-seguranca', this)"><i class="fa-solid fa-shield-halved"></i> Segurança</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
@@ -1852,6 +1853,41 @@
                         <div id="fichas-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
                         <div style="margin-top:1rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;">
                             <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Essas denominações aparecem ao abrir mesa de cash e registrar saídas de jogadores.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA: TORNEIOS (padrões globais do clube) -->
+                <div id="cfg-torneios" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-lock"></i> Travas de Compras (Padrão do Clube)</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
+                            Define o nível máximo em que <strong>buy-in, re-entry e rebuy</strong> podem ser realizados nos torneios deste clube. 
+                            Após esse nível, esses tipos de compra ficam bloqueados automaticamente.
+                            <br>Cada torneio pode <strong>sobrescrever</strong> esse padrão ao criar/editar.
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label class="inp-label">🛒 Compras (buy-in / re-entry / rebuy) até o nível</label>
+                                <input id="cfg-trn-max-compras" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (deixe vazio = sem trava)" inputmode="numeric">
+                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Deixar vazio = sem trava (comportamento atual)</div>
+                            </div>
+                            <div>
+                                <label class="inp-label">🎯 Add-on até o nível</label>
+                                <input id="cfg-trn-max-addon" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (deixe vazio = sem trava)" inputmode="numeric">
+                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Após esse nível, add-on é bloqueado</div>
+                            </div>
+                        </div>
+                        <button onclick="salvarConfigTorneios()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Padrões de Torneios</button>
+                    </div>
+                    <div class="stat-card" style="padding:1rem;background:rgba(59,130,246,.05);border-color:rgba(59,130,246,.2);">
+                        <div style="font-size:.78rem;color:#93c5fd;line-height:1.6;">
+                            <i class="fa-solid fa-info-circle"></i> <strong>Exemplo prático:</strong> Configurando "Compras até nível 10" e "Add-on até nível 10":
+                            <ul style="margin:.5rem 0 0 1.2rem;padding:0;color:#cbd5e1;">
+                                <li>Níveis 1 a 10: tudo permitido</li>
+                                <li>A partir do nível 11: buy-in, re-entry, rebuy e add-on bloqueados</li>
+                                <li>Se o torneio tiver <strong>Last Chance</strong> ativo, ele libera após o add-on</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -11853,7 +11889,7 @@ function renderTorneiosList() {
                     <div style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem;flex-wrap:wrap;">
                         <span class="tag ${statusTag.cls}">${statusTag.label}</span>
                         ${t.tipo && t.tipo!=='normal' ? `<span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);">${ {bounty:'💰 Bounty',pko:'🎯 PKO',knockout:'⚡ KO'}[t.tipo] }</span>` : ''}
-                        <span style="font-size:.75rem;color:#52525b;">Nível ${t.nivelAtual+1} &bull; ${t.blinds[t.nivelAtual].sb}/${t.blinds[t.nivelAtual].bb}</span>
+                        <span style="font-size:.75rem;color:#52525b;">${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].isBreak) ? `Intervalo` : `Nível ${t.nivelAtual+1} &bull; ${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].sb) || 0}/${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].bb) || 0}`}</span>
                     </div>
                 </div>
                 <button onclick="abrirDetalhesTorneio(${i})" class="btn-gold" style="font-size:.85rem;">Abrir <i class="fa-solid fa-arrow-right"></i></button>
@@ -11912,8 +11948,20 @@ function updateModalTorneio() {
     document.getElementById('mt-timer').style.color = t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : 'var(--gold)');
 
     const cur = t.blinds[t.nivelAtual];
-    document.getElementById('mt-blinds-display').innerText = `${cur.sb.toLocaleString()} / ${cur.bb.toLocaleString()}`;
-    document.getElementById('mt-ante-display').innerText = `Ante: ${cur.ante.toLocaleString()}`;
+    if (cur && cur.isBreak) {
+        // Nível atual é intervalo
+        document.getElementById('mt-blinds-display').innerText = '⏸ Intervalo';
+        document.getElementById('mt-ante-display').innerText = `${cur.tempo || 10} min de pausa`;
+    } else if (cur) {
+        const sb = (cur.sb != null) ? cur.sb : 0;
+        const bb = (cur.bb != null) ? cur.bb : 0;
+        const ante = (cur.ante != null) ? cur.ante : 0;
+        document.getElementById('mt-blinds-display').innerText = `${sb.toLocaleString()} / ${bb.toLocaleString()}`;
+        document.getElementById('mt-ante-display').innerText = `Ante: ${ante.toLocaleString()}`;
+    } else {
+        document.getElementById('mt-blinds-display').innerText = '—';
+        document.getElementById('mt-ante-display').innerText = '—';
+    }
 
     const pct = (t.tempoRestante / t.tempoTotal) * 100;
     const bar = document.getElementById('mt-timer-bar');
@@ -11921,9 +11969,20 @@ function updateModalTorneio() {
     bar.className = 'timer-bar' + (pct < 20 ? ' low' : '');
 
     const prox = t.blinds[t.nivelAtual + 1];
-    document.getElementById('mt-prox-blinds').innerText = prox
-        ? `${prox.sb.toLocaleString()} / ${prox.bb.toLocaleString()} (Ante ${prox.ante.toLocaleString()})`
-        : 'Último nível';
+    let proxTexto;
+    if (!prox) {
+        proxTexto = 'Último nível';
+    } else if (prox.isBreak) {
+        // próximo é intervalo
+        proxTexto = `⏸ Intervalo (${prox.tempo || 10} min)`;
+    } else {
+        // próximo nível normal
+        const sb = (prox.sb != null) ? prox.sb : 0;
+        const bb = (prox.bb != null) ? prox.bb : 0;
+        const ante = (prox.ante != null) ? prox.ante : 0;
+        proxTexto = `${sb.toLocaleString()} / ${bb.toLocaleString()} (Ante ${ante.toLocaleString()})`;
+    }
+    document.getElementById('mt-prox-blinds').innerText = proxTexto;
 
     document.getElementById('mt-entries').innerText = t.entries.filter(e => e.tipo !== 'addon').length;
     document.getElementById('mt-ativos').innerText  = ativos;
@@ -12325,6 +12384,73 @@ function toggleBreak(idx) {
 // ============================================================
 // TORNEIO — ENTRADAS / ELIMINAÇÕES
 // ============================================================
+// ============================================================
+// LOTE 1+2 — Travas de Compras/Add-on + Last Chance
+// ============================================================
+// Resolve o nível máximo efetivo de compras (buy-in, re-entry, rebuy)
+// Prioridade: torneio.nivel_max_compras > clube.cfg_nivel_max_compras > null
+function _resolverNivelMaxCompras(t) {
+    if (t && t.nivel_max_compras != null) return Number(t.nivel_max_compras);
+    if (sbClube && sbClube.cfg_nivel_max_compras != null) return Number(sbClube.cfg_nivel_max_compras);
+    return null; // sem trava
+}
+
+// Resolve o nível máximo efetivo de add-on
+function _resolverNivelMaxAddon(t) {
+    if (t && t.nivel_max_addon != null) return Number(t.nivel_max_addon);
+    if (sbClube && sbClube.cfg_nivel_max_addon != null) return Number(sbClube.cfg_nivel_max_addon);
+    return null; // sem trava
+}
+
+// Tipos que entram na trava de "compras"
+const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
+
+// Verifica se um tipo de entrada está bloqueado por trava no torneio atual
+// Retorna { bloqueado: bool, motivo: string }
+function _tipoBloqueadoPorTrava(t, tipo) {
+    if (!t || !t.rodando) return { bloqueado: false, motivo: '' };
+    
+    const nivelAtual = Number(t.nivelAtual) + 1; // nivelAtual é 0-indexed, mostrar 1-indexed
+    
+    // Compras (buy-in, re-entry, rebuy)
+    if (_TIPOS_COMPRA.includes(tipo)) {
+        const max = _resolverNivelMaxCompras(t);
+        if (max != null && nivelAtual > max) {
+            return { 
+                bloqueado: true, 
+                motivo: `Compras só até o nível ${max} (atual: ${nivelAtual})` 
+            };
+        }
+    }
+    
+    // Add-on
+    if (tipo === 'addon') {
+        const max = _resolverNivelMaxAddon(t);
+        if (max != null && nivelAtual > max) {
+            return { 
+                bloqueado: true, 
+                motivo: `Add-on só até o nível ${max} (atual: ${nivelAtual})` 
+            };
+        }
+    }
+    
+    // Last Chance: só após o add-on terminar
+    if (tipo === 'last_chance') {
+        if (!t.last_chance_ativo) {
+            return { bloqueado: true, motivo: 'Last Chance não está ativo neste torneio' };
+        }
+        const maxAddon = _resolverNivelMaxAddon(t);
+        if (maxAddon != null && nivelAtual <= maxAddon) {
+            return { 
+                bloqueado: true, 
+                motivo: `Last Chance só após o nível ${maxAddon} (atual: ${nivelAtual}) — período de add-on em andamento` 
+            };
+        }
+    }
+    
+    return { bloqueado: false, motivo: '' };
+}
+
 function openModalEntrada(idx) {
     const t = torneios[idx];
     const sel = document.getElementById('entrada-jogador');
@@ -12340,19 +12466,35 @@ function openModalEntrada(idx) {
         sel.innerHTML += `<option value="${j.id}" ${jaElim?'':''}>${j.nome}${jaElim?' (elim.)': jaEntrou?' (inscrito)':''}</option>`;
     });
 
-    // Ajuste opções de tipo
+    // Ajuste opções de tipo (com travas do Lote 1+2)
     const tipoSel = document.getElementById('entrada-tipo');
-    const opts = [`<option value="buyin">Buy-in (entrada normal) — R$ ${t.buyin}</option>`];
-    if (t.rebuySimples > 0) opts.push(`<option value="rebuy_simples">Rebuy Simples — R$ ${t.rebuySimples} (${(t.rebuySimplesFichas||0).toLocaleString()} fichas)</option>`);
-    if (t.rebuyDuplo > 0)   opts.push(`<option value="rebuy_duplo">Rebuy Duplo — R$ ${t.rebuyDuplo} (${(t.rebuyDuploFichas||0).toLocaleString()} fichas)</option>`);
-    if (t.reentryAte > 0)   opts.push(`<option value="reentry">Re-entry — R$ ${t.buyin}</option>`);
+    
+    // Helper para adicionar opção considerando trava
+    const addOpt = (tipo, label) => {
+        const trava = _tipoBloqueadoPorTrava(t, tipo);
+        if (trava.bloqueado) {
+            return `<option value="${tipo}" disabled style="color:#71717a;">🔒 ${label} — ${trava.motivo}</option>`;
+        }
+        return `<option value="${tipo}">${label}</option>`;
+    };
+    
+    const opts = [addOpt('buyin', `Buy-in (entrada normal) — R$ ${t.buyin}`)];
+    if (t.rebuySimples > 0) opts.push(addOpt('rebuy_simples', `Rebuy Simples — R$ ${t.rebuySimples} (${(t.rebuySimplesFichas||0).toLocaleString()} fichas)`));
+    if (t.rebuyDuplo > 0)   opts.push(addOpt('rebuy_duplo', `Rebuy Duplo — R$ ${t.rebuyDuplo} (${(t.rebuyDuploFichas||0).toLocaleString()} fichas)`));
+    if (t.reentryAte > 0)   opts.push(addOpt('reentry', `Re-entry — R$ ${t.buyin}`));
     if (t.addonFichas > 0)  {
         const addonLabel = (t.addonValor && t.addonValor > 0)
             ? `Add-on — R$ ${t.addonValor} (${t.addonFichas.toLocaleString()} fichas extras)`
             : `Add-on — Cortesia (${t.addonFichas.toLocaleString()} fichas extras)`;
-        opts.push(`<option value="addon">${addonLabel}</option>`);
+        opts.push(addOpt('addon', addonLabel));
     }
     tipoSel.innerHTML = opts.join('');
+    
+    // Auto-selecionar primeiro tipo NÃO bloqueado
+    const primeiraOpcaoValida = Array.from(tipoSel.options).find(o => !o.disabled);
+    if (primeiraOpcaoValida) {
+        tipoSel.value = primeiraOpcaoValida.value;
+    }
     
     // Configurar staff (mostrar apenas se houver staff e tipo for buyin)
     const staffWrap = document.getElementById('entrada-staff-wrap');
@@ -12416,6 +12558,12 @@ function _registrarEntradaImpl() {
     }
 
     if (!jid) return showToast('⚠️ Selecione um jogador');
+
+    // LOTE 1+2: Validar trava de compras/add-on
+    const trava = _tipoBloqueadoPorTrava(t, tipo);
+    if (trava.bloqueado) {
+        return showToast('🔒 ' + trava.motivo);
+    }
 
     const jaEntrou = t.entries.some(e => e.jogadorId === jid && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
     const eliminado = t.eliminados.some(e => e.jogadorId === jid);
@@ -15124,6 +15272,55 @@ function uploadLogo(event) {
         showToast('✅ Logo carregado!');
     };
     reader.readAsDataURL(file);
+}
+
+// ============================================================
+// LOTE 1+2 — Configurações de Torneios (padrões do clube)
+// ============================================================
+function renderConfigTorneios() {
+    if (!sbClube) return;
+    const inpCompras = document.getElementById('cfg-trn-max-compras');
+    const inpAddon = document.getElementById('cfg-trn-max-addon');
+    if (inpCompras) inpCompras.value = sbClube.cfg_nivel_max_compras != null ? sbClube.cfg_nivel_max_compras : '';
+    if (inpAddon)   inpAddon.value   = sbClube.cfg_nivel_max_addon   != null ? sbClube.cfg_nivel_max_addon   : '';
+}
+
+async function salvarConfigTorneios() {
+    if (!sbClube || !sbClube.id) return showToast('⚠️ Clube não carregado');
+    
+    const vCompras = document.getElementById('cfg-trn-max-compras').value.trim();
+    const vAddon   = document.getElementById('cfg-trn-max-addon').value.trim();
+    
+    const novoCompras = vCompras === '' ? null : parseInt(vCompras, 10);
+    const novoAddon   = vAddon   === '' ? null : parseInt(vAddon, 10);
+    
+    // Validação básica
+    if (novoCompras != null && (isNaN(novoCompras) || novoCompras < 1 || novoCompras > 50)) {
+        return showToast('⚠️ Nível de compras deve ser entre 1 e 50');
+    }
+    if (novoAddon != null && (isNaN(novoAddon) || novoAddon < 1 || novoAddon > 50)) {
+        return showToast('⚠️ Nível de add-on deve ser entre 1 e 50');
+    }
+    
+    try {
+        const { error } = await sb.from('clubes').update({
+            cfg_nivel_max_compras: novoCompras,
+            cfg_nivel_max_addon: novoAddon,
+            atualizado_em: new Date().toISOString(),
+        }).eq('id', sbClube.id);
+        
+        if (error) throw error;
+        
+        // Atualiza cache local
+        sbClube.cfg_nivel_max_compras = novoCompras;
+        sbClube.cfg_nivel_max_addon = novoAddon;
+        window.sbClube = sbClube;
+        
+        showToast('✓ Padrões de torneios salvos');
+    } catch(e) {
+        console.error('[CONFIG-TORNEIOS] erro:', e);
+        showToast('⚠️ Erro ao salvar: ' + (e.message || e));
+    }
 }
 
 function renderLogoPreview() {
