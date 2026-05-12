@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste TV Avançado — StackOS</title>
+<meta name="viewport" content="width=1280">
+<style>
+  body{background:#000;color:#fff;font-family:Arial,sans-serif;padding:30px;margin:0;}
+  h1{color:#a855f7;font-size:32px;margin-bottom:6px;}
+  .info{color:#9ca3af;font-size:16px;margin-bottom:20px;}
+  .test{font-size:20px;padding:12px 16px;margin:8px 0;background:#1a1a2e;border-radius:6px;border-left:4px solid #444;}
+  .ok{border-left-color:#22c55e;}
+  .err{border-left-color:#ef4444;color:#fca5a5;}
+  .pending{color:#9ca3af;}
+  pre{background:#0c1223;padding:10px;border-radius:6px;font-size:14px;color:#a3e635;overflow-x:auto;white-space:pre-wrap;}
+  #ua{font-size:13px;color:#71717a;padding:12px;background:#0c1223;border-radius:6px;margin-top:20px;word-break:break-all;}
+</style>
+</head>
+<body>
+<h1>🧪 Diagnóstico Avançado — StackOS TV</h1>
+<p class="info">Vou testar passo a passo o que o tv.html faz, isolando o ponto exato que quebra.</p>
+
+<div id="t0" class="test pending">⏳ 0. HTML/CSS rendering</div>
+<div id="t1" class="test pending">⏳ 1. Window e document disponíveis</div>
+<div id="t2" class="test pending">⏳ 2. Fetch nativo + headers (sem SDK)</div>
+<div id="t3" class="test pending">⏳ 3. Parse JSON da resposta Supabase</div>
+<div id="t4" class="test pending">⏳ 4. Carregar Supabase SDK via CDN</div>
+<div id="t5" class="test pending">⏳ 5. Criar cliente Supabase</div>
+<div id="t6" class="test pending">⏳ 6. Chamar uma RPC</div>
+<div id="t7" class="test pending">⏳ 7. Channel realtime</div>
+
+<div id="logs"></div>
+
+<div id="ua"></div>
+
+<script>
+function setResult(id, ok, msg) {
+  var el = document.getElementById(id);
+  el.className = 'test ' + (ok ? 'ok' : 'err');
+  el.innerHTML = (ok ? '✅' : '❌') + ' ' + msg;
+}
+function log(msg) {
+  var div = document.getElementById('logs');
+  var p = document.createElement('pre');
+  p.textContent = msg;
+  div.appendChild(p);
+}
+
+// Teste 0: HTML/CSS (se você está vendo, OK)
+setResult('t0', true, 'HTML/CSS funciona (você está vendo)');
+
+// Teste 1: window, document, console
+try {
+  if (window && document && console) {
+    setResult('t1', true, 'window, document, console OK');
+  } else {
+    setResult('t1', false, 'Algo faltando');
+  }
+} catch(e) {
+  setResult('t1', false, 'ERRO: ' + e.message);
+}
+
+// Teste 2: Fetch nativo
+var SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+
+try {
+  fetch(SUPABASE_URL + '/rest/v1/', {
+    method: 'GET',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(function(r) {
+    setResult('t2', true, 'Fetch + headers OK (status ' + r.status + ')');
+    return r.text();
+  })
+  .then(function(txt) {
+    setResult('t3', true, 'Parse de resposta OK (tamanho: ' + txt.length + ')');
+    // Continua pro teste 4 só agora
+    testarSDK();
+  })
+  .catch(function(e) {
+    setResult('t2', false, 'Fetch ERRO: ' + e.message);
+    log('Detalhe fetch error: ' + e.toString());
+  });
+} catch(e) {
+  setResult('t2', false, 'Fetch nem rodou: ' + e.message);
+}
+
+function testarSDK() {
+  // Teste 4: carregar SDK
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  script.onload = function() {
+    if (typeof supabase === 'undefined' || !supabase.createClient) {
+      setResult('t4', false, 'SDK carregou mas global supabase nao existe');
+      return;
+    }
+    setResult('t4', true, 'Supabase SDK carregado');
+    
+    // Teste 5: criar cliente
+    try {
+      var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      setResult('t5', true, 'Cliente Supabase criado');
+      
+      // Teste 6: chamar RPC
+      try {
+        sb.rpc('tv_dados_torneios', { p_clube_id: '00000000-0000-0000-0000-000000000000' })
+          .then(function(res) {
+            if (res.error) {
+              setResult('t6', false, 'RPC retornou erro: ' + res.error.message);
+              log('Erro RPC: ' + JSON.stringify(res.error));
+            } else {
+              setResult('t6', true, 'RPC funcionou (data recebido)');
+            }
+            
+            // Teste 7: realtime
+            try {
+              var ch = sb.channel('test-channel');
+              ch.on('broadcast', { event: 'test' }, function(){})
+                .subscribe(function(status) {
+                  log('Realtime status: ' + status);
+                  if (status === 'SUBSCRIBED') {
+                    setResult('t7', true, 'Realtime conectou (SUBSCRIBED)');
+                  } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    setResult('t7', false, 'Realtime FALHOU: ' + status);
+                  }
+                });
+              setTimeout(function() {
+                if (document.getElementById('t7').className.indexOf('ok') === -1 
+                    && document.getElementById('t7').className.indexOf('err') === -1) {
+                  setResult('t7', false, 'Realtime nao conectou em 8s');
+                }
+              }, 8000);
+            } catch(e) {
+              setResult('t7', false, 'Realtime ERRO: ' + e.message);
+            }
+          })
+          .catch(function(e) {
+            setResult('t6', false, 'RPC ERRO: ' + e.message);
+            log('Exceção: ' + e.toString());
+          });
+      } catch(e) {
+        setResult('t6', false, 'RPC nem rodou: ' + e.message);
+      }
+    } catch(e) {
+      setResult('t5', false, 'Criar cliente ERRO: ' + e.message);
+      log('Erro: ' + e.toString());
+    }
+  };
+  script.onerror = function() {
+    setResult('t4', false, 'Falha ao carregar SDK do CDN');
+  };
+  document.head.appendChild(script);
+}
+
+// UserAgent + outras infos
+var info = 'UserAgent: ' + navigator.userAgent;
+info += '\n\nLocation: ' + window.location.href;
+info += '\nOnline: ' + navigator.onLine;
+document.getElementById('ua').textContent = info;
+
+// Captura erros globais
+window.onerror = function(msg, src, line, col, err) {
+  log('🔴 ERRO GLOBAL: ' + msg + ' (linha ' + line + ')');
+  if (err && err.stack) log('Stack: ' + err.stack);
+  return false;
+};
+</script>
+</body>
+</html>
