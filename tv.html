@@ -1,6 +1,8 @@
 <!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>StackOS TV</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Space+Mono:wght@700&family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
     // Aplica fonte ANTES do CSS renderizar (lê do localStorage compartilhado com app principal)
@@ -67,6 +69,82 @@
         body.layout-neon .blinds-main{color:#06b6d4;text-shadow:0 0 20px rgba(6,182,212,.6);}
         body.layout-neon .panel-bg{background:rgba(20,20,40,.5);border:1px solid rgba(236,72,153,.3);backdrop-filter:blur(10px);border-radius:.75rem;}
         body.layout-neon #tournament-name{background:linear-gradient(90deg,#ec4899,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+        /* ====================================================
+           RESPONSIVIDADE TV — Auto-fit para qualquer tamanho
+           ====================================================
+           Os layouts Clássico, Minimalista, Feltro e Neon agora
+           usam clamp() com vmin pra escalar conforme a tela.
+           vmin = menor entre vw e vh, mais previsível em TVs.
+           ==================================================== */
+        body.tv-responsive #main-tv {
+            padding: clamp(1rem, 2.5vmin, 3rem) clamp(1.5rem, 3vmin, 4rem) !important;
+        }
+        body.tv-responsive #tournament-name {
+            font-size: clamp(1.5rem, 3.5vmin, 4rem) !important;
+        }
+        body.tv-responsive #tournament-type {
+            font-size: clamp(.7rem, 1.2vmin, 1.3rem) !important;
+        }
+        body.tv-responsive #clube-nome {
+            font-size: clamp(.85rem, 1.5vmin, 1.5rem) !important;
+        }
+        body.tv-responsive #next-blinds,
+        body.tv-responsive .top-row span {
+            font-size: clamp(.7rem, 1.2vmin, 1.3rem) !important;
+        }
+        body.tv-responsive #nivel,
+        body.tv-responsive #nivel-total {
+            font-size: clamp(.9rem, 1.8vmin, 1.8rem) !important;
+        }
+        /* TIMER GIGANTE — escala com altura */
+        body.tv-responsive #timer {
+            font-size: clamp(8rem, 28vmin, 32rem) !important;
+            line-height: .9 !important;
+        }
+        body.layout-minimalista.tv-responsive #timer {
+            font-size: clamp(10rem, 35vmin, 40rem) !important;
+        }
+        body.tv-responsive #blinds {
+            font-size: clamp(3.5rem, 11vmin, 14rem) !important;
+            line-height: 1 !important;
+        }
+        body.tv-responsive #ante {
+            font-size: clamp(1rem, 1.8vmin, 2rem) !important;
+        }
+        body.tv-responsive .bar-bg {
+            width: clamp(300px, 50vmin, 800px) !important;
+            height: clamp(3px, .6vmin, 7px) !important;
+        }
+        /* Stats inferiores */
+        body.tv-responsive .stat-label {
+            font-size: clamp(.65rem, 1.1vmin, 1.2rem) !important;
+        }
+        body.tv-responsive #p,
+        body.tv-responsive #a,
+        body.tv-responsive #prize,
+        body.tv-responsive #elapsed {
+            font-size: clamp(1.8rem, 3.5vmin, 3.8rem) !important;
+        }
+        body.tv-responsive #p-total,
+        body.tv-responsive #a-bb,
+        body.tv-responsive #chipcount,
+        body.tv-responsive #entries-detail {
+            font-size: clamp(.7rem, 1.1vmin, 1.2rem) !important;
+        }
+        /* Bottom grid spacing */
+        body.tv-responsive .bottom-grid {
+            padding: clamp(.6rem, 1.5vmin, 1.5rem) !important;
+            gap: clamp(1rem, 2vmin, 2.5rem) !important;
+        }
+        /* Center stack spacing */
+        body.tv-responsive .center-stack {
+            gap: clamp(.25rem, 1vmin, 1rem) !important;
+        }
+        /* Permitir zoom manual via CSS transform (mantém auto-fit como base) */
+        body[data-zoom] #main-tv {
+            transform-origin: top left;
+        }
 
         /* === PRO LIVE (profissional verde com brilho e grid de stats) === */
         body.layout-pokerweb {
@@ -647,6 +725,13 @@
         .stat-label{font-size:.6rem;opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-weight:800;margin-bottom:.3rem;}
     </style></head>
     <body class="layout-classico">
+        <!-- ZOOM CONTROLS — aparece ao mover mouse, esconde após 3s -->
+        <div id="tv-zoom-controls" style="position:fixed;top:.6rem;right:.6rem;z-index:9999;display:flex;gap:.3rem;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:.5rem;padding:.3rem;opacity:0;transition:opacity .3s;pointer-events:none;">
+            <button onclick="_tvZoomDelta(-5)" title="Diminuir zoom" style="background:transparent;border:none;color:#fff;width:2rem;height:2rem;border-radius:.3rem;cursor:pointer;font-size:1.2rem;font-weight:700;line-height:1;">−</button>
+            <div id="tv-zoom-val" style="display:flex;align-items:center;justify-content:center;min-width:3rem;color:#fff;font-size:.75rem;font-family:monospace;font-weight:700;">100%</div>
+            <button onclick="_tvZoomDelta(+5)" title="Aumentar zoom" style="background:transparent;border:none;color:#fff;width:2rem;height:2rem;border-radius:.3rem;cursor:pointer;font-size:1.2rem;font-weight:700;line-height:1;">+</button>
+            <button onclick="_tvZoomReset()" title="Reset (100%)" style="background:transparent;border:none;color:#fff;width:2rem;height:2rem;border-radius:.3rem;cursor:pointer;font-size:.7rem;font-weight:700;">⟲</button>
+        </div>
         <!-- KIOSK RECOVER OVERLAY -->
         <div id="kiosk-recover">
             <div style="font-size:3rem;margin-bottom:1rem;">🔌</div>
@@ -815,6 +900,100 @@
     function pararCarouselPremiacao() {
         // CSS animation é auto-gerenciada; função mantida para compatibilidade
     }
+
+    // ============================================================
+    // ZOOM da TV — controle manual + auto-hide dos controles
+    // ============================================================
+    var _ZOOM_KEY = 'stackos-tv-zoom';
+    var _ZOOM_MIN = 50;
+    var _ZOOM_MAX = 200;
+    var _zoomHideTimer = null;
+    
+    function _getZoomAtual() {
+        try {
+            var v = parseInt(localStorage.getItem(_ZOOM_KEY) || '100', 10);
+            if (isNaN(v) || v < _ZOOM_MIN) v = 100;
+            if (v > _ZOOM_MAX) v = _ZOOM_MAX;
+            return v;
+        } catch(e) { return 100; }
+    }
+    
+    function _aplicarZoomSalvo() {
+        var z = _getZoomAtual();
+        _aplicarZoomValor(z);
+    }
+    
+    function _aplicarZoomValor(z) {
+        if (z < _ZOOM_MIN) z = _ZOOM_MIN;
+        if (z > _ZOOM_MAX) z = _ZOOM_MAX;
+        // Usa CSS zoom (suportado em todos browsers modernos pra TVs)
+        document.body.style.zoom = (z / 100);
+        // Fallback pra Firefox que não suporta zoom nativo
+        if (typeof document.body.style.zoom === 'undefined' || z !== 100) {
+            // Detect Firefox e usar transform como fallback
+            if (navigator.userAgent.toLowerCase().indexOf('firefox') >= 0) {
+                document.body.style.transform = 'scale(' + (z / 100) + ')';
+                document.body.style.transformOrigin = 'top left';
+                document.body.style.width = (10000 / z) + '%';
+                document.body.style.height = (10000 / z) + '%';
+            }
+        }
+        // Atualizar label
+        var lbl = document.getElementById('tv-zoom-val');
+        if (lbl) lbl.innerText = z + '%';
+        // Salvar
+        try { localStorage.setItem(_ZOOM_KEY, String(z)); } catch(e) {}
+    }
+    
+    function _tvZoomDelta(delta) {
+        var z = _getZoomAtual() + delta;
+        _aplicarZoomValor(z);
+        _mostrarControlesZoom();
+    }
+    
+    function _tvZoomReset() {
+        _aplicarZoomValor(100);
+        _mostrarControlesZoom();
+    }
+    
+    function _mostrarControlesZoom() {
+        var ctl = document.getElementById('tv-zoom-controls');
+        if (!ctl) return;
+        ctl.style.opacity = '1';
+        ctl.style.pointerEvents = 'auto';
+        if (_zoomHideTimer) clearTimeout(_zoomHideTimer);
+        _zoomHideTimer = setTimeout(function() {
+            ctl.style.opacity = '0';
+            ctl.style.pointerEvents = 'none';
+        }, 4000);
+    }
+    
+    // Mostra controles ao mover mouse ou tocar
+    document.addEventListener('mousemove', _mostrarControlesZoom, { passive: true });
+    document.addEventListener('touchstart', _mostrarControlesZoom, { passive: true });
+    
+    // Atalhos de teclado: + e -, e 0 pra reset
+    document.addEventListener('keydown', function(e) {
+        // Ignora se tem modifiers (ctrl/alt/meta) — deixa browser zoom nativo funcionar
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.key === '+' || e.key === '=') {
+            _tvZoomDelta(+5);
+            e.preventDefault();
+        } else if (e.key === '-' || e.key === '_') {
+            _tvZoomDelta(-5);
+            e.preventDefault();
+        } else if (e.key === '0') {
+            _tvZoomReset();
+            e.preventDefault();
+        }
+    });
+    
+    // Aplicar zoom salvo quando a página carrega
+    window.addEventListener('load', function() {
+        _aplicarZoomSalvo();
+        // Mostrar controles brevemente pro usuário saber que existem
+        _mostrarControlesZoom();
+    });
 
     function criarItemTicker(i, valor) {
         var classe = '';
@@ -1086,7 +1265,12 @@ function montarCarouselPremiacao(d) {
         
         if (!d || !d.timer) return;  // ignora mensagens sem dados de torneio
         const layout = d.layout || 'classico';
-        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '');
+        // Aplica tv-responsive nos 4 layouts (não Pro Live, que já é responsivo)
+        const responsiveClass = (layout !== 'pokerweb') ? ' tv-responsive' : '';
+        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '') + responsiveClass;
+        
+        // Restaurar zoom salvo
+        _aplicarZoomSalvo();
 
         // ===== PRO LIVE LAYOUT =====
         if (layout === 'pokerweb') {
