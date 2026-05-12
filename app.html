@@ -3541,11 +3541,14 @@
                     <div><label class="inp-label">Add-on (R$)</label><input id="t-addon-valor" type="number" step="0.01" value="0" class="inp" placeholder="0 = grátis"></div>
                 </div>
 
-                <!-- Staff / Taxa de serviço -->
+                <!-- Staff / Taxa de serviço (% sobre prize pool em cascata) -->
                 <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
-                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff / Taxa de Serviço</div>
-                    <div><label class="inp-label">Valor do staff (R$)</label><input id="t-staff-valor" type="number" step="0.01" value="0" class="inp" placeholder="0 = sem staff"></div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.5;">Taxa adicional cobrada apenas no <strong>buy-in (1ª entrada)</strong>. Não é cobrada em rebuys ou re-entries. Pode ser <strong>desmarcada na hora da inscrição</strong> caso o jogador esteja isento.</div>
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff (Dealers + Floor)</div>
+                    <div><label class="inp-label">Staff % (sobre o que sobrou depois do rake)</label><input id="t-staff-pct" type="number" step="0.5" min="0" max="50" value="0" class="inp" placeholder="0 = sem staff"></div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.5;">
+                        Deduzido do prize pool <strong>em cascata depois do rake do clube</strong>. Vai pra equipe (dealers + floor).<br>
+                        <strong>Exemplo:</strong> Bruto R$ 10.000 com rake 20% e staff 3% → Rake: R$ 2.000 · Staff: R$ 240 (3% de R$ 8.000) · Prize: R$ 7.760
+                    </div>
                 </div>
             </div>
             <!-- Blinds -->
@@ -3705,6 +3708,16 @@
                             <div class="stat-card" style="padding:1rem;">
                                 <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake</div>
                                 <div id="mt-rake-val" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:var(--gold);">R$ 0</div>
+                            </div>
+                        </div>
+                        <!-- Card Staff (só aparece se staffPct > 0) -->
+                        <div id="mt-staff-card" class="stat-card" style="padding:.85rem 1rem;display:none;background:rgba(56,189,248,.05);border-color:rgba(56,189,248,.2);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div style="font-size:.6rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff (Dealers + Floor)</div>
+                                    <div id="mt-staff-desc" style="font-size:.7rem;color:#71717a;margin-top:.2rem;">0% sobre o líquido pós-rake</div>
+                                </div>
+                                <div id="mt-staff-val" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#38bdf8;">R$ 0</div>
                             </div>
                         </div>
                         <!-- Extra: jackpot info -->
@@ -5170,6 +5183,7 @@ function _torneioToDb(t) {
         addon_valor: t.addonValor || 0,
         addon_fichas: t.addonFichas || 0,
         staff_valor: t.staffValor || 0,
+        staff_pct: t.staffPct || 0,
         rebuy_valor: t.rebuyValor || 0,
         rebuy_fichas: t.rebuyFichas || 0,
         rebuy_duplo_valor: t.rebuyDuploValor || 0,
@@ -5784,6 +5798,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         addonValor: parseFloat(r.addon_valor || 0),
         addonFichas: r.addon_fichas || 0,
         staffValor: parseFloat(r.staff_valor || 0),
+        staffPct: parseFloat(r.staff_pct || 0),
         capileModo: r.capile_modo || 'pote',
         rebuyValor: parseFloat(r.rebuy_valor || 0),
         rebuyFichas: r.rebuy_fichas || 0,
@@ -11858,7 +11873,8 @@ function saveTournament() {
         addonAte:     parseInt(document.getElementById('t-addon-nivel').value) || 0,
         addonFichas:  parseInt(document.getElementById('t-addon').value)    || 0,
         addonValor:   parseFloat(document.getElementById('t-addon-valor').value) || 0,
-        staffValor:   parseFloat(document.getElementById('t-staff-valor').value) || 0,
+        staffValor:   0, // legado - não usado mais (compat)
+        staffPct:     parseFloat(document.getElementById('t-staff-pct').value) || 0,
         // Rebuy structure
         rebuySimples:       parseFloat(document.getElementById('t-rebuy-simples').value)        || 0,
         rebuySimplesFichas: parseInt(document.getElementById('t-rebuy-simples-fichas').value)   || 0,
@@ -12058,6 +12074,21 @@ function updateModalTorneio() {
     document.getElementById('mt-ativos').innerText  = ativos;
     document.getElementById('mt-prize').innerText   = formatMoney(prize);
     document.getElementById('mt-rake-val').innerText = formatMoney(rake);
+    
+    // LOTE 3: Card staff (só visível se staffPct > 0)
+    const staffCard = document.getElementById('mt-staff-card');
+    if (staffCard) {
+        const staffPct = Number(t.staffPct) || 0;
+        if (staffPct > 0) {
+            const staffVal = getStaff(t);
+            staffCard.style.display = 'block';
+            document.getElementById('mt-staff-val').innerText = formatMoney(staffVal);
+            const staffDesc = document.getElementById('mt-staff-desc');
+            if (staffDesc) staffDesc.innerText = `${staffPct}% sobre o líquido pós-rake (cascata)`;
+        } else {
+            staffCard.style.display = 'none';
+        }
+    }
 
     const btnTimer = document.getElementById('btn-toggle-timer');
     if (t.rodando) {
@@ -12531,7 +12562,11 @@ const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
 // Verifica se um tipo de entrada está bloqueado por trava no torneio atual
 // Retorna { bloqueado: bool, motivo: string }
 function _tipoBloqueadoPorTrava(t, tipo) {
-    if (!t || !t.rodando) return { bloqueado: false, motivo: '' };
+    if (!t) return { bloqueado: false, motivo: '' };
+    
+    // BUG FIX: trava deve valer SEMPRE que o torneio já começou (rodando OU pausado).
+    // Só não vale antes de iniciar (iniciadoEm null = nem começou ainda)
+    if (!t.iniciadoEm) return { bloqueado: false, motivo: '' };
     
     const nivelAtual = Number(t.nivelAtual) + 1; // nivelAtual é 0-indexed, mostrar 1-indexed
     
@@ -12619,14 +12654,10 @@ function openModalEntrada(idx) {
         tipoSel.value = primeiraOpcaoValida.value;
     }
     
-    // Configurar staff (mostrar apenas se houver staff e tipo for buyin)
+    // LOTE 3: Staff não é mais cobrado no buy-in (vira % do prize pool em cascata)
+    // Esconde o wrap legado pra não confundir o operador.
     const staffWrap = document.getElementById('entrada-staff-wrap');
-    const staffLabel = document.getElementById('entrada-staff-valor-label');
-    if (staffWrap && t.staffValor && t.staffValor > 0) {
-        if (staffLabel) staffLabel.innerText = `R$ ${Number(t.staffValor).toFixed(2).replace('.',',')}`;
-        const cb = document.getElementById('entrada-staff-cobrar');
-        if (cb) cb.checked = true;
-    }
+    if (staffWrap) staffWrap.style.display = 'none';
     
     atualizarResumoEntrada();
     openModal('modal-entrada');
@@ -12642,9 +12673,8 @@ function atualizarResumoEntrada() {
     const cbStaff = document.getElementById('entrada-staff-cobrar');
     const resumoVal = document.getElementById('entrada-resumo-valor');
     
-    // Staff aparece SÓ no tipo "buyin" e SE o torneio tem staff configurado
-    const mostrarStaff = (tipo === 'buyin') && (t.staffValor && t.staffValor > 0);
-    if (staffWrap) staffWrap.style.display = mostrarStaff ? 'block' : 'none';
+    // LOTE 3: Staff sempre escondido — agora vira % do prize pool
+    if (staffWrap) staffWrap.style.display = 'none';
     
     // Calcular total
     let valorBase = 0;
@@ -12654,10 +12684,7 @@ function atualizarResumoEntrada() {
     else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuplo) || 0;
     else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
     
-    let staff = 0;
-    if (mostrarStaff && cbStaff && cbStaff.checked) {
-        staff = Number(t.staffValor) || 0;
-    }
+    let staff = 0; // staff zerado sempre (agora é dedução do prize)
     
     const total = valorBase + staff;
     if (resumoVal) resumoVal.innerText = 'R$ ' + total.toFixed(2).replace('.', ',');
@@ -12692,9 +12719,8 @@ function _registrarEntradaImpl() {
     const eliminado = t.eliminados.some(e => e.jogadorId === jid);
 
     if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Rebuy ou Re-entry.');
-    if (tipo === 'reentry' && t.nivelAtual >= t.reentryAte) return showToast(`⚠️ Re-entry encerrado após nível ${t.reentryAte}`);
+    // (validações de nível agora são feitas pela trava unificada acima — _tipoBloqueadoPorTrava)
     if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
-    if (tipo === 'addon' && t.addonAte > 0 && t.nivelAtual >= t.addonAte) return showToast(`⚠️ Add-on encerrado após nível ${t.addonAte}`);
     
     // Suspender realtime durante toda a inscrição (8s)
     if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
@@ -12711,12 +12737,9 @@ function _registrarEntradaImpl() {
     if (tipo === 'rebuy_duplo')   valorBase = t.rebuyDuplo;
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     
-    // Staff: aplicado SÓ em buy-in (1ª entrada) e se checkbox estiver marcado
+    // LOTE 3: Staff não é mais cobrado a parte. Agora é % do prize pool em cascata.
+    // Mantém variáveis pra compat mas sempre zero.
     let staffCobrado = 0;
-    const cbStaff = document.getElementById('entrada-staff-cobrar');
-    if (tipo === 'buyin' && t.staffValor && t.staffValor > 0 && cbStaff && cbStaff.checked) {
-        staffCobrado = Number(t.staffValor);
-    }
     const valorRS = valorBase; // mantém variável legada pra compat
     const valorTotal = valorBase + staffCobrado;
 
@@ -13041,14 +13064,15 @@ function updateTV(idx) {
     if (t.nivelAtual >= t.blinds.length) t.nivelAtual = t.blinds.length - 1;
     const ativos = getAtivos(t);
 
-    // Calcular fichas totais corretamente com rebuys/addons + jackpots
+    // Calcular fichas totais corretamente com rebuys/addons + jackpots + last chance
     const totalFichas = t.entries.reduce((s, e) => {
         if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
+        if (e.tipo === 'last_chance')   return s + (t.last_chance_fichas || 0);
         return s + t.stack;  // buyin, reentry
     }, 0);
-    // Adiciona jackpot chips
+    // Adiciona jackpot chips e last chance chips (somados a parte se vierem por lastChanceCompras antigo)
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
     const chipCount = totalFichas + jackpotFichas;
 
@@ -13567,32 +13591,73 @@ function getAtivos(t) {
     return [...entriesIds].filter(id => !eliminadosIds.has(id)).length;
 }
 
+// ============================================================
+// LOTE 3: Modelo financeiro correto — rake + staff em cascata
+// ============================================================
+// Modelo:
+//   1) Bruto = TUDO que entra (buy-in + rebuy + reentry + addon + jackpot + last chance)
+//   2) Rake do clube: % sobre o bruto → vai pro caixa do clube
+//   3) Sobra = Bruto - Rake
+//   4) Staff: % sobre o que sobrou (cascata) → vai pra equipe (dealers+floor)
+//   5) Prize Pool = Sobra - Staff
+//
+// Exemplo: bruto 10.000, rake 20%, staff 3%
+//   Rake:    10.000 × 20% = 2.000
+//   Sobra:   10.000 - 2.000 = 8.000
+//   Staff:   8.000 × 3% = 240
+//   Prize:   8.000 - 240 = 7.760
+// ============================================================
+
+// Soma TUDO que entrou no torneio (incluindo extras)
+function getBrutoTotal(t) {
+    if (!t) return 0;
+    // Entradas (buy-in + rebuy + reentry + addon + last_chance)
+    // Last Chance JÁ entra em t.entries (registrado em confirmarLastChance), 
+    // então NÃO somamos t.lastChanceCompras separadamente pra evitar duplicação.
+    const entriesTotal = (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
+    // Jackpot (esse fica fora de entries, então soma à parte)
+    const jackpotTotal = (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
+    return entriesTotal + jackpotTotal;
+}
+
+// Soma SÓ as entradas (sem jackpot/last chance) — útil em alguns relatórios
+function getBrutoEntradas(t) {
+    if (!t) return 0;
+    return (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
+}
+
+function getRake(t) {
+    // Rake incide sobre o BRUTO TOTAL (tudo que entrou)
+    const bruto = getBrutoTotal(t);
+    return bruto * ((Number(t.rake) || 0) / 100);
+}
+
+function getStaff(t) {
+    // Staff: % EM CASCATA sobre o que sobrou DEPOIS do rake do clube
+    const bruto = getBrutoTotal(t);
+    const sobra = bruto - getRake(t);
+    return sobra * ((Number(t.staffPct) || 0) / 100);
+}
+
 function getPrize(t) {
-    // soma valores reais pagos em entradas (buy-in, rebuys, reentries)
-    const bruto = t.entries.reduce((s, e) => {
-        if (e.tipo === 'addon') return s;
-        return s + (e.valor || t.buyin);
-    }, 0);
-    // Soma jackpots arrecadados (vai 100% para o prize pool, sem rake)
-    const jackpotTotal = (t.jackpotCompras || []).reduce((s, j) => s + j.valor, 0);
-    const liquido = bruto * (1 - t.rake/100) + jackpotTotal;
+    // Prize = Bruto - Rake - Staff
+    const bruto = getBrutoTotal(t);
+    const rake = getRake(t);
+    const staff = getStaff(t);
+    const liquido = bruto - rake - staff;
+    
     if (t.tipo === 'knockout') {
         // 100% em bounties, nada no prize pool final
         return 0;
     } else if (t.tipo === 'bounty') {
-        // parte vai para bounty fixo (pago por entrada)
-        const totalBounties = t.entries.filter(e=>e.tipo!=='addon').length * t.bountyValor;
+        // parte vai para bounty fixo (pago por entrada — exclui addon e last_chance)
+        const totalBounties = t.entries.filter(e => e.tipo !== 'addon' && e.tipo !== 'last_chance').length * (Number(t.bountyValor) || 0);
         return Math.max(0, liquido - totalBounties);
     } else if (t.tipo === 'pko') {
         // só metade (pkoSplit) fica na cabeça, resto vai para prize pool
-        return liquido * (1 - t.pkoSplit/100);
+        return liquido * (1 - (Number(t.pkoSplit) || 0) / 100);
     }
-    return liquido;
-}
-
-function getRake(t) {
-    const entries = t.entries.filter(e => e.tipo !== 'addon').length;
-    return entries * t.buyin * (t.rake / 100);
+    return Math.max(0, liquido);
 }
 
 function getJogadorNome(id) {
@@ -17768,27 +17833,35 @@ function abrirLastChance(idx) {
         <div style="color:#71717a;font-size:.75rem;margin-top:.25rem;">Cada compra: <strong style="color:#a78bfa;">${formatMoney(t.last_chance_valor)}</strong> → <strong style="color:#22c55e;">${(t.last_chance_fichas||0).toLocaleString()} fichas</strong></div>
     `;
     
-    // Lista jogadores ativos (Last Chance pode ser comprado múltiplas vezes pelo mesmo jogador)
+    // Lista jogadores ativos que ainda NÃO compraram Last Chance (compra única por jogador)
     const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const jaComprouIds = new Set((t.lastChanceCompras || []).map(j => j.jogadorId));
     const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))]
-        .filter(id => !eliminadosIds.has(id));
+        .filter(id => !eliminadosIds.has(id))
+        .filter(id => !jaComprouIds.has(id));  // exclui quem já comprou
 
     const sel = document.getElementById('last-chance-jogador');
     if (ativos.length) {
         sel.innerHTML = ativos.map(id => `<option value="${id}">${getJogadorNome(id)}</option>`).join('');
         sel.disabled = false;
     } else {
-        sel.innerHTML = '<option value="">Nenhum jogador ativo</option>';
+        // Mensagem explicativa se todos já compraram
+        const totalCompras = (t.lastChanceCompras || []).length;
+        const totalAtivos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))].filter(id => !eliminadosIds.has(id)).length;
+        sel.innerHTML = '<option value="">Nenhum jogador disponível</option>';
         sel.disabled = true;
+        if (totalCompras > 0 && totalCompras >= totalAtivos) {
+            showToast(`ℹ️ Todos os ${totalAtivos} jogadores ativos já compraram Last Chance`);
+        }
     }
     
-    // Reset qtd
+    // Last Chance é compra ÚNICA por jogador (igual Jackpot) — fixar qtd em 1
     const qtdInp = document.getElementById('last-chance-qtd');
     if (qtdInp) {
         qtdInp.value = 1;
-        qtdInp.readOnly = false;
-        qtdInp.style.opacity = '1';
-        qtdInp.oninput = atualizarTotalLastChance;
+        qtdInp.readOnly = true;
+        qtdInp.style.opacity = '.6';
+        qtdInp.title = 'Last Chance é compra única por jogador';
     }
     atualizarTotalLastChance();
     openModal('modal-last-chance');
@@ -17820,34 +17893,46 @@ function confirmarLastChance() {
     if (caixa.status !== 'aberto') {
         return showToast('🔒 Abra o caixa do torneio primeiro');
     }
-
-    const qtd = parseInt(document.getElementById('last-chance-qtd').value) || 1;
-    if (qtd < 1) return showToast('⚠️ Quantidade inválida');
     
-    const total = qtd * (t.last_chance_valor || 0);
-    const totalFichas = qtd * (t.last_chance_fichas || 0);
-
-    // Inicializa array se não existir
+    // Garante array inicializado
     if (!Array.isArray(t.lastChanceCompras)) t.lastChanceCompras = [];
+    
+    // Segurança extra: verifica se jogador já comprou
+    const jaComprou = t.lastChanceCompras.some(j => j.jogadorId === jid);
+    if (jaComprou) return showToast('⚠️ Este jogador já comprou o Last Chance');
+
+    // Last Chance é compra ÚNICA por jogador (qtd = 1)
+    const qtd = 1;
+    const total = Number(t.last_chance_valor) || 0;
+    const totalFichas = parseInt(t.last_chance_fichas) || 0;
     
     t.lastChanceCompras.push({
         jogadorId: jid, qtd, valor: total, fichas: totalFichas, ts: Date.now(),
     });
 
-    // Registra transação no caixa (débito)
+    // Registra transação no caixa (débito = jogador deve pagar)
     registrarTransacao({
         jogadorId: jid,
         tipo: 'buyin',
         valor: -total,
-        descricao: `Last Chance (${qtd}x) · ${t.nome} · ${totalFichas.toLocaleString()} fichas`,
+        descricao: `Last Chance · ${t.nome} · ${totalFichas.toLocaleString()} fichas`,
         origem: 'torneio',
         refId: t.id,
+    });
+    
+    // BUG FIX 4: registra também como ENTRY do torneio (entra no financeiro do torneio: prize pool, etc)
+    if (!Array.isArray(t.entries)) t.entries = [];
+    t.entries.push({
+        jogadorId: jid,
+        tipo: 'last_chance',
+        valor: total,
+        ts: Date.now(),
     });
 
     saveData();
     closeModal('modal-last-chance');
     updateModalTorneio();
-    showToast(`⭐ ${qtd}x Last Chance por ${getJogadorNome(jid)}`);
+    showToast(`⭐ Last Chance comprado por ${getJogadorNome(jid)}`);
 }
 
 // ============================================================
