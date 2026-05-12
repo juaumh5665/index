@@ -75,71 +75,75 @@
            ====================================================
            Os layouts Clássico, Minimalista, Feltro e Neon agora
            usam clamp() com vmin pra escalar conforme a tela.
-           vmin = menor entre vw e vh, mais previsível em TVs.
+           Calibrado pra ocupar 90%+ da tela em TVs.
            ==================================================== */
         body.tv-responsive #main-tv {
-            padding: clamp(1rem, 2.5vmin, 3rem) clamp(1.5rem, 3vmin, 4rem) !important;
+            padding: clamp(.8rem, 2vmin, 2.5rem) clamp(1rem, 2.5vmin, 3rem) !important;
+            justify-content: space-between !important;
         }
         body.tv-responsive #tournament-name {
-            font-size: clamp(1.5rem, 3.5vmin, 4rem) !important;
+            font-size: clamp(1.8rem, 4vmin, 5rem) !important;
         }
         body.tv-responsive #tournament-type {
-            font-size: clamp(.7rem, 1.2vmin, 1.3rem) !important;
+            font-size: clamp(.7rem, 1.3vmin, 1.5rem) !important;
         }
         body.tv-responsive #clube-nome {
-            font-size: clamp(.85rem, 1.5vmin, 1.5rem) !important;
+            font-size: clamp(.9rem, 1.7vmin, 1.8rem) !important;
         }
         body.tv-responsive #next-blinds,
         body.tv-responsive .top-row span {
-            font-size: clamp(.7rem, 1.2vmin, 1.3rem) !important;
+            font-size: clamp(.75rem, 1.4vmin, 1.5rem) !important;
         }
         body.tv-responsive #nivel,
         body.tv-responsive #nivel-total {
-            font-size: clamp(.9rem, 1.8vmin, 1.8rem) !important;
+            font-size: clamp(1rem, 2vmin, 2.2rem) !important;
         }
-        /* TIMER GIGANTE — escala com altura */
+        /* TIMER GIGANTE — escala bem agressivo */
         body.tv-responsive #timer {
-            font-size: clamp(8rem, 28vmin, 32rem) !important;
+            font-size: clamp(10rem, 35vmin, 42rem) !important;
             line-height: .9 !important;
+            margin: 0 !important;
         }
         body.layout-minimalista.tv-responsive #timer {
-            font-size: clamp(10rem, 35vmin, 40rem) !important;
+            font-size: clamp(12rem, 42vmin, 50rem) !important;
         }
         body.tv-responsive #blinds {
-            font-size: clamp(3.5rem, 11vmin, 14rem) !important;
+            font-size: clamp(4.5rem, 14vmin, 18rem) !important;
             line-height: 1 !important;
         }
         body.tv-responsive #ante {
-            font-size: clamp(1rem, 1.8vmin, 2rem) !important;
+            font-size: clamp(1.1rem, 2vmin, 2.2rem) !important;
         }
         body.tv-responsive .bar-bg {
-            width: clamp(300px, 50vmin, 800px) !important;
-            height: clamp(3px, .6vmin, 7px) !important;
+            width: clamp(280px, 45vmin, 750px) !important;
+            height: clamp(3px, .6vmin, 8px) !important;
         }
         /* Stats inferiores */
         body.tv-responsive .stat-label {
-            font-size: clamp(.65rem, 1.1vmin, 1.2rem) !important;
+            font-size: clamp(.7rem, 1.3vmin, 1.4rem) !important;
         }
         body.tv-responsive #p,
         body.tv-responsive #a,
         body.tv-responsive #prize,
         body.tv-responsive #elapsed {
-            font-size: clamp(1.8rem, 3.5vmin, 3.8rem) !important;
+            font-size: clamp(2rem, 4vmin, 4.5rem) !important;
         }
         body.tv-responsive #p-total,
         body.tv-responsive #a-bb,
         body.tv-responsive #chipcount,
         body.tv-responsive #entries-detail {
-            font-size: clamp(.7rem, 1.1vmin, 1.2rem) !important;
+            font-size: clamp(.75rem, 1.3vmin, 1.4rem) !important;
         }
         /* Bottom grid spacing */
         body.tv-responsive .bottom-grid {
-            padding: clamp(.6rem, 1.5vmin, 1.5rem) !important;
-            gap: clamp(1rem, 2vmin, 2.5rem) !important;
+            padding: clamp(.8rem, 2vmin, 1.8rem) !important;
+            gap: clamp(1.2rem, 2.5vmin, 3rem) !important;
         }
-        /* Center stack spacing */
+        /* Center stack — vertical com gap controlado */
         body.tv-responsive .center-stack {
-            gap: clamp(.25rem, 1vmin, 1rem) !important;
+            gap: clamp(.5rem, 1.5vmin, 1.5rem) !important;
+            flex: 1 !important;
+            justify-content: center !important;
         }
         /* Permitir zoom manual via CSS transform (mantém auto-fit como base) */
         body[data-zoom] #main-tv {
@@ -902,11 +906,17 @@
     }
 
     // ============================================================
-    // ZOOM da TV — controle manual + auto-hide dos controles
+    // SMART FIT — Auto-ajuste responsivo + zoom manual
+    // ============================================================
+    // Funciona em 2 camadas:
+    //   1) AUTO-FIT: ajusta font-size do <html> conforme tamanho da tela
+    //      Base: 16px em 1080p. Em 4K aumenta proporcionalmente.
+    //      Como CSS usa rem/clamp(vmin), tudo escala junto SEM CORTAR bordas.
+    //   2) ZOOM MANUAL: multiplica esse fator (extraZoom). User salva preferência.
     // ============================================================
     var _ZOOM_KEY = 'stackos-tv-zoom';
-    var _ZOOM_MIN = 50;
-    var _ZOOM_MAX = 200;
+    var _ZOOM_MIN = 50;   // 50% do auto-fit
+    var _ZOOM_MAX = 200;  // 200% do auto-fit
     var _zoomHideTimer = null;
     
     function _getZoomAtual() {
@@ -918,41 +928,52 @@
         } catch(e) { return 100; }
     }
     
-    function _aplicarZoomSalvo() {
-        var z = _getZoomAtual();
-        _aplicarZoomValor(z);
+    // Calcula font-size base ideal pra resolução atual
+    // - 1080p (1920×1080): 16px base
+    // - 1440p: ~21px
+    // - 4K (3840×2160): ~32px
+    function _calcularFontBaseAuto() {
+        var w = window.innerWidth || 1920;
+        var h = window.innerHeight || 1080;
+        // Usa o MENOR entre largura/altura como referência (vmin-like)
+        // mas dá um boost extra na largura pra TVs widescreen
+        var refW = w / 1920;  // proporção comparada com 1080p
+        var refH = h / 1080;
+        // Pega o menor pra garantir que cabe, mas com piso de 0.75
+        var fator = Math.max(0.75, Math.min(refW, refH));
+        // Em telas muito altas (TV 4K), aumenta mais agressivamente
+        if (h >= 1400) fator = Math.min(refW, refH) * 1.15;
+        if (h >= 2000) fator = Math.min(refW, refH) * 1.25;
+        return Math.round(16 * fator * 10) / 10; // 1 casa decimal
     }
     
-    function _aplicarZoomValor(z) {
-        if (z < _ZOOM_MIN) z = _ZOOM_MIN;
-        if (z > _ZOOM_MAX) z = _ZOOM_MAX;
-        // Usa CSS zoom (suportado em todos browsers modernos pra TVs)
-        document.body.style.zoom = (z / 100);
-        // Fallback pra Firefox que não suporta zoom nativo
-        if (typeof document.body.style.zoom === 'undefined' || z !== 100) {
-            // Detect Firefox e usar transform como fallback
-            if (navigator.userAgent.toLowerCase().indexOf('firefox') >= 0) {
-                document.body.style.transform = 'scale(' + (z / 100) + ')';
-                document.body.style.transformOrigin = 'top left';
-                document.body.style.width = (10000 / z) + '%';
-                document.body.style.height = (10000 / z) + '%';
-            }
-        }
+    function _aplicarSmartFit() {
+        var fontBase = _calcularFontBaseAuto();
+        var zoomManual = _getZoomAtual() / 100;
+        var fontFinal = fontBase * zoomManual;
+        // Aplica no <html> — TUDO que usa rem escala junto
+        document.documentElement.style.fontSize = fontFinal + 'px';
         // Atualizar label
         var lbl = document.getElementById('tv-zoom-val');
-        if (lbl) lbl.innerText = z + '%';
-        // Salvar
-        try { localStorage.setItem(_ZOOM_KEY, String(z)); } catch(e) {}
+        if (lbl) lbl.innerText = _getZoomAtual() + '%';
+    }
+    
+    function _aplicarZoomSalvo() {
+        _aplicarSmartFit();
     }
     
     function _tvZoomDelta(delta) {
         var z = _getZoomAtual() + delta;
-        _aplicarZoomValor(z);
+        if (z < _ZOOM_MIN) z = _ZOOM_MIN;
+        if (z > _ZOOM_MAX) z = _ZOOM_MAX;
+        try { localStorage.setItem(_ZOOM_KEY, String(z)); } catch(e) {}
+        _aplicarSmartFit();
         _mostrarControlesZoom();
     }
     
     function _tvZoomReset() {
-        _aplicarZoomValor(100);
+        try { localStorage.setItem(_ZOOM_KEY, '100'); } catch(e) {}
+        _aplicarSmartFit();
         _mostrarControlesZoom();
     }
     
@@ -967,6 +988,13 @@
             ctl.style.pointerEvents = 'none';
         }, 4000);
     }
+    
+    // Re-aplica auto-fit quando a janela muda de tamanho
+    window.addEventListener('resize', function() {
+        // Debounce: espera 200ms parado pra recalcular
+        if (window._resizeDebounce) clearTimeout(window._resizeDebounce);
+        window._resizeDebounce = setTimeout(_aplicarSmartFit, 200);
+    });
     
     // Mostra controles ao mover mouse ou tocar
     document.addEventListener('mousemove', _mostrarControlesZoom, { passive: true });
@@ -987,6 +1015,13 @@
             e.preventDefault();
         }
     });
+    
+    // Aplicar smart fit ASAP (antes do load, evita flash) e novamente no load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _aplicarSmartFit);
+    } else {
+        _aplicarSmartFit();
+    }
     
     // Aplicar zoom salvo quando a página carrega
     window.addEventListener('load', function() {
