@@ -1425,7 +1425,7 @@ function montarCarouselPremiacao(d) {
       const hashAntes = _hashEstrutural(torneioAtual);
       const hashDepois = _hashEstrutural(novoTorneio);
       
-      if (hashAntes && hashAntes === hashDepois && torneioAtual?.id === novoTorneio.id) {
+      if (hashAntes && hashAntes === hashDepois && torneioAtual && torneioAtual.id === novoTorneio.id) {
         // MESMO nível, mesmo status → mantém timer LOCAL rodando
         // Não sobrescreve tempo_restante (servidor pode ter dado desatualizado)
         // Só atualiza dados secundários (entries qtd já está no hash, então não muda aqui)
@@ -1717,8 +1717,8 @@ function montarCarouselPremiacao(d) {
       next: prox ? ((prox.sb || 0).toLocaleString() + '/' + (prox.bb || 0).toLocaleString()) : 'FINAL',
       pct: pct,
       elapsed: elapsed,
-      clubeNome: pubState.clube?.nome || 'StackOS',
-      clubeLogo: pubState.clube?.logo_url || '',
+      clubeNome: (pubState.clube && pubState.clube.nome) || 'StackOS',
+      clubeLogo: (pubState.clube && pubState.clube.logo_url) || '',
       nextBlinds,
       premiacaoProjetada: t.premiacao_proj && t.premiacao_proj.mostrarNaTV ? {
         qtd: t.premiacao_proj.qtd,
@@ -1758,7 +1758,7 @@ function montarCarouselPremiacao(d) {
       : 'A TV vai atualizar automaticamente quando começar.';
     overlay.innerHTML = `
       <div style="font-size:5rem;margin-bottom:1rem;">🏆</div>
-      <h1 style="font-size:2rem;margin-bottom:.5rem;color:#f5e6c8;">${clube?.nome || 'Clube'}</h1>
+      <h1 style="font-size:2rem;margin-bottom:.5rem;color:#f5e6c8;">${(clube && clube.nome) || 'Clube'}</h1>
       <p style="color:#a1a1aa;font-size:1.1rem;margin-bottom:.5rem;">${subtitulo}</p>
       <p style="color:#71717a;font-size:.9rem;">${dica}</p>
     `;
