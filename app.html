@@ -3513,13 +3513,13 @@
                     <div id="t-bounty-hint" style="font-size:.7rem;color:#71717a;margin-top:.5rem;"></div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                    <div>
-                        <label class="inp-label">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(buy-in, re-entry, rebuy)</span></label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;align-items:end;">
+                    <div style="display:flex;flex-direction:column;">
+                        <label class="inp-label" style="min-height:2.1rem;">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(buy-in, re-entry, rebuy)</span></label>
                         <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que buy-in, re-entry e rebuy podem ser registrados">
                     </div>
-                    <div>
-                        <label class="inp-label">Add-on até nível</label>
+                    <div style="display:flex;flex-direction:column;">
+                        <label class="inp-label" style="min-height:2.1rem;">Add-on até nível</label>
                         <input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que add-on pode ser registrado">
                     </div>
                 </div>
@@ -3537,8 +3537,8 @@
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                    <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
                     <div><label class="inp-label">Add-on (R$)</label><input id="t-addon-valor" type="number" step="0.01" value="0" class="inp" placeholder="0 = grátis"></div>
+                    <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
                 </div>
 
                 <!-- Staff / Taxa de serviço (% sobre prize pool em cascata) -->
@@ -12319,29 +12319,91 @@ function renderTabMesas() {
 function renderTabFinanceiro() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    const entries  = t.entries.filter(e => e.tipo !== 'addon').length;
-    const reentries = t.entries.filter(e => e.tipo === 'reentry').length;
-    const addons   = t.entries.filter(e => e.tipo === 'addon').length;
-    const gross    = entries * t.buyin;
+    
+    // Conta entradas por tipo (com valores reais)
+    const buyinEntries = t.entries.filter(e => e.tipo === 'buyin');
+    const reentryEntries = t.entries.filter(e => e.tipo === 'reentry');
+    const rebuyS = t.entries.filter(e => e.tipo === 'rebuy_simples');
+    const rebuyD = t.entries.filter(e => e.tipo === 'rebuy_duplo');
+    const addonEntries = t.entries.filter(e => e.tipo === 'addon');
+    const lcEntries = t.entries.filter(e => e.tipo === 'last_chance');
+    
+    const buyinTotal   = buyinEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    const reentryTotal = reentryEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    const rebuySTotal  = rebuyS.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    const rebuyDTotal  = rebuyD.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    const addonTotal   = addonEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    const lcTotal      = lcEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    
+    const jackpotTotal = (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
+    const jackpotQtd   = (t.jackpotCompras || []).length;
+    
+    const bruto    = getBrutoTotal(t);
     const rakeVal  = getRake(t);
+    const staffVal = getStaff(t);
     const prize    = getPrize(t);
-
-    document.getElementById('mt-financeiro').innerHTML = [
-        ['Buy-ins', entries + ' × R$ ' + t.buyin, formatMoney(entries * t.buyin)],
-        ['Re-entries', reentries + ' × R$ ' + t.buyin, formatMoney(reentries * t.buyin)],
-        ['Add-ons', addons, '—'],
-        ['Total Bruto', '', formatMoney(gross + reentries * t.buyin)],
-        ['Rake (' + t.rake + '%)', '', formatMoney(rakeVal)],
-        ['Prize Pool', '', formatMoney(prize)],
-    ].map(([label, sub, val], i) => `
-        <div class="payout-item" style="${i >= 3 ? 'border-color:#27272a;' : ''}">
+    const staffPct = Number(t.staffPct) || 0;
+    
+    // Monta linhas do resumo (só mostra linha se tem dado nela)
+    const linhas = [];
+    
+    // === ENTRADAS (sempre mostra buy-in) ===
+    linhas.push({ label: 'Buy-ins', sub: `${buyinEntries.length} × ${formatMoney(t.buyin)}`, val: formatMoney(buyinTotal), tipo: 'normal' });
+    
+    if (t.reentryAte > 0 || reentryEntries.length > 0) {
+        linhas.push({ label: 'Re-entries', sub: `${reentryEntries.length} × ${formatMoney(t.buyin)}`, val: formatMoney(reentryTotal), tipo: 'normal' });
+    }
+    
+    if (t.rebuySimples > 0 || rebuyS.length > 0) {
+        linhas.push({ label: 'Rebuy Simples', sub: `${rebuyS.length} × ${formatMoney(t.rebuySimples || 0)}`, val: formatMoney(rebuySTotal), tipo: 'normal' });
+    }
+    
+    if (t.rebuyDuplo > 0 || rebuyD.length > 0) {
+        linhas.push({ label: 'Rebuy Duplo', sub: `${rebuyD.length} × ${formatMoney(t.rebuyDuplo || 0)}`, val: formatMoney(rebuyDTotal), tipo: 'normal' });
+    }
+    
+    if (t.addonFichas > 0 || addonEntries.length > 0) {
+        linhas.push({ label: 'Add-ons', sub: `${addonEntries.length} × ${formatMoney(t.addonValor || 0)}`, val: formatMoney(addonTotal), tipo: 'normal' });
+    }
+    
+    // === EXTRAS ===
+    if (jackpotQtd > 0) {
+        linhas.push({ label: 'Jackpots', sub: `${jackpotQtd} × ${formatMoney(t.jackpotValor || 0)}`, val: formatMoney(jackpotTotal), tipo: 'extra' });
+    }
+    
+    if (t.last_chance_ativo || lcEntries.length > 0) {
+        linhas.push({ label: 'Last Chance', sub: `${lcEntries.length} × ${formatMoney(t.last_chance_valor || 0)}`, val: formatMoney(lcTotal), tipo: 'extra' });
+    }
+    
+    // === TOTAIS ===
+    linhas.push({ label: 'Total Bruto', sub: '', val: formatMoney(bruto), tipo: 'total-bruto' });
+    linhas.push({ label: `Rake (${t.rake || 0}%)`, sub: '', val: formatMoney(rakeVal), tipo: 'rake' });
+    
+    if (staffPct > 0) {
+        linhas.push({ label: `Staff (${staffPct}% em cascata)`, sub: 'Dealers + Floor', val: formatMoney(staffVal), tipo: 'staff' });
+    }
+    
+    linhas.push({ label: 'Prize Pool', sub: '', val: formatMoney(prize), tipo: 'prize' });
+    
+    // Renderiza
+    document.getElementById('mt-financeiro').innerHTML = linhas.map((l) => {
+        let cor = '';
+        let borda = '';
+        if (l.tipo === 'extra')       { cor = 'color:#a78bfa;'; }
+        if (l.tipo === 'total-bruto') { cor = 'color:#fafafa;font-weight:800;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
+        if (l.tipo === 'rake')        { cor = 'color:var(--gold);'; }
+        if (l.tipo === 'staff')       { cor = 'color:#38bdf8;'; }
+        if (l.tipo === 'prize')       { cor = 'color:#22c55e;font-weight:800;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
+        
+        return `
+        <div class="payout-item" style="${borda}">
             <div>
-                <div style="font-size:.8rem;font-weight:700;${i>=4?'color:var(--gold)':''}">${label}</div>
-                ${sub ? `<div style="font-size:.7rem;color:#52525b;">${sub}</div>` : ''}
+                <div style="font-size:.8rem;font-weight:700;${cor}">${l.label}</div>
+                ${l.sub ? `<div style="font-size:.7rem;color:#52525b;">${l.sub}</div>` : ''}
             </div>
-            <div style="font-size:.9rem;font-weight:800;${i===5?'color:#22c55e':i===4?'color:var(--gold)':''}">${val}</div>
-        </div>
-    `).join('');
+            <div style="font-size:.9rem;font-weight:800;${cor}">${l.val}</div>
+        </div>`;
+    }).join('');
 
     renderPayout(t, 'mt-payout-full', true);
 }
@@ -19529,14 +19591,15 @@ function _fecharCaixaTorneioImpl(idx) {
 }
 
 function calcularResumoCaixaTorneio(t) {
-    let buyins = 0, reentries = 0, rebuys = 0, addons = 0;
-    let buyinsQtd = 0, reentriesQtd = 0, rebuysQtd = 0, addonsQtd = 0;
+    let buyins = 0, reentries = 0, rebuys = 0, addons = 0, lastChance = 0;
+    let buyinsQtd = 0, reentriesQtd = 0, rebuysQtd = 0, addonsQtd = 0, lastChanceQtd = 0;
     t.entries.forEach(e => {
         const v = e.valor || t.buyin;
         if (e.tipo === 'buyin')         { buyins += v;    buyinsQtd++; }
         else if (e.tipo === 'reentry')  { reentries += v; reentriesQtd++; }
         else if (e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo') { rebuys += v; rebuysQtd++; }
         else if (e.tipo === 'addon')    { addons += (e.valor || 0); addonsQtd++; }
+        else if (e.tipo === 'last_chance') { lastChance += (e.valor || 0); lastChanceQtd++; }
     });
     const jackpots = (t.jackpotCompras || []).reduce((s,j) => s + j.valor, 0);
     const jackpotsQtd = (t.jackpotCompras || []).reduce((s,j) => s + (j.qtd||1), 0);
@@ -19544,9 +19607,9 @@ function calcularResumoCaixaTorneio(t) {
     // bounties pagos (saem do caixa do torneio)
     const bountiesPagos = (t.eliminados || []).reduce((s,e) => s + (e.bountyPago || 0), 0);
 
-    const total = buyins + reentries + rebuys + addons + jackpots;
-    return { buyins, reentries, rebuys, addons, jackpots, bounties: bountiesPagos,
-             buyinsQtd, reentriesQtd, rebuysQtd, addonsQtd, jackpotsQtd,
+    const total = buyins + reentries + rebuys + addons + jackpots + lastChance;
+    return { buyins, reentries, rebuys, addons, jackpots, lastChance, bounties: bountiesPagos,
+             buyinsQtd, reentriesQtd, rebuysQtd, addonsQtd, jackpotsQtd, lastChanceQtd,
              entradas: buyinsQtd + reentriesQtd,
              total };
 }
@@ -19578,7 +19641,9 @@ function renderCaixaTorneio(t) {
                 <div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Buy-ins</div><div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.buyins)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.buyinsQtd}x</div></div>
                 <div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Re-entries</div><div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.reentries)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.reentriesQtd}x</div></div>
                 <div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Rebuys</div><div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.rebuys)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.rebuysQtd}x</div></div>
+                ${resumo.addons > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Add-ons</div><div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.addons)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.addonsQtd}x</div></div>` : ''}
                 ${resumo.jackpots > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Jackpots</div><div style="font-family:var(--font-mono);font-weight:700;color:var(--gold);margin-top:.1rem;">${formatMoney(resumo.jackpots)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.jackpotsQtd}x</div></div>` : ''}
+                ${resumo.lastChance > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Last Chance</div><div style="font-family:var(--font-mono);font-weight:700;color:#a78bfa;margin-top:.1rem;">${formatMoney(resumo.lastChance)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.lastChanceQtd}x</div></div>` : ''}
                 ${resumo.bounties > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Bounties Pagos</div><div style="font-family:var(--font-mono);font-weight:700;color:#ef4444;margin-top:.1rem;">-${formatMoney(resumo.bounties)}</div></div>` : ''}
                 <div style="padding:.4rem .55rem;background:#0f0f12;border:1px solid var(--gold);border-radius:.35rem;grid-column:span 3;display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--gold);font-size:.65rem;text-transform:uppercase;font-weight:700;">TOTAL NO CAIXA</span><span style="font-family:var(--font-mono);font-weight:800;color:var(--gold);font-size:.95rem;">${formatMoney(resumo.total - resumo.bounties)}</span></div>
             </div>
