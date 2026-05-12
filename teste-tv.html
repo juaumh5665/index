@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste TV — StackOS</title>
+<meta name="viewport" content="width=1280">
+<style>
+  body{background:#000;color:#fff;font-family:Arial,sans-serif;padding:50px;margin:0;}
+  h1{color:#a855f7;font-size:42px;margin-bottom:10px;}
+  .info{color:#9ca3af;font-size:18px;margin-bottom:30px;}
+  .test{font-size:28px;padding:14px 20px;margin:10px 0;background:#1a1a2e;border-radius:8px;border-left:5px solid #444;}
+  .ok{border-left-color:#22c55e;}
+  .err{border-left-color:#ef4444;color:#fca5a5;}
+  .pending{color:#9ca3af;}
+  #user-agent{font-size:14px;color:#71717a;padding:14px;background:#0c1223;border-radius:8px;margin-top:30px;word-break:break-all;}
+</style>
+</head>
+<body>
+<h1>🧪 Teste de Compatibilidade — StackOS TV</h1>
+<p class="info">Se você está vendo esta página, o HTML/CSS funciona. Agora testando JavaScript:</p>
+
+<div id="t1" class="test pending">⏳ Teste 1 — JavaScript básico</div>
+<div id="t2" class="test pending">⏳ Teste 2 — ES6 (arrow, const, template literals)</div>
+<div id="t3" class="test pending">⏳ Teste 3 — Async/Await + Promise</div>
+<div id="t4" class="test pending">⏳ Teste 4 — Fetch + Supabase</div>
+<div id="t5" class="test pending">⏳ Teste 5 — Optional Chaining (?.)</div>
+<div id="t6" class="test pending">⏳ Teste 6 — postMessage</div>
+
+<div id="user-agent"></div>
+
+<script>
+function setResult(id, ok, msg) {
+  var el = document.getElementById(id);
+  el.className = 'test ' + (ok ? 'ok' : 'err');
+  el.innerHTML = (ok ? '✅' : '❌') + ' ' + msg;
+}
+
+// 1. JS básico
+try {
+  var x = 1 + 1;
+  setResult('t1', true, 'JavaScript básico OK (1+1 = ' + x + ')');
+} catch(e) {
+  setResult('t1', false, 'JS ERRO: ' + e.message);
+}
+
+// 2. ES6
+try {
+  const f = () => 'works';
+  const tpl = `template literal ${f()}`;
+  setResult('t2', true, 'ES6 OK: ' + tpl);
+} catch(e) {
+  setResult('t2', false, 'ES6 ERRO: ' + e.message);
+}
+
+// 3. Async/await
+(async function() {
+  try {
+    const r = await Promise.resolve('Promise works');
+    setResult('t3', true, 'Async OK: ' + r);
+  } catch(e) {
+    setResult('t3', false, 'Async ERRO: ' + e.message);
+  }
+})();
+
+// 4. Fetch + Supabase
+try {
+  fetch('https://jvvgdkjohfomuafsafsx.supabase.co/rest/v1/', {
+    method: 'GET',
+    headers: {
+      'apikey': 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA'
+    }
+  })
+  .then(function(r) {
+    setResult('t4', true, 'Fetch + Supabase OK (status ' + r.status + ')');
+  })
+  .catch(function(e) {
+    setResult('t4', false, 'Fetch ERRO: ' + e.message);
+  });
+} catch(e) {
+  setResult('t4', false, 'Fetch INDISPONIVEL: ' + e.message);
+}
+
+// 5. Optional chaining
+try {
+  var obj = {a: {b: 'val'}};
+  // eslint-disable-next-line
+  var v = eval('obj?.a?.b'); // testando se navegador entende sintaxe
+  setResult('t5', true, 'Optional Chaining OK: ' + v);
+} catch(e) {
+  setResult('t5', false, 'Optional Chaining ERRO: ' + e.message + ' (TV provavelmente nao suporta sintaxe moderna)');
+}
+
+// 6. postMessage / addEventListener
+try {
+  if (typeof window.addEventListener === 'function' && typeof window.postMessage === 'function') {
+    setResult('t6', true, 'addEventListener e postMessage OK');
+  } else {
+    setResult('t6', false, 'API nao disponivel');
+  }
+} catch(e) {
+  setResult('t6', false, 'postMessage ERRO: ' + e.message);
+}
+
+// User Agent
+document.getElementById('user-agent').innerText = 'UserAgent: ' + navigator.userAgent;
+</script>
+</body>
+</html>
