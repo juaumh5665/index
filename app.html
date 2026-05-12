@@ -1685,10 +1685,9 @@
                 <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
                     <button class="tab-btn active" id="cfgtab-btn-clube"       onclick="switchConfigTab('cfg-clube', this)"><i class="fa-solid fa-building"></i> Clube</button>
                     <button class="tab-btn"        id="cfgtab-btn-preferencias" onclick="switchConfigTab('cfg-preferencias', this)"><i class="fa-solid fa-sliders"></i> Preferências</button>
-                    <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this)"><i class="fa-solid fa-trophy"></i> Torneios</button>
+                    <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this); renderConfigTorneios();"><i class="fa-solid fa-trophy"></i> Torneios</button>
                     <button class="tab-btn"        id="cfgtab-btn-cash"        onclick="switchConfigTab('cfg-cash', this)"><i class="fa-solid fa-coins"></i> Cash Game</button>
                     <button class="tab-btn"        id="cfgtab-btn-fichas"      onclick="switchConfigTab('cfg-fichas', this)"><i class="fa-solid fa-circle"></i> Fichas</button>
-                    <button class="tab-btn"        id="cfgtab-btn-torneios"    onclick="switchConfigTab('cfg-torneios', this); renderConfigTorneios();"><i class="fa-solid fa-trophy"></i> Torneios</button>
                     <button class="tab-btn"        id="cfgtab-btn-financeiro"  onclick="switchConfigTab('cfg-financeiro', this)"><i class="fa-solid fa-sack-dollar"></i> Financeiro</button>
                     <button class="tab-btn"        id="cfgtab-btn-seguranca"   onclick="switchConfigTab('cfg-seguranca', this)"><i class="fa-solid fa-shield-halved"></i> Segurança</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
@@ -1822,6 +1821,39 @@
                         </div>
                         <button onclick="salvarConfigTorneios()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1.25rem;width:100%;">Salvar Padrões de Torneio</button>
                     </div>
+
+                    <!-- LOTE 1+2: Travas de Compras / Add-on -->
+                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-lock"></i> Travas de Compras (Padrão do Clube)</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
+                            Define o nível máximo em que <strong>buy-in, re-entry e rebuy</strong> podem ser realizados nos torneios deste clube. 
+                            Após esse nível, esses tipos de compra ficam bloqueados automaticamente.
+                            <br>Cada torneio pode <strong>sobrescrever</strong> esse padrão ao criar/editar.
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div>
+                                <label class="inp-label">🛒 Compras (buy-in / re-entry / rebuy) até o nível</label>
+                                <input id="cfg-trn-max-compras" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (vazio = sem trava)" inputmode="numeric">
+                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Vazio = sem trava (comportamento atual)</div>
+                            </div>
+                            <div>
+                                <label class="inp-label">🎯 Add-on até o nível</label>
+                                <input id="cfg-trn-max-addon" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (vazio = sem trava)" inputmode="numeric">
+                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Após esse nível, add-on é bloqueado</div>
+                            </div>
+                        </div>
+                        <button onclick="salvarTravasPadrao()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Travas</button>
+                    </div>
+                    <div class="stat-card" style="padding:1rem;margin-top:.75rem;background:rgba(59,130,246,.05);border-color:rgba(59,130,246,.2);">
+                        <div style="font-size:.78rem;color:#93c5fd;line-height:1.6;">
+                            <i class="fa-solid fa-info-circle"></i> <strong>Exemplo prático:</strong> Configurando "Compras até nível 10" e "Add-on até nível 10":
+                            <ul style="margin:.5rem 0 0 1.2rem;padding:0;color:#cbd5e1;">
+                                <li>Níveis 1 a 10: tudo permitido</li>
+                                <li>A partir do nível 11: buy-in, re-entry, rebuy e add-on bloqueados</li>
+                                <li>Se o torneio tiver <strong>Last Chance</strong> ativo, ele libera após o add-on</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- ABA: CASH GAME (padrões) -->
@@ -1853,41 +1885,6 @@
                         <div id="fichas-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
                         <div style="margin-top:1rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;">
                             <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Essas denominações aparecem ao abrir mesa de cash e registrar saídas de jogadores.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ABA: TORNEIOS (padrões globais do clube) -->
-                <div id="cfg-torneios" class="configtab-content" style="display:none;">
-                    <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
-                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-lock"></i> Travas de Compras (Padrão do Clube)</div>
-                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
-                            Define o nível máximo em que <strong>buy-in, re-entry e rebuy</strong> podem ser realizados nos torneios deste clube. 
-                            Após esse nível, esses tipos de compra ficam bloqueados automaticamente.
-                            <br>Cada torneio pode <strong>sobrescrever</strong> esse padrão ao criar/editar.
-                        </div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-                            <div>
-                                <label class="inp-label">🛒 Compras (buy-in / re-entry / rebuy) até o nível</label>
-                                <input id="cfg-trn-max-compras" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (deixe vazio = sem trava)" inputmode="numeric">
-                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Deixar vazio = sem trava (comportamento atual)</div>
-                            </div>
-                            <div>
-                                <label class="inp-label">🎯 Add-on até o nível</label>
-                                <input id="cfg-trn-max-addon" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (deixe vazio = sem trava)" inputmode="numeric">
-                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Após esse nível, add-on é bloqueado</div>
-                            </div>
-                        </div>
-                        <button onclick="salvarConfigTorneios()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Padrões de Torneios</button>
-                    </div>
-                    <div class="stat-card" style="padding:1rem;background:rgba(59,130,246,.05);border-color:rgba(59,130,246,.2);">
-                        <div style="font-size:.78rem;color:#93c5fd;line-height:1.6;">
-                            <i class="fa-solid fa-info-circle"></i> <strong>Exemplo prático:</strong> Configurando "Compras até nível 10" e "Add-on até nível 10":
-                            <ul style="margin:.5rem 0 0 1.2rem;padding:0;color:#cbd5e1;">
-                                <li>Níveis 1 a 10: tudo permitido</li>
-                                <li>A partir do nível 11: buy-in, re-entry, rebuy e add-on bloqueados</li>
-                                <li>Se o torneio tiver <strong>Last Chance</strong> ativo, ele libera após o add-on</li>
-                            </ul>
                         </div>
                     </div>
                 </div>
@@ -15285,7 +15282,7 @@ function renderConfigTorneios() {
     if (inpAddon)   inpAddon.value   = sbClube.cfg_nivel_max_addon   != null ? sbClube.cfg_nivel_max_addon   : '';
 }
 
-async function salvarConfigTorneios() {
+async function salvarTravasPadrao() {
     if (!sbClube || !sbClube.id) return showToast('⚠️ Clube não carregado');
     
     const vCompras = document.getElementById('cfg-trn-max-compras').value.trim();
@@ -15316,9 +15313,9 @@ async function salvarConfigTorneios() {
         sbClube.cfg_nivel_max_addon = novoAddon;
         window.sbClube = sbClube;
         
-        showToast('✓ Padrões de torneios salvos');
+        showToast('✓ Travas salvas');
     } catch(e) {
-        console.error('[CONFIG-TORNEIOS] erro:', e);
+        console.error('[CONFIG-TORNEIOS-TRAVAS] erro:', e);
         showToast('⚠️ Erro ao salvar: ' + (e.message || e));
     }
 }
