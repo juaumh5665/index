@@ -12928,19 +12928,36 @@ function abrirTV(idx) {
         return;
     }
     
-    tvWindow = window.open('/tv.html', 'PokerTV', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
-    if (!tvWindow) {
-        showToast('⚠️ Permita popups pra usar a TV');
-        return;
+    const torneioAtual = torneios[idx];
+    console.log('[abrirTV] Abrindo TV pra torneio:', torneioAtual.nome, '(id:', torneioAtual.id, ')');
+    
+    // CORREÇÃO BUG: força fechar janela TV anterior se existir
+    // (evita reusar janela com torneio antigo carregado)
+    if (tvWindow && !tvWindow.closed) {
+        try { tvWindow.close(); } catch(_) {}
+        tvWindow = null;
     }
-    // Aguardar a TV carregar antes de mandar dados
-    const trySend = () => {
-        try {
-            updateTV(idx);
-        } catch(e) { /* TV ainda carregando */ }
-    };
-    setTimeout(trySend, 800);  // Primeira tentativa
-    setTimeout(trySend, 1800); // Backup caso 1ª tenha falhado
+    
+    // Pequena pausa pra fechar antes de reabrir
+    setTimeout(() => {
+        tvWindow = window.open('/tv.html', 'PokerTV_' + Date.now(), 'width=1280,height=720,menubar=no,toolbar=no,location=no');
+        if (!tvWindow) {
+            showToast('⚠️ Permita popups pra usar a TV');
+            return;
+        }
+        
+        // Aguardar a TV carregar antes de mandar dados
+        // Múltiplas tentativas pra garantir entrega
+        const trySend = () => {
+            try {
+                updateTV(idx);
+            } catch(e) { /* TV ainda carregando */ }
+        };
+        setTimeout(trySend, 600);   // primeira
+        setTimeout(trySend, 1200);  // segunda
+        setTimeout(trySend, 2400);  // terceira
+        setTimeout(trySend, 4000);  // backup final
+    }, 100);
 }
 
 // ============================================================
