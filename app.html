@@ -3214,6 +3214,23 @@
     </div>
 </div>
 
+<!-- MODAL: COMPRAR LAST CHANCE (3ª compra após add-on) -->
+<div id="modal-last-chance" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-star" style="color:#a78bfa;"></i> Comprar Last Chance</h3>
+            <button onclick="closeModal('modal-last-chance')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="last-chance-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
+            <div><label class="inp-label">Jogador *</label><select id="last-chance-jogador" class="inp"></select></div>
+            <div><label class="inp-label">Quantidade de compras</label><input id="last-chance-qtd" type="number" min="1" value="1" class="inp"></div>
+            <div id="last-chance-total" style="padding:.85rem 1rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:.5rem;font-size:.95rem;font-weight:700;color:#a78bfa;text-align:center;"></div>
+            <button onclick="confirmarLastChance()" style="padding:.85rem;border-radius:.6rem;background:linear-gradient(135deg,#8b5cf6,#a78bfa);color:#fff;border:none;font-family:'Manrope',sans-serif;font-weight:800;font-size:.9rem;cursor:pointer;">Confirmar Compra</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: NOVA MESA CASH -->
 <div id="modal-nova-cash-mesa" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
@@ -3450,6 +3467,21 @@
                     <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Jogador paga R$ X e recebe Y fichas extras. Pode ser comprado múltiplas vezes.</div>
                 </div>
 
+                <!-- LAST CHANCE -->
+                <div style="padding:.85rem 1rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.6rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                        <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-star"></i> Last Chance (3ª compra após add-on)</div>
+                        <label class="switch" title="Ativar Last Chance neste torneio"><input type="checkbox" id="t-last-chance-ativo" onchange="_toggleLastChanceForm(this.checked)"><span class="slider"></span></label>
+                    </div>
+                    <div id="t-last-chance-campos" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                            <div><label class="inp-label">Valor R$</label><input id="t-last-chance-valor" type="number" value="200" class="inp" placeholder="Ex: 200"></div>
+                            <div><label class="inp-label">Fichas entregues</label><input id="t-last-chance-fichas" type="number" value="150000" class="inp" placeholder="Ex: 150000"></div>
+                        </div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.4;">Compra liberada <strong>após o nível de add-on</strong>. Mesma mecânica do Jackpot: pode comprar múltiplas vezes.</div>
+                    </div>
+                </div>
+
                 <!-- RANKING -->
                 <div style="padding:.85rem 1rem;background:rgba(132,204,22,.04);border:1px solid rgba(132,204,22,.15);border-radius:.6rem;">
                     <div style="font-size:.65rem;color:#84cc16;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-ranking-star"></i> Ranking Mensal</div>
@@ -3482,8 +3514,14 @@
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                    <div><label class="inp-label">Re-entry até nível</label><input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem"></div>
-                    <div><label class="inp-label">Add-on até nível</label><input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem"></div>
+                    <div>
+                        <label class="inp-label">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(buy-in, re-entry, rebuy)</span></label>
+                        <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que buy-in, re-entry e rebuy podem ser registrados">
+                    </div>
+                    <div>
+                        <label class="inp-label">Add-on até nível</label>
+                        <input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que add-on pode ser registrado">
+                    </div>
                 </div>
 
                 <!-- Rebuy simples / duplo -->
@@ -3679,6 +3717,16 @@
                                 <div id="mt-jackpot-valor" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:var(--gold);">R$ 0</div>
                             </div>
                         </div>
+                        <!-- Extra: last chance info -->
+                        <div id="mt-last-chance-card" class="stat-card" style="padding:.85rem 1rem;display:none;background:rgba(168,85,247,.05);border-color:rgba(168,85,247,.2);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div style="font-size:.6rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-star"></i> Last Chance Arrecadado</div>
+                                    <div id="mt-last-chance-qtd" style="font-size:.7rem;color:#71717a;margin-top:.2rem;">0 compras</div>
+                                </div>
+                                <div id="mt-last-chance-valor" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#a78bfa;">R$ 0</div>
+                            </div>
+                        </div>
                         <!-- Ações rápidas -->
                         <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Ações Rápidas</div>
                         <div style="display:flex;flex-direction:column;gap:.5rem;">
@@ -3690,6 +3738,9 @@
                             </button>
                             <button onclick="abrirJackpot(activeTorneioIdx)" id="btn-jackpot" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
                                 <i class="fa-solid fa-gem"></i> Comprar Jackpot
+                            </button>
+                            <button onclick="abrirLastChance(activeTorneioIdx)" id="btn-last-chance" style="display:none;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);color:#a78bfa;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(168,85,247,.18)'" onmouseout="this.style.background='rgba(168,85,247,.08)'">
+                                <i class="fa-solid fa-star"></i> Comprar Last Chance
                             </button>
                         </div>
                         <!-- Premiação -->
@@ -5125,6 +5176,9 @@ function _torneioToDb(t) {
         rebuy_duplo_fichas: t.rebuyDuploFichas || 0,
         jackpot_valor: t.jackpotValor || 0,
         jackpot_fichas: t.jackpotFichas || 0,
+        last_chance_ativo: !!t.last_chance_ativo,
+        last_chance_valor: Number(t.last_chance_valor) || 0,
+        last_chance_fichas: parseInt(t.last_chance_fichas) || 0,
         bounty_valor: t.bountyValor || 0,
         bounty_ko_split: t.bountyKoSplit || 50,
         capile_modo: t.capileModo || 'pote',
@@ -5737,6 +5791,9 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         rebuyDuploFichas: r.rebuy_duplo_fichas || 0,
         jackpotValor: parseFloat(r.jackpot_valor || 0),
         jackpotFichas: r.jackpot_fichas || 0,
+        last_chance_ativo: !!r.last_chance_ativo,
+        last_chance_valor: parseFloat(r.last_chance_valor || 0),
+        last_chance_fichas: parseInt(r.last_chance_fichas || 0),
         bountyValor: parseFloat(r.bounty_valor || 0),
         bountyKoSplit: parseFloat(r.bounty_ko_split || 50),
         rankingId: r.ranking_id,
@@ -8056,6 +8113,10 @@ function _capturarConfigTorneio() {
         rebuyDuploFichas: parseInt((document.getElementById('t-rebuy-duplo-fichas') || {}).value) || 0,
         jackpotValor:   parseFloat((document.getElementById('t-jackpot-valor') || {}).value) || 0,
         jackpotFichas:  parseInt((document.getElementById('t-jackpot-fichas') || {}).value) || 0,
+        // Last Chance
+        last_chance_ativo: (document.getElementById('t-last-chance-ativo') || {}).checked || false,
+        last_chance_valor: parseFloat((document.getElementById('t-last-chance-valor') || {}).value) || 0,
+        last_chance_fichas: parseInt((document.getElementById('t-last-chance-fichas') || {}).value) || 0,
         bountyValor:    parseFloat((document.getElementById('t-bounty-valor') || {}).value) || 0,
         bountyKoSplit:  parseFloat((document.getElementById('t-bounty-ko-split') || {}).value) || 50,
         rankingRakePct: parseFloat((document.getElementById('t-ranking-rake-pct') || {}).value) || 0,
@@ -8084,6 +8145,14 @@ function _aplicarConfigTorneio(cfg) {
     set('t-rebuy-duplo-fichas', cfg.rebuyDuploFichas);
     set('t-jackpot-valor', cfg.jackpotValor);
     set('t-jackpot-fichas', cfg.jackpotFichas);
+    // Last Chance
+    const cbLC = document.getElementById('t-last-chance-ativo');
+    if (cbLC) {
+        cbLC.checked = !!cfg.last_chance_ativo;
+        if (typeof _toggleLastChanceForm === 'function') _toggleLastChanceForm(cbLC.checked);
+    }
+    set('t-last-chance-valor', cfg.last_chance_valor);
+    set('t-last-chance-fichas', cfg.last_chance_fichas);
     set('t-bounty-valor', cfg.bountyValor);
     set('t-bounty-ko-split', cfg.bountyKoSplit);
     set('t-ranking-rake-pct', cfg.rankingRakePct);
@@ -11795,6 +11864,10 @@ function saveTournament() {
         rebuySimplesFichas: parseInt(document.getElementById('t-rebuy-simples-fichas').value)   || 0,
         rebuyDuplo:         parseFloat(document.getElementById('t-rebuy-duplo').value)          || 0,
         rebuyDuploFichas:   parseInt(document.getElementById('t-rebuy-duplo-fichas').value)     || 0,
+        // Last Chance (3ª compra após add-on)
+        last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
+        last_chance_valor:  parseFloat(document.getElementById('t-last-chance-valor')?.value) || 0,
+        last_chance_fichas: parseInt(document.getElementById('t-last-chance-fichas')?.value) || 0,
         // KO config
         bountyValor:    parseFloat(document.getElementById('t-bounty-valor').value) || 0,
         pkoSplit:       parseFloat(document.getElementById('t-pko-split').value) || 50,
@@ -12011,6 +12084,32 @@ function updateModalTorneio() {
     const btnJack = document.getElementById('btn-jackpot');
     if (btnJack) btnJack.style.display = (t.jackpotValor > 0 && t.jackpotFichas > 0) ? 'block' : 'none';
 
+    // LOTE 2: Botão de Last Chance — só aparece se ativo NO TORNEIO + APÓS add-on
+    const btnLC = document.getElementById('btn-last-chance');
+    if (btnLC) {
+        if (t.last_chance_ativo && t.last_chance_valor > 0) {
+            // Verifica se já passou da trava do add-on
+            const trava = _tipoBloqueadoPorTrava(t, 'last_chance');
+            if (trava.bloqueado) {
+                // Mostra desabilitado com mensagem
+                btnLC.style.display = 'block';
+                btnLC.style.opacity = '.4';
+                btnLC.style.cursor = 'not-allowed';
+                btnLC.title = trava.motivo;
+                btnLC.disabled = true;
+            } else {
+                // Liberado pra clicar
+                btnLC.style.display = 'block';
+                btnLC.style.opacity = '1';
+                btnLC.style.cursor = 'pointer';
+                btnLC.title = `Comprar Last Chance: ${formatMoney(t.last_chance_valor)} → ${(t.last_chance_fichas||0).toLocaleString()} fichas`;
+                btnLC.disabled = false;
+            }
+        } else {
+            btnLC.style.display = 'none';
+        }
+    }
+
     // Render Caixa do Torneio
     renderCaixaTorneio(t);
 
@@ -12043,6 +12142,22 @@ function updateModalTorneio() {
             document.getElementById('mt-jackpot-valor').innerText = formatMoney(totalJP);
         } else {
             jpCard.style.display = 'none';
+        }
+    }
+    
+    // LOTE 2: Card do Last Chance arrecadado
+    const lcCard = document.getElementById('mt-last-chance-card');
+    if (lcCard) {
+        const lcCompras = t.lastChanceCompras || [];
+        if (t.last_chance_ativo && lcCompras.length > 0) {
+            lcCard.style.display = 'block';
+            const totalLC = lcCompras.reduce((s,j) => s + (j.valor || 0), 0);
+            const totalComprasLC = lcCompras.reduce((s,j) => s + (j.qtd || 1), 0);
+            const jogadoresUnicos = new Set(lcCompras.map(j => j.jogadorId)).size;
+            document.getElementById('mt-last-chance-qtd').innerText = `${totalComprasLC} compra${totalComprasLC>1?'s':''} · ${jogadoresUnicos} jogador${jogadoresUnicos>1?'es':''}`;
+            document.getElementById('mt-last-chance-valor').innerText = formatMoney(totalLC);
+        } else {
+            lcCard.style.display = 'none';
         }
     }
 
@@ -12382,24 +12497,35 @@ function toggleBreak(idx) {
 // TORNEIO — ENTRADAS / ELIMINAÇÕES
 // ============================================================
 // ============================================================
-// LOTE 1+2 — Travas de Compras/Add-on + Last Chance
+// LOTE 1+2 — Travas de Entradas/Add-on + Last Chance
 // ============================================================
-// Resolve o nível máximo efetivo de compras (buy-in, re-entry, rebuy)
-// Prioridade: torneio.nivel_max_compras > clube.cfg_nivel_max_compras > null
+// MODELO:
+//  - Entradas (buy-in, re-entry, rebuy simples, rebuy duplo): mesma trava
+//    Fonte: t.reentryAte (campo existente "Entradas até nível")
+//    Fallback: sbClube.cfg_nivel_max_compras (config global do clube)
+//  - Add-on: trava separada
+//    Fonte: t.addonAte (campo existente "Add-on até nível")
+//    Fallback: sbClube.cfg_nivel_max_addon
+//  - Last Chance: libera APÓS o add-on (se torneio tiver ativo)
+// ============================================================
+
+// Resolve o nível máximo efetivo de Entradas (buy-in, re-entry, rebuy)
+// Prioridade: torneio.reentryAte > clube.cfg_nivel_max_compras > null (sem trava)
 function _resolverNivelMaxCompras(t) {
-    if (t && t.nivel_max_compras != null) return Number(t.nivel_max_compras);
-    if (sbClube && sbClube.cfg_nivel_max_compras != null) return Number(sbClube.cfg_nivel_max_compras);
+    if (t && t.reentryAte && Number(t.reentryAte) > 0) return Number(t.reentryAte);
+    if (sbClube && sbClube.cfg_nivel_max_compras != null && Number(sbClube.cfg_nivel_max_compras) > 0) return Number(sbClube.cfg_nivel_max_compras);
     return null; // sem trava
 }
 
-// Resolve o nível máximo efetivo de add-on
+// Resolve o nível máximo efetivo de Add-on
+// Prioridade: torneio.addonAte > clube.cfg_nivel_max_addon > null
 function _resolverNivelMaxAddon(t) {
-    if (t && t.nivel_max_addon != null) return Number(t.nivel_max_addon);
-    if (sbClube && sbClube.cfg_nivel_max_addon != null) return Number(sbClube.cfg_nivel_max_addon);
+    if (t && t.addonAte && Number(t.addonAte) > 0) return Number(t.addonAte);
+    if (sbClube && sbClube.cfg_nivel_max_addon != null && Number(sbClube.cfg_nivel_max_addon) > 0) return Number(sbClube.cfg_nivel_max_addon);
     return null; // sem trava
 }
 
-// Tipos que entram na trava de "compras"
+// Tipos que entram na trava de "entradas" (todos os tipos de compra pra continuar)
 const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
 
 // Verifica se um tipo de entrada está bloqueado por trava no torneio atual
@@ -12409,13 +12535,13 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     
     const nivelAtual = Number(t.nivelAtual) + 1; // nivelAtual é 0-indexed, mostrar 1-indexed
     
-    // Compras (buy-in, re-entry, rebuy)
+    // Entradas (buy-in, re-entry, rebuy simples, rebuy duplo) — mesma trava
     if (_TIPOS_COMPRA.includes(tipo)) {
         const max = _resolverNivelMaxCompras(t);
         if (max != null && nivelAtual > max) {
             return { 
                 bloqueado: true, 
-                motivo: `Compras só até o nível ${max} (atual: ${nivelAtual})` 
+                motivo: `Entradas só até o nível ${max} (atual: ${nivelAtual})` 
             };
         }
     }
@@ -17614,6 +17740,114 @@ function confirmarJackpot() {
     closeModal('modal-jackpot');
     updateModalTorneio();
     showToast(`💎 ${qtd}x Jackpot comprado por ${getJogadorNome(jid)}`);
+}
+
+// ============================================================
+// LOTE 2 — Last Chance (3ª compra após add-on)
+// ============================================================
+// Toggle dos campos no formulário de novo torneio (mostrar/ocultar valor + fichas)
+function _toggleLastChanceForm(ativo) {
+    const wrap = document.getElementById('t-last-chance-campos');
+    if (wrap) wrap.style.display = ativo ? 'block' : 'none';
+}
+
+// Abre modal de compra de Last Chance
+function abrirLastChance(idx) {
+    const t = torneios[idx];
+    if (!t) return;
+    
+    // Verifica se está liberado pela trava (após add-on)
+    const trava = _tipoBloqueadoPorTrava(t, 'last_chance');
+    if (trava.bloqueado) {
+        return showToast('🔒 ' + trava.motivo);
+    }
+    
+    activeTorneioIdx = idx;
+    document.getElementById('last-chance-info').innerHTML = `
+        <div style="color:#71717a;font-size:.75rem;">Torneio: <strong style="color:#e4e4e7;">${t.nome}</strong></div>
+        <div style="color:#71717a;font-size:.75rem;margin-top:.25rem;">Cada compra: <strong style="color:#a78bfa;">${formatMoney(t.last_chance_valor)}</strong> → <strong style="color:#22c55e;">${(t.last_chance_fichas||0).toLocaleString()} fichas</strong></div>
+    `;
+    
+    // Lista jogadores ativos (Last Chance pode ser comprado múltiplas vezes pelo mesmo jogador)
+    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
+    const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))]
+        .filter(id => !eliminadosIds.has(id));
+
+    const sel = document.getElementById('last-chance-jogador');
+    if (ativos.length) {
+        sel.innerHTML = ativos.map(id => `<option value="${id}">${getJogadorNome(id)}</option>`).join('');
+        sel.disabled = false;
+    } else {
+        sel.innerHTML = '<option value="">Nenhum jogador ativo</option>';
+        sel.disabled = true;
+    }
+    
+    // Reset qtd
+    const qtdInp = document.getElementById('last-chance-qtd');
+    if (qtdInp) {
+        qtdInp.value = 1;
+        qtdInp.readOnly = false;
+        qtdInp.style.opacity = '1';
+        qtdInp.oninput = atualizarTotalLastChance;
+    }
+    atualizarTotalLastChance();
+    openModal('modal-last-chance');
+}
+
+function atualizarTotalLastChance() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const qtd = parseInt(document.getElementById('last-chance-qtd').value) || 1;
+    const total = qtd * (t.last_chance_valor || 0);
+    const totalFichas = qtd * (t.last_chance_fichas || 0);
+    document.getElementById('last-chance-total').innerHTML = `
+        Total: ${formatMoney(total)}<br>
+        <span style="font-weight:400;color:#71717a;font-size:.8rem;">→ ${totalFichas.toLocaleString()} fichas extras</span>
+    `;
+}
+
+function confirmarLastChance() {
+    const t = torneios[activeTorneioIdx];
+    const jid = document.getElementById('last-chance-jogador').value;
+    if (!jid) return showToast('⚠️ Selecione um jogador');
+
+    // Re-valida trava (defesa em profundidade)
+    const trava = _tipoBloqueadoPorTrava(t, 'last_chance');
+    if (trava.bloqueado) return showToast('🔒 ' + trava.motivo);
+
+    // Bloqueio: caixa do torneio precisa estar aberto
+    const caixa = getCaixaTorneio(t);
+    if (caixa.status !== 'aberto') {
+        return showToast('🔒 Abra o caixa do torneio primeiro');
+    }
+
+    const qtd = parseInt(document.getElementById('last-chance-qtd').value) || 1;
+    if (qtd < 1) return showToast('⚠️ Quantidade inválida');
+    
+    const total = qtd * (t.last_chance_valor || 0);
+    const totalFichas = qtd * (t.last_chance_fichas || 0);
+
+    // Inicializa array se não existir
+    if (!Array.isArray(t.lastChanceCompras)) t.lastChanceCompras = [];
+    
+    t.lastChanceCompras.push({
+        jogadorId: jid, qtd, valor: total, fichas: totalFichas, ts: Date.now(),
+    });
+
+    // Registra transação no caixa (débito)
+    registrarTransacao({
+        jogadorId: jid,
+        tipo: 'buyin',
+        valor: -total,
+        descricao: `Last Chance (${qtd}x) · ${t.nome} · ${totalFichas.toLocaleString()} fichas`,
+        origem: 'torneio',
+        refId: t.id,
+    });
+
+    saveData();
+    closeModal('modal-last-chance');
+    updateModalTorneio();
+    showToast(`⭐ ${qtd}x Last Chance por ${getJogadorNome(jid)}`);
 }
 
 // ============================================================
