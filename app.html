@@ -3541,6 +3541,7 @@
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
                     <div><label class="inp-label">Buy-in R$</label><input id="t-buyin" type="number" value="100" class="inp"></div>
+                    <div><label class="inp-label">Taxa Adm. R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(opcional, só no buy-in)</span></label><input id="t-taxa-adm" type="number" step="0.01" value="0" class="inp" placeholder="0 = sem taxa" title="Cobrada apenas na 1ª entrada (buy-in). NÃO entra no cálculo do rake."></div>
                     <div><label class="inp-label">Rake %</label><input id="t-rake" type="number" value="20" class="inp"></div>
                     <div><label class="inp-label">Stack Inicial</label><input id="t-stack" type="number" value="20000" class="inp"></div>
                     <div><label class="inp-label">Nível (min)</label><input id="t-tempo" type="number" value="15" class="inp"></div>
@@ -5220,6 +5221,7 @@ function _torneioToDb(t) {
         series_nome: t.seriesNome || null,
         buyin: t.buyin || 0,
         rake: t.rake || 0,
+        taxa_administrativa: t.taxaAdm || 0,
         stack: t.stack || 0,
         tempo_nivel: t.tempoNivel || 15,
         reentry_ate: t.reentryAte || 0,
@@ -5837,6 +5839,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         seriesNome: r.series_nome,
         buyin: parseFloat(r.buyin || 0),
         rake: parseFloat(r.rake || 0),
+        taxaAdm: parseFloat(r.taxa_administrativa || 0),
         stack: r.stack || 0,
         tempoNivel: r.tempo_nivel || 15,
         reentryAte: r.reentry_ate || 0,
@@ -8164,6 +8167,7 @@ function _capturarConfigTorneio() {
         tipo:           (document.getElementById('t-tipo') || {}).value || 'normal',
         buyin:          parseFloat((document.getElementById('t-buyin') || {}).value) || 0,
         rake:           parseFloat((document.getElementById('t-rake') || {}).value) || 0,
+        taxaAdm:        parseFloat((document.getElementById('t-taxa-adm') || {}).value) || 0,
         stack:          parseInt((document.getElementById('t-stack') || {}).value) || 0,
         tempoNivel:     parseInt((document.getElementById('t-tempo') || {}).value) || 15,
         reentryAte:     parseInt((document.getElementById('t-reentry') || {}).value) || 0,
@@ -8206,6 +8210,7 @@ function _aplicarConfigTorneio(cfg) {
     if (typeof onTipoTorneioChange === 'function') onTipoTorneioChange();
     set('t-buyin', cfg.buyin);
     set('t-rake', cfg.rake);
+    set('t-taxa-adm', cfg.taxaAdm);
     set('t-stack', cfg.stack);
     set('t-tempo', cfg.tempoNivel);
     set('t-reentry', cfg.reentryAte);
@@ -11934,6 +11939,7 @@ function saveTournament() {
         rankingRakePct,                                                          // % do rake que vai para premiação do ranking
         buyin:        parseFloat(document.getElementById('t-buyin').value)  || 100,
         rake:         parseFloat(document.getElementById('t-rake').value)   || 20,
+        taxaAdm:      parseFloat(document.getElementById('t-taxa-adm')?.value) || 0,
         tempoNivel,
         stack:        parseInt(document.getElementById('t-stack').value)    || 20000,
         reentryAte:   parseInt(document.getElementById('t-reentry').value)  || 0,
@@ -12458,7 +12464,7 @@ function renderTabFinanceiro() {
     }
     
     // === TOTAIS ===
-    linhas.push({ label: 'Total Bruto', sub: '', val: formatMoney(bruto), tipo: 'total-bruto' });
+    linhas.push({ label: 'Total Bruto', sub: '<span style="color:#52525b;">(entra no rake)</span>', val: formatMoney(bruto), tipo: 'total-bruto' });
     linhas.push({ label: `Rake (${t.rake || 0}%)`, sub: '', val: formatMoney(rakeVal), tipo: 'rake' });
     
     if (staffPct > 0) {
@@ -12466,6 +12472,13 @@ function renderTabFinanceiro() {
     }
     
     linhas.push({ label: 'Prize Pool', sub: '', val: formatMoney(prize), tipo: 'prize' });
+    
+    // LOTE 5: Taxa Administrativa — soma à parte (não entra no rake nem no prize)
+    const taxaAdmEntries = buyinEntries.length; // taxa cobrada só no buy-in
+    const taxaAdmTotal = taxaAdmEntries * (Number(t.taxaAdm) || 0);
+    if (taxaAdmTotal > 0) {
+        linhas.push({ label: 'Taxa Administrativa', sub: `${taxaAdmEntries} × ${formatMoney(Number(t.taxaAdm) || 0)} · separada do prize`, val: formatMoney(taxaAdmTotal), tipo: 'taxa-adm' });
+    }
     
     // Renderiza
     document.getElementById('mt-financeiro').innerHTML = linhas.map((l) => {
@@ -12476,6 +12489,7 @@ function renderTabFinanceiro() {
         if (l.tipo === 'rake')        { cor = 'color:var(--gold);'; }
         if (l.tipo === 'staff')       { cor = 'color:#38bdf8;'; }
         if (l.tipo === 'prize')       { cor = 'color:#22c55e;font-weight:800;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
+        if (l.tipo === 'taxa-adm')    { cor = 'color:#fb923c;font-weight:700;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
         
         return `
         <div class="payout-item" style="${borda}">
@@ -12830,8 +12844,22 @@ function atualizarResumoEntrada() {
     
     let staff = 0; // staff zerado sempre (agora é dedução do prize)
     
-    const total = valorBase + staff;
-    if (resumoVal) resumoVal.innerText = 'R$ ' + total.toFixed(2).replace('.', ',');
+    // LOTE 5: Taxa administrativa — cobrada apenas no buy-in
+    let taxaAdm = 0;
+    if (tipo === 'buyin' && Number(t.taxaAdm) > 0) {
+        taxaAdm = Number(t.taxaAdm);
+    }
+    
+    const total = valorBase + staff + taxaAdm;
+    if (resumoVal) {
+        // Se tem taxa adm, mostra detalhado
+        if (taxaAdm > 0) {
+            resumoVal.innerHTML = 'R$ ' + total.toFixed(2).replace('.', ',') + 
+                ' <span style="font-size:.65rem;color:#71717a;font-weight:400;font-family:Manrope,sans-serif;">(R$ ' + valorBase.toFixed(2).replace('.', ',') + ' + R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa)</span>';
+        } else {
+            resumoVal.innerText = 'R$ ' + total.toFixed(2).replace('.', ',');
+        }
+    }
 }
 
 function registrarEntrada() {
@@ -12881,13 +12909,20 @@ function _registrarEntradaImpl() {
     if (tipo === 'rebuy_duplo')   valorBase = t.rebuyDuplo;
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     
+    // LOTE 5: Taxa Administrativa — cobrada APENAS no buy-in (1ª entrada)
+    // Não entra no rake, mas vai pro caixa do clube (separada contabilmente).
+    let taxaAdmCobrada = 0;
+    if (tipo === 'buyin' && Number(t.taxaAdm) > 0) {
+        taxaAdmCobrada = Number(t.taxaAdm);
+    }
+    
     // LOTE 3: Staff não é mais cobrado a parte. Agora é % do prize pool em cascata.
     // Mantém variáveis pra compat mas sempre zero.
     let staffCobrado = 0;
     const valorRS = valorBase; // mantém variável legada pra compat
-    const valorTotal = valorBase + staffCobrado;
+    const valorTotal = valorBase + staffCobrado + taxaAdmCobrada;
 
-    t.entries.push({ id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado });
+    t.entries.push({ id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado, taxaAdm: taxaAdmCobrada });
     alocarJogadorMesa(t, jid);
 
     // Para torneios KO: cada entrada paga também bounty (exceto add-on)
@@ -12926,6 +12961,18 @@ function _registrarEntradaImpl() {
             refId: t.id,
         });
     }
+    
+    // LOTE 5: Registra transação SEPARADA para taxa administrativa
+    if (taxaAdmCobrada > 0) {
+        registrarTransacao({
+            jogadorId: jid,
+            tipo: 'taxa_adm',
+            valor: -taxaAdmCobrada,
+            descricao: `Taxa Adm. · ${t.nome} · ${getJogadorNome(jid)}`,
+            origem: 'torneio',
+            refId: t.id,
+        });
+    }
 
     saveData();
     closeModal('modal-entrada');
@@ -12936,7 +12983,7 @@ function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0);
+    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0);
     const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
@@ -19790,12 +19837,18 @@ function calcularResumoCaixaTorneio(t) {
     });
     const jackpots = (t.jackpotCompras || []).reduce((s,j) => s + j.valor, 0);
     const jackpotsQtd = (t.jackpotCompras || []).reduce((s,j) => s + (j.qtd||1), 0);
+    
+    // LOTE 5: Taxa administrativa — cobrada só no buy-in, separada do prize
+    const taxaAdmUnit = Number(t.taxaAdm) || 0;
+    const taxaAdm = taxaAdmUnit * buyinsQtd;
+    const taxaAdmQtd = taxaAdmUnit > 0 ? buyinsQtd : 0;
 
     // bounties pagos (saem do caixa do torneio)
     const bountiesPagos = (t.eliminados || []).reduce((s,e) => s + (e.bountyPago || 0), 0);
 
-    const total = buyins + reentries + rebuys + addons + jackpots + lastChance;
+    const total = buyins + reentries + rebuys + addons + jackpots + lastChance + taxaAdm;
     return { buyins, reentries, rebuys, addons, jackpots, lastChance, bounties: bountiesPagos,
+             taxaAdm, taxaAdmQtd,
              buyinsQtd, reentriesQtd, rebuysQtd, addonsQtd, jackpotsQtd, lastChanceQtd,
              entradas: buyinsQtd + reentriesQtd,
              total };
@@ -19831,6 +19884,7 @@ function renderCaixaTorneio(t) {
                 ${resumo.addons > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Add-ons</div><div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;margin-top:.1rem;">${formatMoney(resumo.addons)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.addonsQtd}x</div></div>` : ''}
                 ${resumo.jackpots > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Jackpots</div><div style="font-family:var(--font-mono);font-weight:700;color:var(--gold);margin-top:.1rem;">${formatMoney(resumo.jackpots)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.jackpotsQtd}x</div></div>` : ''}
                 ${resumo.lastChance > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Last Chance</div><div style="font-family:var(--font-mono);font-weight:700;color:#a78bfa;margin-top:.1rem;">${formatMoney(resumo.lastChance)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.lastChanceQtd}x</div></div>` : ''}
+                ${resumo.taxaAdm > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;border:1px solid rgba(251,146,60,.3);"><div style="color:#fb923c;font-size:.6rem;text-transform:uppercase;font-weight:700;">Taxa Adm.</div><div style="font-family:var(--font-mono);font-weight:700;color:#fb923c;margin-top:.1rem;">${formatMoney(resumo.taxaAdm)}</div><div style="font-size:.6rem;color:#52525b;">${resumo.taxaAdmQtd}x</div></div>` : ''}
                 ${resumo.bounties > 0 ? `<div style="padding:.4rem .55rem;background:#0f0f12;border-radius:.35rem;"><div style="color:#52525b;font-size:.6rem;text-transform:uppercase;font-weight:700;">Bounties Pagos</div><div style="font-family:var(--font-mono);font-weight:700;color:#ef4444;margin-top:.1rem;">-${formatMoney(resumo.bounties)}</div></div>` : ''}
                 <div style="padding:.4rem .55rem;background:#0f0f12;border:1px solid var(--gold);border-radius:.35rem;grid-column:span 3;display:flex;justify-content:space-between;align-items:center;"><span style="color:var(--gold);font-size:.65rem;text-transform:uppercase;font-weight:700;">TOTAL NO CAIXA</span><span style="font-family:var(--font-mono);font-weight:800;color:var(--gold);font-size:.95rem;">${formatMoney(resumo.total - resumo.bounties)}</span></div>
             </div>
