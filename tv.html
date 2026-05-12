@@ -1191,8 +1191,72 @@ function montarCarouselPremiacao(d) {
      SCRIPT PÚBLICO: carrega dados via Supabase quando acessado
      em /tv/SLUG (URL pública), sem precisar de postMessage
      ============================================================ -->
-<!-- Versão 2.39.7 do Supabase JS — última que ainda suporta Chrome 63 (Samsung Tizen 5.0) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
+<!-- Wrapper Supabase via fetch nativo (compatível com Smart TVs antigas) -->
+<script>
+  // Wrapper simples que imita a API do supabase-js mas usa só fetch().
+  // Compatível com qualquer navegador desde 2015.
+  window.supabase = {
+    createClient: function(url, anonKey, opts) {
+      var baseUrl = url.replace(/\/$/, '');
+      var headers = {
+        'apikey': anonKey,
+        'Authorization': 'Bearer ' + anonKey,
+        'Content-Type': 'application/json'
+      };
+      
+      function fetchJson(endpoint, options) {
+        options = options || {};
+        var fetchOpts = {
+          method: options.method || 'GET',
+          headers: headers
+        };
+        if (options.body) {
+          fetchOpts.body = JSON.stringify(options.body);
+        }
+        
+        return fetch(baseUrl + endpoint, fetchOpts)
+          .then(function(res) {
+            return res.text().then(function(txt) {
+              var data = null;
+              try { data = txt ? JSON.parse(txt) : null; } catch(e) { data = txt; }
+              if (!res.ok) {
+                return { data: null, error: { message: (data && data.message) || ('HTTP ' + res.status), details: data, status: res.status } };
+              }
+              return { data: data, error: null };
+            });
+          })
+          .catch(function(err) {
+            return { data: null, error: { message: err.message || String(err) } };
+          });
+      }
+      
+      return {
+        rpc: function(fnName, params) {
+          return fetchJson('/rest/v1/rpc/' + encodeURIComponent(fnName), {
+            method: 'POST',
+            body: params || {}
+          });
+        },
+        // Stub do channel — TV em modo público vai usar polling em vez de realtime
+        // (já existe polling a cada 30s no código original, suficiente pra TV pública)
+        channel: function(name) {
+          var stub = {
+            on: function() { return stub; },
+            subscribe: function(cb) {
+              if (typeof cb === 'function') {
+                try { cb('SUBSCRIBED'); } catch(_) {}
+              }
+              return stub;
+            },
+            unsubscribe: function() { return Promise.resolve(); }
+          };
+          return stub;
+        },
+        removeChannel: function() { return Promise.resolve(); }
+      };
+    }
+  };
+</script>
 <script>
 (function() {
   // Detectar se estamos em modo público (URL /tv/SLUG ou /tv?slug=)
@@ -1310,7 +1374,8 @@ function montarCarouselPremiacao(d) {
     await carregarPubData();
     
     // Polling backup a cada 30s (realtime cuida do tempo real)
-    pubState.pollingInterval = setInterval(carregarPubData, 30000);
+    // Polling a cada 15s (era 30s, mas reduzido porque realtime via SDK não funciona em TVs antigas)
+    pubState.pollingInterval = setInterval(carregarPubData, 15000);
     
     // Iniciar realtime
     iniciarPubRealtime();
