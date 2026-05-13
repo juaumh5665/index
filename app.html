@@ -2083,7 +2083,8 @@ html {
                             <button onclick="addFichaDenom()" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Adicionar</button>
                         </div>
                         <div id="fichas-list" style="display:flex;flex-direction:column;gap:.5rem;"></div>
-                        <div style="margin-top:1rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;">
+                        <div id="fichas-sync-status" style="margin-top:.85rem;padding:.5rem .85rem;background:#0a0a0b;border-radius:.4rem;font-size:.7rem;color:#71717a;"></div>
+                        <div style="margin-top:.75rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.75rem;color:#71717a;">
                             <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Essas denominações aparecem ao abrir mesa de cash e registrar saídas de jogadores.
                         </div>
                     </div>
@@ -4387,13 +4388,26 @@ let funcionarios   = JSON.parse(localStorage.getItem('ps_funcionarios'))   || []
 let torneioDealers = JSON.parse(localStorage.getItem('ps_torneio_dealers'))|| [];
 let torneioCapiles = JSON.parse(localStorage.getItem('ps_torneio_capiles'))|| [];
 // Denominações de fichas padrão do clube (editável em Configurações)
-let fichasDenominacoes = JSON.parse(localStorage.getItem('ps_fichas_denom')) || [
+// Persistido em clubes.config.fichas_denominacoes (Supabase) + cache em localStorage
+const FICHAS_DEFAULT = [
     { valor:25,    cor:'#22c55e', nome:'Verde'   },
     { valor:100,   cor:'#000000', nome:'Preta'   },
     { valor:500,   cor:'#a855f7', nome:'Roxa'    },
     { valor:1000,  cor:'#eab308', nome:'Amarela' },
     { valor:5000,  cor:'#ef4444', nome:'Vermelha'},
 ];
+let fichasDenominacoes = (() => {
+    try {
+        const raw = localStorage.getItem('ps_fichas_denom');
+        if (!raw) return FICHAS_DEFAULT.slice();
+        const arr = JSON.parse(raw);
+        // Proteção: se vier array vazio ou inválido, usa defaults (evita "sumir tudo" após reset bugado)
+        if (!Array.isArray(arr) || arr.length === 0) return FICHAS_DEFAULT.slice();
+        return arr;
+    } catch (e) {
+        return FICHAS_DEFAULT.slice();
+    }
+})();
 
 // Payment methods metadata
 const PAYMENT_METHODS = {
@@ -6025,6 +6039,23 @@ async function carregarEstadoDoSupabase() {
                 }
             } catch(e) { console.warn('[CAPILES] erro carregar:', e); }
         }
+
+        // Fichas (denominações) — vem de clubes.config jsonb
+        try {
+            const { data: clubeRow } = await sb.from('clubes')
+                .select('config')
+                .eq('id', clubeIdEsperado)
+                .single();
+            if (clubeRow && clubeRow.config && Array.isArray(clubeRow.config.fichas_denominacoes)) {
+                const remotas = clubeRow.config.fichas_denominacoes;
+                // Só sobrescreve se vier algo válido (não vazio)
+                if (remotas.length > 0) {
+                    fichasDenominacoes = remotas;
+                    localStorage.setItem('ps_fichas_denom', JSON.stringify(fichasDenominacoes));
+                    console.log(`✅ ${remotas.length} denominações de fichas carregadas do clube`);
+                }
+            }
+        } catch(e) { console.warn('[FICHAS] erro carregar:', e); }
 
         console.log(`✅ Estado carregado do Supabase: ${torneios.length} torneios, ${cashMesas?.length||0} mesas, ${barProdutos.length} produtos, ${barComandas.length} comandas`);
     } catch (e) {
@@ -8661,7 +8692,7 @@ function _limparEstadoClube() {
         'ps_jogadores', 'ps_torneios', 'ps_bar_grupos', 'ps_bar_produtos',
         'ps_bar_comandas', 'ps_cash_mesas', 'ps_transacoes', 'ps_fechamentos',
         'ps_bar_caixa', 'ps_rankings', 'ps_auditoria', 'ps_torneio_templates',
-        'ps_backup_auto', 'ps_fichas_denominacoes',
+        'ps_backup_auto', 'ps_fichas_denom',
     ];
     keysClube.forEach(k => localStorage.removeItem(k));
 
@@ -8678,7 +8709,10 @@ function _limparEstadoClube() {
     if (typeof rankings !== 'undefined')    rankings = [];
     if (typeof auditoria !== 'undefined')   auditoria = [];
     if (typeof torneioTemplates !== 'undefined') torneioTemplates = [];
-    if (typeof fichasDenominacoes !== 'undefined') fichasDenominacoes = [];
+    // Fichas: volta para defaults (não array vazio — vai ser sobrescrito pelo banco se houver config remota)
+    if (typeof fichasDenominacoes !== 'undefined' && typeof FICHAS_DEFAULT !== 'undefined') {
+        fichasDenominacoes = FICHAS_DEFAULT.slice();
+    }
 
     // Limpa queue de sync (não vai sincronizar dados antigos)
     if (typeof _syncQueue !== 'undefined') {
@@ -19017,27 +19051,75 @@ function renderFichasConfig() {
     el.innerHTML = fichasDenominacoes.map((f, i) => `
         <div style="display:grid;grid-template-columns:60px 100px 1fr 80px 40px;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
             <div style="display:flex;align-items:center;gap:.4rem;">
-                <input type="color" value="${f.cor}" onchange="fichasDenominacoes[${i}].cor=this.value;saveData();renderFichasConfig();" style="width:36px;height:28px;border:none;border-radius:.3rem;cursor:pointer;background:transparent;">
+                <input type="color" value="${f.cor}" onchange="fichasDenominacoes[${i}].cor=this.value;agendarSalvarFichas();renderFichasConfig();" style="width:36px;height:28px;border:none;border-radius:.3rem;cursor:pointer;background:transparent;">
                 <div style="width:24px;height:24px;border-radius:50%;background:${f.cor};border:2px solid #fff;box-shadow:0 0 0 1px #000;"></div>
             </div>
-            <input type="number" value="${f.valor}" onchange="fichasDenominacoes[${i}].valor=parseFloat(this.value)||0;saveData();" class="inp" style="padding:.35rem .5rem;font-size:.85rem;font-family:var(--font-mono);">
-            <input type="text" value="${f.nome}" placeholder="Nome da ficha" onchange="fichasDenominacoes[${i}].nome=this.value;saveData();" class="inp" style="padding:.35rem .5rem;font-size:.85rem;">
+            <input type="number" value="${f.valor}" onchange="fichasDenominacoes[${i}].valor=parseFloat(this.value)||0;agendarSalvarFichas();" class="inp" style="padding:.35rem .5rem;font-size:.85rem;font-family:var(--font-mono);">
+            <input type="text" value="${f.nome}" placeholder="Nome da ficha" onchange="fichasDenominacoes[${i}].nome=this.value;agendarSalvarFichas();" class="inp" style="padding:.35rem .5rem;font-size:.85rem;">
             <span style="font-size:.7rem;color:#52525b;text-align:right;">#${i+1}</span>
             <button onclick="removerFichaDenom(${i})" class="btn-danger" style="padding:.3rem .5rem;font-size:.7rem;"><i class="fa-solid fa-trash"></i></button>
         </div>`).join('');
+
+    // Indicador de status de sync (sutil, abaixo da lista)
+    const statusEl = document.getElementById('fichas-sync-status');
+    if (statusEl) {
+        statusEl.innerHTML = sbClube?.id
+            ? '<i class="fa-solid fa-cloud" style="color:#22c55e;"></i> Sincronizado com a nuvem · Visível em todos os dispositivos'
+            : '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i> Salvo apenas neste dispositivo (offline)';
+    }
 }
 
 function addFichaDenom() {
     fichasDenominacoes.push({ valor: 100, cor: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0'), nome: 'Nova' });
-    saveData();
+    agendarSalvarFichas();
     renderFichasConfig();
 }
 
 function removerFichaDenom(i) {
     if (!confirm('Remover esta denominação?')) return;
     fichasDenominacoes.splice(i, 1);
-    saveData();
+    agendarSalvarFichas();
     renderFichasConfig();
+}
+
+// Debounce: agrupa múltiplas edições rápidas em um único update remoto
+let _fichasSaveTimer = null;
+function agendarSalvarFichas() {
+    // Salva imediatamente no localStorage (não perde nada se fechar a aba)
+    try {
+        localStorage.setItem('ps_fichas_denom', JSON.stringify(fichasDenominacoes));
+    } catch(e) { /* quota etc — segue */ }
+    // Agenda sync remoto (debounce 600ms)
+    if (_fichasSaveTimer) clearTimeout(_fichasSaveTimer);
+    _fichasSaveTimer = setTimeout(() => {
+        _fichasSaveTimer = null;
+        salvarFichasNoClube();
+    }, 600);
+}
+
+// Persiste fichas em clubes.config jsonb. Não dispara erro pra UI — segue silencioso.
+async function salvarFichasNoClube() {
+    if (!sbClube?.id) {
+        console.log('[FICHAS] Sem clube ativo, salvou só localmente');
+        return;
+    }
+    try {
+        // Lê config atual primeiro (não pode sobrescrever outras chaves do jsonb)
+        const { data: row, error: getErr } = await sb.from('clubes')
+            .select('config')
+            .eq('id', sbClube.id)
+            .single();
+        if (getErr) throw getErr;
+        const novoConfig = { ...(row?.config || {}), fichas_denominacoes: fichasDenominacoes };
+        const { error: upErr } = await sb.from('clubes')
+            .update({ config: novoConfig, atualizado_em: new Date().toISOString() })
+            .eq('id', sbClube.id);
+        if (upErr) throw upErr;
+        console.log(`💾 ${fichasDenominacoes.length} denominações de fichas salvas no clube`);
+    } catch (e) {
+        console.warn('[FICHAS] Erro ao salvar no Supabase (mantido no localStorage):', e.message || e);
+        // Não mostra toast em erro — silenciosamente mantém só localmente
+    }
 }
 
 // ============================================================
