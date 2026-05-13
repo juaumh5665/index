@@ -1443,7 +1443,6 @@ html {
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Contato</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Cidade</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Torneios</th>
-                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Saldo</th>
                                 <th style="padding:1rem 1.5rem;text-align:right;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Ações</th>
                             </tr>
                         </thead>
@@ -11678,10 +11677,6 @@ function renderJogadores(data = jogadores) {
         return;
     }
     tbody.innerHTML = data.map(j => {
-        const saldo = getSaldoJogador(j.id);
-        const devedor = saldo < 0;
-        const credito = saldo > 0;
-        const corSaldo = devedor ? '#ef4444' : credito ? '#22c55e' : '#52525b';
         return `
         <tr style="border-bottom:1px solid #1a1a1e;">
             <td style="padding:.9rem 1.5rem;">
@@ -11691,10 +11686,6 @@ function renderJogadores(data = jogadores) {
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:var(--font-mono);">${j.whatsapp || '—'}</td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#a1a1aa;">${j.cidade?`${j.cidade}${j.uf?' / '+j.uf:''}`:'<span style="color:#3f3f46;">—</span>'}</td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#52525b;">${contarTorneiosJogador(j.id)}</td>
-            <td style="padding:.9rem 1.5rem;">
-                <div style="font-family:var(--font-mono);font-weight:800;color:${corSaldo};font-size:.9rem;">${saldo===0?formatMoney(0):(devedor?'-':'+')+formatMoney(Math.abs(saldo))}</div>
-                <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Devedor':credito?'Crédito':'Zerado'}</div>
-            </td>
             <td style="padding:.9rem 1.5rem;text-align:right;">
                 <button onclick="editarJogador('${j.id}')" class="btn-ghost" style="padding:.35rem .75rem;font-size:.75rem;margin-right:.3rem;" title="Editar informações cadastrais"><i class="fa-solid fa-pen"></i> Editar</button>
                 <button onclick="removerJogador('${j.id}')" class="btn-danger"><i class="fa-solid fa-trash"></i></button>
