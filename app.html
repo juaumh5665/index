@@ -392,13 +392,6 @@
         @keyframes pulse-gold { 0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.4); } 50% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } }
         .pulse { animation: pulse-gold 2s infinite; }
 
-        /* Flash dourado pra item recém-adicionado em comanda do bar */
-        @keyframes bar-item-flash {
-            0%   { transform: translateX(-8px); opacity: 0; background: rgba(245,158,11,.35); }
-            40%  { transform: translateX(0);    opacity: 1; background: rgba(245,158,11,.25); }
-            100% { transform: translateX(0);    opacity: 1; background: rgba(245,158,11,.15); }
-        }
-
         /* Break overlay on TV-like feel */
         .break-banner { background: linear-gradient(135deg, #1a0a0a, #0a0a0a); border: 1px solid #3f1515; }
     
@@ -1871,6 +1864,7 @@ html {
                     <button class="tab-btn"        id="cfgtab-btn-financeiro"  onclick="switchConfigTab('cfg-financeiro', this)"><i class="fa-solid fa-sack-dollar"></i> Financeiro</button>
                     <button class="tab-btn"        id="cfgtab-btn-seguranca"   onclick="switchConfigTab('cfg-seguranca', this)"><i class="fa-solid fa-shield-halved"></i> Segurança</button>
                     <button class="tab-btn"        id="cfgtab-btn-backup"      onclick="switchConfigTab('cfg-backup', this)"><i class="fa-solid fa-database"></i> Backup</button>
+                    <button class="tab-btn"        id="cfgtab-btn-importar"    onclick="switchConfigTab('cfg-importar', this); resetarImportJogadores();"><i class="fa-solid fa-file-import"></i> Importar Jogadores</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
                     <button class="tab-btn"        id="cfgtab-btn-tv"          onclick="switchConfigTab('cfg-tv', this); renderConfigTV();"><i class="fa-solid fa-tv"></i> TV Pública</button>
                 </div>
@@ -2177,6 +2171,43 @@ html {
                             <i class="fa-solid fa-trash"></i> Resetar Todo o Sistema
                         </button>
                     </div>
+                </div>
+
+                <!-- ABA: IMPORTAR JOGADORES -->
+                <div id="cfg-importar" class="configtab-content" style="display:none;">
+                    <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;"><i class="fa-solid fa-file-import"></i> Importar Jogadores em Lote</div>
+                        <div style="font-size:.85rem;color:#a1a1aa;line-height:1.6;margin-bottom:1rem;">
+                            Importe jogadores em massa via planilha. Campos aceitos: <strong style="color:#e4e4e7;">Nome</strong> (obrigatório), <strong style="color:#e4e4e7;">WhatsApp</strong>, <strong style="color:#e4e4e7;">Cidade</strong> e <strong style="color:#e4e4e7;">UF</strong>.
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
+                            <button onclick="baixarModeloImport('csv')" style="padding:.75rem;background:#0f0f12;border:1px solid #27272a;color:#e4e4e7;border-radius:.5rem;cursor:pointer;font-size:.8rem;font-weight:600;font-family:'Manrope',sans-serif;" onmouseover="this.style.borderColor='#3f3f46'" onmouseout="this.style.borderColor='#27272a'">
+                                <i class="fa-solid fa-download" style="color:#22c55e;margin-right:.4rem;"></i> Baixar modelo CSV
+                            </button>
+                            <button onclick="baixarModeloImport('xlsx')" style="padding:.75rem;background:#0f0f12;border:1px solid #27272a;color:#e4e4e7;border-radius:.5rem;cursor:pointer;font-size:.8rem;font-weight:600;font-family:'Manrope',sans-serif;" onmouseover="this.style.borderColor='#3f3f46'" onmouseout="this.style.borderColor='#27272a'">
+                                <i class="fa-solid fa-download" style="color:#22c55e;margin-right:.4rem;"></i> Baixar modelo Excel
+                            </button>
+                        </div>
+                        <label for="import-jogadores-input" style="display:block;padding:1.5rem;background:rgba(245,158,11,.05);border:2px dashed rgba(245,158,11,.3);color:var(--gold);border-radius:.6rem;text-align:center;cursor:pointer;font-weight:700;font-size:.95rem;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background='rgba(245,158,11,.05)'">
+                            <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.5rem;display:block;margin-bottom:.5rem;"></i>
+                            Selecionar arquivo CSV ou Excel (.xlsx)
+                            <div style="font-size:.7rem;color:#71717a;font-weight:400;margin-top:.35rem;">Suporta UTF-8 e arquivos do Google Sheets / Excel</div>
+                        </label>
+                        <input id="import-jogadores-input" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none;" onchange="lerArquivoImportJogadores(event)">
+
+                        <div style="margin-top:1rem;padding:.75rem;background:#0a0a0b;border-radius:.5rem;font-size:.72rem;color:#71717a;line-height:1.6;">
+                            <strong style="color:#a1a1aa;">💡 Dicas:</strong>
+                            <ul style="margin:.4rem 0 0 1.2rem;padding:0;">
+                                <li>A primeira linha deve conter os cabeçalhos.</li>
+                                <li>Nomes de coluna aceitos (sem distinção de maiúsculas/acentos): <code>nome</code>, <code>whatsapp</code> ou <code>telefone</code>, <code>cidade</code>, <code>uf</code> ou <code>estado</code>.</li>
+                                <li>WhatsApp pode estar em qualquer formato (será limpo automaticamente).</li>
+                                <li>UF deve ter 2 letras (ex: PR, SP) — se vier o nome do estado por extenso, será convertido.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Preview / Resultado -->
+                    <div id="import-jog-preview" style="display:none;"></div>
                 </div>
 
                 <!-- ABA: INTEGRAÇÕES -->
@@ -14603,9 +14634,9 @@ function renderDetalheComanda() {
     itensEl.innerHTML = c.itens.length ? c.itens.map((it, i) => {
         const prod = barProdutos.find(p => p.id === it.produtoId);
         const isNovo = recemId && it.id === recemId;
-        const styleNovo = isNovo ? 'background:rgba(245,158,11,.15);border:1px solid var(--gold);animation:bar-item-flash .6s ease-out;' : 'background:#0f0f12;border:1px solid transparent;';
+        const styleNovo = isNovo ? 'background:rgba(245,158,11,.18);border:1px solid var(--gold);' : 'background:#0f0f12;border:1px solid transparent;';
         return `
-        <div data-item-id="${it.id}" style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;transition:background .4s ease, border-color .4s ease;${styleNovo}">
+        <div data-item-id="${it.id}" style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;transition:background .6s ease, border-color .6s ease;${styleNovo}">
             <div>
                 <span style="font-weight:700;">${prod ? prod.nome : (it.nome || '?')}</span>
                 ${prod && prod.descricao ? `<span style="color:#52525b;margin-left:.3rem;">${prod.descricao}</span>` : ''}
@@ -14616,14 +14647,14 @@ function renderDetalheComanda() {
         </div>`;
     }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Nenhum item ainda</div>';
 
-    // Após render, agenda a remoção visual do destaque (volta ao estado normal)
+    // Após render, mantém o destaque por 2s e depois desfaz suavemente (transition cuida do fade)
     if (recemId) {
         const el = itensEl.querySelector(`[data-item-id="${recemId}"]`);
         if (el) {
             setTimeout(() => {
                 el.style.background = '#0f0f12';
                 el.style.border = '1px solid transparent';
-            }, 1200);
+            }, 2000);
         }
         // Limpa marcação para próximas renderizações não destacarem de novo
         window._barItemRecemAdicionado = null;
@@ -16291,6 +16322,423 @@ function importarBackup(event) {
     };
     reader.readAsText(file);
 }
+
+// ============================================================
+// IMPORTAÇÃO DE JOGADORES EM LOTE (CSV / XLSX)
+// ============================================================
+// Estado em memória — armazenado fora de variáveis globais persistentes
+// para evitar contaminar localStorage / backup.
+let _importJogState = null; // { linhas:[], estatisticas:{}, arquivoNome:'' }
+
+// Reset do estado da aba importar
+function resetarImportJogadores() {
+    _importJogState = null;
+    const preview = document.getElementById('import-jog-preview');
+    if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+    const input = document.getElementById('import-jogadores-input');
+    if (input) input.value = '';
+}
+
+// Mapa de nome de estado por extenso -> UF (para tolerar planilhas com "Paraná" em vez de "PR")
+const _UF_NOMES_TO_SIGLA = {
+    'acre':'AC','alagoas':'AL','amapa':'AP','amapá':'AP','amazonas':'AM',
+    'bahia':'BA','ceara':'CE','ceará':'CE','distrito federal':'DF','espirito santo':'ES','espírito santo':'ES',
+    'goias':'GO','goiás':'GO','maranhao':'MA','maranhão':'MA','mato grosso':'MT','mato grosso do sul':'MS',
+    'minas gerais':'MG','para':'PA','pará':'PA','paraiba':'PB','paraíba':'PB','parana':'PR','paraná':'PR',
+    'pernambuco':'PE','piaui':'PI','piauí':'PI','rio de janeiro':'RJ','rio grande do norte':'RN','rio grande do sul':'RS',
+    'rondonia':'RO','rondônia':'RO','roraima':'RR','santa catarina':'SC','sao paulo':'SP','são paulo':'SP',
+    'sergipe':'SE','tocantins':'TO'
+};
+const _UF_VALIDAS = new Set(['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']);
+
+// Normaliza string para comparação (lower, sem acento, sem espaços extras)
+function _normStr(s) {
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+// Normaliza telefone: tira tudo que não for dígito
+function _normFone(s) { return String(s || '').replace(/\D+/g, ''); }
+
+// Resolve cabeçalho da planilha em chaves canônicas { nome, whatsapp, cidade, uf }
+function _mapHeader(header) {
+    const map = { nome:null, whatsapp:null, cidade:null, uf:null };
+    header.forEach((h, idx) => {
+        const k = _normStr(h);
+        if (['nome','nome completo','jogador','player','name'].includes(k)) map.nome = idx;
+        else if (['whatsapp','telefone','fone','celular','phone','tel'].includes(k)) map.whatsapp = idx;
+        else if (['cidade','city','municipio','município'].includes(k)) map.cidade = idx;
+        else if (['uf','estado','state','sigla'].includes(k)) map.uf = idx;
+    });
+    return map;
+}
+
+// Resolve UF a partir de qualquer entrada ("PR", "Paraná", "parana", "pr")
+function _resolverUF(raw) {
+    if (!raw) return '';
+    const limpo = String(raw).trim();
+    const upper = limpo.toUpperCase();
+    if (upper.length === 2 && _UF_VALIDAS.has(upper)) return upper;
+    const norm = _normStr(limpo);
+    return _UF_NOMES_TO_SIGLA[norm] || '';
+}
+
+// Detecta duplicata no cache local de jogadores
+function _acharDuplicata(reg) {
+    const fone = _normFone(reg.whatsapp);
+    const nomeNorm = _normStr(reg.nome);
+    return jogadores.find(j => {
+        if (fone && _normFone(j.whatsapp) === fone) return true;
+        if (nomeNorm && _normStr(j.nome) === nomeNorm) return true;
+        return false;
+    });
+}
+
+// Parser CSV simples (suporta vírgula e ponto-e-vírgula, aspas e escape)
+function _parseCSV(text) {
+    // detecta separador: usa ; se a primeira linha tem mais ; que ,
+    const firstLine = text.split(/\r?\n/)[0] || '';
+    const sep = (firstLine.match(/;/g)||[]).length > (firstLine.match(/,/g)||[]).length ? ';' : ',';
+    const rows = [];
+    let cur = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"' && text[i+1] === '"') { cell += '"'; i++; }
+            else if (ch === '"') inQuotes = false;
+            else cell += ch;
+        } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === sep) { cur.push(cell); cell = ''; }
+            else if (ch === '\n') { cur.push(cell); rows.push(cur); cur = []; cell = ''; }
+            else if (ch === '\r') { /* ignora */ }
+            else cell += ch;
+        }
+    }
+    if (cell.length || cur.length) { cur.push(cell); rows.push(cur); }
+    return rows.filter(r => r.some(c => String(c || '').trim() !== ''));
+}
+
+// Lê arquivo escolhido (CSV ou XLSX) e dispara o preview
+async function lerArquivoImportJogadores(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (bloquearSeExpirado('importar jogadores')) { event.target.value = ''; return; }
+
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    try {
+        let linhas;
+        if (ext === 'csv') {
+            const text = await file.text();
+            linhas = _parseCSV(text);
+        } else if (ext === 'xlsx' || ext === 'xls') {
+            // Carrega SheetJS sob demanda (não polui o boot)
+            if (typeof XLSX === 'undefined') {
+                await _carregarSheetJS();
+            }
+            const buffer = await file.arrayBuffer();
+            const wb = XLSX.read(buffer, { type:'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            linhas = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
+            // Filtra linhas totalmente vazias
+            linhas = linhas.filter(r => Array.isArray(r) && r.some(c => String(c || '').trim() !== ''));
+        } else {
+            showToast('⚠️ Formato não suportado. Use CSV ou XLSX.');
+            event.target.value = '';
+            return;
+        }
+
+        if (!linhas.length) {
+            showToast('⚠️ Arquivo vazio.');
+            event.target.value = '';
+            return;
+        }
+
+        // Processa: primeira linha = cabeçalho
+        const header = linhas[0].map(h => String(h || '').trim());
+        const mapa = _mapHeader(header);
+
+        if (mapa.nome === null) {
+            showToast('⚠️ Coluna "Nome" não encontrada no cabeçalho.');
+            event.target.value = '';
+            return;
+        }
+
+        const registros = [];
+        for (let i = 1; i < linhas.length; i++) {
+            const row = linhas[i];
+            const nome     = String(row[mapa.nome]      ?? '').trim();
+            const whatsapp = mapa.whatsapp !== null ? String(row[mapa.whatsapp] ?? '').trim() : '';
+            const cidade   = mapa.cidade   !== null ? String(row[mapa.cidade]   ?? '').trim() : '';
+            const ufRaw    = mapa.uf       !== null ? String(row[mapa.uf]       ?? '').trim() : '';
+
+            const erros = [];
+            if (!nome || nome.length < 2) erros.push('Nome ausente ou muito curto');
+
+            let uf = '';
+            if (ufRaw) {
+                uf = _resolverUF(ufRaw);
+                if (!uf) erros.push(`UF inválida: "${ufRaw}"`);
+            }
+
+            // Telefone: aceita qualquer formato, só limpa
+            const foneDigits = _normFone(whatsapp);
+            if (whatsapp && foneDigits.length < 8) erros.push('WhatsApp muito curto');
+
+            const reg = {
+                linha: i + 1,
+                nome, whatsapp, cidade, uf,
+                foneDigits,
+                erros,
+                status: erros.length ? 'erro' : 'ok',
+                duplicata: null,
+                acao: 'criar',
+            };
+            // Marca duplicata só se não tiver erro
+            if (!erros.length) {
+                const dup = _acharDuplicata(reg);
+                if (dup) {
+                    reg.duplicata = { id: dup.id, nome: dup.nome };
+                    reg.status = 'duplicado';
+                    reg.acao = 'pular'; // ação padrão p/ duplicata
+                }
+            }
+            registros.push(reg);
+        }
+
+        _importJogState = { linhas: registros, arquivoNome: file.name };
+        renderPreviewImportJogadores();
+    } catch (e) {
+        console.error(e);
+        showToast('⚠️ Erro ao ler arquivo: ' + e.message);
+    } finally {
+        event.target.value = '';
+    }
+}
+
+// Carrega SheetJS via CDN (apenas quando o usuário tenta importar .xlsx)
+function _carregarSheetJS() {
+    return new Promise((resolve, reject) => {
+        if (typeof XLSX !== 'undefined') return resolve();
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Não foi possível carregar a biblioteca Excel. Verifique sua conexão.'));
+        document.head.appendChild(script);
+    });
+}
+
+function renderPreviewImportJogadores() {
+    const el = document.getElementById('import-jog-preview');
+    if (!el || !_importJogState) return;
+    const st = _importJogState;
+    const total = st.linhas.length;
+    const ok        = st.linhas.filter(l => l.status === 'ok').length;
+    const dup       = st.linhas.filter(l => l.status === 'duplicado').length;
+    const erros     = st.linhas.filter(l => l.status === 'erro').length;
+    const importaveis = st.linhas.filter(l => (l.status === 'ok') || (l.status === 'duplicado' && l.acao !== 'pular')).length;
+
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div class="stat-card" style="padding:1.25rem;margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem;">
+                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;"><i class="fa-solid fa-magnifying-glass-chart"></i> Pré-visualização — ${st.arquivoNome}</div>
+                <button onclick="resetarImportJogadores()" style="padding:.35rem .7rem;background:transparent;border:1px solid #3f3f46;color:#a1a1aa;border-radius:.4rem;cursor:pointer;font-size:.7rem;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-times"></i> Cancelar</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem;">
+                <div style="padding:.6rem;background:#0a0a0b;border-radius:.4rem;text-align:center;">
+                    <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;">Total</div>
+                    <div style="font-size:1.3rem;font-weight:800;color:#e4e4e7;font-family:var(--font-mono);">${total}</div>
+                </div>
+                <div style="padding:.6rem;background:rgba(34,197,94,.08);border-radius:.4rem;text-align:center;border:1px solid rgba(34,197,94,.2);">
+                    <div style="font-size:.65rem;color:#22c55e;text-transform:uppercase;letter-spacing:.08em;">Novos</div>
+                    <div style="font-size:1.3rem;font-weight:800;color:#22c55e;font-family:var(--font-mono);">${ok}</div>
+                </div>
+                <div style="padding:.6rem;background:rgba(245,158,11,.08);border-radius:.4rem;text-align:center;border:1px solid rgba(245,158,11,.2);">
+                    <div style="font-size:.65rem;color:var(--gold);text-transform:uppercase;letter-spacing:.08em;">Duplicados</div>
+                    <div style="font-size:1.3rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">${dup}</div>
+                </div>
+                <div style="padding:.6rem;background:rgba(239,68,68,.08);border-radius:.4rem;text-align:center;border:1px solid rgba(239,68,68,.2);">
+                    <div style="font-size:.65rem;color:#ef4444;text-transform:uppercase;letter-spacing:.08em;">Com erro</div>
+                    <div style="font-size:1.3rem;font-weight:800;color:#ef4444;font-family:var(--font-mono);">${erros}</div>
+                </div>
+            </div>
+            ${dup ? `
+            <div style="padding:.75rem;background:rgba(245,158,11,.06);border-left:3px solid var(--gold);border-radius:.3rem;margin-bottom:.75rem;font-size:.8rem;color:#a1a1aa;">
+                <strong style="color:var(--gold);">Duplicados encontrados:</strong> escolha o que fazer com cada um na tabela abaixo (pular = não importa; atualizar = sobrescreve dados existentes).
+            </div>` : ''}
+            <div style="max-height:420px;overflow:auto;border:1px solid #1e1e23;border-radius:.5rem;">
+                <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+                    <thead style="position:sticky;top:0;background:#0a0a0b;z-index:1;">
+                        <tr style="border-bottom:1px solid #1e1e23;">
+                            <th style="padding:.5rem;text-align:left;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.65rem;">Linha</th>
+                            <th style="padding:.5rem;text-align:left;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.65rem;">Nome</th>
+                            <th style="padding:.5rem;text-align:left;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.65rem;">WhatsApp</th>
+                            <th style="padding:.5rem;text-align:left;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.65rem;">Cidade</th>
+                            <th style="padding:.5rem;text-align:left;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.65rem;">UF</th>
+                            <th style="padding:.5rem;text-align:left;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.65rem;">Status / Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${st.linhas.map((l, idx) => {
+                            let statusBadge = '';
+                            let bg = 'transparent';
+                            if (l.status === 'ok') {
+                                statusBadge = '<span style="color:#22c55e;font-weight:700;font-size:.7rem;"><i class="fa-solid fa-check-circle"></i> Novo</span>';
+                            } else if (l.status === 'duplicado') {
+                                bg = 'rgba(245,158,11,.04)';
+                                statusBadge = `
+                                    <div style="display:flex;flex-direction:column;gap:.2rem;">
+                                        <span style="color:var(--gold);font-weight:700;font-size:.7rem;"><i class="fa-solid fa-triangle-exclamation"></i> Já cadastrado: ${l.duplicata.nome}</span>
+                                        <select onchange="atualizarAcaoImport(${idx}, this.value)" style="background:#0f0f12;border:1px solid #27272a;color:#e4e4e7;border-radius:.3rem;padding:.2rem .35rem;font-size:.7rem;font-family:'Manrope',sans-serif;">
+                                            <option value="pular"     ${l.acao==='pular'?'selected':''}>Pular</option>
+                                            <option value="atualizar" ${l.acao==='atualizar'?'selected':''}>Atualizar existente</option>
+                                            <option value="criar"     ${l.acao==='criar'?'selected':''}>Criar mesmo assim</option>
+                                        </select>
+                                    </div>`;
+                            } else {
+                                bg = 'rgba(239,68,68,.05)';
+                                statusBadge = `<span style="color:#ef4444;font-weight:700;font-size:.7rem;"><i class="fa-solid fa-circle-xmark"></i> ${l.erros.join(' / ')}</span>`;
+                            }
+                            return `
+                                <tr style="border-bottom:1px solid #1e1e23;background:${bg};">
+                                    <td style="padding:.45rem .5rem;color:#52525b;font-family:var(--font-mono);">${l.linha}</td>
+                                    <td style="padding:.45rem .5rem;color:#e4e4e7;">${escapeHtml(l.nome || '—')}</td>
+                                    <td style="padding:.45rem .5rem;color:#a1a1aa;font-family:var(--font-mono);">${escapeHtml(l.whatsapp || '—')}</td>
+                                    <td style="padding:.45rem .5rem;color:#a1a1aa;">${escapeHtml(l.cidade || '—')}</td>
+                                    <td style="padding:.45rem .5rem;color:#a1a1aa;">${escapeHtml(l.uf || '—')}</td>
+                                    <td style="padding:.45rem .5rem;">${statusBadge}</td>
+                                </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:center;margin-top:1rem;flex-wrap:wrap;">
+                <button id="btn-import-confirmar" onclick="confirmarImportJogadores()" ${importaveis === 0 ? 'disabled' : ''} class="btn-gold" style="padding:.75rem 1.25rem;border-radius:.5rem;${importaveis === 0 ? 'opacity:.4;cursor:not-allowed;' : ''}">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Confirmar importação (${importaveis})
+                </button>
+                <div id="import-jog-progress" style="font-size:.8rem;color:#71717a;"></div>
+            </div>
+        </div>
+    `;
+}
+
+// Atualiza ação de uma linha duplicada
+function atualizarAcaoImport(idx, valor) {
+    if (!_importJogState) return;
+    const linha = _importJogState.linhas[idx];
+    if (!linha) return;
+    linha.acao = valor;
+    // Atualiza só os totais (não re-renderiza tudo pra preservar scroll)
+    const importaveis = _importJogState.linhas.filter(l => (l.status === 'ok') || (l.status === 'duplicado' && l.acao !== 'pular')).length;
+    const btn = document.getElementById('btn-import-confirmar');
+    if (btn) {
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Confirmar importação (${importaveis})`;
+        btn.disabled = importaveis === 0;
+        btn.style.opacity = importaveis === 0 ? '.4' : '1';
+        btn.style.cursor  = importaveis === 0 ? 'not-allowed' : 'pointer';
+    }
+}
+
+// Executa a importação efetiva
+async function confirmarImportJogadores() {
+    if (!_importJogState) return;
+    if (bloquearSeExpirado('importar jogadores')) return;
+
+    const aProcessar = _importJogState.linhas.filter(l =>
+        (l.status === 'ok') ||
+        (l.status === 'duplicado' && l.acao !== 'pular')
+    );
+    if (!aProcessar.length) { showToast('Nenhum registro para importar.'); return; }
+
+    const btn = document.getElementById('btn-import-confirmar');
+    const prog = document.getElementById('import-jog-progress');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
+
+    let criados = 0, atualizados = 0, falhas = 0;
+    for (let i = 0; i < aProcessar.length; i++) {
+        const l = aProcessar[i];
+        if (prog) prog.innerText = `Importando ${i+1}/${aProcessar.length}...`;
+        const dados = {
+            nome: l.nome,
+            whatsapp: l.whatsapp,
+            cidade: l.cidade,
+            uf: l.uf,
+        };
+        try {
+            if (l.status === 'duplicado' && l.acao === 'atualizar' && l.duplicata) {
+                await db.jogadores.update(l.duplicata.id, dados);
+                atualizados++;
+            } else {
+                // 'criar' (caso ok ou duplicado-criar mesmo assim)
+                await db.jogadores.create(dados);
+                criados++;
+            }
+        } catch (e) {
+            console.error('Falha ao importar linha', l.linha, e);
+            falhas++;
+        }
+    }
+
+    if (prog) prog.innerText = '';
+    logAudit('JOGADOR_IMPORT', `Importação CSV/XLSX: ${criados} novos, ${atualizados} atualizados, ${falhas} falhas`, {
+        arquivo: _importJogState.arquivoNome, criados, atualizados, falhas, total: aProcessar.length
+    });
+
+    showToast(`✅ Importação concluída: ${criados} novos, ${atualizados} atualizados${falhas?`, ${falhas} falharam`:''}`);
+
+    // Limpa preview e atualiza listagens
+    resetarImportJogadores();
+    if (typeof renderJogadores === 'function') renderJogadores();
+    if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+// Baixa modelo (CSV ou XLSX) com cabeçalho e exemplos
+function baixarModeloImport(formato) {
+    const cabecalho = ['Nome', 'WhatsApp', 'Cidade', 'UF'];
+    const exemplos = [
+        ['João da Silva',        '46999990000', 'Pato Branco',    'PR'],
+        ['Maria Santos',         '11988887777', 'São Paulo',      'SP'],
+        ['Carlos Eduardo Pereira','',           'Laranjeiras do Sul','PR'],
+    ];
+
+    if (formato === 'csv') {
+        // BOM UTF-8 para o Excel abrir com acentos corretos
+        const linhas = [cabecalho, ...exemplos].map(row =>
+            row.map(c => {
+                const s = String(c ?? '');
+                return /[",;\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+            }).join(';')
+        );
+        const csv = '\uFEFF' + linhas.join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'modelo-jogadores.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast('📥 Modelo CSV baixado!');
+    } else {
+        // XLSX (carrega SheetJS sob demanda)
+        (async () => {
+            try {
+                if (typeof XLSX === 'undefined') await _carregarSheetJS();
+                const ws = XLSX.utils.aoa_to_sheet([cabecalho, ...exemplos]);
+                ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 24 }, { wch: 6 }];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Jogadores');
+                XLSX.writeFile(wb, 'modelo-jogadores.xlsx');
+                showToast('📥 Modelo Excel baixado!');
+            } catch (e) {
+                console.error(e);
+                showToast('⚠️ ' + e.message);
+            }
+        })();
+    }
+}
+// FIM IMPORTAÇÃO JOGADORES
+// ============================================================
 
 // --- INTEGRAÇÕES ---
 function salvarIntegracoes() {
