@@ -392,6 +392,13 @@
         @keyframes pulse-gold { 0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.4); } 50% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } }
         .pulse { animation: pulse-gold 2s infinite; }
 
+        /* Flash dourado pra item recém-adicionado em comanda do bar */
+        @keyframes bar-item-flash {
+            0%   { transform: translateX(-8px); opacity: 0; background: rgba(245,158,11,.35); }
+            40%  { transform: translateX(0);    opacity: 1; background: rgba(245,158,11,.25); }
+            100% { transform: translateX(0);    opacity: 1; background: rgba(245,158,11,.15); }
+        }
+
         /* Break overlay on TV-like feel */
         .break-banner { background: linear-gradient(135deg, #1a0a0a, #0a0a0a); border: 1px solid #3f1515; }
     
@@ -14500,16 +14507,38 @@ function renderComandas() {
         const j = jogadores.find(j => j.id === c.jogadorId);
         const total = calcTotalComanda(c);
         const ativa = c.id === activeComandaId;
+        // Renderiza itens da comanda (visível apenas quando expandida)
+        const itensHtml = (c.itens && c.itens.length) ? c.itens.map(it => {
+            const prod = barProdutos.find(p => p.id === it.produtoId);
+            const nome = it.nome || (prod ? prod.nome : '?');
+            return `
+                <div style="display:grid;grid-template-columns:1fr auto auto;gap:.75rem;align-items:center;padding:.4rem .6rem;background:#0a0a0b;border-radius:.35rem;font-size:.78rem;">
+                    <span style="color:#a1a1aa;">${nome}</span>
+                    <span style="color:#71717a;font-family:var(--font-mono);">${it.qtd}x</span>
+                    <span style="font-family:var(--font-mono);color:#22c55e;white-space:nowrap;">${formatMoney(it.subtotal)}</span>
+                </div>`;
+        }).join('') : '<div style="color:#3f3f46;font-size:.75rem;padding:.5rem .6rem;font-style:italic;">Nenhum item adicionado ainda</div>';
+
         return `
-        <div onclick="selecionarComanda('${c.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:${ativa?'#1a1a1e':'#0f0f12'};border:1px solid ${ativa?'var(--gold)':'#1e1e23'};border-radius:.6rem;cursor:pointer;transition:all .15s;">
-            <div>
-                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}${j && j.apelido ? ` <span style="color:#52525b;font-weight:400;">(${j.apelido})</span>` : ''}</div>
-                <div style="font-size:.75rem;color:#52525b;margin-top:.15rem;">${c.itens.length} item(s)</div>
+        <div style="background:${ativa?'#1a1a1e':'#0f0f12'};border:1px solid ${ativa?'var(--gold)':'#1e1e23'};border-radius:.6rem;overflow:hidden;transition:all .15s;">
+            <div onclick="selecionarComanda('${c.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;cursor:pointer;">
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <i class="fa-solid fa-chevron-${ativa?'down':'right'}" style="font-size:.7rem;color:#52525b;transition:transform .15s;"></i>
+                    <div>
+                        <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}${j && j.apelido ? ` <span style="color:#52525b;font-weight:400;">(${j.apelido})</span>` : ''}</div>
+                        <div style="font-size:.75rem;color:#52525b;margin-top:.15rem;">${c.itens.length} item(s)</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(total)}</div>
+                    <div style="font-size:.65rem;color:#52525b;margin-top:.15rem;">${new Date(c.abertoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+                </div>
             </div>
-            <div style="text-align:right;">
-                <div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(total)}</div>
-                <div style="font-size:.65rem;color:#52525b;margin-top:.15rem;">${new Date(c.abertoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
-            </div>
+            ${ativa ? `
+            <div style="padding:.5rem .85rem .85rem .85rem;border-top:1px dashed #27272a;display:flex;flex-direction:column;gap:.25rem;">
+                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Itens da comanda</div>
+                ${itensHtml}
+            </div>` : ''}
         </div>`;
     }).join('');
 
@@ -14539,6 +14568,14 @@ function mudarPaginaComandas(delta) {
 }
 
 function selecionarComanda(id) {
+    // Se já está selecionada, fecha (toggle); senão abre a nova
+    if (activeComandaId === id) {
+        activeComandaId = null;
+        renderComandas();
+        const detEl = document.getElementById('bar-comanda-detalhe');
+        if (detEl) detEl.style.display = 'none';
+        return;
+    }
     activeComandaId = id;
     renderComandas();
     renderDetalheComanda();
@@ -14562,12 +14599,15 @@ function renderDetalheComanda() {
 
     // Itens
     const itensEl = document.getElementById('cd-itens');
+    const recemId = window._barItemRecemAdicionado;
     itensEl.innerHTML = c.itens.length ? c.itens.map((it, i) => {
         const prod = barProdutos.find(p => p.id === it.produtoId);
+        const isNovo = recemId && it.id === recemId;
+        const styleNovo = isNovo ? 'background:rgba(245,158,11,.15);border:1px solid var(--gold);animation:bar-item-flash .6s ease-out;' : 'background:#0f0f12;border:1px solid transparent;';
         return `
-        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.5rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
+        <div data-item-id="${it.id}" style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;transition:background .4s ease, border-color .4s ease;${styleNovo}">
             <div>
-                <span style="font-weight:700;">${prod ? prod.nome : '?'}</span>
+                <span style="font-weight:700;">${prod ? prod.nome : (it.nome || '?')}</span>
                 ${prod && prod.descricao ? `<span style="color:#52525b;margin-left:.3rem;">${prod.descricao}</span>` : ''}
             </div>
             <span style="color:#71717a;">${it.qtd}x</span>
@@ -14575,6 +14615,19 @@ function renderDetalheComanda() {
             <button onclick="removeItemComanda(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
         </div>`;
     }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Nenhum item ainda</div>';
+
+    // Após render, agenda a remoção visual do destaque (volta ao estado normal)
+    if (recemId) {
+        const el = itensEl.querySelector(`[data-item-id="${recemId}"]`);
+        if (el) {
+            setTimeout(() => {
+                el.style.background = '#0f0f12';
+                el.style.border = '1px solid transparent';
+            }, 1200);
+        }
+        // Limpa marcação para próximas renderizações não destacarem de novo
+        window._barItemRecemAdicionado = null;
+    }
 
     document.getElementById('cd-total').innerText = formatMoney(calcTotalComanda(c));
 }
@@ -14598,12 +14651,14 @@ function addItemComanda() {
     // Agrupa itens iguais
     const valorUnit = Number(prod.valor || 0);
     const existente = c.itens.find(it => it.produtoId === prodId);
+    let itemAdicionadoId;
     if (existente) {
         existente.qtd += qtd;
         existente.valor = valorUnit;  // garante valor unitário consistente
         existente.subtotal = existente.qtd * valorUnit;
+        itemAdicionadoId = existente.id;
     } else {
-        c.itens.push({
+        const novoItem = {
             id: _genUuid(),
             produtoId: prodId,
             nome: prod.nome,
@@ -14611,8 +14666,13 @@ function addItemComanda() {
             valor: valorUnit,
             subtotal: qtd * valorUnit,
             ts: Date.now(),
-        });
+        };
+        c.itens.push(novoItem);
+        itemAdicionadoId = novoItem.id;
     }
+
+    // Marca esse item como "recém-adicionado" para animação
+    window._barItemRecemAdicionado = itemAdicionadoId;
     
     // Recalcula total da comanda
     c.total = c.itens.reduce((s, it) => s + Number(it.subtotal || 0), 0);
