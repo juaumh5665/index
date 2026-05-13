@@ -508,6 +508,26 @@
     -webkit-text-fill-color: #fafafa !important;
 }
 
+/* === CRITICAL FIX: Permite scroll quando uma tela de auth está visível === */
+/* O body tem overflow-hidden por padrão (pro app principal), mas */
+/* nas telas de cadastro/login/convite precisamos rolar */
+body.auth-active {
+    overflow: auto !important;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+html {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* As próprias telas de auth também rolam */
+#login-screen, #signup-screen, #invite-screen {
+    -webkit-overflow-scrolling: touch !important;
+}
+
 /* === RESPONSIVO: Auth screens em mobile === */
 @media (max-width: 600px) {
     #login-screen, #signup-screen, #invite-screen {
@@ -655,6 +675,12 @@
 </style>
 </head>
 <body class="overflow-hidden">
+<script>
+  // Por padrão, o body tem overflow-hidden (necessário pro app principal).
+  // Mas se a tela inicial é de auth (login/signup/invite), precisamos permitir scroll.
+  // Adicionamos a classe auth-active imediatamente — será removida quando o app principal aparecer.
+  document.body.classList.add('auth-active');
+</script>
 
 <!-- ============================================================ -->
 <!-- LOTE 3 TRIAL: Modal fullscreen "Trial Expirou"               -->
@@ -6938,6 +6964,7 @@ sb.auth.onAuthStateChange((event, session) => {
         const ma = document.getElementById('main-app');
         if (ls) ls.style.display = 'flex';
         if (ma) ma.style.display = 'none';
+        document.body.classList.add('auth-active');
     } else if (event === 'TOKEN_REFRESHED') {
         sbSession = session;
     }
@@ -6977,6 +7004,7 @@ async function login() {
 
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'flex';
+        document.body.classList.remove('auth-active');
 
         applyPermissions();
         renderDashboard();
@@ -8848,6 +8876,7 @@ function mostrarTelaSignup() {
     document.getElementById('invite-screen').style.display = 'none';
     const ss = document.getElementById('signup-screen');
     ss.style.display = 'flex';
+    document.body.classList.add('auth-active');
     setTimeout(() => document.getElementById('su-clube-nome').focus(), 100);
 }
 
@@ -8855,6 +8884,7 @@ function mostrarTelaLogin() {
     document.getElementById('signup-screen').style.display = 'none';
     document.getElementById('invite-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
+    document.body.classList.add('auth-active');
     // Limpa URL params para não ficar repetindo a tela
     if (window.history && window.history.replaceState) {
         window.history.replaceState(null, '', window.location.pathname);
@@ -8978,6 +9008,7 @@ async function fazerSignup() {
         document.getElementById('signup-screen').style.display = 'none';
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'flex';
+        document.body.classList.remove('auth-active');
 
         applyPermissions();
         renderDashboard();
@@ -9032,6 +9063,7 @@ async function carregarConvitePorToken(token) {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('signup-screen').style.display = 'none';
     ms.style.display = 'flex';
+    document.body.classList.add('auth-active');
 
     try {
         const { data, error } = await sb
@@ -9130,6 +9162,7 @@ async function aceitarConviteSubmit() {
         await carregarUsuarioEClube(loginData.user);
         document.getElementById('invite-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'flex';
+        document.body.classList.remove('auth-active');
         applyPermissions();
         renderDashboard();
         iniciarRelogio();
@@ -10393,6 +10426,7 @@ async function adminVerificarAcessoEMostrar() {
 function adminVoltarSistema() {
     document.getElementById('admin-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
+    document.body.classList.remove('auth-active');
     // Remove ?admin=1 da URL sem reload
     const url = new URL(window.location.href);
     url.searchParams.delete('admin');
@@ -11307,6 +11341,7 @@ async function logout() {
     _limparEstadoClube();  // 🛡️ SEGURANÇA: remove dados do clube anterior
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
+    document.body.classList.add('auth-active');
     document.getElementById('login-pass').value = '';
 }
 
@@ -20914,6 +20949,7 @@ window.onload = () => {
     if (currentUser && usuarios.find(u => u.id === currentUser.id && u.status === 'ativo')) {
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'flex';
+        document.body.classList.remove('auth-active');
         applyPermissions();
         renderDashboard();
         iniciarRelogio();
