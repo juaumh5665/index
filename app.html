@@ -15024,9 +15024,12 @@ const PlayerSearch = (function() {
         if (!opt) return;
 
         // Atualiza o <select> nativo
+        state.select.__pickedByUser = true; // sinaliza que mudança veio do usuário (evita reset do syncFromSelect)
         state.select.value = value;
         // Dispara change event (caso alguma lógica externa esteja ouvindo)
         state.select.dispatchEvent(new Event('change', { bubbles: true }));
+        // Limpa a flag depois do ciclo do observer
+        setTimeout(() => { state.select.__pickedByUser = false; }, 50);
 
         // Atualiza o input visual
         state.input.value = opt.label + (opt.tag ? ' (' + opt.tag + ')' : '');
@@ -15060,6 +15063,24 @@ const PlayerSearch = (function() {
     // Sincroniza visual do input com o valor atual do <select>
     // (útil quando o select é re-populado externamente)
     function syncFromSelect(state) {
+        // Garante que existe um <option value=""> como placeholder (estado "nada selecionado")
+        // Se o select foi populado por innerHTML = '<option value="X">...</option>' sem placeholder,
+        // o browser auto-seleciona a primeira opção. Aqui forçamos o estado limpo.
+        const hasPlaceholder = Array.from(state.select.options).some(o => !o.value);
+        if (!hasPlaceholder && state.select.options.length > 0 && !state.select.__pickedByUser) {
+            // Insere placeholder no topo SEM disparar o observer (pausamos temporariamente)
+            if (state._observer) state._observer.disconnect();
+            const ph = document.createElement('option');
+            ph.value = '';
+            ph.text = '';
+            ph.selected = true;
+            state.select.insertBefore(ph, state.select.firstChild);
+            state.select.value = '';
+            if (state._observer) {
+                state._observer.observe(state.select, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+            }
+        }
+
         state.options = readOptions(state.select);
         const current = state.options.find(o => o.value === state.select.value);
         if (current && !current.isPlaceholder) {
@@ -15181,6 +15202,7 @@ const PlayerSearch = (function() {
         // Observa mudanças no <select> (re-população por outras funções)
         const observer = new MutationObserver(() => syncFromSelect(state));
         observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+        state._observer = observer;
 
         // Sincronização inicial
         syncFromSelect(state);
