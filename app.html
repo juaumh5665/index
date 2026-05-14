@@ -16514,11 +16514,39 @@ function uploadLogo(event) {
     if (!file) return;
     if (file.size > 500 * 1024) return showToast('⚠️ Logo muito grande (máx 500KB)');
     const reader = new FileReader();
-    reader.onload = e => {
-        config.clube.logo = e.target.result;
+    reader.onload = async (e) => {
+        const dataUrl = e.target.result;
+        // 1. Salva localmente (rápido — pra preview instantâneo)
+        config.clube.logo = dataUrl;
         salvarConfig();
         renderLogoPreview();
-        showToast('✅ Logo carregado!');
+
+        // 2. Salva no Supabase em clubes.logo_url (pra outros dispositivos verem + tela de login)
+        if (sbClube && sbClube.id) {
+            try {
+                const { error } = await sb.from('clubes')
+                    .update({ logo_url: dataUrl, atualizado_em: new Date().toISOString() })
+                    .eq('id', sbClube.id);
+                if (error) throw error;
+                // Atualiza objeto em memória
+                sbClube.logo_url = dataUrl;
+                // Atualiza branding pra próximo login (tela personalizada)
+                try {
+                    const raw = localStorage.getItem('ps_last_clube_branding');
+                    const b = raw ? JSON.parse(raw) : {};
+                    b.logo_url = dataUrl;
+                    b.nome = sbClube.nome || b.nome;
+                    b.ts = Date.now();
+                    localStorage.setItem('ps_last_clube_branding', JSON.stringify(b));
+                } catch(_){}
+                showToast('✅ Logo salvo e sincronizado!');
+            } catch (err) {
+                console.warn('[LOGO] Erro ao salvar no Supabase:', err.message || err);
+                showToast('✅ Logo salvo localmente (⚠️ falha ao sincronizar — tente novamente)');
+            }
+        } else {
+            showToast('✅ Logo carregado!');
+        }
     };
     reader.readAsDataURL(file);
 }
@@ -16618,6 +16646,12 @@ async function salvarRakeExtras() {
 function renderLogoPreview() {
     const el = document.getElementById('cfg-logo-preview');
     if (!el) return;
+    // Prioridade: cache local (instantâneo) > sbClube.logo_url (Supabase)
+    // Mantém sincronizado: se o banco tem mas localStorage não, copia
+    if (!config.clube.logo && sbClube && sbClube.logo_url) {
+        config.clube.logo = sbClube.logo_url;
+        try { salvarConfig(); } catch(_){}
+    }
     if (config.clube.logo) {
         el.innerHTML = `<img src="${config.clube.logo}" alt="Logo">`;
         el.style.border = '2px solid var(--gold)';
@@ -16628,11 +16662,33 @@ function renderLogoPreview() {
 }
 
 function removerLogo() {
-    if (!config.clube.logo) return;
+    if (!config.clube.logo && !(sbClube && sbClube.logo_url)) return;
     if (!confirm('Remover o logo?')) return;
     config.clube.logo = null;
     salvarConfig();
     renderLogoPreview();
+
+    // Limpa também no Supabase + no branding do login
+    if (sbClube && sbClube.id) {
+        (async () => {
+            try {
+                await sb.from('clubes')
+                    .update({ logo_url: null, atualizado_em: new Date().toISOString() })
+                    .eq('id', sbClube.id);
+                sbClube.logo_url = null;
+                try {
+                    const raw = localStorage.getItem('ps_last_clube_branding');
+                    if (raw) {
+                        const b = JSON.parse(raw);
+                        b.logo_url = null;
+                        localStorage.setItem('ps_last_clube_branding', JSON.stringify(b));
+                    }
+                } catch(_){}
+            } catch (err) {
+                console.warn('[LOGO] Erro ao remover do Supabase:', err.message || err);
+            }
+        })();
+    }
     showToast('🗑️ Logo removido');
 }
 
