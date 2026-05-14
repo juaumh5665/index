@@ -4161,6 +4161,30 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
 </div>
 
+<!-- MODAL: ESTORNO DE LANÇAMENTO FINANCEIRO -->
+<div id="modal-estorno" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;display:flex;align-items:center;gap:.5rem;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;"></i>
+                Estornar lançamento?
+            </h3>
+            <button onclick="closeModal('modal-estorno')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="mod-estorno-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;"></div>
+            <div>
+                <label class="inp-label" style="display:block;margin-bottom:.3rem;">Motivo do estorno <span style="color:#ef4444;">*</span></label>
+                <textarea id="mod-estorno-motivo" class="inp" placeholder="Ex: lançamento duplicado, jogador desistiu, erro de comunicação..." style="min-height:80px;font-family:inherit;resize:vertical;"></textarea>
+                <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;"><i class="fa-solid fa-circle-info"></i> Mínimo 5 caracteres. Esta ação será auditada permanentemente.</div>
+            </div>
+            <button id="btn-confirmar-estorno" onclick="confirmarEstorno()" style="padding:.85rem;border-radius:.6rem;background:#dc2626;color:#fff;border:none;font-family:'Manrope',sans-serif;font-weight:800;cursor:pointer;font-size:.9rem;">
+                Confirmar Estorno
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: NOVA MESA CASH -->
 <div id="modal-nova-cash-mesa" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
@@ -4598,6 +4622,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="tab-btn" onclick="switchTab('tab-financeiro', this)">Financeiro</button>
             <button class="tab-btn" onclick="switchTab('tab-blinds', this)">Blinds</button>
             <button class="tab-btn" onclick="switchTab('tab-dealers', this)"><i class="fa-solid fa-spade"></i> Dealers</button>
+            <button class="tab-btn" onclick="switchTab('tab-estornos', this)" id="tab-btn-estornos" style="display:none;"><i class="fa-solid fa-rotate-left"></i> Estornos <span id="tab-estornos-badge" style="display:none;background:#dc2626;color:#fff;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;margin-left:.25rem;">0</span></button>
         </div>
         <!-- Body -->
         <div style="flex:1;overflow:auto;padding:1.5rem;">
@@ -4750,6 +4775,33 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
                 </div>
+
+                <!-- LANÇAMENTOS DETALHADOS (com estorno por linha — só admin) -->
+                <div style="margin-top:1.75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;overflow:hidden;">
+                    <div style="padding:.75rem 1rem;border-bottom:1px solid #1e1e23;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+                        <div>
+                            <div style="font-size:.7rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-list-ol" style="color:var(--gold);"></i> Lançamentos individuais</div>
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">Cada buy-in, rebuy, addon, last chance e jackpot. <span style="color:#ef4444;">Apenas admins</span> podem estornar.</div>
+                        </div>
+                        <div id="mt-lancamentos-count" style="font-size:.7rem;color:#71717a;">0 lançamentos</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;font-size:.8rem;">
+                            <thead>
+                                <tr style="background:#161618;">
+                                    <th style="padding:.55rem 1rem;text-align:left;font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Data/Hora</th>
+                                    <th style="padding:.55rem 1rem;text-align:left;font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Jogador</th>
+                                    <th style="padding:.55rem 1rem;text-align:left;font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Tipo</th>
+                                    <th style="padding:.55rem 1rem;text-align:right;font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Valor</th>
+                                    <th style="padding:.55rem 1rem;text-align:center;font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;width:70px;">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mt-lancamentos-tbody">
+                                <tr><td colspan="5" style="padding:1rem;text-align:center;color:#71717a;font-size:.8rem;">—</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- TAB: MESAS -->
@@ -4817,6 +4869,37 @@ document.addEventListener('DOMContentLoaded', function(){
                 
                 <!-- Resumo de ganhos -->
                 <div id="resumo-dealers-torneio" style="margin-top:1.5rem;"></div>
+            </div>
+
+            <!-- TAB: ESTORNOS -->
+            <div id="tab-estornos" class="tab-content" style="display:none;">
+                <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:.6rem;padding:.85rem 1rem;margin-bottom:1rem;font-size:.78rem;color:#a1a1aa;">
+                    <i class="fa-solid fa-circle-info" style="color:#ef4444;"></i>
+                    <strong style="color:#fff;">Histórico de estornos</strong> · Cada linha foi auditada com motivo, operador e data/hora. Estornos não podem ser desfeitos.
+                </div>
+                <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;overflow:hidden;">
+                    <div style="padding:.75rem 1rem;border-bottom:1px solid #1e1e23;display:flex;align-items:center;justify-content:space-between;">
+                        <div style="font-size:.7rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-rotate-left" style="color:#ef4444;"></i> Lançamentos estornados</div>
+                        <div id="tab-estornos-count" style="font-size:.7rem;color:#71717a;">0 estornos</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;font-size:.8rem;">
+                            <thead>
+                                <tr style="background:#161618;">
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Data/Hora</th>
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Jogador</th>
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Tipo</th>
+                                    <th style="padding:.7rem 1rem;text-align:right;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Valor</th>
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Motivo</th>
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Por</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tab-estornos-tbody">
+                                <tr><td colspan="6" style="padding:2.5rem;text-align:center;color:#71717a;font-size:.85rem;">Carregando…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -6698,16 +6781,42 @@ async function carregarEstadoDoSupabase() {
         const { data: tRowsRaw } = await sb.from('torneios').select('*').eq('clube_id', clubeIdEsperado).order('criado_em', { ascending: false });
         const tRows = (tRowsRaw || []).filter(r => r.clube_id === clubeIdEsperado);
         if (tRows && tRows.length) {
-            // Buscar entries, eliminados, jackpot, mesas em paralelo (filtrado por clube_id)
+            // Buscar entries, eliminados, jackpot, mesas, estornos em paralelo (filtrado por clube_id)
             const ids = tRows.map(t => t.id);
-            const [eRes, elRes, jRes, mRes] = await Promise.all([
+            const [eRes, elRes, jRes, mRes, esRes] = await Promise.all([
                 sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
                 sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
                 sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
                 sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
+                sb.from('torneio_estornos').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado).then(r => r).catch(() => ({ data: [] })),
             ]);
             // Reconstruir torneios em formato de UI
             torneios = tRows.map(r => _torneioFromDb(r, eRes.data || [], elRes.data || [], jRes.data || [], mRes.data || []));
+            // Anexa estornos a cada torneio
+            const estornosByT = {};
+            (esRes && esRes.data ? esRes.data : []).forEach(es => {
+                (estornosByT[es.torneio_id] ||= []).push({
+                    id: es.id,
+                    entry_id: es.entry_id,
+                    jackpot_compra_ref: es.jackpot_compra_ref,
+                    jogadorId: es.jogador_id,
+                    jogadorNome: es.operador_nome ? null : null,
+                    tipo_original: es.tipo_original,
+                    valor: Number(es.valor) || 0,
+                    fichas: es.fichas || 0,
+                    motivo: es.motivo,
+                    ts: es.ts ? new Date(es.ts).getTime() : Date.now(),
+                    operador_id: es.operador_id,
+                    operador_nome: es.operador_nome,
+                });
+            });
+            torneios.forEach(t => {
+                t.estornos = estornosByT[t.id] || [];
+                // Preenche jogadorNome via lookup
+                t.estornos.forEach(es => {
+                    if (!es.jogadorNome) es.jogadorNome = getJogadorNome(es.jogadorId);
+                });
+            });
             localStorage.setItem('ps_torneios', JSON.stringify(torneios));
         }
 
@@ -12820,6 +12929,7 @@ function switchTab(tabId, btn) {
     if (tabId === 'tab-financeiro') renderTabFinanceiro();
     if (tabId === 'tab-blinds')    renderTabBlinds();
     if (tabId === 'tab-dealers')   renderTabDealers();
+    if (tabId === 'tab-estornos')  renderTabEstornosTorneio();
 }
 
 // ============================================================
@@ -13459,8 +13569,31 @@ function abrirDetalhesTorneio(idx) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-controle').style.display = 'block';
     document.querySelector('.tab-btn').classList.add('active');
+    // Mostra/esconde a aba "Estornos" baseado em se há estornos OU se o usuário é admin
+    atualizarVisibilidadeAbaEstornos();
     openModal('modal-torneio');
     setTimeout(syncTVControls, 50);
+}
+
+// Mostra a aba "Estornos" se o torneio já tiver estornos OU se o usuário é admin
+// (admin pode querer ver a aba mesmo sem estornos, pra auditoria futura)
+function atualizarVisibilidadeAbaEstornos() {
+    const t = torneios[activeTorneioIdx];
+    const btn = document.getElementById('tab-btn-estornos');
+    const badge = document.getElementById('tab-estornos-badge');
+    if (!t || !btn) return;
+    const qtd = (t.estornos || []).length;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    // Visível pra admin sempre; pra outros papéis só se houver estornos
+    btn.style.display = (isAdmin || qtd > 0) ? 'inline-block' : 'none';
+    if (badge) {
+        if (qtd > 0) {
+            badge.style.display = 'inline-block';
+            badge.innerText = qtd;
+        } else {
+            badge.style.display = 'none';
+        }
+    }
 }
 
 function updateModalTorneio() {
@@ -13753,6 +13886,80 @@ function renderTabJogadores() {
             <span style="font-size:.75rem;color:#ef4444;font-weight:700;">${e.posicao}º lugar</span>
         </div>`;
     }).join('') || '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhum eliminado ainda</div>';
+
+    // Renderiza tabela de lançamentos detalhados (com botão de estornar por linha)
+    renderTabLancamentosDetalhados();
+}
+
+// Alias para uso no módulo de estornos (mantém compatibilidade)
+function renderTabJogadoresTorneio() {
+    renderTabJogadores();
+}
+
+// Renderiza tabela de TODOS os lançamentos individuais (entries + jackpot compras)
+// com botão de estornar em cada linha (só visível pra admin).
+function renderTabLancamentosDetalhados() {
+    const t = torneios[activeTorneioIdx];
+    const tbody = document.getElementById('mt-lancamentos-tbody');
+    const count = document.getElementById('mt-lancamentos-count');
+    if (!t || !tbody) return;
+
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    // Junta entries + jackpot compras em uma única lista ordenada por ts desc
+    const lancamentos = [];
+    (t.entries || []).forEach(e => {
+        lancamentos.push({
+            kind: 'entry',
+            id: e.id,
+            jogadorId: e.jogadorId,
+            tipo: e.tipo,
+            valor: Number(e.valor) || 0,
+            ts: e.ts || 0,
+        });
+    });
+    (t.jackpotCompras || []).forEach(j => {
+        lancamentos.push({
+            kind: 'jackpot',
+            id: j.compraRef || ('jp_' + j.jogadorId + '_' + j.ts),
+            jogadorId: j.jogadorId,
+            tipo: 'jackpot',
+            valor: Number(j.valor) || 0,
+            ts: j.ts || 0,
+            compraRef: j.compraRef || null,
+        });
+    });
+    lancamentos.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    if (count) count.innerText = `${lancamentos.length} lançamento${lancamentos.length === 1 ? '' : 's'}`;
+
+    if (lancamentos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#3f3f46;font-size:.8rem;">Nenhum lançamento ainda</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = lancamentos.map(l => {
+        const meta = _getEstornoTipoLabel(l.tipo);
+        const jogadorNome = getJogadorNome(l.jogadorId);
+        const dt = l.ts ? new Date(l.ts) : null;
+        const dataStr = dt ? (dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })) : '—';
+
+        const btnEstornar = isAdmin
+            ? `<button onclick="abrirModalEstorno('${l.kind}', '${l.kind === 'jackpot' ? l.jogadorId : l.id}')" title="Estornar" style="background:transparent;border:1px solid #3f3f46;color:#71717a;padding:.25rem .5rem;border-radius:.3rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444';this.style.borderColor='#ef4444';" onmouseout="this.style.color='#71717a';this.style.borderColor='#3f3f46';"><i class="fa-solid fa-trash-can"></i></button>`
+            : `<span style="font-size:.65rem;color:#3f3f46;">—</span>`;
+
+        return `<tr style="border-top:1px solid #1e1e23;">
+            <td style="padding:.55rem 1rem;font-size:.72rem;color:#71717a;white-space:nowrap;">${dataStr}</td>
+            <td style="padding:.55rem 1rem;font-size:.8rem;color:#e4e4e7;">${escapeHtml(jogadorNome)}</td>
+            <td style="padding:.55rem 1rem;">
+                <span style="display:inline-flex;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:.25rem;background:${meta.color}22;color:${meta.color};">
+                    ${meta.label}
+                </span>
+            </td>
+            <td style="padding:.55rem 1rem;text-align:right;font-weight:700;color:#e4e4e7;white-space:nowrap;" class="mono">${formatMoney(l.valor)}</td>
+            <td style="padding:.55rem 1rem;text-align:center;">${btnEstornar}</td>
+        </tr>`;
+    }).join('');
 }
 
 function renderTabMesas() {
@@ -20608,6 +20815,291 @@ function confirmarJackpot() {
     closeModal('modal-jackpot');
     updateModalTorneio();
     showToast(`💎 ${qtd}x Jackpot comprado por ${getJogadorNome(jid)}  ·  +R$ ${total} na Caixa do Clube`);
+}
+
+// ============================================================
+// ESTORNOS DE LANÇAMENTOS FINANCEIROS DO TORNEIO
+// ============================================================
+// Permite estornar buy-ins, rebuys, addons, last_chance e jackpots
+// caso o operador tenha errado a entrada. Reverte:
+//   - Entry de t.entries (ou jackpotCompras se for jackpot)
+//   - Transação no caixa do torneio (credita de volta)
+//   - Saldo do jogador (devolve valor)
+//   - Caixa do Jackpot do clube (se for jackpot)
+//   - Registra auditoria em t.estornos + torneio_estornos (Supabase)
+
+// Mapa de labels amigáveis por tipo
+const _ESTORNO_TIPO_LABELS = {
+    buyin:          { label: 'Buy-in',        color: '#22c55e' },
+    reentry:        { label: 'Re-entry',      color: '#f59e0b' },
+    rebuy_simples:  { label: 'Rebuy Simples', color: '#fbbf24' },
+    rebuy_duplo:    { label: 'Rebuy Duplo',   color: '#fbbf24' },
+    addon:          { label: 'Add-on',        color: '#06b6d4' },
+    last_chance:    { label: 'Last Chance',   color: '#a78bfa' },
+    jackpot:        { label: 'Jackpot',       color: '#a855f7' },
+};
+
+function _getEstornoTipoLabel(tipo) {
+    return _ESTORNO_TIPO_LABELS[tipo] || { label: tipo, color: '#71717a' };
+}
+
+// Calcula fichas que serão revertidas por uma entry (pra mostrar no modal e auditar)
+function _calcularFichasReverter(t, entry) {
+    if (!entry) return 0;
+    if (entry.tipo === 'buyin' || entry.tipo === 'reentry') return t.stack || 0;
+    if (entry.tipo === 'rebuy_simples') return t.rebuySimplesFichas || t.stack || 0;
+    if (entry.tipo === 'rebuy_duplo') return (t.rebuyDuploFichas || (t.stack||0) * 2);
+    if (entry.tipo === 'addon') return t.addonFichas || 0;
+    if (entry.tipo === 'last_chance') return t.last_chance_fichas || 0;
+    return 0;
+}
+
+// Abre o modal de confirmação de estorno (pede motivo obrigatório)
+// kind: 'entry' (entry comum) ou 'jackpot' (compra de jackpot)
+// refId: id da entry ou jogadorId (no caso de jackpot)
+function abrirModalEstorno(kind, refId) {
+    // Só admin pode estornar
+    if (!currentUser || currentUser.role !== 'admin') {
+        return showToast('🔒 Apenas administradores podem estornar lançamentos');
+    }
+
+    const t = torneios[activeTorneioIdx];
+    if (!t) return showToast('⚠️ Torneio não encontrado');
+
+    // Coleta dados do lançamento
+    let dados;
+    if (kind === 'jackpot') {
+        const compra = (t.jackpotCompras || []).find(j => j.jogadorId === refId);
+        if (!compra) return showToast('⚠️ Compra de jackpot não encontrada');
+        dados = {
+            kind: 'jackpot',
+            jogadorId: compra.jogadorId,
+            jogadorNome: getJogadorNome(compra.jogadorId),
+            tipo: 'jackpot',
+            valor: Number(compra.valor) || 0,
+            fichas: 0, // jackpot não gera fichas que afetam stack do torneio
+            compraRef: compra.compraRef || null,
+        };
+    } else {
+        const entry = (t.entries || []).find(e => e.id === refId);
+        if (!entry) return showToast('⚠️ Lançamento não encontrado');
+        dados = {
+            kind: 'entry',
+            entryId: entry.id,
+            jogadorId: entry.jogadorId,
+            jogadorNome: getJogadorNome(entry.jogadorId),
+            tipo: entry.tipo,
+            valor: Number(entry.valor) || 0,
+            fichas: _calcularFichasReverter(t, entry),
+        };
+    }
+
+    // Popula o modal
+    const meta = _getEstornoTipoLabel(dados.tipo);
+
+    // Detecta se é caso especial: estornar buy-in/reentry de jogador já eliminado
+    let warningExtra = '';
+    if (dados.kind === 'entry' && (dados.tipo === 'buyin' || dados.tipo === 'reentry')) {
+        const elim = (t.eliminados || []).find(e => e.jogadorId === dados.jogadorId);
+        // Conta quantos buyin/reentry o jogador tem (se for o último, vai sumir do torneio)
+        const buyinsReentries = (t.entries || []).filter(e =>
+            e.jogadorId === dados.jogadorId && (e.tipo === 'buyin' || e.tipo === 'reentry') && e.id !== dados.entryId
+        ).length;
+        if (elim && buyinsReentries === 0) {
+            warningExtra = `<div style="font-size:.7rem;color:#f59e0b;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);padding:.5rem .7rem;border-radius:.4rem;margin-top:.5rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <strong>Atenção:</strong> este é o último buy-in/re-entry deste jogador e ele já está eliminado.
+                Após o estorno o jogador <strong>não constará mais como participante</strong> do torneio, mas a eliminação <strong>permanecerá</strong> na lista de eliminados.
+                Considere remover manualmente a eliminação se necessário.
+            </div>`;
+        }
+    }
+
+    const info = document.getElementById('mod-estorno-info');
+    if (info) {
+        info.innerHTML = `
+            <div style="font-size:.78rem;margin-bottom:.35rem;">Jogador: <strong style="color:#fff;">${escapeHtml(dados.jogadorNome)}</strong></div>
+            <div style="font-size:.78rem;margin-bottom:.35rem;">Tipo: <strong style="color:${meta.color};">${meta.label}</strong> · <span class="mono">${formatMoney(dados.valor)}</span></div>
+            ${dados.fichas > 0 ? `<div style="font-size:.7rem;color:#71717a;margin-bottom:.35rem;">Fichas que serão revertidas: <strong>${dados.fichas.toLocaleString('pt-BR')}</strong></div>` : ''}
+            <div style="font-size:.7rem;color:#a1a1aa;margin-top:.45rem;padding-top:.45rem;border-top:1px dashed #27272a;">
+                <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
+                O valor de ${formatMoney(dados.valor)} será devolvido ao saldo do jogador e descontado do caixa do torneio.
+                ${dados.tipo === 'jackpot' ? '<br>O valor também será estornado da <strong style="color:#a855f7;">Caixa do Jackpot</strong> do clube.' : ''}
+            </div>
+            ${warningExtra}
+        `;
+    }
+
+    // Guarda dados pro confirmar
+    window._estornoEmAndamento = dados;
+    document.getElementById('mod-estorno-motivo').value = '';
+    openModal('modal-estorno');
+    setTimeout(() => document.getElementById('mod-estorno-motivo').focus(), 100);
+}
+
+async function confirmarEstorno() {
+    const dados = window._estornoEmAndamento;
+    if (!dados) return showToast('⚠️ Nenhum estorno selecionado');
+
+    const motivo = (document.getElementById('mod-estorno-motivo').value || '').trim();
+    if (!motivo) {
+        showToast('⚠️ Informe o motivo do estorno');
+        document.getElementById('mod-estorno-motivo').focus();
+        return;
+    }
+    if (motivo.length < 5) {
+        return showToast('⚠️ Motivo muito curto (mínimo 5 caracteres)');
+    }
+
+    const t = torneios[activeTorneioIdx];
+    if (!t) return showToast('⚠️ Torneio não encontrado');
+
+    // Desabilita botão pra evitar duplo clique
+    const btn = document.getElementById('btn-confirmar-estorno');
+    if (btn) { btn.disabled = true; btn.innerText = 'Processando...'; }
+
+    try {
+        const tsEstorno = Date.now();
+        const estornoId = _genUuid();
+
+        // 1. Remove a entry ou jackpot compra do torneio
+        if (dados.kind === 'jackpot') {
+            t.jackpotCompras = (t.jackpotCompras || []).filter(j => !(j.jogadorId === dados.jogadorId && (dados.compraRef ? j.compraRef === dados.compraRef : true)));
+
+            // 1a. Estorna a movimentação na Caixa do Jackpot do clube
+            if (dados.compraRef) {
+                const movOriginal = db.jackpotMovimentacoes.findByCompraRef(dados.compraRef);
+                if (movOriginal) {
+                    try {
+                        await db.jackpotMovimentacoes.estornar(movOriginal.id, `Estorno: ${motivo}`);
+                    } catch (e) {
+                        console.warn('[ESTORNO] Falha ao estornar movimentação na Caixa do Jackpot:', e.message);
+                    }
+                }
+            }
+        } else {
+            t.entries = (t.entries || []).filter(e => e.id !== dados.entryId);
+        }
+
+        // 2. Devolve o valor ao jogador (saldo) — transação de crédito
+        if (dados.valor > 0) {
+            registrarTransacao({
+                jogadorId: dados.jogadorId,
+                tipo: 'estorno',
+                valor: +dados.valor,
+                descricao: `Estorno de ${_getEstornoTipoLabel(dados.tipo).label} · ${t.nome} · ${motivo}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
+
+        // 3. Adiciona à lista local de estornos do torneio (auditoria)
+        if (!Array.isArray(t.estornos)) t.estornos = [];
+        const registroEstorno = {
+            id: estornoId,
+            entry_id: dados.entryId || null,
+            jackpot_compra_ref: dados.compraRef || null,
+            jogadorId: dados.jogadorId,
+            jogadorNome: dados.jogadorNome,
+            tipo_original: dados.tipo,
+            valor: dados.valor,
+            fichas: dados.fichas || 0,
+            motivo: motivo,
+            ts: tsEstorno,
+            operador_id: (currentUser && currentUser.id) || null,
+            operador_nome: (currentUser && currentUser.nome) || 'Sistema',
+        };
+        t.estornos.push(registroEstorno);
+
+        // 4. Persiste no Supabase (tabela torneio_estornos)
+        if (sbClube && typeof sb !== 'undefined') {
+            try {
+                await sb.from('torneio_estornos').insert({
+                    id:                 estornoId,
+                    torneio_id:         t.id,
+                    clube_id:           sbClube.id,
+                    jogador_id:         dados.jogadorId,
+                    entry_id:           dados.entryId || null,
+                    jackpot_compra_ref: dados.compraRef || null,
+                    tipo_original:     dados.tipo,
+                    valor:             dados.valor,
+                    fichas:            dados.fichas || 0,
+                    motivo:            motivo,
+                    ts:                new Date(tsEstorno).toISOString(),
+                    operador_id:       (currentUser && currentUser.id) || null,
+                    operador_nome:     (currentUser && currentUser.nome) || 'Sistema',
+                });
+            } catch (e) {
+                console.warn('[ESTORNO] Falha ao salvar auditoria no Supabase:', e.message);
+            }
+        }
+
+        // 5. Auditoria geral
+        if (typeof logAudit === 'function') {
+            try {
+                logAudit('TORNEIO_ESTORNO',
+                    `Estorno de ${_getEstornoTipoLabel(dados.tipo).label} · ${dados.jogadorNome} · ${formatMoney(dados.valor)}`,
+                    { torneioId: t.id, ...registroEstorno }
+                );
+            } catch(_){}
+        }
+
+        // 6. Persiste tudo
+        saveData();
+
+        // 7. Atualiza UI
+        closeModal('modal-estorno');
+        window._estornoEmAndamento = null;
+        updateModalTorneio();
+        if (typeof renderTabJogadoresTorneio === 'function') renderTabJogadoresTorneio();
+        if (typeof renderTabEstornosTorneio === 'function')  renderTabEstornosTorneio();
+
+        showToast(`✅ Estornado: ${_getEstornoTipoLabel(dados.tipo).label} · ${formatMoney(dados.valor)} devolvido`);
+    } catch (e) {
+        console.error('[ESTORNO] Falha:', e);
+        showToast('❌ Erro ao processar estorno: ' + (e.message || 'tente novamente'));
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = 'Confirmar Estorno'; }
+    }
+}
+
+// Renderiza a aba "Estornos" do torneio
+function renderTabEstornosTorneio() {
+    const t = torneios[activeTorneioIdx];
+    const tbody = document.getElementById('tab-estornos-tbody');
+    const count = document.getElementById('tab-estornos-count');
+    if (!t || !tbody) return;
+
+    const estornos = (t.estornos || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    if (count) count.innerText = `${estornos.length} estorno${estornos.length === 1 ? '' : 's'}`;
+
+    if (estornos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:2.5rem;text-align:center;color:#71717a;font-size:.85rem;"><i class="fa-solid fa-circle-check" style="font-size:1.5rem;color:#22c55e;display:block;margin-bottom:.5rem;"></i>Nenhum estorno registrado neste torneio</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = estornos.map(es => {
+        const meta = _getEstornoTipoLabel(es.tipo_original);
+        const dt = new Date(es.ts);
+        const dataStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+        return `<tr style="border-top:1px solid #1e1e23;">
+            <td style="padding:.65rem 1rem;font-size:.75rem;color:#a1a1aa;white-space:nowrap;">${dataStr}</td>
+            <td style="padding:.65rem 1rem;font-size:.8rem;color:#e4e4e7;">${escapeHtml(es.jogadorNome || getJogadorNome(es.jogadorId))}</td>
+            <td style="padding:.65rem 1rem;">
+                <span style="display:inline-flex;font-size:.7rem;font-weight:700;padding:.2rem .5rem;border-radius:.25rem;background:${meta.color}22;color:${meta.color};">
+                    ${meta.label}
+                </span>
+            </td>
+            <td style="padding:.65rem 1rem;text-align:right;font-weight:700;color:#ef4444;white-space:nowrap;" class="mono">${formatMoney(es.valor)}</td>
+            <td style="padding:.65rem 1rem;font-size:.78rem;color:#a1a1aa;">${escapeHtml(es.motivo || '—')}</td>
+            <td style="padding:.65rem 1rem;font-size:.72rem;color:#71717a;white-space:nowrap;">${escapeHtml(es.operador_nome || 'Sistema')}</td>
+        </tr>`;
+    }).join('');
+}
+
+// Verifica se uma entry foi estornada (não deve mais aparecer ativa)
+function _entryEstornada(t, entryId) {
+    return (t.estornos || []).some(es => es.entry_id === entryId);
 }
 
 // ============================================================
