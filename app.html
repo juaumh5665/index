@@ -581,6 +581,26 @@
         /* Tema claro: hover/active mantém texto escuro mas ícone segue colorido */
         body.tema-claro .nav-item:hover:not(.nav-active) { color: var(--t-text-1); }
 
+        /* Filtros da página Jackpot */
+        .jackpot-filter-btn {
+            background:#18181b; color:#71717a; border:1px solid #27272a;
+            font-size:.7rem; padding:.4rem .75rem; border-radius:.35rem;
+            cursor:pointer; font-weight:600; transition: all .15s;
+        }
+        .jackpot-filter-btn:hover { background:#27272a; color:#e4e4e7; }
+        .jackpot-filter-btn.jackpot-filter-active {
+            background: rgba(168,85,247,.15);
+            color: #c084fc;
+            border-color: rgba(168,85,247,.4);
+        }
+        body.tema-claro .jackpot-filter-btn {
+            background: var(--t-bg-2, #f1f5f9); color: var(--t-text-2, #475569);
+            border-color: var(--t-border, #e2e8f0);
+        }
+        body.tema-claro .jackpot-filter-btn.jackpot-filter-active {
+            background: rgba(168,85,247,.12); color: #7c3aed;
+        }
+
         /* ============================================================
            PLAYER SEARCH COMBOBOX
            Substitui visualmente os <select> de jogador por um campo
@@ -1846,6 +1866,9 @@ document.addEventListener('DOMContentLoaded', function(){
             <div onclick="showPage('fechamento')" id="nav-fechamento" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-receipt nav-ico" style="width:16px;color:#ec4899;"></i> Fechamento do Dia
             </div>
+            <div onclick="showPage('jackpot')" id="nav-jackpot" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
+                <i class="fa-solid fa-gem nav-ico" style="width:16px;color:#a855f7;"></i> Caixa do Jackpot
+            </div>
             <div style="height:1px;background:#1a1a1e;margin:.5rem .5rem;" id="nav-divider-admin"></div>
             <div onclick="showPage('funcionarios')" id="nav-funcionarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-id-card-clip nav-ico" style="width:16px;color:#c084fc;"></i> Funcionários
@@ -2993,6 +3016,74 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
             </div>
 
+            <!-- CAIXA DO JACKPOT -->
+            <div id="page-jackpot" class="page-content fade-in" style="display:none;">
+                <div style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:.25rem;"><i class="fa-solid fa-gem" style="color:#a855f7;"></i> Caixa do Jackpot</h2>
+                        <div style="font-size:.8rem;color:#71717a;">Carteira do clube alimentada pelas compras de jackpot nos torneios</div>
+                    </div>
+                    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                        <button onclick="abrirModalJackpotCreditar()" class="btn-gold" style="font-size:.8rem;padding:.6rem 1rem;"><i class="fa-solid fa-user-plus"></i> Creditar Jogador</button>
+                        <button onclick="abrirModalJackpotSaque()" style="background:#27272a;color:#a1a1aa;border:none;font-size:.8rem;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;"><i class="fa-solid fa-minus"></i> Saque/Uso</button>
+                        <button onclick="abrirModalJackpotEntradaManual()" style="background:#27272a;color:#a1a1aa;border:none;font-size:.8rem;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;"><i class="fa-solid fa-plus"></i> Entrada Manual</button>
+                    </div>
+                </div>
+
+                <!-- Card de saldo destacado -->
+                <div style="background:linear-gradient(135deg,rgba(168,85,247,.18),rgba(99,102,241,.12));border:1px solid rgba(168,85,247,.5);border-radius:.8rem;padding:1.5rem;margin-bottom:1.5rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;align-items:center;">
+                    <div>
+                        <div style="font-size:.65rem;color:#a855f7;text-transform:uppercase;letter-spacing:.15em;font-weight:700;">Saldo Atual</div>
+                        <div id="jackpot-saldo" style="font-size:2.25rem;font-weight:800;color:#fff;margin-top:.25rem;letter-spacing:-.02em;">R$ 0,00</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.65rem;color:#a1a1aa;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Entradas (acumulado)</div>
+                        <div id="jackpot-total-entradas" style="font-size:1.4rem;font-weight:700;color:#22c55e;margin-top:.25rem;">R$ 0,00</div>
+                        <div id="jackpot-qtd-entradas" style="font-size:.7rem;color:#71717a;margin-top:.15rem;">0 compras</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.65rem;color:#a1a1aa;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Saídas (acumulado)</div>
+                        <div id="jackpot-total-saidas" style="font-size:1.4rem;font-weight:700;color:#ef4444;margin-top:.25rem;">R$ 0,00</div>
+                        <div id="jackpot-qtd-saidas" style="font-size:.7rem;color:#71717a;margin-top:.15rem;">0 movimentações</div>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+                    <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Filtrar:</div>
+                    <button onclick="setFiltroJackpot('todos')" id="jackpot-filtro-todos" class="jackpot-filter-btn jackpot-filter-active">Todos</button>
+                    <button onclick="setFiltroJackpot('entrada_torneio')" id="jackpot-filtro-entrada_torneio" class="jackpot-filter-btn">Compras (torneio)</button>
+                    <button onclick="setFiltroJackpot('saida_credito')" id="jackpot-filtro-saida_credito" class="jackpot-filter-btn">Créditos a jogador</button>
+                    <button onclick="setFiltroJackpot('saida_uso_clube')" id="jackpot-filtro-saida_uso_clube" class="jackpot-filter-btn">Uso do clube</button>
+                    <button onclick="setFiltroJackpot('estorno')" id="jackpot-filtro-estorno" class="jackpot-filter-btn">Estornos</button>
+                </div>
+
+                <!-- Extrato (tabela) -->
+                <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;overflow:hidden;">
+                    <div style="padding:.85rem 1rem;border-bottom:1px solid #1e1e23;display:flex;align-items:center;justify-content:space-between;">
+                        <div style="font-size:.75rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-clipboard-list" style="color:#a855f7;"></i> Extrato</div>
+                        <div id="jackpot-extrato-count" style="font-size:.7rem;color:#71717a;">0 movimentações</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;font-size:.8rem;">
+                            <thead>
+                                <tr style="background:#161618;">
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Data/Hora</th>
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Tipo</th>
+                                    <th style="padding:.7rem 1rem;text-align:left;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Descrição</th>
+                                    <th style="padding:.7rem 1rem;text-align:right;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Valor</th>
+                                    <th style="padding:.7rem 1rem;text-align:right;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Saldo após</th>
+                                    <th style="padding:.7rem .5rem;text-align:center;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;width:50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="jackpot-extrato-tbody">
+                                <tr><td colspan="6" style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;">Carregando…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- FECHAMENTO DO DIA -->
             <div id="page-fechamento" class="page-content fade-in" style="display:none;">
                 <div style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
@@ -4021,6 +4112,55 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
 </div>
 
+<!-- MODAL: CREDITAR JOGADOR (da Caixa do Jackpot) -->
+<div id="modal-jackpot-creditar" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-user-plus" style="color:#a855f7;"></i> Creditar Jogador</h3>
+            <button onclick="closeModal('modal-jackpot-creditar')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="jpc-saldo-info" style="padding:.7rem 1rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:.5rem;font-size:.8rem;color:#c084fc;text-align:center;font-weight:700;">Saldo disponível: R$ 0,00</div>
+            <div><label class="inp-label">Jogador *</label><select id="jpc-jogador" class="inp" data-player-search="1"></select></div>
+            <div><label class="inp-label">Valor (R$) *</label><input id="jpc-valor" type="number" step="0.01" min="0.01" placeholder="0,00" class="inp"></div>
+            <div><label class="inp-label">Descrição (opcional)</label><input id="jpc-descricao" type="text" placeholder="Ex: Prêmio Last Chance" class="inp"></div>
+            <button onclick="confirmarCreditoJackpot()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;background:linear-gradient(135deg,#a855f7,#7c3aed);">Confirmar Crédito</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: SAQUE/USO DO CLUBE -->
+<div id="modal-jackpot-saque" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-money-bill-trend-up" style="color:#ef4444;"></i> Saque / Uso do Clube</h3>
+            <button onclick="closeModal('modal-jackpot-saque')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div id="jps-saldo-info" style="padding:.7rem 1rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:.5rem;font-size:.8rem;color:#c084fc;text-align:center;font-weight:700;">Saldo disponível: R$ 0,00</div>
+            <div><label class="inp-label">Valor (R$) *</label><input id="jps-valor" type="number" step="0.01" min="0.01" placeholder="0,00" class="inp"></div>
+            <div><label class="inp-label">Descrição *</label><input id="jps-descricao" type="text" placeholder="Ex: Prêmio do mês, evento, etc" class="inp"></div>
+            <button onclick="confirmarSaqueJackpot()" style="padding:.85rem;border-radius:.6rem;background:#dc2626;color:#fff;border:none;font-family:'Manrope',sans-serif;font-weight:800;cursor:pointer;">Confirmar Saída</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ENTRADA MANUAL -->
+<div id="modal-jackpot-entrada" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-plus" style="color:#22c55e;"></i> Entrada Manual</h3>
+            <button onclick="closeModal('modal-jackpot-entrada')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="padding:.7rem 1rem;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:.5rem;font-size:.75rem;color:#a1a1aa;">Use somente quando precisar lançar uma entrada que não veio de compras de jogadores em torneios (ex: aporte, ajuste manual).</div>
+            <div><label class="inp-label">Valor (R$) *</label><input id="jpe-valor" type="number" step="0.01" min="0.01" placeholder="0,00" class="inp"></div>
+            <div><label class="inp-label">Descrição *</label><input id="jpe-descricao" type="text" placeholder="Ex: Ajuste manual, aporte" class="inp"></div>
+            <button onclick="confirmarEntradaManualJackpot()" style="padding:.85rem;border-radius:.6rem;background:#16a34a;color:#fff;border:none;font-family:'Manrope',sans-serif;font-weight:800;cursor:pointer;">Confirmar Entrada</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: NOVA MESA CASH -->
 <div id="modal-nova-cash-mesa" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">
@@ -4923,6 +5063,8 @@ document.addEventListener('DOMContentLoaded', function(){
 // ============================================================
 let jogadores  = JSON.parse(localStorage.getItem('ps_jogadores'))  || [];
 let torneios   = JSON.parse(localStorage.getItem('ps_torneios'))   || [];
+// Cache de movimentações do jackpot (carteira do clube). Carregado do Supabase no boot.
+let jackpotMovimentacoesCache = [];
 let barGrupos  = JSON.parse(localStorage.getItem('ps_bar_grupos')) || ['Refrigerantes','Cervejas','Salgados','Picolés','Outros'];
 let _barGruposMap = JSON.parse(localStorage.getItem('ps_bar_grupos_map') || 'null') || { nomeParaId: {}, idParaNome: {} };
 let barProdutos= JSON.parse(localStorage.getItem('ps_bar_produtos'))|| [];
@@ -5004,9 +5146,9 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','usuarios','funcionarios','config','relatorios','assinatura','stackclock'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','jackpot','usuarios','funcionarios','config','relatorios','assinatura','stackclock'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
-    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento'] },
+    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
 };
 
@@ -5370,6 +5512,92 @@ const db = {
         // Helper: busca rápida por id no cache (sem hit no banco)
         getById(id) {
             return jogadores.find(j => j.id === id);
+        },
+    },
+
+    // ============================================================
+    // db.jackpotMovimentacoes — Caixa do Jackpot do clube
+    // ============================================================
+    // Carteira global do clube alimentada automaticamente quando jogadores
+    // compram jackpot em torneios. Suporta saques (crédito a jogador ou
+    // uso interno do clube) e estornos.
+    jackpotMovimentacoes: {
+        async list() {
+            if (!sbClube) return jackpotMovimentacoesCache;
+            try {
+                const { data, error } = await sb
+                    .from('jackpot_movimentacoes')
+                    .select('*')
+                    .eq('clube_id', sbClube.id)
+                    .order('criado_em', { ascending: false })
+                    .limit(500);
+                if (error) throw error;
+                jackpotMovimentacoesCache = data || [];
+                return jackpotMovimentacoesCache;
+            } catch (e) {
+                console.warn('db.jackpotMovimentacoes.list falhou:', e.message);
+                return jackpotMovimentacoesCache;
+            }
+        },
+
+        async create(dados) {
+            if (!sbClube) throw new Error('Sem clube ativo');
+            const payload = {
+                clube_id:           sbClube.id,
+                tipo:               dados.tipo,
+                valor:               Number(dados.valor) || 0,
+                descricao:          dados.descricao || null,
+                torneio_id:         dados.torneio_id || null,
+                jogador_id:         dados.jogador_id || null,
+                compra_ref:         dados.compra_ref || null,
+                movimentacao_origem: dados.movimentacao_origem || null,
+                criado_por:         (currentUser && currentUser.id) || null,
+                criado_por_nome:    (currentUser && currentUser.nome) || 'Sistema',
+            };
+            const { data, error } = await sb
+                .from('jackpot_movimentacoes')
+                .insert(payload)
+                .select()
+                .single();
+            if (error) throw error;
+            // Atualiza cache (novo item no topo)
+            jackpotMovimentacoesCache.unshift(data);
+            return data;
+        },
+
+        // Estorna uma movimentação existente (gera uma nova do tipo 'estorno')
+        async estornar(movimentacaoId, motivo) {
+            const orig = jackpotMovimentacoesCache.find(m => m.id === movimentacaoId);
+            if (!orig) throw new Error('Movimentação original não encontrada');
+            return this.create({
+                tipo: 'estorno',
+                valor: orig.valor,
+                descricao: motivo || `Estorno de ${orig.descricao || orig.tipo}`,
+                torneio_id: orig.torneio_id,
+                jogador_id: orig.jogador_id,
+                compra_ref: orig.compra_ref,
+                movimentacao_origem: orig.id,
+            });
+        },
+
+        // Procura movimentação por compra_ref (usado pra evitar duplicação na sync)
+        findByCompraRef(compraRef) {
+            return jackpotMovimentacoesCache.find(m => m.compra_ref === compraRef && m.tipo === 'entrada_torneio');
+        },
+
+        // Calcula saldo atual a partir do cache
+        getSaldo() {
+            let saldo = 0;
+            const estornadasIds = new Set(
+                jackpotMovimentacoesCache.filter(m => m.tipo === 'estorno').map(m => m.movimentacao_origem)
+            );
+            jackpotMovimentacoesCache.forEach(m => {
+                if (estornadasIds.has(m.id)) return; // movimentação já estornada
+                if (m.tipo === 'estorno') return;    // não conta a movimentação de estorno em si
+                if (m.tipo === 'entrada_torneio' || m.tipo === 'entrada_manual') saldo += Number(m.valor) || 0;
+                else if (m.tipo === 'saida_credito' || m.tipo === 'saida_uso_clube') saldo -= Number(m.valor) || 0;
+            });
+            return saldo;
         },
     },
 };
@@ -6608,6 +6836,12 @@ async function carregarEstadoDoSupabase() {
                 }
             }
         } catch(e) { console.warn('[FICHAS] erro carregar:', e); }
+
+        // Carrega movimentações da Caixa do Jackpot (carteira do clube)
+        try {
+            await db.jackpotMovimentacoes.list();
+            console.log(`✅ ${jackpotMovimentacoesCache.length} movimentações de jackpot carregadas`);
+        } catch(e) { console.warn('[JACKPOT] erro carregar:', e); }
 
         console.log(`✅ Estado carregado do Supabase: ${torneios.length} torneios, ${cashMesas?.length||0} mesas, ${barProdutos.length} produtos, ${barComandas.length} comandas`);
     } catch (e) {
@@ -8485,6 +8719,279 @@ function inicializarFechamento() {
     if (inp && !inp.value) inp.value = yyyymmdd;
     renderFechamentoDia();
 }
+
+// ============================================================
+// CAIXA DO JACKPOT — Carteira do clube
+// ============================================================
+// Página acessível pelo menu lateral. Mostra saldo, KPIs e extrato
+// completo de movimentações. Permite creditar jogadores e fazer
+// saques/usos do clube. Toda movimentação grava em jackpot_movimentacoes.
+
+let _jackpotFiltroAtivo = 'todos';
+
+// Carrega movimentações do Supabase e renderiza a página
+async function renderPaginaJackpot() {
+    try {
+        await db.jackpotMovimentacoes.list();
+    } catch (e) {
+        console.warn('[JACKPOT] Erro ao carregar:', e.message);
+    }
+    renderJackpotKPIs();
+    renderJackpotExtrato();
+}
+
+function renderJackpotKPIs() {
+    const movs = jackpotMovimentacoesCache || [];
+    // Conjunto de ids estornados (não contam pra saldo/KPI)
+    const estornadasIds = new Set(movs.filter(m => m.tipo === 'estorno').map(m => m.movimentacao_origem));
+
+    let entradas = 0, saidas = 0, qtdEntradas = 0, qtdSaidas = 0;
+    movs.forEach(m => {
+        if (estornadasIds.has(m.id) || m.tipo === 'estorno') return;
+        const v = Number(m.valor) || 0;
+        if (m.tipo === 'entrada_torneio' || m.tipo === 'entrada_manual') { entradas += v; qtdEntradas++; }
+        else if (m.tipo === 'saida_credito' || m.tipo === 'saida_uso_clube') { saidas += v; qtdSaidas++; }
+    });
+    const saldo = entradas - saidas;
+
+    document.getElementById('jackpot-saldo').innerText = formatMoney(saldo);
+    document.getElementById('jackpot-total-entradas').innerText = formatMoney(entradas);
+    document.getElementById('jackpot-qtd-entradas').innerText = `${qtdEntradas} movimentaç${qtdEntradas === 1 ? 'ão' : 'ões'}`;
+    document.getElementById('jackpot-total-saidas').innerText = formatMoney(saidas);
+    document.getElementById('jackpot-qtd-saidas').innerText = `${qtdSaidas} movimentaç${qtdSaidas === 1 ? 'ão' : 'ões'}`;
+}
+
+function setFiltroJackpot(filtro) {
+    _jackpotFiltroAtivo = filtro;
+    document.querySelectorAll('.jackpot-filter-btn').forEach(b => b.classList.remove('jackpot-filter-active'));
+    const ativo = document.getElementById('jackpot-filtro-' + filtro);
+    if (ativo) ativo.classList.add('jackpot-filter-active');
+    renderJackpotExtrato();
+}
+
+function renderJackpotExtrato() {
+    const tbody = document.getElementById('jackpot-extrato-tbody');
+    if (!tbody) return;
+
+    // Ordena por criado_em DESC, mas calcula saldo após em ordem cronológica
+    const movs = [...(jackpotMovimentacoesCache || [])].sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+    const estornadasIds = new Set(movs.filter(m => m.tipo === 'estorno').map(m => m.movimentacao_origem));
+
+    // Calcula saldo acumulado (em ordem cronológica)
+    const movsAsc = [...movs].reverse();
+    const saldoMap = new Map();
+    let saldoAcc = 0;
+    movsAsc.forEach(m => {
+        if (estornadasIds.has(m.id)) {
+            saldoMap.set(m.id, saldoAcc);
+            return;
+        }
+        const v = Number(m.valor) || 0;
+        if (m.tipo === 'entrada_torneio' || m.tipo === 'entrada_manual') saldoAcc += v;
+        else if (m.tipo === 'saida_credito' || m.tipo === 'saida_uso_clube') saldoAcc -= v;
+        else if (m.tipo === 'estorno') {
+            const orig = movs.find(x => x.id === m.movimentacao_origem);
+            if (orig) {
+                if (orig.tipo === 'entrada_torneio' || orig.tipo === 'entrada_manual') saldoAcc -= Number(orig.valor) || 0;
+                else if (orig.tipo === 'saida_credito' || orig.tipo === 'saida_uso_clube') saldoAcc += Number(orig.valor) || 0;
+            }
+        }
+        saldoMap.set(m.id, saldoAcc);
+    });
+
+    // Aplica filtro
+    const filtrados = movs.filter(m => {
+        if (_jackpotFiltroAtivo === 'todos') return true;
+        return m.tipo === _jackpotFiltroAtivo;
+    });
+
+    document.getElementById('jackpot-extrato-count').innerText = `${filtrados.length} movimentaç${filtrados.length === 1 ? 'ão' : 'ões'}`;
+
+    if (filtrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding:2.5rem;text-align:center;color:#71717a;font-size:.85rem;"><i class="fa-solid fa-inbox" style="font-size:1.5rem;color:#3f3f46;display:block;margin-bottom:.5rem;"></i>Nenhuma movimentação encontrada</td></tr>';
+        return;
+    }
+
+    const tipoLabels = {
+        entrada_torneio:  { label: 'Compra Jackpot', icon: 'fa-trophy',     color: '#22c55e' },
+        entrada_manual:   { label: 'Entrada Manual', icon: 'fa-plus',       color: '#22c55e' },
+        saida_credito:    { label: 'Crédito Jogador', icon: 'fa-user-plus', color: '#ef4444' },
+        saida_uso_clube:  { label: 'Uso do Clube',   icon: 'fa-money-bill-trend-up', color: '#ef4444' },
+        estorno:          { label: 'Estorno',         icon: 'fa-rotate-left', color: '#f59e0b' },
+    };
+
+    tbody.innerHTML = filtrados.map(m => {
+        const isEstornada = estornadasIds.has(m.id);
+        const isEstorno = m.tipo === 'estorno';
+        const meta = tipoLabels[m.tipo] || { label: m.tipo, icon: 'fa-circle', color: '#71717a' };
+        const dt = new Date(m.criado_em);
+        const dataStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+        const isEntrada = (m.tipo === 'entrada_torneio' || m.tipo === 'entrada_manual');
+        const sinal = isEntrada ? '+' : (isEstorno ? '↺' : '-');
+        const valorTxt = formatMoney(Number(m.valor) || 0);
+        const saldoApos = saldoMap.get(m.id) || 0;
+        const descricao = m.descricao || '—';
+        const autor = m.criado_por_nome || 'Sistema';
+        const dimmed = isEstornada ? 'opacity:.4;text-decoration:line-through;' : '';
+        const canEstornar = !isEstornada && !isEstorno && m.tipo !== 'entrada_torneio'; // entrada de torneio só estorna via cancelamento de jackpot
+
+        return `<tr style="border-top:1px solid #1e1e23;${dimmed}">
+            <td style="padding:.65rem 1rem;font-size:.75rem;color:#a1a1aa;white-space:nowrap;">${dataStr}<div style="font-size:.6rem;color:#52525b;margin-top:.1rem;">por ${escapeHtml(autor)}</div></td>
+            <td style="padding:.65rem 1rem;">
+                <span style="display:inline-flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:700;color:${meta.color};">
+                    <i class="fa-solid ${meta.icon}"></i> ${meta.label}
+                </span>
+            </td>
+            <td style="padding:.65rem 1rem;font-size:.78rem;color:#e4e4e7;">${escapeHtml(descricao)}</td>
+            <td style="padding:.65rem 1rem;text-align:right;font-weight:800;color:${meta.color};white-space:nowrap;">${sinal} ${valorTxt}</td>
+            <td style="padding:.65rem 1rem;text-align:right;font-size:.78rem;color:#a1a1aa;white-space:nowrap;">${formatMoney(saldoApos)}</td>
+            <td style="padding:.65rem .5rem;text-align:center;">
+                ${canEstornar ? `<button onclick="estornarMovimentacaoJackpot('${m.id}')" title="Estornar" style="background:transparent;border:1px solid #27272a;color:#71717a;padding:.25rem .45rem;border-radius:.3rem;cursor:pointer;font-size:.7rem;"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ====== MODAIS de Jackpot ======
+
+function abrirModalJackpotCreditar() {
+    if (jackpotMovimentacoesCache.length === 0) renderPaginaJackpot();
+    const saldo = db.jackpotMovimentacoes.getSaldo();
+    if (saldo <= 0) return showToast('⚠️ Saldo insuficiente na Caixa do Jackpot');
+
+    // Reutilizamos o modal genérico via prompt simples — pra abrir UX simples
+    // Popula <select> com jogadores e abre modal-jackpot-creditar
+    const sel = document.getElementById('jpc-jogador');
+    if (sel) {
+        sel.innerHTML = '<option value="">Selecionar jogador…</option>' +
+            (jogadores || []).map(j => `<option value="${j.id}">${escapeHtml(j.nome)}${j.apelido ? ' (' + escapeHtml(j.apelido) + ')' : ''}</option>`).join('');
+        // Re-sincroniza combobox PlayerSearch
+        try { PlayerSearch.mount('jpc-jogador', { placeholder: 'Digite nome ou apelido…' }); } catch(e){}
+    }
+    document.getElementById('jpc-valor').value = '';
+    document.getElementById('jpc-descricao').value = '';
+    document.getElementById('jpc-saldo-info').innerText = `Saldo disponível: ${formatMoney(saldo)}`;
+    openModal('modal-jackpot-creditar');
+}
+
+async function confirmarCreditoJackpot() {
+    const jid = document.getElementById('jpc-jogador').value;
+    const valor = parseFloat(document.getElementById('jpc-valor').value);
+    const desc = document.getElementById('jpc-descricao').value.trim();
+    if (!jid) return showToast('⚠️ Selecione um jogador');
+    if (!valor || valor <= 0) return showToast('⚠️ Valor inválido');
+    const saldo = db.jackpotMovimentacoes.getSaldo();
+    if (valor > saldo) return showToast(`⚠️ Saldo insuficiente (disponível: ${formatMoney(saldo)})`);
+
+    try {
+        await db.jackpotMovimentacoes.create({
+            tipo: 'saida_credito',
+            valor: valor,
+            descricao: desc || `Crédito a ${getJogadorNome(jid)}`,
+            jogador_id: jid,
+        });
+        // Credita o saldo do jogador também (via registrarTransacao)
+        if (typeof registrarTransacao === 'function') {
+            try {
+                registrarTransacao({
+                    jogadorId: jid,
+                    tipo: 'credito',
+                    valor: +valor,
+                    descricao: `Crédito da Caixa do Jackpot ${desc ? '· ' + desc : ''}`.trim(),
+                    origem: 'jackpot',
+                    refId: null,
+                });
+            } catch(e){}
+        }
+        logAudit && logAudit('JACKPOT_CREDITO', `+${formatMoney(valor)} a ${getJogadorNome(jid)}`, { jid, valor, desc });
+        showToast(`✅ ${formatMoney(valor)} creditado a ${getJogadorNome(jid)}`);
+        closeModal('modal-jackpot-creditar');
+        renderJackpotKPIs();
+        renderJackpotExtrato();
+    } catch (e) {
+        console.error('[JACKPOT] credito falhou:', e);
+        showToast('❌ Erro ao creditar: ' + (e.message || 'tente novamente'));
+    }
+}
+
+function abrirModalJackpotSaque() {
+    if (jackpotMovimentacoesCache.length === 0) renderPaginaJackpot();
+    const saldo = db.jackpotMovimentacoes.getSaldo();
+    if (saldo <= 0) return showToast('⚠️ Saldo insuficiente na Caixa do Jackpot');
+    document.getElementById('jps-valor').value = '';
+    document.getElementById('jps-descricao').value = '';
+    document.getElementById('jps-saldo-info').innerText = `Saldo disponível: ${formatMoney(saldo)}`;
+    openModal('modal-jackpot-saque');
+}
+
+async function confirmarSaqueJackpot() {
+    const valor = parseFloat(document.getElementById('jps-valor').value);
+    const desc = document.getElementById('jps-descricao').value.trim();
+    if (!valor || valor <= 0) return showToast('⚠️ Valor inválido');
+    if (!desc) return showToast('⚠️ Informe a descrição do uso');
+    const saldo = db.jackpotMovimentacoes.getSaldo();
+    if (valor > saldo) return showToast(`⚠️ Saldo insuficiente (disponível: ${formatMoney(saldo)})`);
+
+    try {
+        await db.jackpotMovimentacoes.create({
+            tipo: 'saida_uso_clube',
+            valor: valor,
+            descricao: desc,
+        });
+        logAudit && logAudit('JACKPOT_USO_CLUBE', `-${formatMoney(valor)}: ${desc}`, { valor, desc });
+        showToast(`✅ ${formatMoney(valor)} debitado da Caixa do Jackpot`);
+        closeModal('modal-jackpot-saque');
+        renderJackpotKPIs();
+        renderJackpotExtrato();
+    } catch (e) {
+        console.error('[JACKPOT] saque falhou:', e);
+        showToast('❌ Erro: ' + (e.message || 'tente novamente'));
+    }
+}
+
+function abrirModalJackpotEntradaManual() {
+    document.getElementById('jpe-valor').value = '';
+    document.getElementById('jpe-descricao').value = '';
+    openModal('modal-jackpot-entrada');
+}
+
+async function confirmarEntradaManualJackpot() {
+    const valor = parseFloat(document.getElementById('jpe-valor').value);
+    const desc = document.getElementById('jpe-descricao').value.trim();
+    if (!valor || valor <= 0) return showToast('⚠️ Valor inválido');
+    if (!desc) return showToast('⚠️ Informe a descrição da entrada');
+
+    try {
+        await db.jackpotMovimentacoes.create({
+            tipo: 'entrada_manual',
+            valor: valor,
+            descricao: desc,
+        });
+        logAudit && logAudit('JACKPOT_ENTRADA_MANUAL', `+${formatMoney(valor)}: ${desc}`, { valor, desc });
+        showToast(`✅ ${formatMoney(valor)} adicionado à Caixa do Jackpot`);
+        closeModal('modal-jackpot-entrada');
+        renderJackpotKPIs();
+        renderJackpotExtrato();
+    } catch (e) {
+        console.error('[JACKPOT] entrada manual falhou:', e);
+        showToast('❌ Erro: ' + (e.message || 'tente novamente'));
+    }
+}
+
+async function estornarMovimentacaoJackpot(movId) {
+    if (!confirm('Estornar essa movimentação? Esta ação NÃO pode ser desfeita.')) return;
+    try {
+        await db.jackpotMovimentacoes.estornar(movId, 'Estorno manual');
+        logAudit && logAudit('JACKPOT_ESTORNO', `Estorno da movimentação ${movId}`, { movId });
+        showToast('↺ Movimentação estornada');
+        renderJackpotKPIs();
+        renderJackpotExtrato();
+    } catch (e) {
+        console.error('[JACKPOT] estorno falhou:', e);
+        showToast('❌ Erro ao estornar: ' + (e.message || 'tente novamente'));
+    }
+}
+
 
 function renderFechamentoDia() {
     const dataInp = document.getElementById('fech-data');
@@ -12144,6 +12651,7 @@ function applyPermissions() {
         'nav-assinatura':'assinatura',
         'nav-caixa':     'caixa',
         'nav-fechamento':'fechamento',
+        'nav-jackpot':   'jackpot',
         'nav-relatorios':'relatorios',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
@@ -12241,6 +12749,7 @@ function _renderSidebarLocks() {
 
 function showPage(page) {
     if (page === 'fechamento') setTimeout(inicializarFechamento, 50);
+    if (page === 'jackpot')    setTimeout(() => renderPaginaJackpot(), 50);
 
     // Gate by permission (papel)
     if (currentUser && !hasAccess(page)) {
@@ -14984,7 +15493,7 @@ function _lastChancePagaRake(t) {
 function _getBrutoParaRake(t) {
     if (!t) return 0;
     let total = 0;
-    
+
     // Entradas: buyin/rebuy/reentry/addon SEMPRE pagam rake.
     // Last Chance: depende do opt-in.
     const lcPaga = _lastChancePagaRake(t);
@@ -14992,12 +15501,11 @@ function _getBrutoParaRake(t) {
         if (e.tipo === 'last_chance' && !lcPaga) return; // skip
         total += Number(e.valor) || 0;
     });
-    
-    // Jackpot: depende do opt-in
-    if (_jackpotPagaRake(t)) {
-        total += (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
-    }
-    
+
+    // 💎 JACKPOT: NÃO entra mais no cálculo de rake/prize.
+    // Vai pra Caixa do Jackpot do clube (carteira separada).
+    // O comportamento antigo (paga_rake true/false) foi descontinuado.
+
     return total;
 }
 
@@ -15005,19 +15513,16 @@ function _getBrutoParaRake(t) {
 function _getBrutoSemRake(t) {
     if (!t) return 0;
     let total = 0;
-    
+
     // Last Chance "sem rake"
     if (!_lastChancePagaRake(t)) {
         total += (t.entries || [])
             .filter(e => e.tipo === 'last_chance')
             .reduce((s, e) => s + (Number(e.valor) || 0), 0);
     }
-    
-    // Jackpot "sem rake"
-    if (!_jackpotPagaRake(t)) {
-        total += (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
-    }
-    
+
+    // 💎 JACKPOT: removido daqui também — vai pra Caixa do Clube, não pro prize.
+
     return total;
 }
 
@@ -20061,12 +20566,14 @@ function confirmarJackpot() {
     const qtd = 1;
     const total = t.jackpotValor;
     const totalFichas = t.jackpotFichas;
+    const compraRef = 'jp_' + t.id + '_' + jid + '_' + Date.now();
 
     t.jackpotCompras.push({
         jogadorId: jid, qtd, valor: total, fichas: totalFichas, ts: Date.now(),
+        compraRef,  // ID local da compra (usado pra rastrear movimentação no caixa do clube)
     });
 
-    // Registra transação no caixa (débito)
+    // Registra transação no caixa (débito) — jogador pagou
     registrarTransacao({
         jogadorId: jid,
         tipo: 'buyin',
@@ -20076,10 +20583,31 @@ function confirmarJackpot() {
         refId: t.id,
     });
 
+    // 💎 EM TEMPO REAL: credita o valor na Caixa do Jackpot do clube
+    // (carteira separada que acumula entre torneios — não vai pro prize pool)
+    db.jackpotMovimentacoes.create({
+        tipo: 'entrada_torneio',
+        valor: total,
+        descricao: `Compra de Jackpot · ${getJogadorNome(jid)} · ${t.nome}`,
+        torneio_id: t.id,
+        jogador_id: jid,
+        compra_ref: compraRef,
+    }).then(() => {
+        // re-renderiza tela do jackpot se estiver aberta
+        if (typeof renderPaginaJackpot === 'function' &&
+            document.getElementById('page-jackpot') &&
+            document.getElementById('page-jackpot').style.display !== 'none') {
+            renderPaginaJackpot();
+        }
+    }).catch(err => {
+        console.warn('[JACKPOT] Falha ao creditar na caixa do clube:', err.message || err);
+        showToast('⚠️ Compra registrada, mas falhou ao creditar na Caixa do Jackpot');
+    });
+
     saveData();
     closeModal('modal-jackpot');
     updateModalTorneio();
-    showToast(`💎 ${qtd}x Jackpot comprado por ${getJogadorNome(jid)}`);
+    showToast(`💎 ${qtd}x Jackpot comprado por ${getJogadorNome(jid)}  ·  +R$ ${total} na Caixa do Clube`);
 }
 
 // ============================================================
