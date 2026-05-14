@@ -2904,7 +2904,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;padding:2rem;margin-bottom:1.5rem;">
                     <h3 style="font-size:1.25rem;font-weight:700;margin-bottom:1rem;">Compare os Planos</h3>
                     <p style="color:#a1a1aa;font-size:.85rem;margin-bottom:1.5rem;">Faça upgrade ou downgrade quando quiser. Você pode entrar em contato com o suporte para alterações.</p>
-                    <div id="assinatura-planos-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+                    <div id="assinatura-planos-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;align-items:stretch;">
                         Carregando planos...
                     </div>
                 </div>
@@ -10667,16 +10667,18 @@ function renderPlanosGrid() {
         if (p.feature_white_label) features.push('✓ White-label');
         if (p.feature_stackclock) features.push('✓ StackClock (Dealer App)');
         
-        return `<div style="background:${isAtual ? cor + '22' : '#0d0d0f'};border:2px solid ${isAtual ? cor : '#27272a'};padding:1.5rem;border-radius:.75rem;position:relative;">
+        return `<div style="background:${isAtual ? cor + '22' : '#0d0d0f'};border:2px solid ${isAtual ? cor : '#27272a'};padding:1.5rem;border-radius:.75rem;position:relative;display:flex;flex-direction:column;min-height:480px;">
             ${isAtual ? `<div style="position:absolute;top:-10px;right:1rem;background:${cor};color:white;padding:.2rem .75rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;border-radius:.25rem;">PLANO ATUAL</div>` : ''}
             <div style="font-size:.7rem;color:${cor};font-weight:700;text-transform:uppercase;letter-spacing:.1em;">${p.id}</div>
             <div style="font-size:1.25rem;font-weight:800;margin-top:.25rem;">${p.nome.replace('StackOS ','')}</div>
             <div style="font-size:2rem;font-weight:800;margin:.75rem 0;">R$ ${Number(p.preco_mensal).toFixed(2).replace('.', ',')}<span style="font-size:.85rem;color:#71717a;">/mês</span></div>
             <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">ou R$ ${Number(p.preco_anual).toFixed(2).replace('.', ',')} /ano (~17% off)</div>
-            <div style="display:flex;flex-direction:column;gap:.4rem;font-size:.8rem;color:#a1a1aa;margin-top:1rem;">
+            <!-- Features (cresce pra ocupar o espaço vertical disponível) -->
+            <div style="display:flex;flex-direction:column;gap:.4rem;font-size:.8rem;color:#a1a1aa;margin-top:1rem;flex:1;">
                 ${features.map(f => `<div>${f}</div>`).join('')}
             </div>
-            ${!isAtual ? `<button onclick="solicitarMudancaPlano('${p.id}', '${p.nome.replace(/'/g, "\\\\'")}')" class="btn-gold" style="width:100%;margin-top:1.5rem;padding:.7rem;border-radius:.5rem;font-weight:700;cursor:pointer;border:none;">Quero esse plano</button>` : '<div style="margin-top:1.5rem;padding:.7rem;text-align:center;color:#71717a;font-size:.8rem;">Você está neste plano</div>'}
+            <!-- Botão / texto plano atual (sempre no fundo, alinhado entre os cards) -->
+            ${!isAtual ? `<button onclick="solicitarMudancaPlano('${p.id}', '${p.nome.replace(/'/g, "\\\\'")}')" class="btn-gold" style="width:100%;margin-top:1.5rem;padding:.7rem;border-radius:.5rem;font-weight:700;cursor:pointer;border:none;">Quero esse plano</button>` : '<div style="margin-top:1.5rem;padding:.7rem;text-align:center;color:#71717a;font-size:.8rem;border-top:1px dashed #27272a;padding-top:1rem;">✓ Você está neste plano</div>'}
         </div>`;
     }).join('');
 }
