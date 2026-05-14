@@ -22044,6 +22044,8 @@ function selecionarBusca(idx) {
 // ATALHOS GLOBAIS DE TECLADO
 // ============================================================
 document.addEventListener('keydown', function(e) {
+    // Guarda: eventos especiais (IME composition, autofill, etc) podem chegar sem e.key
+    if (!e || typeof e.key !== 'string') return;
     const ativo = document.activeElement;
     const isTexto = ativo && (ativo.tagName === 'INPUT' || ativo.tagName === 'TEXTAREA' || ativo.isContentEditable);
     const buscaAberta = document.getElementById('modal-busca-global').classList.contains('open');
