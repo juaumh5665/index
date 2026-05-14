@@ -12939,6 +12939,9 @@ function abrirDetalhesTorneio(idx) {
     pedirPermissaoNotificacoes();
     const t = torneios[idx];
     document.getElementById('mt-nome').innerText = t.nome;
+    // Renderiza o mini-TV ANTES do primeiro updateModalTorneio pra que os IDs internos
+    // (mt-timer, mt-blinds-display, etc) já existam quando ele for chamado.
+    try { renderMiniTVPreview(t.tvLayout || 'classico'); } catch(e){}
     updateModalTorneio();
     // reset to controle tab
     document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
@@ -12968,31 +12971,44 @@ function updateModalTorneio() {
     }[t.tipo] || '';
     document.getElementById('mt-info').innerText = `Buy-in R$ ${t.buyin} | Rake ${t.rake}%${tipoTag}`;
 
-    document.getElementById('mt-nivel-label').innerText = t.isBreak ? 'INTERVALO' : `Nível ${t.nivelAtual + 1}`;
-    document.getElementById('mt-timer').innerText = formatTime(t.tempoRestante);
+    // Helper defensivo: o slot do mini-TV pode estar vazio em alguns momentos
+    // (entre renderizações), então protegemos contra elementos null.
+    const _setText = (id, txt) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = txt;
+    };
+    const _setColor = (id, color) => {
+        const el = document.getElementById(id);
+        if (el) el.style.color = color;
+    };
+
+    _setText('mt-nivel-label', t.isBreak ? 'INTERVALO' : `Nível ${t.nivelAtual + 1}`);
+    _setText('mt-timer', formatTime(t.tempoRestante));
     // Em break ou últimos 60s: pinta de vermelho. Caso contrário, preserva cor do tema (inherit).
-    document.getElementById('mt-timer').style.color = t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : '');
+    _setColor('mt-timer', t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : ''));
 
     const cur = t.blinds[t.nivelAtual];
     if (cur && cur.isBreak) {
         // Nível atual é intervalo
-        document.getElementById('mt-blinds-display').innerText = '⏸ Intervalo';
-        document.getElementById('mt-ante-display').innerText = `${cur.tempo || 10} min de pausa`;
+        _setText('mt-blinds-display', '⏸ Intervalo');
+        _setText('mt-ante-display', `${cur.tempo || 10} min de pausa`);
     } else if (cur) {
         const sb = (cur.sb != null) ? cur.sb : 0;
         const bb = (cur.bb != null) ? cur.bb : 0;
         const ante = (cur.ante != null) ? cur.ante : 0;
-        document.getElementById('mt-blinds-display').innerText = `${sb.toLocaleString()} / ${bb.toLocaleString()}`;
-        document.getElementById('mt-ante-display').innerText = `Ante: ${ante.toLocaleString()}`;
+        _setText('mt-blinds-display', `${sb.toLocaleString()} / ${bb.toLocaleString()}`);
+        _setText('mt-ante-display', `Ante: ${ante.toLocaleString()}`);
     } else {
-        document.getElementById('mt-blinds-display').innerText = '—';
-        document.getElementById('mt-ante-display').innerText = '—';
+        _setText('mt-blinds-display', '—');
+        _setText('mt-ante-display', '—');
     }
 
     const pct = (t.tempoRestante / t.tempoTotal) * 100;
     const bar = document.getElementById('mt-timer-bar');
-    bar.style.width = pct + '%';
-    bar.className = 'timer-bar' + (pct < 20 ? ' low' : '');
+    if (bar) {
+        bar.style.width = pct + '%';
+        bar.className = 'timer-bar' + (pct < 20 ? ' low' : '');
+    }
 
     const prox = t.blinds[t.nivelAtual + 1];
     let proxTexto;
