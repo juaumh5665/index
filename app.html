@@ -4467,11 +4467,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
                     <!-- Timer + controls -->
                     <div>
-                        <div class="stat-card" style="text-align:center;padding:2rem;">
-                            <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;" id="mt-nivel-label">Nível 1</div>
-                            <div id="mt-timer" class="timer-display" style="margin:.5rem 0;">00:00</div>
-                            <div id="mt-blinds-display" style="font-size:1.5rem;font-weight:800;color:#e4e4e7;">0 / 0</div>
-                            <div id="mt-ante-display" style="font-size:.8rem;color:#52525b;margin-top:.25rem;">Ante: 0</div>
+                        <div id="mt-timer-card" class="stat-card" style="text-align:center;padding:2rem;transition:background .3s ease,border-color .3s ease;">
+                            <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;transition:color .3s ease;" id="mt-nivel-label">Nível 1</div>
+                            <div id="mt-timer" class="timer-display" style="margin:.5rem 0;transition:color .3s ease,text-shadow .3s ease;">00:00</div>
+                            <div id="mt-blinds-display" style="font-size:1.5rem;font-weight:800;color:#e4e4e7;transition:color .3s ease,text-shadow .3s ease;">0 / 0</div>
+                            <div id="mt-ante-display" style="font-size:.8rem;color:#52525b;margin-top:.25rem;transition:color .3s ease;">Ante: 0</div>
                             <div class="timer-bar-bg" style="margin:1rem 0 0;">
                                 <div id="mt-timer-bar" class="timer-bar" style="width:100%;"></div>
                             </div>
@@ -14330,12 +14330,45 @@ function onTipoTorneioChange() {
     }
 }
 
+// Aplica a paleta visual do tema TV selecionado ao CARD DO TIMER no modal de torneio.
+// Reutiliza a mesma paleta da galeria (renderMiniTV) pra ficar consistente.
+// Pro Live (pokerweb) tem efeitos especiais (radial gradient verde + glow dourado).
+function aplicarTemaPreviewTimer(layout) {
+    const card    = document.getElementById('mt-timer-card');
+    const timer   = document.getElementById('mt-timer');
+    const blinds  = document.getElementById('mt-blinds-display');
+    const ante    = document.getElementById('mt-ante-display');
+    const nivel   = document.getElementById('mt-nivel-label');
+    if (!card || !timer || !blinds || !ante || !nivel) return;
+
+    // Paletas (mesma estrutura do renderMiniTV da galeria, expandida pra Pro Live)
+    const palettes = {
+        classico:    { bg: '#000',                                                  border: '#1e1e23', timer: '#f59e0b', blinds: '#fff',     ante: '#555',    nivel: '#555',    glow: '' },
+        minimalista: { bg: '#0f0f10',                                               border: '#1e1e23', timer: '#fafafa', blinds: '#a1a1aa',  ante: '#3f3f46', nivel: '#3f3f46', glow: '' },
+        feltro:      { bg: 'radial-gradient(ellipse,#12553f,#0a2e22 70%)',          border: 'rgba(245,213,114,.25)', timer: '#f5d572', blinds: '#fef3c7',  ante: '#7a6a40', nivel: '#7a6a40', glow: '0 0 20px rgba(245,213,114,.4)' },
+        neon:        { bg: 'linear-gradient(135deg,#1a0a2e,#05050a,#0a1a2e)',       border: 'rgba(236,72,153,.25)', timer: '#ec4899', blinds: '#06b6d4',  ante: '#52525b', nivel: '#52525b', glow: '0 0 15px #ec4899',  glowBlinds: '0 0 10px #06b6d4' },
+        pokerweb:    { bg: 'radial-gradient(ellipse at center,#1a6b4f 0%,#0d3d2e 50%,#062018 100%)', border: 'rgba(245,213,114,.35)', timer: '#f5d572', blinds: '#fef3c7', ante: '#7a6a40', nivel: '#f5d572', glow: '0 0 20px rgba(245,213,114,.7)' },
+    };
+    const p = palettes[layout] || palettes.classico;
+
+    // Aplica
+    card.style.background    = p.bg;
+    card.style.borderColor   = p.border;
+    timer.style.color        = p.timer;
+    timer.style.textShadow   = p.glow || 'none';
+    blinds.style.color       = p.blinds;
+    blinds.style.textShadow  = p.glowBlinds || 'none';
+    ante.style.color         = p.ante;
+    nivel.style.color        = p.nivel;
+}
+
 function onLayoutChange() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
     t.tvLayout = document.getElementById('mt-tv-layout').value;
     saveData();
     updateTV(activeTorneioIdx);
+    aplicarTemaPreviewTimer(t.tvLayout);
     // Mostra/oculta botão de config de stats (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
@@ -14368,6 +14401,8 @@ function syncTVControls() {
     // Mostra/oculta botão de stats config (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
+    // Aplica visual do tema TV no card do timer (preview ao abrir o modal)
+    aplicarTemaPreviewTimer(t.tvLayout || 'classico');
 }
 
 // ============================================================
