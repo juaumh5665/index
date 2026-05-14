@@ -4467,14 +4467,14 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
                     <!-- Timer + controls -->
                     <div>
-                        <!-- O conteúdo deste card é re-renderizado por renderMiniTVPreview()
-                             pra espelhar o layout TV selecionado (Clássico, Minimalista, Feltro, Neon, Pro Live).
-                             Os elementos #mt-timer, #mt-blinds-display, #mt-ante-display, #mt-nivel-label
-                             ficam sempre dentro do card (em posições diferentes por layout) pra que
-                             updateMonitorPreview / startTimer continuem funcionando como antes. -->
-                        <div id="mt-timer-card" class="stat-card" style="text-align:center;padding:0;overflow:hidden;transition:background .3s ease,border-color .3s ease;min-height:280px;">
-                            <!-- Slot que será preenchido por renderMiniTVPreview() -->
-                            <div id="mt-timer-card-slot"></div>
+                        <div id="mt-timer-card" class="stat-card" style="text-align:center;padding:2rem;transition:background .3s ease,border-color .3s ease;">
+                            <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;transition:color .3s ease;" id="mt-nivel-label">Nível 1</div>
+                            <div id="mt-timer" class="timer-display" style="margin:.5rem 0;transition:color .3s ease,text-shadow .3s ease;">00:00</div>
+                            <div id="mt-blinds-display" style="font-size:1.5rem;font-weight:800;color:#e4e4e7;transition:color .3s ease,text-shadow .3s ease;">0 / 0</div>
+                            <div id="mt-ante-display" style="font-size:.8rem;color:#52525b;margin-top:.25rem;transition:color .3s ease;">Ante: 0</div>
+                            <div class="timer-bar-bg" style="margin:1rem 0 0;">
+                                <div id="mt-timer-bar" class="timer-bar" style="width:100%;"></div>
+                            </div>
                         </div>
                         <!-- Próximo nível -->
                         <div style="margin-top:.75rem;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.75rem;display:flex;justify-content:space-between;align-items:center;">
@@ -12970,8 +12970,7 @@ function updateModalTorneio() {
 
     document.getElementById('mt-nivel-label').innerText = t.isBreak ? 'INTERVALO' : `Nível ${t.nivelAtual + 1}`;
     document.getElementById('mt-timer').innerText = formatTime(t.tempoRestante);
-    // Em break ou últimos 60s: pinta de vermelho. Caso contrário, preserva cor do tema (inherit).
-    document.getElementById('mt-timer').style.color = t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : '');
+    document.getElementById('mt-timer').style.color = t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : 'var(--gold)');
 
     const cur = t.blinds[t.nivelAtual];
     if (cur && cur.isBreak) {
@@ -13139,17 +13138,6 @@ function updateModalTorneio() {
         if (infoEl && !infoEl.innerHTML.includes(diaTag)) {
             infoEl.innerHTML += ` <span class="tag" style="background:rgba(6,182,212,.12);color:#06b6d4;margin-left:.3rem;">${diaTag}</span>`;
         }
-    }
-
-    // Re-renderiza o mini-TV preview a cada ~5 segundos pra refletir mudanças
-    // em dados estruturais (jogadores ativos, prize pool, etc) sem causar flicker.
-    // O timer interno continua tickando suave pelos updates direto nos IDs internos.
-    if (!window._lastMiniTvRender || (Date.now() - window._lastMiniTvRender) > 5000) {
-        try {
-            const layout = (t && t.tvLayout) || 'classico';
-            renderMiniTVPreview(layout);
-            window._lastMiniTvRender = Date.now();
-        } catch(e){}
     }
 }
 
@@ -14342,252 +14330,36 @@ function onTipoTorneioChange() {
     }
 }
 
-// ============================================================
-// MINI-TV PREVIEW (card do timer no modal de torneio)
-// ============================================================
-// Renderiza o card do timer como um "mini-monitor de TV" fiel ao layout escolhido,
-// espelhando o conteúdo da TV externa (título, KPIs, etc) em escala compacta.
-//
-// IMPORTANTE: mantém os 5 IDs essenciais dentro do slot pra que o ciclo de
-// atualização existente (renderModalTorneio + tick do timer) continue funcionando:
-//   - mt-nivel-label
-//   - mt-timer
-//   - mt-blinds-display
-//   - mt-ante-display
-//   - mt-timer-bar
-function renderMiniTVPreview(layout) {
-    const slot = document.getElementById('mt-timer-card-slot');
-    const card = document.getElementById('mt-timer-card');
-    if (!slot || !card) return;
+// Aplica a paleta visual do tema TV selecionado ao CARD DO TIMER no modal de torneio.
+// Reutiliza a mesma paleta da galeria (renderMiniTV) pra ficar consistente.
+// Pro Live (pokerweb) tem efeitos especiais (radial gradient verde + glow dourado).
+function aplicarTemaPreviewTimer(layout) {
+    const card    = document.getElementById('mt-timer-card');
+    const timer   = document.getElementById('mt-timer');
+    const blinds  = document.getElementById('mt-blinds-display');
+    const ante    = document.getElementById('mt-ante-display');
+    const nivel   = document.getElementById('mt-nivel-label');
+    if (!card || !timer || !blinds || !ante || !nivel) return;
 
-    const t = torneios[activeTorneioIdx];
-    if (!t) return;
-
-    // Calcula os dados extras usados pelos layouts (jogadores, avg, prize pool, elapsed, etc)
-    const dados = _computarDadosMiniTV(t);
-
-    // Layout padrão se não suportado
-    const lay = ['classico','minimalista','feltro','neon','pokerweb'].includes(layout) ? layout : 'classico';
-
-    // Aplica estilo de fundo + borda do card
-    const cardStyles = {
-        classico:    { bg: '#000',                                                                  border: '#1e1e23' },
-        minimalista: { bg: '#0f0f10',                                                               border: '#1e1e23' },
-        feltro:      { bg: 'radial-gradient(ellipse at center,#12553f 0%,#0a2e22 55%,#041410 100%)', border: 'rgba(245,213,114,.2)' },
-        neon:        { bg: '#05050a',                                                                border: 'rgba(236,72,153,.3)' },
-        pokerweb:    { bg: 'radial-gradient(ellipse at center,#1a6b4f 0%,#0d3d2e 50%,#062018 100%)', border: 'rgba(245,213,114,.35)' },
+    // Paletas (mesma estrutura do renderMiniTV da galeria, expandida pra Pro Live)
+    const palettes = {
+        classico:    { bg: '#000',                                                  border: '#1e1e23', timer: '#f59e0b', blinds: '#fff',     ante: '#555',    nivel: '#555',    glow: '' },
+        minimalista: { bg: '#0f0f10',                                               border: '#1e1e23', timer: '#fafafa', blinds: '#a1a1aa',  ante: '#3f3f46', nivel: '#3f3f46', glow: '' },
+        feltro:      { bg: 'radial-gradient(ellipse,#12553f,#0a2e22 70%)',          border: 'rgba(245,213,114,.25)', timer: '#f5d572', blinds: '#fef3c7',  ante: '#7a6a40', nivel: '#7a6a40', glow: '0 0 20px rgba(245,213,114,.4)' },
+        neon:        { bg: 'linear-gradient(135deg,#1a0a2e,#05050a,#0a1a2e)',       border: 'rgba(236,72,153,.25)', timer: '#ec4899', blinds: '#06b6d4',  ante: '#52525b', nivel: '#52525b', glow: '0 0 15px #ec4899',  glowBlinds: '0 0 10px #06b6d4' },
+        pokerweb:    { bg: 'radial-gradient(ellipse at center,#1a6b4f 0%,#0d3d2e 50%,#062018 100%)', border: 'rgba(245,213,114,.35)', timer: '#f5d572', blinds: '#fef3c7', ante: '#7a6a40', nivel: '#f5d572', glow: '0 0 20px rgba(245,213,114,.7)' },
     };
-    card.style.background  = cardStyles[lay].bg;
-    card.style.borderColor = cardStyles[lay].border;
+    const p = palettes[layout] || palettes.classico;
 
-    // Renderiza HTML do slot
-    if (lay === 'pokerweb') {
-        slot.innerHTML = _renderMiniProLive(t, dados);
-    } else {
-        slot.innerHTML = _renderMiniLayoutComum(lay, t, dados);
-    }
-}
-
-// Calcula dados auxiliares do torneio pra exibir no mini-monitor (mesmas regras do updateTV)
-function _computarDadosMiniTV(t) {
-    if (!t || !t.blinds) return {};
-    const ativos = (typeof getAtivos === 'function') ? getAtivos(t) : 0;
-    const eliminadosIds = new Set((t.eliminados || []).map(e => e.jogadorId));
-    const totalEntries = new Set((t.entries || []).filter(e => e.tipo === 'buyin' || e.tipo === 'reentry').map(e => e.jogadorId)).size;
-    // Fichas (mesma fórmula do updateTV)
-    const totalFichas = (t.entries || []).reduce((s, e) => {
-        if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
-        if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
-        if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
-        if (e.tipo === 'last_chance')   return s + (t.last_chance_fichas || 0);
-        return s + t.stack;
-    }, 0);
-    const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
-    const chipCount = totalFichas + jackpotFichas;
-    const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
-    const buyinsQtd  = (t.entries || []).filter(e => e.tipo === 'buyin').length;
-    const reentriesQtd = (t.entries || []).filter(e => e.tipo === 'reentry').length;
-    const addonsQtd  = (t.entries || []).filter(e => e.tipo === 'addon').length;
-    // Prize pool: usa a função do app (mesma usada em updateTV)
-    let prize = 0;
-    try {
-        if (typeof getPrize === 'function') {
-            prize = getPrize(t) || 0;
-        }
-    } catch(e){}
-    // Elapsed time: usa tempoIniciado se houver
-    let elapsedStr = '00:00:00';
-    if (t.tempoIniciado) {
-        const elapsedSec = Math.max(0, Math.floor((Date.now() - t.tempoIniciado) / 1000));
-        const h = Math.floor(elapsedSec / 3600);
-        const m = Math.floor((elapsedSec % 3600) / 60);
-        const s = elapsedSec % 60;
-        elapsedStr = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-    }
-    // Próximo nível (texto)
-    let proxStr = '—';
-    const prox = t.blinds[t.nivelAtual + 1];
-    if (prox) {
-        if (prox.isBreak) proxStr = '⏸ Break';
-        else proxStr = `${(prox.sb||0).toLocaleString()} / ${(prox.bb||0).toLocaleString()}`;
-    }
-    // Total de níveis (não breaks)
-    const totalNiveisJogo = t.blinds.filter(b => !b.isBreak).length;
-    let nivelJogo = 0;
-    for (let k = 0; k <= t.nivelAtual; k++) {
-        if (t.blinds[k] && !t.blinds[k].isBreak) nivelJogo++;
-    }
-    return {
-        ativos, totalEntries, chipCount, avg, prize, elapsedStr,
-        proxStr, buyinsQtd, reentriesQtd, addonsQtd,
-        nivelJogo: nivelJogo || 1,
-        totalNiveis: totalNiveisJogo || t.blinds.length,
-        clubeNome: (typeof sbClube !== 'undefined' && sbClube && sbClube.nome) ? sbClube.nome : '',
-    };
-}
-
-// Layout comum (Clássico, Minimalista, Feltro, Neon) — espelha bottom-grid + center-stack
-function _renderMiniLayoutComum(layout, t, d) {
-    // Cores por layout — espelha tv.html
-    const colors = {
-        classico:    { color: '#fff',     timer: '#f59e0b', blinds: '#fff',     timerGlow: '',                                            blindsGlow: '', label: 'rgba(255,255,255,.45)', panelBg: 'rgba(255,255,255,.04)', panelBorder: 'rgba(255,255,255,.08)', titleColor: '#fff' },
-        minimalista: { color: '#e4e4e7',  timer: '#fafafa', blinds: '#a1a1aa',  timerGlow: '',                                            blindsGlow: '', label: 'rgba(228,228,231,.45)', panelBg: 'rgba(255,255,255,.03)', panelBorder: 'rgba(255,255,255,.06)', titleColor: '#e4e4e7' },
-        feltro:      { color: '#f5e6c8',  timer: '#f5d572', blinds: '#fef3c7',  timerGlow: '0 0 18px rgba(245,213,114,.35)',              blindsGlow: '', label: 'rgba(245,230,200,.55)', panelBg: 'rgba(0,0,0,.3)',         panelBorder: 'rgba(245,213,114,.2)',  titleColor: '#f5d572' },
-        neon:        { color: '#fff',     timer: '#ec4899', blinds: '#06b6d4',  timerGlow: '0 0 14px #ec4899,0 0 28px rgba(236,72,153,.5)', blindsGlow: '0 0 10px rgba(6,182,212,.6)', label: 'rgba(255,255,255,.5)',  panelBg: 'rgba(20,20,40,.5)',     panelBorder: 'rgba(236,72,153,.3)',  titleColor: 'linear-gradient(90deg,#ec4899,#06b6d4)' },
-    };
-    const c = colors[layout] || colors.classico;
-
-    // Minimalista esconde KPIs e topo (igual hide-on-min da TV real)
-    const showTopAndKpis = layout !== 'minimalista';
-
-    // Título com gradiente (neon)
-    const titleStyle = layout === 'neon'
-        ? `background:${c.titleColor};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;`
-        : `color:${c.titleColor};`;
-
-    return `
-        <div style="padding:1rem 1.25rem;color:${c.color};font-family:'Manrope',sans-serif;display:flex;flex-direction:column;height:100%;min-height:280px;">
-            ${showTopAndKpis ? `
-            <!-- TOP BAR -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem;gap:.5rem;">
-                <div style="text-align:left;flex:1;min-width:0;">
-                    <div style="font-size:.85rem;font-weight:800;letter-spacing:-.02em;${titleStyle}line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.nome || 'TORNEIO')}</div>
-                    <div style="font-size:.55rem;color:${c.label};text-transform:uppercase;letter-spacing:.15em;margin-top:.1rem;font-weight:700;">Torneio ${t.tipo || 'normal'}</div>
-                </div>
-                <div style="text-align:right;flex-shrink:0;font-size:.55rem;color:${c.label};">
-                    ${d.clubeNome ? `<div style="font-weight:800;text-transform:uppercase;letter-spacing:.1em;">${escapeHtml(d.clubeNome).substring(0,20)}</div>` : ''}
-                    <div style="margin-top:.15rem;"><span style="opacity:.7;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Próx:</span> <span class="mono" style="font-weight:600;">${d.proxStr}</span></div>
-                </div>
-            </div>` : ''}
-
-            <!-- CENTER: NÍVEL + TIMER + BLINDS -->
-            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;">
-                ${showTopAndKpis ? `<div style="font-size:.55rem;color:${c.label};text-transform:uppercase;letter-spacing:.25em;font-weight:800;">NÍVEL <span id="mt-nivel-label" style="color:inherit;">${d.nivelJogo}</span> <span style="opacity:.5;">/ ${d.totalNiveis}</span></div>` : `<div id="mt-nivel-label" style="display:none;"></div>`}
-                <div id="mt-timer" class="mono" style="font-size:${layout==='minimalista'?'5.5rem':'4.5rem'};line-height:1;letter-spacing:-.04em;font-weight:700;color:${c.timer};text-shadow:${c.timerGlow||'none'};margin:.25rem 0;">${formatTime(t.tempoRestante || 0)}</div>
-                <div class="timer-bar-bg" style="width:60%;opacity:.5;margin:.15rem 0 .5rem;"><div id="mt-timer-bar" class="timer-bar" style="width:100%;"></div></div>
-                <div id="mt-blinds-display" style="font-size:${layout==='minimalista'?'2.2rem':'1.8rem'};font-weight:800;line-height:1;color:${c.blinds};text-shadow:${c.blindsGlow||'none'};">0 / 0</div>
-                <div id="mt-ante-display" style="font-size:.65rem;color:${c.label};margin-top:.4rem;text-transform:uppercase;letter-spacing:.2em;font-weight:700;">Ante 0</div>
-            </div>
-
-            ${showTopAndKpis ? `
-            <!-- BOTTOM KPIs (4 colunas) -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;padding:.55rem .75rem;background:${c.panelBg};border:1px solid ${c.panelBorder};border-radius:.5rem;margin-top:.55rem;">
-                <div style="text-align:left;">
-                    <div style="font-size:.5rem;color:${c.label};text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Jogadores</div>
-                    <div class="mono" style="font-size:.95rem;font-weight:700;line-height:1;margin-top:.15rem;">${d.ativos}<span style="font-size:.55rem;opacity:.5;margin-left:.2rem;">(${d.totalEntries} ent.)</span></div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:.5rem;color:${c.label};text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Avg Stack</div>
-                    <div class="mono" style="font-size:.95rem;font-weight:700;line-height:1;margin-top:.15rem;">${d.avg.toLocaleString('pt-BR')}</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:.5rem;color:${c.label};text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Prize Pool</div>
-                    <div class="mono" style="font-size:.95rem;font-weight:700;line-height:1;margin-top:.15rem;color:#22c55e;">R$ ${(d.prize || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-size:.5rem;color:${c.label};text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Tempo Decorrido</div>
-                    <div class="mono" style="font-size:.95rem;font-weight:700;line-height:1;margin-top:.15rem;opacity:.85;">${d.elapsedStr}</div>
-                </div>
-            </div>` : ''}
-        </div>
-    `;
-}
-
-// Layout Pro Live — espelha pw-screen (3 colunas + bottom-strip)
-function _renderMiniProLive(t, d) {
-    const gold = '#f5d572';
-    const cream = '#fef3c7';
-    // Stats strip (BUY-IN, ADD-ON, REBUY, etc — só os relevantes)
-    const stats = [];
-    if (d.buyinsQtd) stats.push({ label: 'BUY-IN', value: d.buyinsQtd });
-    if (d.reentriesQtd) stats.push({ label: 'RE-ENTRY', value: d.reentriesQtd });
-    if (d.addonsQtd) stats.push({ label: 'ADD-ON', value: d.addonsQtd });
-    const statsHtml = stats.slice(0, 4).map(s => `
-        <div style="text-align:center;flex:1;">
-            <div style="font-size:.5rem;color:rgba(254,243,199,.7);text-transform:uppercase;letter-spacing:.08em;font-weight:700;">${s.label}</div>
-            <div class="mono" style="font-size:.95rem;font-weight:800;color:${gold};margin-top:.1rem;">${s.value}</div>
-        </div>
-    `).join('');
-
-    const sb = t.blinds[t.nivelAtual] ? (t.blinds[t.nivelAtual].sb || 0) : 0;
-    const bb = t.blinds[t.nivelAtual] ? (t.blinds[t.nivelAtual].bb || 0) : 0;
-    const ante = t.blinds[t.nivelAtual] ? (t.blinds[t.nivelAtual].ante || 0) : 0;
-
-    return `
-        <div style="padding:.85rem 1rem;font-family:'Manrope',sans-serif;display:flex;flex-direction:column;min-height:280px;">
-            <!-- Title -->
-            <div style="text-align:center;font-size:.85rem;font-weight:800;color:${gold};letter-spacing:.06em;text-shadow:0 0 10px rgba(245,213,114,.4);text-transform:uppercase;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.nome || 'TORNEIO')}</div>
-            <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(245,213,114,.5),transparent);margin:.35rem auto .55rem;width:80%;"></div>
-
-            <!-- Main 3-col grid -->
-            <div style="display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:.6rem;align-items:center;flex:1;">
-                <!-- LEFT -->
-                <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.55rem;">
-                    <div>
-                        <div style="color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.08em;">NÍVEL <span id="mt-nivel-label" style="color:inherit;">${d.nivelJogo}</span></div>
-                    </div>
-                    <div>
-                        <div style="color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.08em;">JOGADORES</div>
-                        <div class="mono" style="color:${cream};font-weight:800;font-size:.95rem;line-height:1.1;">${d.ativos} <span style="opacity:.6;font-size:.65rem;">DE</span> ${d.totalEntries}</div>
-                    </div>
-                    <div>
-                        <div style="color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.08em;">MÉDIA</div>
-                        <div class="mono" style="color:${cream};font-weight:800;font-size:.95rem;line-height:1.1;">${d.avg.toLocaleString('pt-BR')}</div>
-                    </div>
-                </div>
-
-                <!-- CENTER (Timer + Blinds) -->
-                <div style="text-align:center;">
-                    <div id="mt-timer" class="mono" style="font-size:3rem;font-weight:800;color:${gold};line-height:1;text-shadow:0 0 18px rgba(245,213,114,.6);letter-spacing:-.04em;">${formatTime(t.tempoRestante || 0)}</div>
-                    <div class="timer-bar-bg" style="width:90%;margin:.3rem auto;background:rgba(245,213,114,.15);"><div id="mt-timer-bar" class="timer-bar" style="width:100%;background:${gold};"></div></div>
-                    <div id="mt-blinds-display" class="mono" style="font-size:1.3rem;font-weight:800;color:${cream};line-height:1;">${sb.toLocaleString('pt-BR')} / ${bb.toLocaleString('pt-BR')}</div>
-                    <div id="mt-ante-display" style="font-size:.55rem;color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.18em;margin-top:.2rem;">BIG-ANTE <strong style="color:${cream};">${ante}</strong></div>
-                </div>
-
-                <!-- RIGHT -->
-                <div style="display:flex;flex-direction:column;gap:.5rem;font-size:.55rem;text-align:right;">
-                    <div>
-                        <div style="color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.08em;">TEMPO DE JOGO</div>
-                        <div class="mono" style="color:${cream};font-weight:800;font-size:.95rem;line-height:1.1;">${d.elapsedStr}</div>
-                    </div>
-                    <div>
-                        <div style="color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.08em;">PRÓXIMO</div>
-                        <div class="mono" style="color:${cream};font-weight:800;font-size:.8rem;line-height:1.1;">${d.proxStr}</div>
-                    </div>
-                    <div>
-                        <div style="color:${gold};font-weight:700;text-transform:uppercase;letter-spacing:.08em;">CHIPCOUNT</div>
-                        <div class="mono" style="color:${cream};font-weight:800;font-size:.95rem;line-height:1.1;">${d.chipCount.toLocaleString('pt-BR')}</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- BOTTOM STRIP -->
-            ${stats.length ? `
-            <div style="display:flex;justify-content:space-around;padding:.45rem .25rem;margin:.55rem -1rem -.85rem;background:rgba(0,0,0,.4);border-top:1px solid rgba(245,213,114,.3);">
-                ${statsHtml}
-            </div>` : ''}
-        </div>
-    `;
+    // Aplica
+    card.style.background    = p.bg;
+    card.style.borderColor   = p.border;
+    timer.style.color        = p.timer;
+    timer.style.textShadow   = p.glow || 'none';
+    blinds.style.color       = p.blinds;
+    blinds.style.textShadow  = p.glowBlinds || 'none';
+    ante.style.color         = p.ante;
+    nivel.style.color        = p.nivel;
 }
 
 function onLayoutChange() {
@@ -14596,7 +14368,7 @@ function onLayoutChange() {
     t.tvLayout = document.getElementById('mt-tv-layout').value;
     saveData();
     updateTV(activeTorneioIdx);
-    renderMiniTVPreview(t.tvLayout);
+    aplicarTemaPreviewTimer(t.tvLayout);
     // Mostra/oculta botão de config de stats (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
@@ -14630,8 +14402,7 @@ function syncTVControls() {
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     // Aplica visual do tema TV no card do timer (preview ao abrir o modal)
-    window._lastMiniTvRender = Date.now(); // marca a renderização inicial
-    renderMiniTVPreview(t.tvLayout || 'classico');
+    aplicarTemaPreviewTimer(t.tvLayout || 'classico');
 }
 
 // ============================================================
