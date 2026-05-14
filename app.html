@@ -581,6 +581,98 @@
         /* Tema claro: hover/active mantém texto escuro mas ícone segue colorido */
         body.tema-claro .nav-item:hover:not(.nav-active) { color: var(--t-text-1); }
 
+        /* ============================================================
+           PLAYER SEARCH COMBOBOX
+           Substitui visualmente os <select> de jogador por um campo
+           de busca com dropdown autocomplete. O <select> nativo fica
+           escondido mas continua sendo a "fonte da verdade" pro submit.
+           ============================================================ */
+        .ps-wrap { position: relative; }
+        .ps-wrap > select.ps-hidden { display: none !important; }
+        .ps-input {
+            width: 100%;
+            background: #0f0f12;
+            border: 1px solid #27272a;
+            color: #fff;
+            padding: .7rem 2.2rem .7rem 1rem;
+            border-radius: .5rem;
+            font-size: .85rem;
+            font-family: inherit;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color .15s;
+        }
+        .ps-input::placeholder { color: #52525b; }
+        .ps-input:focus { border-color: var(--gold); }
+        .ps-input.ps-has-value { color: #fff; font-weight: 500; }
+        .ps-icon {
+            position: absolute;
+            right: .7rem; top: 50%; transform: translateY(-50%);
+            color: #52525b; font-size: .8rem;
+            pointer-events: none;
+        }
+        .ps-clear {
+            position: absolute;
+            right: .7rem; top: 50%; transform: translateY(-50%);
+            color: #71717a; font-size: .9rem;
+            cursor: pointer; padding: 2px 6px;
+            border-radius: 4px;
+            display: none;
+            background: transparent; border: none;
+        }
+        .ps-clear:hover { color: #ef4444; background: #18181b; }
+        .ps-wrap.has-value .ps-icon { display: none; }
+        .ps-wrap.has-value .ps-clear { display: block; }
+        .ps-list {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px); left: 0; right: 0;
+            background: #0f0f12;
+            border: 1px solid #27272a;
+            border-radius: .5rem;
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 8px 24px rgba(0,0,0,.5);
+        }
+        .ps-wrap.open .ps-list { display: block; }
+        .ps-item {
+            padding: .6rem .85rem;
+            font-size: .82rem;
+            color: #e4e4e7;
+            cursor: pointer;
+            border-bottom: 1px solid #18181b;
+            transition: background .1s;
+            user-select: none;
+        }
+        .ps-item:last-child { border-bottom: none; }
+        .ps-item:hover, .ps-item.ps-highlight { background: #18181b; color: #fff; }
+        .ps-item mark { background: rgba(251,191,36,.25); color: var(--gold); padding: 1px 2px; border-radius: 2px; }
+        .ps-item .ps-tag {
+            font-size: .65rem; color: var(--gold);
+            margin-left: .4rem; font-weight: 600;
+            opacity: .85;
+        }
+        .ps-empty {
+            padding: .9rem; color: #71717a;
+            font-size: .8rem; text-align: center;
+        }
+        /* Tema claro */
+        body.tema-claro .ps-input {
+            background: var(--t-bg-2, #fff);
+            color: var(--t-text-1, #18181b);
+            border-color: var(--t-border, #e4e4e7);
+        }
+        body.tema-claro .ps-input::placeholder { color: #94a3b8; }
+        body.tema-claro .ps-list {
+            background: var(--t-bg-2, #fff);
+            border-color: var(--t-border, #e4e4e7);
+        }
+        body.tema-claro .ps-item { color: #18181b; border-bottom-color: #f1f5f9; }
+        body.tema-claro .ps-item:hover, body.tema-claro .ps-item.ps-highlight {
+            background: #f1f5f9; color: #18181b;
+        }
+
         /* Toast */
         #toast {
             position: fixed; bottom: 2rem; right: 2rem;
@@ -3207,7 +3299,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div>
                 <label class="inp-label">Jogador *</label>
-                <select id="comanda-jogador" class="inp"></select>
+                <select id="comanda-jogador" class="inp" data-player-search="1"></select>
             </div>
             <button onclick="abrirComanda()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Abrir Comanda</button>
         </div>
@@ -3725,7 +3817,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <button onclick="closeModal('modal-deposito-rapido')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
-            <div><label class="inp-label">Jogador *</label><select id="dep-jogador" class="inp"></select></div>
+            <div><label class="inp-label">Jogador *</label><select id="dep-jogador" class="inp" data-player-search="1"></select></div>
             <div><label class="inp-label">Valor R$ *</label><input id="dep-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 200"></div>
             <div>
                 <label class="inp-label">Forma de Pagamento *</label>
@@ -3904,7 +3996,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div id="jackpot-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
-            <div><label class="inp-label">Jogador *</label><select id="jackpot-jogador" class="inp"></select></div>
+            <div><label class="inp-label">Jogador *</label><select id="jackpot-jogador" class="inp" data-player-search="1"></select></div>
             <div><label class="inp-label">Quantidade de compras</label><input id="jackpot-qtd" type="number" min="1" value="1" class="inp"></div>
             <div id="jackpot-total" style="padding:.85rem 1rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;font-size:.95rem;font-weight:700;color:var(--gold);text-align:center;"></div>
             <button onclick="confirmarJackpot()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Compra</button>
@@ -3921,7 +4013,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div id="last-chance-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
-            <div><label class="inp-label">Jogador *</label><select id="last-chance-jogador" class="inp"></select></div>
+            <div><label class="inp-label">Jogador *</label><select id="last-chance-jogador" class="inp" data-player-search="1"></select></div>
             <div><label class="inp-label">Quantidade de compras</label><input id="last-chance-qtd" type="number" min="1" value="1" class="inp"></div>
             <div id="last-chance-total" style="padding:.85rem 1rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:.5rem;font-size:.95rem;font-weight:700;color:#a78bfa;text-align:center;"></div>
             <button onclick="confirmarLastChance()" style="padding:.85rem;border-radius:.6rem;background:linear-gradient(135deg,#8b5cf6,#a78bfa);color:#fff;border:none;font-family:'Manrope',sans-serif;font-weight:800;font-size:.9rem;cursor:pointer;">Confirmar Compra</button>
@@ -3993,7 +4085,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div>
                 <label class="inp-label">Jogador *</label>
-                <select id="acj-jogador" class="inp"></select>
+                <select id="acj-jogador" class="inp" data-player-search="1"></select>
             </div>
             <div id="acj-buyin-range" style="font-size:.75rem;color:#52525b;padding:.5rem .75rem;background:#0f0f12;border-radius:.5rem;"></div>
             <div>
@@ -4627,7 +4719,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <label class="inp-label" style="margin:0;">Jogador</label>
                     <button type="button" onclick="abrirCadastroRapido()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-user-plus"></i> Novo jogador</button>
                 </div>
-                <select id="entrada-jogador" class="inp">
+                <select id="entrada-jogador" class="inp" data-player-search="1">
                     <option value="">Selecionar jogador...</option>
                 </select>
             </div>
@@ -4817,7 +4909,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div>
                 <label class="inp-label">Jogador eliminado</label>
-                <select id="eliminar-jogador" class="inp"></select>
+                <select id="eliminar-jogador" class="inp" data-player-search="1"></select>
             </div>
             <div id="eliminar-posicao-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:1rem;font-size:.85rem;"></div>
             <button onclick="confirmarEliminacao()" style="background:#7f1d1d;border:1px solid #991b1b;color:#fca5a5;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:700;cursor:pointer;">Confirmar Eliminação</button>
@@ -13788,7 +13880,7 @@ function openModalEliminar(idx) {
     if (isKO) {
         html += `<div style="margin-top:.85rem;padding-top:.75rem;border-top:1px solid #27272a;">
             <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;"><i class="fa-solid fa-crosshairs"></i> Quem eliminou?</div>
-            <select id="eliminador-jogador" class="inp" style="font-size:.85rem;padding:.5rem .75rem;">
+            <select id="eliminador-jogador" class="inp" style="font-size:.85rem;padding:.5rem .75rem;" data-player-search="1">
                 <option value="">— Sem eliminador (blindada) —</option>
                 ${ativos.map(id => {
                     const j = jogadores.find(j => j.id === id);
@@ -13800,6 +13892,11 @@ function openModalEliminar(idx) {
     }
 
     document.getElementById('eliminar-posicao-info').innerHTML = html;
+
+    // Monta PlayerSearch no eliminador-jogador (foi criado via innerHTML, então não passou pelo mountAll inicial)
+    if (isKO) {
+        try { PlayerSearch.mount('eliminador-jogador', { placeholder: 'Quem eliminou? (opcional)' }); } catch(e){}
+    }
 
     // Atualiza apenas o select de "quem eliminou" sem recriar o modal inteiro
     sel.onchange = () => {
@@ -13815,6 +13912,8 @@ function openModalEliminar(idx) {
             }).join('');
         // Mantém valor selecionado se ainda for válido
         if (valorAtual && valorAtual !== jidEliminado) eliminadorSel.value = valorAtual;
+        // Re-sincroniza o combobox PlayerSearch após mudança de opções
+        try { PlayerSearch._syncFromSelect && PlayerSearch.mount('eliminador-jogador'); } catch(e){}
     };
     // Dispara uma vez para inicializar
     sel.onchange();
@@ -14816,6 +14915,293 @@ function showToast(msg) {
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
 }
+
+// ============================================================
+// PlayerSearch — Combobox autocomplete pra <select> de jogador
+// ============================================================
+// Uso: PlayerSearch.mount('id-do-select', { placeholder: '...' })
+//
+// Esta função pega o <select> existente, esconde ele e monta um
+// combobox em cima. O <select> continua sendo a fonte da verdade —
+// .value, .innerHTML, change event continuam funcionando como antes.
+// Quando o <select> é re-populado (innerHTML = ...), o combobox
+// detecta via MutationObserver e re-sincroniza as opções.
+//
+// Vantagens:
+// - Zero refactor das funções que populam ou leem os selects.
+// - Submit/validação existentes continuam idênticos.
+// - Reaplica busca mesmo após re-render do select.
+
+const PlayerSearch = (function() {
+    function normalize(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function escapeHtml(s) {
+        return (s || '').replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    // Lê opções do <select> e retorna [{value, label, tag, disabled}]
+    function readOptions(select) {
+        const opts = [];
+        for (const o of select.options) {
+            const text = o.text || '';
+            // Detecta "(inscrito)", "(elim.)" etc. como tags
+            const tagMatch = text.match(/\s*\(([^)]+)\)\s*$/);
+            const tag = tagMatch ? tagMatch[1] : '';
+            const label = tagMatch ? text.replace(tagMatch[0], '').trim() : text.trim();
+            opts.push({
+                value: o.value,
+                label: label,
+                tag: tag,
+                disabled: o.disabled,
+                isPlaceholder: !o.value, // value="" é o "Selecionar…"
+            });
+        }
+        return opts;
+    }
+
+    function renderList(state) {
+        const q = normalize(state.input.value);
+        const opts = state.options.filter(o => !o.isPlaceholder); // remove "Selecionar..." da lista
+
+        let matches;
+        if (q) {
+            matches = opts.filter(o => normalize(o.label).includes(q));
+        } else {
+            matches = opts;
+        }
+
+        // Limita exibição a 50 pra performance em listas grandes
+        const shown = matches.slice(0, 50);
+        const overflow = matches.length - shown.length;
+
+        if (matches.length === 0) {
+            state.list.innerHTML = `<div class="ps-empty">Nenhum jogador encontrado${q ? ' para "' + escapeHtml(q) + '"' : ''}</div>`;
+            state.highlightIdx = -1;
+            return;
+        }
+
+        state.list.innerHTML = shown.map((o, idx) => {
+            let display = escapeHtml(o.label);
+            if (q) {
+                const norm = normalize(o.label);
+                const i = norm.indexOf(q);
+                if (i >= 0) {
+                    // Encontra posição no texto original (não-normalizado)
+                    // Como normalize só remove acentos sem mudar tamanho, índices batem
+                    display = escapeHtml(o.label.substring(0, i)) +
+                              '<mark>' + escapeHtml(o.label.substring(i, i + q.length)) + '</mark>' +
+                              escapeHtml(o.label.substring(i + q.length));
+                }
+            }
+            const tag = o.tag ? `<span class="ps-tag">(${escapeHtml(o.tag)})</span>` : '';
+            const dis = o.disabled ? 'opacity:.4;pointer-events:none;' : '';
+            return `<div class="ps-item${idx === state.highlightIdx ? ' ps-highlight' : ''}" data-value="${escapeHtml(o.value)}" style="${dis}">${display}${tag}</div>`;
+        }).join('') + (overflow > 0 ? `<div class="ps-empty" style="font-style:italic;">+ ${overflow} resultado(s) — refine sua busca</div>` : '');
+
+        // Click handlers
+        state.list.querySelectorAll('.ps-item').forEach((el, idx) => {
+            el.onmousedown = (e) => {
+                e.preventDefault(); // evita perda de foco antes do click
+                pick(state, el.getAttribute('data-value'));
+            };
+            el.onmouseenter = () => {
+                state.highlightIdx = idx;
+                // Re-aplica destaque sem re-renderizar tudo
+                state.list.querySelectorAll('.ps-item').forEach((x, i) => {
+                    x.classList.toggle('ps-highlight', i === idx);
+                });
+            };
+        });
+    }
+
+    function pick(state, value) {
+        // Acha a option correspondente
+        const opt = state.options.find(o => o.value === value);
+        if (!opt) return;
+
+        // Atualiza o <select> nativo
+        state.select.value = value;
+        // Dispara change event (caso alguma lógica externa esteja ouvindo)
+        state.select.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // Atualiza o input visual
+        state.input.value = opt.label + (opt.tag ? ' (' + opt.tag + ')' : '');
+        state.wrap.classList.add('has-value');
+        state.input.classList.add('ps-has-value');
+
+        // Fecha
+        close(state);
+    }
+
+    function clear(state) {
+        state.select.value = '';
+        state.select.dispatchEvent(new Event('change', { bubbles: true }));
+        state.input.value = '';
+        state.wrap.classList.remove('has-value');
+        state.input.classList.remove('ps-has-value');
+        state.input.focus();
+        renderList(state);
+    }
+
+    function open(state) {
+        state.wrap.classList.add('open');
+        state.highlightIdx = -1;
+        renderList(state);
+    }
+
+    function close(state) {
+        state.wrap.classList.remove('open');
+    }
+
+    // Sincroniza visual do input com o valor atual do <select>
+    // (útil quando o select é re-populado externamente)
+    function syncFromSelect(state) {
+        state.options = readOptions(state.select);
+        const current = state.options.find(o => o.value === state.select.value);
+        if (current && !current.isPlaceholder) {
+            state.input.value = current.label + (current.tag ? ' (' + current.tag + ')' : '');
+            state.wrap.classList.add('has-value');
+            state.input.classList.add('ps-has-value');
+        } else {
+            state.input.value = '';
+            state.wrap.classList.remove('has-value');
+            state.input.classList.remove('ps-has-value');
+        }
+    }
+
+    function mount(selectId, options) {
+        options = options || {};
+        const select = document.getElementById(selectId);
+        if (!select) {
+            console.warn('[PlayerSearch] Select não encontrado:', selectId);
+            return null;
+        }
+        // Se já foi montado, só re-sincroniza
+        if (select.dataset.psMounted === '1') {
+            const wrap = select.parentNode;
+            if (wrap && wrap.__psState) syncFromSelect(wrap.__psState);
+            return wrap.__psState;
+        }
+
+        // Wrap
+        const wrap = document.createElement('div');
+        wrap.className = 'ps-wrap';
+        // Preserva qualquer style/classe inline do select pai (mas no wrap)
+        select.parentNode.insertBefore(wrap, select);
+        wrap.appendChild(select);
+        select.classList.add('ps-hidden');
+
+        // Input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'ps-input';
+        input.placeholder = options.placeholder || 'Digite nome ou apelido…';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        wrap.appendChild(input);
+
+        // Ícone lupa
+        const icon = document.createElement('span');
+        icon.className = 'ps-icon';
+        icon.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+        wrap.appendChild(icon);
+
+        // Botão limpar
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'ps-clear';
+        clearBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        clearBtn.title = 'Limpar';
+        wrap.appendChild(clearBtn);
+
+        // Lista
+        const list = document.createElement('div');
+        list.className = 'ps-list';
+        wrap.appendChild(list);
+
+        // Estado
+        const state = {
+            select, wrap, input, list,
+            options: readOptions(select),
+            highlightIdx: -1,
+        };
+        wrap.__psState = state;
+        select.dataset.psMounted = '1';
+
+        // Handlers
+        input.addEventListener('focus', () => open(state));
+        input.addEventListener('blur', () => {
+            // Pequeno delay pra permitir mousedown em items
+            setTimeout(() => close(state), 150);
+        });
+        input.addEventListener('input', () => {
+            // Limpa seleção quando o usuário começa a digitar
+            if (state.select.value) {
+                state.select.value = '';
+                state.wrap.classList.remove('has-value');
+                state.input.classList.remove('ps-has-value');
+            }
+            renderList(state);
+        });
+        input.addEventListener('keydown', (e) => {
+            const items = list.querySelectorAll('.ps-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (!wrap.classList.contains('open')) { open(state); return; }
+                state.highlightIdx = Math.min(items.length - 1, state.highlightIdx + 1);
+                items.forEach((x, i) => x.classList.toggle('ps-highlight', i === state.highlightIdx));
+                const cur = items[state.highlightIdx];
+                if (cur) cur.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                state.highlightIdx = Math.max(0, state.highlightIdx - 1);
+                items.forEach((x, i) => x.classList.toggle('ps-highlight', i === state.highlightIdx));
+                const cur = items[state.highlightIdx];
+                if (cur) cur.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter') {
+                if (state.highlightIdx >= 0 && items[state.highlightIdx]) {
+                    e.preventDefault();
+                    pick(state, items[state.highlightIdx].getAttribute('data-value'));
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                close(state);
+                input.blur();
+            }
+        });
+        clearBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            clear(state);
+        });
+
+        // Observa mudanças no <select> (re-população por outras funções)
+        const observer = new MutationObserver(() => syncFromSelect(state));
+        observer.observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+
+        // Sincronização inicial
+        syncFromSelect(state);
+
+        return state;
+    }
+
+    // Monta automaticamente todos os selects marcados com data-player-search="1"
+    function mountAll() {
+        document.querySelectorAll('select[data-player-search="1"]').forEach(s => {
+            mount(s.id);
+        });
+    }
+
+    return { mount, mountAll, _syncFromSelect: syncFromSelect };
+})();
+
+// Monta automaticamente quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+    try { PlayerSearch.mountAll(); } catch(e) { console.warn('[PlayerSearch]', e); }
+});
 
 function confirmarLimparDados() {
     if (!confirm('⚠️ Isso apagará TODOS os dados. Continuar?')) return;
