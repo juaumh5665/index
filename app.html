@@ -2226,12 +2226,25 @@ document.addEventListener('DOMContentLoaded', function(){
                             <button onclick="openModalDepositoRapido()" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-plus-circle"></i> Depósito</button>
                         </div>
                     </div>
+                    <!-- Busca global do caixa (saldos + comandas) -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.6rem;margin-bottom:.75rem;">
+                        <div style="font-size:.7rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Saldos por Jogador</div>
+                        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
+                            <input id="caixa-aberto-busca" oninput="renderCaixaAberto()" placeholder="🔍 Buscar nome, apelido ou sobrenome..." class="inp" style="padding:.45rem .75rem;font-size:.8rem;width:280px;">
+                            <select id="caixa-aberto-limite" onchange="renderCaixaAberto()" class="inp" style="padding:.45rem .65rem;font-size:.8rem;width:90px;" title="Limite de exibição">
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="999">Todos</option>
+                            </select>
+                        </div>
+                    </div>
                     <!-- Comandas abertas do bar para acerto pelo caixa -->
                     <div id="caixa-comandas-abertas-wrap" style="display:none;margin-bottom:1rem;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
                             <div style="font-size:.65rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comandas Abertas do Bar <span id="caixa-comandas-count" style="color:#71717a;">(0)</span></div>
                             <div style="display:flex;gap:.4rem;align-items:center;">
-                                <input id="caixa-comandas-busca" oninput="renderComandasAbertasCaixa()" placeholder="Buscar jogador..." class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:180px;">
+                                <input id="caixa-comandas-busca" oninput="renderComandasAbertasCaixa()" placeholder="Buscar comanda..." class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:180px;">
                                 <select id="caixa-comandas-limite" onchange="renderComandasAbertasCaixa()" class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:110px;">
                                     <option value="10">10</option>
                                     <option value="20">20</option>
@@ -19162,13 +19175,20 @@ function renderCaixaAberto() {
     renderComandasAbertasCaixa();
 
     const filtro = (document.getElementById('caixa-filtro') || {}).value || 'devedor';
+    const buscaRaw = ((document.getElementById('caixa-aberto-busca') || {}).value || '').trim();
+    const limite = parseInt((document.getElementById('caixa-aberto-limite') || {}).value || '20', 10) || 20;
+
+    // Helper de normalização (case-insensitive + sem acentos)
+    const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const q = norm(buscaRaw);
+
     // CAIXA GERAL: usa saldo SEM cash (cash tem caixa próprio por mesa)
     const saldos = jogadores.map(j => ({
         jogador: j,
         saldo: getSaldoJogadorCaixaGeral(j.id),
     }));
 
-    // Stats
+    // Stats (sempre sobre TODOS os saldos, não os filtrados, pra dar visão completa do caixa)
     const devedores = saldos.filter(s => s.saldo < 0);
     const credito   = saldos.filter(s => s.saldo > 0);
     const totalReceber = devedores.reduce((s, x) => s + Math.abs(x.saldo), 0);
@@ -19183,30 +19203,84 @@ function renderCaixaAberto() {
     const tCred = document.getElementById('caixa-total-credito');
     if (tCred) tCred.innerText = formatMoney(totalCredito);
 
-    // Filtro
+    // Filtro por status
     let lista = saldos;
     if (filtro === 'devedor') lista = saldos.filter(s => s.saldo < 0);
     else if (filtro === 'credito') lista = saldos.filter(s => s.saldo > 0);
     else if (filtro === 'zerado') lista = saldos.filter(s => s.saldo === 0);
 
-    lista.sort((a, b) => a.saldo - b.saldo);  // devedores primeiro
+    // Busca inteligente em nome, apelido e sobrenome
+    // Score: 3 = começa com query · 2 = palavra inicial · 1 = contém · 0 = não bate
+    if (q) {
+        lista = lista.map(s => {
+            const nome    = norm(s.jogador.nome);
+            const apelido = norm(s.jogador.apelido);
+            // sobrenome = última palavra do nome completo
+            const partes = nome.split(/\s+/).filter(Boolean);
+            const sobrenome = partes.length > 1 ? partes[partes.length - 1] : '';
+
+            let score = 0;
+            if (nome.startsWith(q) || apelido.startsWith(q)) score = 3;
+            else if (sobrenome.startsWith(q)) score = 2;
+            else if (partes.some(w => w.startsWith(q))) score = 2;  // qualquer palavra do nome inicia com query
+            else if (nome.includes(q) || apelido.includes(q)) score = 1;
+
+            return { ...s, _score: score };
+        }).filter(s => s._score > 0);
+
+        // Ordena: maior score primeiro, depois alfabético
+        lista.sort((a, b) => (b._score - a._score) || a.jogador.nome.localeCompare(b.jogador.nome));
+    } else {
+        // Sem busca: ordena devedores primeiro (maiores dívidas) e depois alfabético
+        lista.sort((a, b) => a.saldo - b.saldo);
+    }
+
+    const totalEncontrados = lista.length;
+
+    // Aplica limite
+    const listaExibida = lista.slice(0, limite);
 
     const el = document.getElementById('caixa-aberto-list');
     if (!el) return;
-    if (!lista.length) {
-        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador neste filtro</div>`;
+    if (!listaExibida.length) {
+        if (q) {
+            el.innerHTML = `<div style="padding:2.5rem;text-align:center;color:#71717a;font-size:.85rem;"><i class="fa-solid fa-magnifying-glass" style="font-size:1.4rem;color:#3f3f46;display:block;margin-bottom:.5rem;"></i>Nenhum jogador encontrado para "<strong style="color:#a1a1aa;">${buscaRaw}</strong>"</div>`;
+        } else {
+            el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador neste filtro</div>`;
+        }
         return;
     }
-    el.innerHTML = lista.map(({ jogador, saldo }) => {
+
+    // Helper pra destacar trecho da busca no nome
+    function highlight(texto, queryNorm) {
+        if (!queryNorm) return texto;
+        const tNorm = norm(texto);
+        const i = tNorm.indexOf(queryNorm);
+        if (i < 0) return texto;
+        // i e tNorm têm mesmo comprimento porque normalização só remove acentos sem mudar tamanho
+        return texto.substring(0, i) +
+               '<mark style="background:rgba(251,191,36,.25);color:var(--gold);padding:1px 2px;border-radius:2px;">' +
+               texto.substring(i, i + queryNorm.length) +
+               '</mark>' +
+               texto.substring(i + queryNorm.length);
+    }
+
+    const headerInfo = q
+        ? `<div style="font-size:.72rem;color:#71717a;padding:.4rem .8rem;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.15);border-radius:.4rem;margin-bottom:.5rem;"><i class="fa-solid fa-magnifying-glass" style="color:var(--gold);"></i> <strong style="color:#e4e4e7;">${totalEncontrados}</strong> resultado${totalEncontrados!==1?'s':''} para "<strong style="color:var(--gold);">${buscaRaw}</strong>"${totalEncontrados > limite ? ` <span style="color:#52525b;">(mostrando ${limite})</span>` : ''}</div>`
+        : (totalEncontrados > limite ? `<div style="font-size:.7rem;color:#52525b;padding:.3rem .8rem;">Mostrando ${limite} de ${totalEncontrados}. Use a busca pra filtrar.</div>` : '');
+
+    el.innerHTML = headerInfo + listaExibida.map(({ jogador, saldo }) => {
         const devedor = saldo < 0;
         const credito = saldo > 0;
         const zerado  = saldo === 0;
+        const nomeHtml = highlight(jogador.nome, q);
+        const apelidoHtml = jogador.apelido ? highlight(jogador.apelido, q) : '';
         return `
         <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
             <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
             <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;">
-                <div style="font-weight:700;font-size:.9rem;">${jogador.nome}</div>
-                ${jogador.apelido ? `<div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">${jogador.apelido}</div>` : ''}
+                <div style="font-weight:700;font-size:.9rem;">${nomeHtml}</div>
+                ${apelidoHtml ? `<div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">${apelidoHtml}</div>` : ''}
             </div>
             <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;text-align:right;">
                 <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Deve':credito?'Crédito':'Saldo'}</div>
