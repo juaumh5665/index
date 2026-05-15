@@ -7054,19 +7054,27 @@ function _cashFromDb(r) {
             }
         }
     } catch(e) {}
-    
+
+    const rakeNum = parseFloat(r.rake_pct) || 0;
+    const aberturaMs = r.abertura_ts ? new Date(r.abertura_ts).getTime() : Date.now();
+    const fechamentoMs = r.fechamento_ts ? new Date(r.fechamento_ts).getTime() : null;
+
     return {
         id: r.id, nome: r.nome,
         sb: parseFloat(r.sb), bb: parseFloat(r.bb),
         bmin: parseFloat(r.bmin), bmax: parseFloat(r.bmax),
-        rakePct: parseFloat(r.rake_pct),
-        modo: r.modo, duracaoH: r.duracao_h,
+        // Nomes novos (alinhados com Supabase) + aliases antigos pra compat:
+        rakePct: rakeNum,         rake: rakeNum,
+        modo: r.modo,
+        duracaoH: r.duracao_h,    duracaoHoras: r.duracao_h || 0,
         fichasIniciais: r.fichas_iniciais,
         contagemInicial: r.contagem_inicial,
         contagemFinal: r.contagem_final,
+        fichasInicio: r.fichas_iniciais || r.contagem_inicial || {},   // alias antigo
+        fichasFinal: r.contagem_final || null,
         status: r.status,
-        aberturaTs: r.abertura_ts ? new Date(r.abertura_ts).getTime() : Date.now(),
-        fechamentoTs: r.fechamento_ts ? new Date(r.fechamento_ts).getTime() : null,
+        aberturaTs: aberturaMs,   abertoEm: aberturaMs,
+        fechamentoTs: fechamentoMs, fechadoEm: fechamentoMs,
         operador: r.operador,
         jogadores: jogadoresExistentes,  // ← preservar
         sessoes: sessoesExistentes,        // ← preservar
@@ -17138,7 +17146,8 @@ function renderCashMesas() {
     const empty = document.getElementById('cash-sem-mesas');
     if (!list) return;
 
-    const ativas = cashMesas.filter(m => m.status === 'ativa');
+    // Aceita ambos status: 'aberta' (novo, alinhado com Supabase) ou 'ativa' (antigo, retrocompatível)
+    const ativas = cashMesas.filter(m => m.status === 'ativa' || m.status === 'aberta');
     if (!ativas.length) {
         list.innerHTML = '';
         empty.style.display = 'block';
@@ -17147,7 +17156,9 @@ function renderCashMesas() {
     empty.style.display = 'none';
 
     list.innerHTML = ativas.map(m => {
-        const tempoAberto = formatDuration(Date.now() - m.abertoEm);
+        // abertoEm é o nome antigo; aberturaTs é o nome novo (alinhado com Supabase)
+        const tsAbertura = m.abertoEm || m.aberturaTs || Date.now();
+        const tempoAberto = formatDuration(Date.now() - tsAbertura);
         const totalInvestido = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
         const ativos = m.jogadores.filter(j => j.status === 'ativo');
         const pctCheio = Math.min(100, (ativos.length / 9) * 100);
@@ -21525,18 +21536,32 @@ function _criarMesaCashOrig_wrapped(fichasInicio) {
 
     if (bmin > bmax) return showToast('⚠️ Buy-in mínimo maior que máximo');
 
+    // IMPORTANTE: usar UUID (não Date.now()) e nomes de campos que o sync entende:
+    // _cashToDb espera: rakePct, duracaoH, aberturaTs, fechamentoTs, fichasIniciais, contagemInicial
+    // _cashFromDb (load do Supabase) retorna os mesmos nomes.
+    const agora = Date.now();
     cashMesas.push({
-        id: Date.now(),
-        nome, sb, bb, bmin, bmax, rake, modo,
+        id: _genUuid(),
+        nome, sb, bb, bmin, bmax,
+        // Aliases pra retrocompatibilidade do render existente + nomes que o sync precisa:
+        rake,            rakePct: rake,
+        modo,
         duracaoHoras: modo === 'programado' ? duracao : 0,
-        status: 'ativa',
-        abertoEm: Date.now(),
+        duracaoH:     modo === 'programado' ? duracao : null,
+        status: 'aberta',                       // padronizado com o que o banco/sync esperam
+        abertoEm: agora,                        // alias antigo (alguns renders usam)
+        aberturaTs: agora,                      // nome do sync
         fechadoEm: null,
+        fechamentoTs: null,
         jogadores: [],
         sessoes: [],
-        fichasInicio,
+        fichasInicio,                           // alias antigo
+        fichasIniciais: fichasInicio,           // nome do sync
+        contagemInicial: fichasInicio,          // nome do sync (alternativo)
         fichasFinal: null,
         fichasDiferenca: null,
+        contagemFinal: null,
+        operador: (currentUser && currentUser.nome) || null,
     });
 
     // Reset contagem
