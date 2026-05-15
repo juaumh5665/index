@@ -6124,6 +6124,8 @@ async function _processarMudancaRealtime(tipo, payload) {
                 const { data: cmRows } = await sb.from('cash_mesas').select('*').eq('clube_id', clubeId);
                 if (cmRows) {
                     cashMesas = cmRows.map(_cashFromDb); // _cashFromDb preserva jogadores do cache
+                    // Recarrega sessões pra ter jogadores atualizados
+                    await _carregarSessoesCash(clubeId);
                     localStorage.setItem('ps_cash_mesas', JSON.stringify(cashMesas));
                 }
             } catch(e) { console.warn('[REALTIME] reload cash:', e); }
@@ -6376,6 +6378,121 @@ function _cashToDb(m) {
         fechamento_ts: m.fechamentoTs ? new Date(m.fechamentoTs).toISOString() : null,
         operador: m.operador || null,
     };
+}
+
+// Converte sessão (j) de jogador em mesa de cash → linha cash_sessoes
+// Sessão local tem: jogadorId, status, entrouEm, saiuEm, totalInvestido, saiuCom,
+//                   movimentos[{tipo,valor,rakeCobrado,ts}], fichasRetiradas
+// Tabela tem: id, mesa_id, clube_id, jogador_id, buyin, recompras (jsonb), saida_valor,
+//             saida_fichas (jsonb), rake_pago, entrou_ts, saiu_ts, operador
+function _cashSessaoToDb(j, mesaId) {
+    // buyin = primeiro movimento (sempre tipo 'buyin')
+    const buyinMov = (j.movimentos || []).find(mv => mv.tipo === 'buyin');
+    const buyinValor = buyinMov ? Number(buyinMov.valor) || 0 : 0;
+    // recompras = todos os movimentos exceto buyin e saida (vão como JSON)
+    const recompras = (j.movimentos || []).filter(mv => mv.tipo === 'recompra').map(mv => ({
+        valor: Number(mv.valor) || 0,
+        rakeCobrado: Number(mv.rakeCobrado) || 0,
+        ts: mv.ts || Date.now(),
+    }));
+    // rake total = soma de rakeCobrado de todos os movimentos
+    const rakeTotal = (j.movimentos || []).reduce((s, mv) => s + (Number(mv.rakeCobrado) || 0), 0);
+
+    return {
+        id: j.id,                       // ID estável da sessão
+        mesa_id: mesaId,
+        clube_id: sbClube ? sbClube.id : null,
+        jogador_id: j.jogadorId,
+        buyin: buyinValor,
+        recompras: recompras,
+        saida_valor: j.status === 'saiu' ? (Number(j.saiuCom) || 0) : null,
+        saida_fichas: j.fichasRetiradas || null,
+        rake_pago: rakeTotal,
+        entrou_ts: j.entrouEm ? new Date(j.entrouEm).toISOString() : new Date().toISOString(),
+        saiu_ts: j.saiuEm ? new Date(j.saiuEm).toISOString() : null,
+        operador: j.operador || (currentUser && currentUser.nome) || null,
+    };
+}
+
+function _cashSessaoFromDb(r) {
+    // Reconstroi movimentos: buyin (1) + recompras (N) + saída (1 se houver)
+    const movimentos = [];
+    if (r.buyin > 0) {
+        movimentos.push({
+            tipo: 'buyin',
+            valor: Number(r.buyin) || 0,
+            rakeCobrado: 0,
+            ts: r.entrou_ts ? new Date(r.entrou_ts).getTime() : Date.now(),
+        });
+    }
+    if (Array.isArray(r.recompras)) {
+        r.recompras.forEach(mv => {
+            movimentos.push({
+                tipo: 'recompra',
+                valor: Number(mv.valor) || 0,
+                rakeCobrado: Number(mv.rakeCobrado) || 0,
+                ts: mv.ts || Date.now(),
+            });
+        });
+    }
+    if (r.saida_valor !== null && r.saida_valor !== undefined) {
+        movimentos.push({
+            tipo: 'saida',
+            valor: Number(r.saida_valor) || 0,
+            rakeCobrado: 0,
+            ts: r.saiu_ts ? new Date(r.saiu_ts).getTime() : Date.now(),
+        });
+    }
+
+    // totalInvestido = buyin + soma das recompras
+    const totalInvestido = (Number(r.buyin) || 0) +
+        (Array.isArray(r.recompras) ? r.recompras.reduce((s, mv) => s + (Number(mv.valor) || 0), 0) : 0);
+
+    return {
+        id: r.id,
+        jogadorId: r.jogador_id,
+        status: (r.saiu_ts || r.saida_valor !== null) ? 'saiu' : 'ativo',
+        entrouEm: r.entrou_ts ? new Date(r.entrou_ts).getTime() : Date.now(),
+        saiuEm: r.saiu_ts ? new Date(r.saiu_ts).getTime() : null,
+        totalInvestido: totalInvestido,
+        saiuCom: Number(r.saida_valor) || 0,
+        movimentos: movimentos,
+        fichasRetiradas: r.saida_fichas || null,
+        operador: r.operador || null,
+    };
+}
+
+// Carrega todas as sessões de cash do clube e popula m.jogadores de cada mesa em cashMesas
+// Deve ser chamada DEPOIS de carregar cashMesas (do Supabase)
+async function _carregarSessoesCash(clubeId) {
+    if (!clubeId || typeof sb === 'undefined') return;
+    try {
+        const { data: rows, error } = await sb
+            .from('cash_sessoes')
+            .select('*')
+            .eq('clube_id', clubeId);
+        if (error) throw error;
+        if (!Array.isArray(rows)) return;
+
+        // Agrupa sessões por mesa_id
+        const porMesa = new Map();
+        rows.forEach(r => {
+            const arr = porMesa.get(r.mesa_id) || [];
+            arr.push(_cashSessaoFromDb(r));
+            porMesa.set(r.mesa_id, arr);
+        });
+
+        // Popula m.jogadores de cada mesa local
+        cashMesas.forEach(m => {
+            m.jogadores = porMesa.get(m.id) || [];
+        });
+
+        // Salva no localStorage atualizado
+        try { localStorage.setItem('ps_cash_mesas', JSON.stringify(cashMesas)); } catch(_){}
+        console.log(`✅ ${rows.length} sessões de cash carregadas do Supabase`);
+    } catch (e) {
+        console.warn('[CASH] Falha ao carregar sessões:', e.message || e);
+    }
 }
 
 function _produtoToDb(p) {
@@ -6825,6 +6942,8 @@ async function carregarEstadoDoSupabase() {
             const { data: cmRows } = await sb.from('cash_mesas').select('*').eq('clube_id', clubeIdEsperado);
             if (cmRows) {
                 cashMesas = cmRows.map(_cashFromDb);
+                // Carrega as sessões (jogadores na mesa) — preenche m.jogadores
+                await _carregarSessoesCash(clubeIdEsperado);
                 localStorage.setItem('ps_cash_mesas', JSON.stringify(cashMesas));
             }
         }
@@ -17280,18 +17399,23 @@ function confirmAddCashJogador() {
     if (m.jogadores.filter(j => j.status === 'ativo').length >= 9) return showToast('⚠️ Mesa cheia (9 lugares)');
 
     const rakeCobrado = valor * (m.rake / 100);
+    const sessaoId = _genUuid();   // ID estável da sessão (pra UPDATE depois)
+    const agora = Date.now();
 
-    m.jogadores.push({
+    const novaSessao = {
+        id: sessaoId,                // ID estável (importante pra sync)
         jogadorId: jid,
         status: 'ativo',
-        entrouEm: Date.now(),
+        entrouEm: agora,
         saiuEm: null,
         totalInvestido: valor,
         saiuCom: 0,
-        movimentos: [{ tipo: 'buyin', valor, rakeCobrado, ts: Date.now() }],
-    });
+        movimentos: [{ tipo: 'buyin', valor, rakeCobrado, ts: agora }],
+        operador: (currentUser && currentUser.nome) || null,
+    };
+    m.jogadores.push(novaSessao);
 
-    // Registra transação no caixa
+    // Registra transação no caixa (saldo do jogador)
     registrarTransacao({
         jogadorId: jid,
         tipo: 'cash_in',
@@ -17300,6 +17424,16 @@ function confirmAddCashJogador() {
         origem: 'cash',
         refId: m.id,
     });
+
+    // Persiste a sessão no Supabase (cash_sessoes)
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_sessoes').insert(_cashSessaoToDb(novaSessao, m.id)).then(({ error }) => {
+            if (error) {
+                console.warn('[CASH] Falha ao salvar sessão no Supabase:', error.message);
+                showToast('⚠️ Jogador adicionado localmente, mas falhou ao sincronizar');
+            }
+        }).catch(e => console.warn('[CASH] insert sessao falhou:', e));
+    }
 
     saveData();
     closeModal('modal-add-cash-jogador');
@@ -17343,6 +17477,13 @@ function confirmRecompra() {
         origem: 'cash',
         refId: m.id,
     });
+
+    // Persiste atualização da sessão no Supabase
+    if (sbClube && typeof sb !== 'undefined' && j.id) {
+        sb.from('cash_sessoes').update(_cashSessaoToDb(j, m.id)).eq('id', j.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao atualizar sessão (recompra):', error.message);
+        }).catch(e => console.warn('[CASH] update recompra falhou:', e));
+    }
 
     saveData();
     closeModal('modal-recompra');
@@ -17413,6 +17554,13 @@ function confirmRetirar() {
             origem: 'cash',
             refId: m.id,
         });
+    }
+
+    // Persiste atualização da sessão no Supabase (saída do jogador)
+    if (sbClube && typeof sb !== 'undefined' && j.id) {
+        sb.from('cash_sessoes').update(_cashSessaoToDb(j, m.id)).eq('id', j.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao atualizar sessão (saída):', error.message);
+        }).catch(e => console.warn('[CASH] update saida falhou:', e));
     }
 
     saveData();
