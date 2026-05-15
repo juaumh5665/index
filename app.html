@@ -20151,8 +20151,31 @@ function confirmarFechamentoDia() {
     // Exclui cash do fechamento (tem caixa próprio)
     const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t));
 
-    if (!abertas.length) return showToast('⚠️ Nenhuma transação para fechar hoje');
-    if (!confirm(`Confirmar fechamento de ${abertas.length} transação(ões) de hoje?\n\nApós fechadas, não poderão mais ser estornadas.`)) return;
+    // 🆕 Detecta comandas do bar AINDA abertas no fim do dia
+    // Elas vão ser auto-fechadas como "devedor" — viram saldo a pagar pro próximo dia
+    const comandasAbertas = (barComandas || []).filter(c => c.status === 'aberta');
+    const totalComandasAbertas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+
+    if (!abertas.length && !comandasAbertas.length) {
+        return showToast('⚠️ Nenhuma transação ou comanda para fechar hoje');
+    }
+
+    // Confirmação detalhada
+    let msgConfirm = `Confirmar fechamento do dia?\n\n`;
+    if (abertas.length) {
+        msgConfirm += `📒 ${abertas.length} transação(ões) do caixa serão registradas no fechamento\n`;
+    }
+    if (comandasAbertas.length) {
+        // Conta quantos jogadores únicos com comandas abertas
+        const jogadoresUnicos = new Set(comandasAbertas.map(c => c.jogadorId)).size;
+        msgConfirm += `\n🧾 ${comandasAbertas.length} comanda(s) do bar ainda aberta(s):\n`;
+        msgConfirm += `   • ${jogadoresUnicos} jogador(es)\n`;
+        msgConfirm += `   • Total: ${formatMoney(totalComandasAbertas)}\n`;
+        msgConfirm += `   • Serão fechadas como DEVEDOR (valor vira saldo a pagar)\n`;
+    }
+    msgConfirm += `\nApós fechado, não poderão mais ser estornadas.`;
+
+    if (!confirm(msgConfirm)) return;
 
     const totalIn  = abertas.filter(t => t.valor > 0).reduce((s,t)=>s+t.valor, 0);
     const totalOut = abertas.filter(t => t.valor < 0).reduce((s,t)=>s+Math.abs(t.valor), 0);
@@ -20163,19 +20186,81 @@ function confirmarFechamentoDia() {
         dataLabel: hoje.toLocaleDateString('pt-BR'),
         operador: currentUser ? currentUser.nome : '-',
         qtdTransacoes: abertas.length,
+        qtdComandasFechadas: 0,            // preenchido abaixo
+        totalComandasFechadas: 0,           // preenchido abaixo
         totalEntradas: totalIn,
         totalSaidas:   totalOut,
         saldoLiquido:  totalIn - totalOut,
     };
-    fechamentos.push(fechamento);
 
     // Vincula transações ao fechamento
     abertas.forEach(t => { t.fechamentoId = fechamento.id; });
 
+    // 🆕 Auto-fecha comandas abertas como "devedor"
+    // Cada comanda vira uma transação de débito (origem: 'bar') que entra no saldo do jogador.
+    // A transação NÃO é vinculada ao fechamento atual (fechamentoId fica null) pra que
+    // possa aparecer no caixa devedor do PRÓXIMO dia (saldo persiste).
+    let comandasFechadas = 0;
+    let totalFechado = 0;
+    comandasAbertas.forEach(c => {
+        const totalC = calcTotalComanda(c);
+        if (totalC <= 0) return;
+
+        // Registra débito da comanda (saldo devedor) — mantém rastreabilidade
+        registrarTransacao({
+            jogadorId: c.jogadorId,
+            tipo: 'bar',
+            valor: -totalC,
+            descricao: `Comanda bar (${c.itens.length} iten${c.itens.length>1?'s':''}) · fechada por fim do dia · pendente de pagamento`,
+            origem: 'bar',
+            refId: c.id,
+            // Marcador especial: essa transação NÃO entra no fechamento de hoje
+            // (vai aparecer no caixa devedor do próximo dia)
+            categoriaSaldoDevedor: 'bar',
+            fechadaPorFechamentoDia: fechamento.id,
+        });
+
+        // Marca a comanda como fechada (mas SEM pagamento — fica como dívida pendente)
+        c.status = 'fechada';
+        c.fechadoEm = Date.now();
+        c.pagamento = 'pendente';
+        c.total = totalC;
+        c.fechadaPorFechamentoDia = fechamento.id;
+        c.fechadaPeloCaixa = false;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+
+        comandasFechadas++;
+        totalFechado += totalC;
+    });
+
+    fechamento.qtdComandasFechadas = comandasFechadas;
+    fechamento.totalComandasFechadas = totalFechado;
+    fechamentos.push(fechamento);
+
+    // Suspende realtime durante a janela de sync (evita realtime reverter comandas)
+    if (comandasFechadas > 0 && typeof _suspenderRealtime === 'function') {
+        _suspenderRealtime(12000);
+    }
+
+    logAudit && logAudit('FECHAMENTO_DIA', `Fechamento do dia ${fechamento.dataLabel} · ${abertas.length} trans · ${comandasFechadas} comandas viraram dívida (${formatMoney(totalFechado)})`, {
+        fechamentoId: fechamento.id,
+        qtdTransacoes: abertas.length,
+        qtdComandasFechadas: comandasFechadas,
+        totalComandasFechadas: totalFechado,
+    });
+
     saveData();
-    showToast(`🔒 Fechamento realizado — ${abertas.length} transações`);
+
+    // Toast com detalhamento
+    if (comandasFechadas > 0) {
+        showToast(`🔒 Dia fechado · ${comandasFechadas} comanda(s) viraram dívida (${formatMoney(totalFechado)})`);
+    } else {
+        showToast(`🔒 Fechamento realizado — ${abertas.length} transações`);
+    }
     renderCaixaFechamento();
     renderCaixaHistorico();
+    renderCaixaAberto && renderCaixaAberto();  // atualiza lista (comandas viraram saldo)
+    renderComandas && renderComandas();         // atualiza aba do bar
 }
 
 function renderCaixaHistorico() {
