@@ -2239,23 +2239,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             </select>
                         </div>
                     </div>
-                    <!-- Comandas abertas do bar para acerto pelo caixa -->
-                    <div id="caixa-comandas-abertas-wrap" style="display:none;margin-bottom:1rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem;">
-                            <div style="font-size:.65rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comandas Abertas do Bar <span id="caixa-comandas-count" style="color:#71717a;">(0)</span></div>
-                            <div style="display:flex;gap:.4rem;align-items:center;">
-                                <input id="caixa-comandas-busca" oninput="renderComandasAbertasCaixa()" placeholder="Buscar comanda..." class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:180px;">
-                                <select id="caixa-comandas-limite" onchange="renderComandasAbertasCaixa()" class="inp" style="padding:.35rem .6rem;font-size:.75rem;width:110px;">
-                                    <option value="10">10</option>
-                                    <option value="20">20</option>
-                                    <option value="50">50</option>
-                                    <option value="999">Todas</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="caixa-comandas-abertas" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.5rem;"></div>
-                        <div id="caixa-comandas-pager" style="display:none;justify-content:space-between;align-items:center;padding:.4rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;margin-bottom:1rem;"></div>
-                    </div>
+                    <!-- Comandas Abertas do Bar foi removida — agora aparece integrada ao saldo de cada jogador (clique no jogador → modal mostra a comanda e permite pagar junto) -->
                     <div id="caixa-aberto-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                 </div>
 
@@ -19171,7 +19155,7 @@ function renderCaixa() {
 }
 
 function renderCaixaAberto() {
-    // Render comandas abertas do bar
+    // Render comandas abertas do bar (no-op agora — fica integrado no saldo)
     renderComandasAbertasCaixa();
 
     const filtro = (document.getElementById('caixa-filtro') || {}).value || 'devedor';
@@ -19182,20 +19166,40 @@ function renderCaixaAberto() {
     const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const q = norm(buscaRaw);
 
-    // CAIXA GERAL: usa saldo SEM cash (cash tem caixa próprio por mesa)
-    const saldos = jogadores.map(j => ({
-        jogador: j,
-        saldo: getSaldoJogadorCaixaGeral(j.id),
-    }));
+    // Mapa de comandas abertas por jogador (valor + qtd)
+    const comandasAbertasMap = new Map();
+    (barComandas || []).forEach(c => {
+        if (c.status !== 'aberta') return;
+        const total = calcTotalComanda(c);
+        const existente = comandasAbertasMap.get(c.jogadorId) || { valor: 0, qtd: 0, itens: 0 };
+        existente.valor += total;
+        existente.qtd += 1;
+        existente.itens += (c.itens || []).length;
+        comandasAbertasMap.set(c.jogadorId, existente);
+    });
 
-    // Stats (sempre sobre TODOS os saldos, não os filtrados, pra dar visão completa do caixa)
+    // CAIXA GERAL: usa saldo SEM cash (cash tem caixa próprio por mesa)
+    // Anexa info da comanda aberta de cada jogador
+    const saldos = jogadores.map(j => {
+        const saldo = getSaldoJogadorCaixaGeral(j.id);
+        const comanda = comandasAbertasMap.get(j.id) || null;
+        return { jogador: j, saldo, comanda };
+    });
+
+    // Stats — Total a Receber inclui:
+    //  (1) saldos negativos (devedores no caixa geral)
+    //  (2) + comandas abertas no bar (mesmo de jogadores sem saldo negativo)
     const devedores = saldos.filter(s => s.saldo < 0);
     const credito   = saldos.filter(s => s.saldo > 0);
-    const totalReceber = devedores.reduce((s, x) => s + Math.abs(x.saldo), 0);
+    const totalReceberCaixa = devedores.reduce((s, x) => s + Math.abs(x.saldo), 0);
+    const totalComandasAbertas = saldos.reduce((s, x) => s + (x.comanda ? x.comanda.valor : 0), 0);
+    const totalReceber = totalReceberCaixa + totalComandasAbertas;
     const totalCredito = credito.reduce((s, x) => s + x.saldo, 0);
+    // Quantidade de jogadores devendo: união (saldo negativo OR comanda aberta)
+    const qtdDevedoresTotal = saldos.filter(s => s.saldo < 0 || s.comanda).length;
 
     const qtdDev = document.getElementById('caixa-qtd-devedores');
-    if (qtdDev) qtdDev.innerText = devedores.length;
+    if (qtdDev) qtdDev.innerText = qtdDevedoresTotal;
     const qtdCred = document.getElementById('caixa-qtd-credito');
     if (qtdCred) qtdCred.innerText = credito.length;
     const tRec = document.getElementById('caixa-total-receber');
@@ -19203,41 +19207,40 @@ function renderCaixaAberto() {
     const tCred = document.getElementById('caixa-total-credito');
     if (tCred) tCred.innerText = formatMoney(totalCredito);
 
-    // Filtro por status
+    // Filtro por status — agora também aceita jogador com comanda aberta como "devedor"
     let lista = saldos;
-    if (filtro === 'devedor') lista = saldos.filter(s => s.saldo < 0);
-    else if (filtro === 'credito') lista = saldos.filter(s => s.saldo > 0);
-    else if (filtro === 'zerado') lista = saldos.filter(s => s.saldo === 0);
+    if (filtro === 'devedor') lista = saldos.filter(s => s.saldo < 0 || s.comanda);
+    else if (filtro === 'credito') lista = saldos.filter(s => s.saldo > 0 && !s.comanda);
+    else if (filtro === 'zerado') lista = saldos.filter(s => s.saldo === 0 && !s.comanda);
 
     // Busca inteligente em nome, apelido e sobrenome
-    // Score: 3 = começa com query · 2 = palavra inicial · 1 = contém · 0 = não bate
     if (q) {
         lista = lista.map(s => {
             const nome    = norm(s.jogador.nome);
             const apelido = norm(s.jogador.apelido);
-            // sobrenome = última palavra do nome completo
             const partes = nome.split(/\s+/).filter(Boolean);
             const sobrenome = partes.length > 1 ? partes[partes.length - 1] : '';
 
             let score = 0;
             if (nome.startsWith(q) || apelido.startsWith(q)) score = 3;
             else if (sobrenome.startsWith(q)) score = 2;
-            else if (partes.some(w => w.startsWith(q))) score = 2;  // qualquer palavra do nome inicia com query
+            else if (partes.some(w => w.startsWith(q))) score = 2;
             else if (nome.includes(q) || apelido.includes(q)) score = 1;
 
             return { ...s, _score: score };
         }).filter(s => s._score > 0);
 
-        // Ordena: maior score primeiro, depois alfabético
         lista.sort((a, b) => (b._score - a._score) || a.jogador.nome.localeCompare(b.jogador.nome));
     } else {
-        // Sem busca: ordena devedores primeiro (maiores dívidas) e depois alfabético
-        lista.sort((a, b) => a.saldo - b.saldo);
+        // Sem busca: ordena por "valor a receber total" (caixa negativo + comanda)
+        lista.sort((a, b) => {
+            const totalA = (a.saldo < 0 ? -a.saldo : 0) + (a.comanda ? a.comanda.valor : 0);
+            const totalB = (b.saldo < 0 ? -b.saldo : 0) + (b.comanda ? b.comanda.valor : 0);
+            return totalB - totalA;  // maior devedor primeiro
+        });
     }
 
     const totalEncontrados = lista.length;
-
-    // Aplica limite
     const listaExibida = lista.slice(0, limite);
 
     const el = document.getElementById('caixa-aberto-list');
@@ -19251,13 +19254,11 @@ function renderCaixaAberto() {
         return;
     }
 
-    // Helper pra destacar trecho da busca no nome
     function highlight(texto, queryNorm) {
         if (!queryNorm) return texto;
         const tNorm = norm(texto);
         const i = tNorm.indexOf(queryNorm);
         if (i < 0) return texto;
-        // i e tNorm têm mesmo comprimento porque normalização só remove acentos sem mudar tamanho
         return texto.substring(0, i) +
                '<mark style="background:rgba(251,191,36,.25);color:var(--gold);padding:1px 2px;border-radius:2px;">' +
                texto.substring(i, i + queryNorm.length) +
@@ -19269,19 +19270,30 @@ function renderCaixaAberto() {
         ? `<div style="font-size:.72rem;color:#71717a;padding:.4rem .8rem;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.15);border-radius:.4rem;margin-bottom:.5rem;"><i class="fa-solid fa-magnifying-glass" style="color:var(--gold);"></i> <strong style="color:#e4e4e7;">${totalEncontrados}</strong> resultado${totalEncontrados!==1?'s':''} para "<strong style="color:var(--gold);">${buscaRaw}</strong>"${totalEncontrados > limite ? ` <span style="color:#52525b;">(mostrando ${limite})</span>` : ''}</div>`
         : (totalEncontrados > limite ? `<div style="font-size:.7rem;color:#52525b;padding:.3rem .8rem;">Mostrando ${limite} de ${totalEncontrados}. Use a busca pra filtrar.</div>` : '');
 
-    el.innerHTML = headerInfo + listaExibida.map(({ jogador, saldo }) => {
+    el.innerHTML = headerInfo + listaExibida.map(({ jogador, saldo, comanda }) => {
         const devedor = saldo < 0;
         const credito = saldo > 0;
         const zerado  = saldo === 0;
+        const temComanda = !!comanda;
         const nomeHtml = highlight(jogador.nome, q);
         const apelidoHtml = jogador.apelido ? highlight(jogador.apelido, q) : '';
+
+        // Indicador da comanda do bar
+        const indicadorComanda = temComanda ? `
+            <div style="display:flex;align-items:center;gap:.3rem;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);color:#f97316;padding:.15rem .45rem;border-radius:.3rem;font-size:.65rem;font-weight:700;white-space:nowrap;" title="Comanda aberta no bar — pague junto pra fechar">
+                <i class="fa-solid fa-utensils" style="font-size:.6rem;"></i>
+                <span>+${formatMoney(comanda.valor)}</span>
+            </div>
+        ` : '';
+
         return `
-        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'">
             <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;width:36px;height:36px;border-radius:50%;background:${devedor?'rgba(239,68,68,.15)':credito?'rgba(34,197,94,.15)':'#1e1e23'};color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;">${jogador.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
             <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;">
                 <div style="font-weight:700;font-size:.9rem;">${nomeHtml}</div>
                 ${apelidoHtml ? `<div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">${apelidoHtml}</div>` : ''}
             </div>
+            ${indicadorComanda}
             <div onclick="abrirPagamentoJogador('${jogador.id}')" style="cursor:pointer;text-align:right;">
                 <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">${devedor?'Deve':credito?'Crédito':'Saldo'}</div>
                 <div style="font-family:var(--font-mono);font-weight:800;color:${devedor?'#ef4444':credito?'#22c55e':'#71717a'};font-size:1rem;">${zerado?formatMoney(0):(devedor?'-':'+')+formatMoney(Math.abs(saldo))}</div>
@@ -19295,6 +19307,16 @@ function renderCaixaAberto() {
 let _caixaComandasPagina = 1;
 
 function renderComandasAbertasCaixa() {
+    // Função desativada: a seção "Comandas Abertas do Bar" no topo do Caixa foi removida.
+    // Agora as comandas abertas aparecem como indicador 🍔 no saldo do jogador e podem
+    // ser pagas junto no modal "Pagar Conta" (com checkbox de incluir).
+    // Mantemos a função pra compat com chamadas existentes.
+    const wrap = document.getElementById('caixa-comandas-abertas-wrap');
+    if (wrap) wrap.style.display = 'none';
+    return;
+}
+
+function renderComandasAbertasCaixa_DEPRECATED() {
     const wrap = document.getElementById('caixa-comandas-abertas-wrap');
     const lista = document.getElementById('caixa-comandas-abertas');
     const pager = document.getElementById('caixa-comandas-pager');
@@ -19760,14 +19782,35 @@ function _confirmarPagamentoContaImpl() {
     const metodo = metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo';
     const taxaAplicada = 0;  // taxa já registrada acima
 
-    // Se o operador marcou "incluir comandas" e existe checkbox marcada, fecha as comandas abertas
+    // === FECHAMENTO INTELIGENTE DE COMANDAS ABERTAS ===
+    // Regra: comanda só fecha se o pagamento cobrir o valor total dela.
+    // O valor é distribuído em ordem cronológica (comandas mais antigas fecham primeiro).
+    // Se o valor pago não cobrir totalmente uma comanda, ela permanece aberta.
     const incCheckbox = document.getElementById('pj-incluir-comandas');
-    const comandasAlteradas = []; // snapshot para undo: { id, status, fechadoEm, pagamento, total, fechadaPeloCaixa }
+    const comandasAlteradas = []; // snapshot para undo: { id, estadoAnterior }
     if (incCheckbox && incCheckbox.checked) {
-        const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
+        const comandasAbertas = barComandas
+            .filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta')
+            .sort((a, b) => (a.abertoEm || a.createdAt || 0) - (b.abertoEm || b.createdAt || 0)); // mais antigas primeiro
+
+        // Saldo devedor ANTES do pagamento (no caixa geral, sem cash)
+        const saldoAntes = getSaldoJogadorCaixaGeral(pagamentoJogadorId);
+        const dividaCaixa = Math.max(0, -saldoAntes);
+
+        // Valor disponível pra cobrir as comandas:
+        //   = valor total pago - dívida do caixa geral (porque a dívida do caixa também precisa ser paga)
+        // Se valorBase < dividaCaixa: nada sobra pra comandas; nenhuma fecha
+        // Se valorBase >= dividaCaixa: o que sobra é distribuído pras comandas (mais antigas primeiro)
+        let disponivelParaComandas = Math.max(0, valorBase - dividaCaixa);
+
         let comandasFechadas = 0;
-        comandasAbertas.forEach(c => {
-            // Salva estado anterior para permitir undo
+        for (const c of comandasAbertas) {
+            const totalC = calcTotalComanda(c);
+            if (disponivelParaComandas + 0.001 < totalC) {
+                // Não cobre essa comanda — ela e as próximas ficam abertas
+                break;
+            }
+            // Cobre: fecha
             comandasAlteradas.push({
                 id: c.id,
                 estadoAnterior: {
@@ -19778,8 +19821,6 @@ function _confirmarPagamentoContaImpl() {
                     fechadaPeloCaixa: c.fechadaPeloCaixa || false,
                 }
             });
-            const totalC = calcTotalComanda(c);
-            // Registra débito da comanda (consumo)
             registrarTransacao({
                 jogadorId: pagamentoJogadorId,
                 tipo: 'bar',
@@ -19788,21 +19829,32 @@ function _confirmarPagamentoContaImpl() {
                 origem: 'bar',
                 refId: c.id,
             });
-            // Marca como fechada
             c.status = 'fechada';
             c.fechadoEm = Date.now();
             c.pagamento = metodo;
             c.formasPagamento = splits.map(p => ({ valor: Number(p.valor), metodo: p.metodo }));
             c.total = totalC;
             c.fechadaPeloCaixa = true;
-            // Anti-loop: marca como mudança nossa pra realtime não reverter
             if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+            disponivelParaComandas -= totalC;
             comandasFechadas++;
-        });
+        }
+
+        // Total das comandas que ficaram abertas (pra mostrar no toast)
+        const totalAbertasRestantes = comandasAbertas
+            .filter(c => c.status === 'aberta')
+            .reduce((s, c) => s + calcTotalComanda(c), 0);
+
         if (comandasFechadas > 0) {
-            // Suspende realtime durante a janela de sync
             if (typeof _suspenderRealtime === 'function') _suspenderRealtime(12000);
-            showToast(`🧾 ${comandasFechadas} comanda${comandasFechadas>1?'s':''} fechada${comandasFechadas>1?'s':''} automaticamente`);
+            if (totalAbertasRestantes > 0) {
+                showToast(`🧾 ${comandasFechadas} comanda${comandasFechadas>1?'s':''} fechada${comandasFechadas>1?'s':''}. ${formatMoney(totalAbertasRestantes)} ainda em aberto.`);
+            } else {
+                showToast(`✅ ${comandasFechadas} comanda${comandasFechadas>1?'s':''} fechada${comandasFechadas>1?'s':''} automaticamente`);
+            }
+        } else if (comandasAbertas.length > 0) {
+            // Tinha comandas mas valor pago não cobriu nenhuma — aviso pro operador
+            showToast(`⚠️ Valor insuficiente para fechar comandas do bar (continuam abertas)`);
         }
     }
 
