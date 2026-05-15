@@ -2280,11 +2280,9 @@ document.addEventListener('DOMContentLoaded', function(){
                             <option value="todas">Todos os tipos</option>
                             <option value="buyin">Buy-ins torneio</option>
                             <option value="reentry">Re-entries</option>
-                            <option value="cash">Cash game</option>
                             <option value="bar">Bar & Vendas</option>
                             <option value="pagamento">Pagamentos</option>
                             <option value="deposito">Depósitos</option>
-                            <option value="cashout">Retiradas (cash)</option>
                         </select>
                     </div>
                     <div id="caixa-transacoes-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
@@ -4200,7 +4198,8 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div><label class="inp-label">Buy-in Mín R$</label><input id="cm-bmin" type="number" step="1" min="0" value="50" class="inp"></div>
                 <div><label class="inp-label">Buy-in Máx R$</label><input id="cm-bmax" type="number" step="1" min="0" value="200" class="inp"></div>
             </div>
-            <div>
+            <!-- Rake escondido (não usado em cash atualmente, mas mantido pra eventual uso futuro) -->
+            <div style="display:none;">
                 <label class="inp-label">Rake % (por buy-in/recompra)</label>
                 <input id="cm-rake" type="number" step="0.5" min="0" value="0" class="inp" placeholder="0 = sem rake">
                 <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Rake aplicado sobre cada compra de fichas</div>
@@ -17279,8 +17278,9 @@ function renderCashMesas() {
         const tsAbertura = m.abertoEm || m.aberturaTs || Date.now();
         const tempoAberto = formatDuration(Date.now() - tsAbertura);
         const totalInvestido = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
+        const totalSaidas    = m.jogadores.reduce((s, j) => s + (j.saiuCom || 0), 0);
+        const saldoNaMesa    = totalInvestido - totalSaidas;  // dinheiro vivo na mesa
         const ativos = m.jogadores.filter(j => j.status === 'ativo');
-        const pctCheio = Math.min(100, (ativos.length / 9) * 100);
 
         return `
         <div class="t-card">
@@ -17289,7 +17289,7 @@ function renderCashMesas() {
                     <div style="font-size:1rem;font-weight:800;">${m.nome}</div>
                     <div style="display:flex;gap:.75rem;align-items:center;margin-top:.35rem;">
                         <span class="tag tag-running">Ativa</span>
-                        <span style="font-size:.75rem;color:#52525b;">Blinds R$ ${m.sb}/${m.bb} &bull; Buy-in R$ ${m.bmin}–${m.bmax}${m.rake>0?` &bull; Rake ${m.rake}%`:''}</span>
+                        <span style="font-size:.75rem;color:#52525b;">Blinds R$ ${m.sb}/${m.bb} &bull; Buy-in R$ ${m.bmin}–${m.bmax}</span>
                         <span style="font-size:.75rem;color:#71717a;font-family:var(--font-mono);"><i class="fa-regular fa-clock"></i> ${tempoAberto}</span>
                     </div>
                 </div>
@@ -17298,12 +17298,44 @@ function renderCashMesas() {
                     <button onclick="encerrarMesaCash('${m.id}')" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;" title="Encerrar mesa"><i class="fa-solid fa-stop"></i> Encerrar</button>
                 </div>
             </div>
-            <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;border-bottom:1px solid #1e1e23;">
+            <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;border-bottom:1px solid #1e1e23;">
                 <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Na Mesa</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:#22c55e;">${ativos.length}/9</div></div>
                 <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Entradas totais</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;">${m.jogadores.length}</div></div>
                 <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Volume investido</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:#22c55e;">${formatMoney(totalInvestido)}</div></div>
-                <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake acumulado</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;color:var(--gold);">${formatMoney(getCashRake(m))}</div></div>
             </div>
+
+            <!-- ✨ Caixa da Mesa (separado do caixa geral) -->
+            <div style="padding:.85rem 1.5rem;background:#0a0a0b;border-bottom:1px solid #1e1e23;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem;">
+                    <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:.4rem;">
+                        <i class="fa-solid fa-cash-register"></i> Caixa da Mesa
+                    </div>
+                    <div style="font-size:.6rem;color:#52525b;">Não aparece no caixa geral do clube</div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;">
+                    <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:.4rem;padding:.55rem .65rem;">
+                        <div style="font-size:.55rem;color:#52525b;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Entradas</div>
+                        <div style="font-size:.95rem;font-weight:800;color:#22c55e;margin-top:.15rem;font-family:var(--font-mono);">${formatMoney(totalInvestido)}</div>
+                        <div style="font-size:.55rem;color:#52525b;margin-top:.1rem;">${m.jogadores.length} buy-in${m.jogadores.length!==1?'s':''}${m.jogadores.reduce((s,j)=>s+j.movimentos.filter(mv=>mv.tipo==='recompra').length,0) ? ' + ' + m.jogadores.reduce((s,j)=>s+j.movimentos.filter(mv=>mv.tipo==='recompra').length,0) + ' rec.' : ''}</div>
+                    </div>
+                    <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:.4rem;padding:.55rem .65rem;">
+                        <div style="font-size:.55rem;color:#52525b;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Saídas</div>
+                        <div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-top:.15rem;font-family:var(--font-mono);">${formatMoney(totalSaidas)}</div>
+                        <div style="font-size:.55rem;color:#52525b;margin-top:.1rem;">${m.jogadores.filter(j=>j.status==='saiu').length} jogador${m.jogadores.filter(j=>j.status==='saiu').length!==1?'es':''}</div>
+                    </div>
+                    <div style="background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:.4rem;padding:.55rem .65rem;">
+                        <div style="font-size:.55rem;color:#52525b;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Saldo na Mesa</div>
+                        <div style="font-size:.95rem;font-weight:800;color:#6366f1;margin-top:.15rem;font-family:var(--font-mono);">${formatMoney(saldoNaMesa)}</div>
+                        <div style="font-size:.55rem;color:#52525b;margin-top:.1rem;">dinheiro vivo</div>
+                    </div>
+                    <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.4rem;padding:.55rem .65rem;">
+                        <div style="font-size:.55rem;color:#52525b;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Fichas estim.</div>
+                        <div style="font-size:.95rem;font-weight:800;color:var(--gold);margin-top:.15rem;font-family:var(--font-mono);">${formatMoney(saldoNaMesa)}</div>
+                        <div style="font-size:.55rem;color:#52525b;margin-top:.1rem;">esperadas na mesa</div>
+                    </div>
+                </div>
+            </div>
+
             <div style="padding:1rem 1.5rem;">
                 <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Jogadores na Mesa</div>
                 ${renderJogadoresCashMesa(m)}
@@ -17383,7 +17415,7 @@ function abrirAddJogadorCash(mesaId) {
     if (!disponiveis.length) return showToast('⚠️ Todos os jogadores cadastrados já estão na mesa');
 
     sel.innerHTML = disponiveis.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('');
-    document.getElementById('acj-buyin-range').innerText = `Buy-in permitido: R$ ${m.bmin} – R$ ${m.bmax}${m.rake>0?` (rake ${m.rake}%)`:''}`;
+    document.getElementById('acj-buyin-range').innerText = `Buy-in permitido: R$ ${m.bmin} – R$ ${m.bmax}`;
     document.getElementById('acj-valor').value = m.bmin;
     openModal('modal-add-cash-jogador');
 }
@@ -19007,6 +19039,19 @@ function getSaldoJogador(jogadorId) {
         .reduce((s, t) => s + t.valor, 0);
 }
 
+// Versão filtrada: ignora transações com origem === 'cash'
+// Usado no CAIXA GERAL do clube (que não deve mostrar cash)
+function getSaldoJogadorCaixaGeral(jogadorId) {
+    return transacoes
+        .filter(t => t.jogadorId === jogadorId && t.origem !== 'cash')
+        .reduce((s, t) => s + t.valor, 0);
+}
+
+// Helper pra saber se transação é de cash (não conta no caixa geral)
+function _isTransacaoCash(t) {
+    return t && t.origem === 'cash';
+}
+
 function getExtratoJogador(jogadorId) {
     return transacoes
         .filter(t => t.jogadorId === jogadorId)
@@ -19036,9 +19081,10 @@ function renderCaixaAberto() {
     renderComandasAbertasCaixa();
 
     const filtro = (document.getElementById('caixa-filtro') || {}).value || 'devedor';
+    // CAIXA GERAL: usa saldo SEM cash (cash tem caixa próprio por mesa)
     const saldos = jogadores.map(j => ({
         jogador: j,
-        saldo: getSaldoJogador(j.id),
+        saldo: getSaldoJogadorCaixaGeral(j.id),
     }));
 
     // Stats
@@ -19816,8 +19862,8 @@ function renderCaixaFechamento() {
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
     document.getElementById('fechamento-data').innerText = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
 
-    // Transações do dia não fechadas
-    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje);
+    // Transações do dia não fechadas — exclui cash (tem caixa próprio por mesa)
+    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t));
 
     // Resumo por jogador
     const porJogador = {};
@@ -19895,7 +19941,8 @@ function renderCaixaFechamento() {
 function confirmarFechamentoDia() {
     const hoje = new Date();
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
-    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje);
+    // Exclui cash do fechamento (tem caixa próprio)
+    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t));
 
     if (!abertas.length) return showToast('⚠️ Nenhuma transação para fechar hoje');
     if (!confirm(`Confirmar fechamento de ${abertas.length} transação(ões) de hoje?\n\nApós fechadas, não poderão mais ser estornadas.`)) return;
@@ -19951,16 +19998,17 @@ function renderCaixaTransacoes() {
     const el = document.getElementById('caixa-transacoes-list');
     if (!el) return;
     const filtro = (document.getElementById('caixa-trans-filtro') || {}).value || 'todas';
-    let lista = [...transacoes].sort((a,b) => b.ts - a.ts);
+    // CAIXA GERAL: esconde transações de cash (têm caixa próprio por mesa)
+    let lista = transacoes
+        .filter(t => !_isTransacaoCash(t))
+        .sort((a,b) => b.ts - a.ts);
 
     const mapFiltro = {
         buyin: ['buyin'],
         reentry: ['reentry'],
-        cash: ['cash_in','cash_out','cash_rec'],
         bar: ['bar'],
         pagamento: ['pagamento'],
         deposito: ['deposito'],
-        cashout: ['cash_out'],
     };
     if (mapFiltro[filtro]) lista = lista.filter(t => mapFiltro[filtro].includes(t.tipo));
 
