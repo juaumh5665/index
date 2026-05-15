@@ -4240,9 +4240,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <!-- MODAL: ADICIONAR JOGADOR À MESA -->
 <div id="modal-add-cash-jogador" class="modal-overlay">
-    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-            <h3 style="font-weight:800;font-size:1.1rem;">Adicionar Jogador</h3>
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-user-plus" style="color:#22c55e;"></i> Adicionar Jogador</h3>
             <button onclick="closeModal('modal-add-cash-jogador')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:1rem;">
@@ -4253,8 +4253,22 @@ document.addEventListener('DOMContentLoaded', function(){
             <div id="acj-buyin-range" style="font-size:.75rem;color:#52525b;padding:.5rem .75rem;background:#0f0f12;border-radius:.5rem;"></div>
             <div>
                 <label class="inp-label">Valor do Buy-in R$ *</label>
-                <input id="acj-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 100">
+                <input id="acj-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 100" oninput="calcularTotalFichas('acj')">
             </div>
+
+            <!-- Contagem de fichas na entrada (obrigatório) -->
+            <div style="padding:.85rem 1rem;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.2);border-radius:.6rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem;">
+                    <div>
+                        <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-circle"></i> Fichas Entregues *</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Conte as fichas que o jogador recebeu por esse buy-in</div>
+                    </div>
+                    <div id="acj-fichas-total" style="font-size:.7rem;color:#71717a;"></div>
+                </div>
+                <div id="acj-fichas-wrap"></div>
+                <div id="acj-fichas-confere" style="display:none;margin-top:.5rem;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;font-weight:700;"></div>
+            </div>
+
             <button onclick="confirmAddCashJogador()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Entrar na Mesa</button>
         </div>
     </div>
@@ -4280,7 +4294,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <!-- MODAL: RECOMPRA -->
 <div id="modal-recompra" class="modal-overlay">
-    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
             <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-plus-circle" style="color:var(--gold);"></i> Recompra</h3>
             <button onclick="closeModal('modal-recompra')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
@@ -4289,8 +4303,22 @@ document.addEventListener('DOMContentLoaded', function(){
             <div id="rec-info" style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.85rem;"></div>
             <div>
                 <label class="inp-label">Valor da Recompra R$ *</label>
-                <input id="rec-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 50">
+                <input id="rec-valor" type="number" step="1" min="0" class="inp" placeholder="Ex: 50" oninput="calcularTotalFichas('rec')">
             </div>
+
+            <!-- Contagem de fichas na recompra (obrigatório) -->
+            <div style="padding:.85rem 1rem;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:.6rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem;">
+                    <div>
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-circle"></i> Fichas Entregues *</div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Conte as fichas que o jogador recebeu por essa recompra</div>
+                    </div>
+                    <div id="rec-fichas-total" style="font-size:.7rem;color:#71717a;"></div>
+                </div>
+                <div id="rec-fichas-wrap"></div>
+                <div id="rec-fichas-confere" style="display:none;margin-top:.5rem;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;font-weight:700;"></div>
+            </div>
+
             <button onclick="confirmRecompra()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Recompra</button>
         </div>
     </div>
@@ -6391,6 +6419,7 @@ function _cashSessaoToDb(j, mesaId) {
     // recompras = todos os movimentos exceto buyin e saida (vão como JSON)
     const recompras = (j.movimentos || []).filter(mv => mv.tipo === 'recompra').map(mv => ({
         valor: Number(mv.valor) || 0,
+        fichas: mv.fichas || null,                      // ✨ fichas entregues nessa recompra
         rakeCobrado: Number(mv.rakeCobrado) || 0,
         ts: mv.ts || Date.now(),
     }));
@@ -6403,6 +6432,7 @@ function _cashSessaoToDb(j, mesaId) {
         clube_id: sbClube ? sbClube.id : null,
         jogador_id: j.jogadorId,
         buyin: buyinValor,
+        entrada_fichas: j.fichasInicial || (buyinMov && buyinMov.fichas) || null,  // ✨ fichas do buy-in
         recompras: recompras,
         saida_valor: j.status === 'saiu' ? (Number(j.saiuCom) || 0) : null,
         saida_fichas: j.fichasRetiradas || null,
@@ -6420,6 +6450,7 @@ function _cashSessaoFromDb(r) {
         movimentos.push({
             tipo: 'buyin',
             valor: Number(r.buyin) || 0,
+            fichas: r.entrada_fichas || null,   // ✨ fichas do buy-in inicial
             rakeCobrado: 0,
             ts: r.entrou_ts ? new Date(r.entrou_ts).getTime() : Date.now(),
         });
@@ -6429,6 +6460,7 @@ function _cashSessaoFromDb(r) {
             movimentos.push({
                 tipo: 'recompra',
                 valor: Number(mv.valor) || 0,
+                fichas: mv.fichas || null,          // ✨ fichas da recompra
                 rakeCobrado: Number(mv.rakeCobrado) || 0,
                 ts: mv.ts || Date.now(),
             });
@@ -6456,6 +6488,7 @@ function _cashSessaoFromDb(r) {
         totalInvestido: totalInvestido,
         saiuCom: Number(r.saida_valor) || 0,
         movimentos: movimentos,
+        fichasInicial: r.entrada_fichas || null,  // ✨ alias direto pras fichas do buy-in
         fichasRetiradas: r.saida_fichas || null,
         operador: r.operador || null,
     };
@@ -17417,6 +17450,14 @@ function abrirAddJogadorCash(mesaId) {
     sel.innerHTML = disponiveis.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('');
     document.getElementById('acj-buyin-range').innerText = `Buy-in permitido: R$ ${m.bmin} – R$ ${m.bmax}`;
     document.getElementById('acj-valor').value = m.bmin;
+
+    // Reset contagem de fichas e renderiza inputs por cor
+    resetarFichasContagem('acj');
+    renderFichasInputs('acj');
+    // Esconde o aviso de confronto inicial
+    const confEl = document.getElementById('acj-fichas-confere');
+    if (confEl) confEl.style.display = 'none';
+
     openModal('modal-add-cash-jogador');
 }
 
@@ -17430,22 +17471,39 @@ function confirmAddCashJogador() {
     if (valor < m.bmin || valor > m.bmax) return showToast(`⚠️ Buy-in deve ser entre R$ ${m.bmin} e R$ ${m.bmax}`);
     if (m.jogadores.filter(j => j.status === 'ativo').length >= 9) return showToast('⚠️ Mesa cheia (9 lugares)');
 
+    // Valida contagem de fichas (obrigatória)
+    const fichasEntrada = getFichasContagem('acj');
+    const totalFichas = calcularTotalFichas('acj');
+    const qtdFichas = Object.values(fichasEntrada).reduce((s, q) => s + q, 0);
+    if (qtdFichas === 0) {
+        return showToast('⚠️ Conte as fichas que o jogador recebeu');
+    }
+    if (Math.abs(totalFichas - valor) > 0.01) {
+        if (!confirm(`⚠️ As fichas (${formatMoney(totalFichas)}) não batem com o valor do buy-in (${formatMoney(valor)}).\n\nDeseja continuar mesmo assim?`)) {
+            return;
+        }
+    }
+
     const rakeCobrado = valor * (m.rake / 100);
     const sessaoId = _genUuid();   // ID estável da sessão (pra UPDATE depois)
     const agora = Date.now();
 
     const novaSessao = {
-        id: sessaoId,                // ID estável (importante pra sync)
+        id: sessaoId,
         jogadorId: jid,
         status: 'ativo',
         entrouEm: agora,
         saiuEm: null,
         totalInvestido: valor,
         saiuCom: 0,
-        movimentos: [{ tipo: 'buyin', valor, rakeCobrado, ts: agora }],
+        fichasInicial: fichasEntrada,  // ✨ fichas que o jogador recebeu no buy-in
+        movimentos: [{ tipo: 'buyin', valor, fichas: fichasEntrada, rakeCobrado, ts: agora }],
         operador: (currentUser && currentUser.nome) || null,
     };
     m.jogadores.push(novaSessao);
+
+    // Reset contagem
+    resetarFichasContagem('acj');
 
     // Registra transação no caixa (saldo do jogador)
     registrarTransacao({
@@ -17487,6 +17545,13 @@ function abrirRecompra(mesaId, jogadorId) {
         ${m.rake>0?`<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Rake:</span><span style="color:var(--gold);">${m.rake}%</span></div>`:''}
     `;
     document.getElementById('rec-valor').value = m.bmin;
+
+    // Reset contagem de fichas e renderiza inputs por cor
+    resetarFichasContagem('rec');
+    renderFichasInputs('rec');
+    const confEl = document.getElementById('rec-fichas-confere');
+    if (confEl) confEl.style.display = 'none';
+
     openModal('modal-recompra');
 }
 
@@ -17496,9 +17561,25 @@ function confirmRecompra() {
     const valor = parseFloat(document.getElementById('rec-valor').value) || 0;
     if (valor <= 0) return showToast('⚠️ Valor inválido');
 
+    // Valida contagem de fichas (obrigatória)
+    const fichasRecompra = getFichasContagem('rec');
+    const totalFichas = calcularTotalFichas('rec');
+    const qtdFichas = Object.values(fichasRecompra).reduce((s, q) => s + q, 0);
+    if (qtdFichas === 0) {
+        return showToast('⚠️ Conte as fichas que o jogador recebeu');
+    }
+    if (Math.abs(totalFichas - valor) > 0.01) {
+        if (!confirm(`⚠️ As fichas (${formatMoney(totalFichas)}) não batem com o valor da recompra (${formatMoney(valor)}).\n\nDeseja continuar mesmo assim?`)) {
+            return;
+        }
+    }
+
     const rakeCobrado = valor * (m.rake / 100);
     j.totalInvestido += valor;
-    j.movimentos.push({ tipo: 'recompra', valor, rakeCobrado, ts: Date.now() });
+    j.movimentos.push({ tipo: 'recompra', valor, fichas: fichasRecompra, rakeCobrado, ts: Date.now() });
+
+    // Reset contagem
+    resetarFichasContagem('rec');
 
     // Registra transação
     registrarTransacao({
@@ -21617,7 +21698,7 @@ async function salvarFichasNoClube() {
 // CONTAGEM DE FICHAS (input UI genérico)
 // ============================================================
 // prefix: 'cm' = cash mesa init, 'ret' = retirada, 'enc' = encerrar
-let _fichasContagemState = { cm:{}, ret:{}, enc:{} };
+let _fichasContagemState = { cm:{}, ret:{}, enc:{}, acj:{}, rec:{} };
 
 function toggleFichasContagem(prefix) {
     const wrap = document.getElementById(prefix + '-fichas-wrap');
@@ -21672,14 +21753,16 @@ function calcularTotalFichas(prefix) {
     const totEl = document.getElementById(prefix + '-fichas-total');
     if (totEl) totEl.innerHTML = `<span style="color:#71717a;">${totalQtd} fichas · Total: </span><span style="color:#22c55e;font-family:var(--font-mono);">${formatMoney(total)}</span>`;
 
-    // If ret (retirada), conferir com valor digitado
-    if (prefix === 'ret') {
-        const valorInformado = parseFloat(document.getElementById('ret-valor').value) || 0;
-        const confereEl = document.getElementById('ret-fichas-confere');
-        if (!confereEl) return;
+    // Confronto: ret (retirada), acj (entrada cash), rec (recompra)
+    // Todos comparam fichas contadas com o valor digitado
+    const prefixConfronto = { ret: 'ret-valor', acj: 'acj-valor', rec: 'rec-valor' };
+    if (prefixConfronto[prefix]) {
+        const valorInformado = parseFloat(document.getElementById(prefixConfronto[prefix]).value) || 0;
+        const confereEl = document.getElementById(prefix + '-fichas-confere');
+        if (!confereEl) return total;
         if (totalQtd === 0) {
             confereEl.style.display = 'none';
-            return;
+            return total;
         }
         confereEl.style.display = 'block';
         const diff = total - valorInformado;
