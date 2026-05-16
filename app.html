@@ -7154,6 +7154,12 @@ async function carregarEstadoDoSupabase() {
             console.log(`✅ ${jackpotMovimentacoesCache.length} movimentações de jackpot carregadas`);
         } catch(e) { console.warn('[JACKPOT] erro carregar:', e); }
 
+        // Carrega rankings do clube
+        try {
+            const _clubeId = sbClube && sbClube.id;
+            if (_clubeId) await _carregarRankings(_clubeId);
+        } catch(e) { console.warn('[RANKINGS] erro carregar:', e); }
+
         console.log(`✅ Estado carregado do Supabase: ${torneios.length} torneios, ${cashMesas?.length||0} mesas, ${barProdutos.length} produtos, ${barComandas.length} comandas`);
     } catch (e) {
         console.error('Carregar estado falhou:', e);
@@ -7300,6 +7306,58 @@ function _produtoFromDb(r) {
         estoqueMin: r.estoque_min || 0,
         ativo: r.ativo !== false,
     };
+}
+
+// ============================================================
+// RANKINGS — Conversores e sync com Supabase
+// ============================================================
+function _rankingToDb(r) {
+    return {
+        id: r.id,
+        clube_id: sbClube ? sbClube.id : null,
+        nome: r.nome || 'Ranking',
+        descricao: r.descricao || null,
+        data_inicio: r.inicio || null,
+        data_fim:    r.fim || null,
+        formula:     r.formula || null,
+        custom_pontos: Array.isArray(r.customPontos) ? r.customPontos : null,
+        premios_pct:   Array.isArray(r.premiosPct) ? r.premiosPct : null,
+        criado_em: r.criadoEm ? new Date(r.criadoEm).toISOString() : new Date().toISOString(),
+    };
+}
+
+function _rankingFromDb(row) {
+    return {
+        id: row.id,                              // UUID
+        nome: row.nome,
+        descricao: row.descricao || '',
+        inicio: row.data_inicio || '',
+        fim:    row.data_fim || '',
+        formula: row.formula || '',
+        customPontos: Array.isArray(row.custom_pontos) ? row.custom_pontos : [],
+        premiosPct:   Array.isArray(row.premios_pct) ? row.premios_pct : [],
+        criadoEm: row.criado_em ? new Date(row.criado_em).getTime() : Date.now(),
+    };
+}
+
+// Carrega rankings do Supabase pro cache local
+async function _carregarRankings(clubeId) {
+    if (!clubeId || typeof sb === 'undefined') return;
+    try {
+        const { data: rows, error } = await sb
+            .from('rankings')
+            .select('*')
+            .eq('clube_id', clubeId)
+            .order('criado_em', { ascending: false });
+        if (error) throw error;
+        if (Array.isArray(rows)) {
+            rankings = rows.map(_rankingFromDb);
+            try { localStorage.setItem('ps_rankings', JSON.stringify(rankings)); } catch(_){}
+            console.log(`✅ ${rankings.length} ranking(s) carregado(s)`);
+        }
+    } catch(e) {
+        console.warn('[RANKINGS] erro ao carregar:', e.message || e);
+    }
 }
 
 // ============================================================
@@ -16139,11 +16197,7 @@ function openModal(id) {
             document.getElementById('t-addon').value   = config.torneios.addonFichas;
         }
         // Populate rankings dropdown
-        const rankSel = document.getElementById('t-ranking-id');
-        if (rankSel) {
-            rankSel.innerHTML = '<option value="">Sem ranking</option>' +
-                rankings.map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
-        }
+        popularSelectRankings();
         // Reset formato/dia fields
         const formatoSel = document.getElementById('t-formato');
         if (formatoSel) { formatoSel.value = 'unico'; onFormatoChange(); }
@@ -21199,7 +21253,20 @@ function openModalRanking() {
     openModal('modal-ranking');
 }
 
-function salvarRanking() {
+// Popula o <select id="t-ranking-id"> do modal de torneio com os rankings do clube
+function popularSelectRankings() {
+    const rankSel = document.getElementById('t-ranking-id');
+    if (!rankSel) return;
+    const valorAtual = rankSel.value;
+    rankSel.innerHTML = '<option value="">Sem ranking</option>' +
+        (rankings || []).map(r => `<option value="${r.id}">${r.nome}</option>`).join('');
+    // Preserva valor selecionado se ainda existir
+    if (valorAtual && rankings.find(r => String(r.id) === String(valorAtual))) {
+        rankSel.value = valorAtual;
+    }
+}
+
+async function salvarRanking() {
     const nome = document.getElementById('rk-nome').value.trim();
     if (!nome) return showToast('⚠️ Nome obrigatório');
     const editId = document.getElementById('rk-edit-id').value;
@@ -21214,20 +21281,47 @@ function salvarRanking() {
     };
 
     if (editId) {
-        const r = rankings.find(x => x.id === parseInt(editId));
+        // EDITAR — atualiza local + Supabase
+        const r = rankings.find(x => String(x.id) === String(editId));
         if (r) Object.assign(r, dados);
+        // Persiste no Supabase
+        if (sbClube && typeof sb !== 'undefined' && r) {
+            try {
+                const { error } = await sb.from('rankings').update(_rankingToDb(r)).eq('id', r.id);
+                if (error) {
+                    console.warn('[RANKING] update falhou:', error.message);
+                    showToast('⚠️ Salvo localmente, mas falhou ao sincronizar: ' + error.message);
+                }
+            } catch(e) { console.warn('[RANKING] update erro:', e); }
+        }
         showToast('✅ Ranking atualizado');
     } else {
-        rankings.push({ id: Date.now(), ...dados, criadoEm: Date.now() });
+        // CRIAR — gera UUID, push local + insert no Supabase
+        const novoRanking = { id: _genUuid(), ...dados, criadoEm: Date.now() };
+        rankings.push(novoRanking);
+        if (sbClube && typeof sb !== 'undefined') {
+            try {
+                const { error } = await sb.from('rankings').insert(_rankingToDb(novoRanking));
+                if (error) {
+                    console.warn('[RANKING] insert falhou:', error.message);
+                    showToast('⚠️ Salvo localmente, mas falhou ao sincronizar: ' + error.message);
+                } else {
+                    console.log('✅ Ranking persistido no Supabase');
+                }
+            } catch(e) { console.warn('[RANKING] insert erro:', e); }
+        }
         showToast('✅ Ranking criado');
     }
-    saveData();
+    // Salva localStorage
+    try { localStorage.setItem('ps_rankings', JSON.stringify(rankings)); } catch(_){}
     closeModal('modal-ranking');
     renderRankingsList();
+    // Re-render dos selects vinculados a ranking (modal de novo torneio)
+    if (typeof popularSelectRankings === 'function') popularSelectRankings();
 }
 
 function editarRanking(id) {
-    const r = rankings.find(x => x.id === id);
+    const r = rankings.find(x => String(x.id) === String(id));
     if (!r) return;
     document.getElementById('modal-ranking-titulo').innerText = 'Editar Ranking';
     document.getElementById('rk-edit-id').value = r.id;
@@ -21242,11 +21336,20 @@ function editarRanking(id) {
     openModal('modal-ranking');
 }
 
-function removerRanking(id) {
+async function removerRanking(id) {
     if (!confirm('Remover este ranking?')) return;
-    rankings = rankings.filter(r => r.id !== id);
-    saveData();
+    // Remove local
+    rankings = rankings.filter(r => String(r.id) !== String(id));
+    try { localStorage.setItem('ps_rankings', JSON.stringify(rankings)); } catch(_){}
+    // Remove no Supabase
+    if (sbClube && typeof sb !== 'undefined') {
+        try {
+            const { error } = await sb.from('rankings').delete().eq('id', id);
+            if (error) console.warn('[RANKING] delete falhou:', error.message);
+        } catch(e) { console.warn('[RANKING] delete erro:', e); }
+    }
     renderRankingsList();
+    if (typeof popularSelectRankings === 'function') popularSelectRankings();
     showToast('🗑️ Ranking removido');
 }
 
