@@ -1856,6 +1856,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <div onclick="showPage('bar')" id="nav-bar" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-utensils nav-ico" style="width:16px;color:#f97316;"></i> Bar & Vendas
+                <span id="nav-bar-estoque-badge" title="Produtos com estoque baixo" style="display:none;margin-left:auto;background:#dc2626;color:white;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;align-items:center;justify-content:center;min-width:18px;height:16px;"></span>
             </div>
             <div onclick="showPage('caixa')" id="nav-caixa" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-cash-register nav-ico" style="width:16px;color:#10b981;"></i> Caixa
@@ -2382,20 +2383,52 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <!-- ABA: BAR -->
                 <div id="rel-bar" class="reltab-content" style="display:none;">
-                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
-                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Comandas</div><div id="rb-qtd" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div></div>
-                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Faturamento</div><div id="rb-fat" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
-                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Ticket Médio</div><div id="rb-ticket" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
-                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Itens Vendidos</div><div id="rb-itens" style="font-size:1.75rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                    <!-- Linha 1: KPIs de vendas -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Comandas</div><div id="rb-qtd" style="font-size:1.6rem;font-weight:800;margin-top:.4rem;">0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Faturamento Bruto</div><div id="rb-fat" style="font-size:1.6rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Ticket Médio</div><div id="rb-ticket" style="font-size:1.6rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Itens Vendidos</div><div id="rb-itens" style="font-size:1.6rem;font-weight:800;margin-top:.4rem;">0</div></div>
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-                        <div class="stat-card" style="padding:1.25rem;">
-                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Top Produtos Vendidos</div>
-                            <div id="rb-top-produtos" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                    <!-- Linha 2: KPIs financeiros (custo / lucro / margem) -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Custo Total (CMV)</div><div id="rb-cmv" style="font-size:1.4rem;font-weight:800;margin-top:.4rem;color:#ef4444;">R$ 0</div><div id="rb-cmv-info" style="font-size:.65rem;color:#52525b;margin-top:.25rem;"></div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Lucro Líquido</div><div id="rb-lucro" style="font-size:1.4rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0</div><div id="rb-lucro-info" style="font-size:.65rem;color:#52525b;margin-top:.25rem;"></div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Margem Média</div><div id="rb-margem" style="font-size:1.4rem;font-weight:800;margin-top:.4rem;color:var(--gold);">—</div></div>
+                        <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Valor em Estoque</div><div id="rb-estoque-valor" style="font-size:1.4rem;font-weight:800;margin-top:.4rem;color:#06b6d4;">R$ 0</div><div id="rb-estoque-info" style="font-size:.65rem;color:#52525b;margin-top:.25rem;"></div></div>
+                    </div>
+
+                    <!-- Sub-tabs internas: Vendas / Estoque & Custos -->
+                    <div style="display:flex;gap:.25rem;margin-bottom:1rem;border-bottom:1px solid #1e1e23;padding-bottom:.5rem;flex-wrap:wrap;">
+                        <button class="tab-btn active" id="rb-subtab-vendas-btn" onclick="switchBarSubtab('vendas', this)" style="font-size:.75rem;padding:.4rem .85rem;"><i class="fa-solid fa-chart-line"></i> Vendas</button>
+                        <button class="tab-btn" id="rb-subtab-estoque-btn" onclick="switchBarSubtab('estoque', this)" style="font-size:.75rem;padding:.4rem .85rem;"><i class="fa-solid fa-box-archive"></i> Estoque & Custos</button>
+                        <div style="margin-left:auto;display:flex;gap:.5rem;">
+                            <button onclick="exportRelBarCSV()" class="btn-ghost" style="font-size:.7rem;padding:.4rem .75rem;"><i class="fa-solid fa-file-csv"></i> CSV</button>
                         </div>
+                    </div>
+
+                    <!-- Sub-aba: Vendas (top produtos + por grupo) -->
+                    <div id="rb-sub-vendas" class="rb-subtab" style="display:block;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                            <div class="stat-card" style="padding:1.25rem;">
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Top Produtos Vendidos</div>
+                                <div id="rb-top-produtos" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                            </div>
+                            <div class="stat-card" style="padding:1.25rem;">
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Por Grupo</div>
+                                <div id="rb-por-grupo" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-aba: Estoque & Custos -->
+                    <div id="rb-sub-estoque" class="rb-subtab" style="display:none;">
                         <div class="stat-card" style="padding:1.25rem;">
-                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Por Grupo</div>
-                            <div id="rb-por-grupo" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;">
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Detalhamento de Estoque & Margem por Produto</div>
+                                <div style="font-size:.7rem;color:#71717a;">📋 Mostra preço, custo, margem e situação do estoque</div>
+                            </div>
+                            <div id="rb-estoque-tabela"></div>
                         </div>
                     </div>
                 </div>
@@ -3366,8 +3399,26 @@ document.addEventListener('DOMContentLoaded', function(){
             <div><label class="inp-label">Nome do Produto *</label><input id="prod-nome" class="inp" placeholder="Ex: Coca-Cola Lata"></div>
             <div><label class="inp-label">Descrição</label><input id="prod-descricao" class="inp" placeholder="Ex: 350ml gelada"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                <div><label class="inp-label">Valor R$ *</label><input id="prod-valor" type="number" step="0.01" min="0" class="inp" placeholder="0,00"></div>
-                <div><label class="inp-label">Estoque inicial</label><input id="prod-estoque" type="number" min="0" value="0" class="inp"></div>
+                <div>
+                    <label class="inp-label">Preço de Venda R$ *</label>
+                    <input id="prod-valor" type="number" step="0.01" min="0" class="inp" placeholder="0,00" oninput="atualizarMargemProduto()">
+                </div>
+                <div>
+                    <label class="inp-label">Preço de Custo R$</label>
+                    <input id="prod-custo" type="number" step="0.01" min="0" class="inp" placeholder="0,00 (opcional)" oninput="atualizarMargemProduto()">
+                </div>
+            </div>
+            <!-- Indicador de margem (aparece quando ambos preenchidos) -->
+            <div id="prod-margem-info" style="display:none;font-size:.75rem;padding:.55rem .75rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:.4rem;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div>
+                    <label class="inp-label">Quantidade em Estoque</label>
+                    <input id="prod-estoque" type="number" min="0" value="0" class="inp">
+                </div>
+                <div>
+                    <label class="inp-label">Estoque Mínimo (alerta)</label>
+                    <input id="prod-estoque-min" type="number" min="0" value="0" class="inp" placeholder="0 = sem alerta" title="Quando o estoque cair abaixo desse valor, dispara alerta de reposição">
+                </div>
             </div>
             <div>
                 <label class="inp-label">Grupo *</label>
@@ -7249,6 +7300,35 @@ function _produtoFromDb(r) {
         estoqueMin: r.estoque_min || 0,
         ativo: r.ativo !== false,
     };
+}
+
+// ============================================================
+// HELPERS DE ESTOQUE — alertas de produtos com nível baixo
+// ============================================================
+// Retorna produtos com estoque <= estoqueMin (quando estoqueMin > 0)
+// Status: 'critico' se estoque === 0, 'baixo' se 0 < estoque <= estoqueMin
+function getProdutosEstoqueBaixo() {
+    return (barProdutos || [])
+        .filter(p => p && p.ativo !== false && Number(p.estoqueMin) > 0 && Number(p.estoque) <= Number(p.estoqueMin))
+        .map(p => ({
+            ...p,
+            _status: Number(p.estoque) === 0 ? 'critico' : 'baixo',
+            _gap: Number(p.estoqueMin) - Number(p.estoque),  // qto falta pra repor ao nível mínimo
+        }))
+        .sort((a, b) => a.estoque - b.estoque);  // mais críticos primeiro
+}
+
+// Atualiza badge da sidebar (Bar & Vendas) com qtd de produtos em alerta
+function atualizarBadgeEstoqueBaixo() {
+    const alertas = getProdutosEstoqueBaixo();
+    const badge = document.getElementById('nav-bar-estoque-badge');
+    if (!badge) return;
+    if (alertas.length === 0) {
+        badge.style.display = 'none';
+    } else {
+        badge.style.display = 'inline-flex';
+        badge.innerText = alertas.length;
+    }
 }
 
 function _comandaFromDb(r) {
@@ -16434,6 +16514,9 @@ function removerGrupo(i) {
 
 // --- PRODUTOS ---
 function renderProdutos() {
+    // Atualiza badge da sidebar (qtd de produtos em alerta)
+    atualizarBadgeEstoqueBaixo && atualizarBadgeEstoqueBaixo();
+
     const el = document.getElementById('bar-produtos-list');
     if (!el) return;
     const pager = document.getElementById('bar-produtos-pager');
@@ -16471,23 +16554,60 @@ function renderProdutos() {
     el.innerHTML = Object.entries(porGrupo).map(([grp, prods]) => `
         <div style="margin-bottom:1rem;">
             <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:.25rem 0 .5rem;">${grp}</div>
-            ${prods.map(p => `
-            <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:1rem;align-items:center;padding:.7rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:.3rem;">
-                <div>
-                    <div style="font-weight:700;font-size:.9rem;">${p.nome}</div>
-                    ${p.descricao ? `<div style="font-size:.75rem;color:#71717a;">${p.descricao}</div>` : ''}
-                </div>
-                <div style="font-family:var(--font-mono);font-weight:700;font-size:.9rem;color:#22c55e;white-space:nowrap;">${formatMoney(p.valor)}</div>
-                <div style="display:flex;align-items:center;gap:.3rem;">
-                    <span style="font-size:.7rem;color:#52525b;">Est:</span>
-                    <span style="font-size:.85rem;font-weight:700;color:${p.estoque<=5?'#ef4444':p.estoque<=10?'#f59e0b':'#e4e4e7'};">${p.estoque}</span>
-                </div>
-                <div style="display:flex;gap:.4rem;">
-                    <button onclick="editarProduto('${p.id}')" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .55rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-pen"></i></button>
-                    <button onclick="removerProduto('${p.id}')" class="btn-danger" style="padding:.3rem .55rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
-                </div>
-            </div>
-            `).join('')}
+            ${prods.map(p => {
+                // Calcula status do estoque
+                const estMin = Number(p.estoqueMin) || 0;
+                const est = Number(p.estoque) || 0;
+                let estoqueStatus = 'ok';
+                let estoqueCor = '#e4e4e7';
+                let estoqueIcone = '';
+                if (estMin > 0) {
+                    if (est === 0) {
+                        estoqueStatus = 'esgotado';
+                        estoqueCor = '#ef4444';
+                        estoqueIcone = '<i class="fa-solid fa-circle-exclamation" title="Esgotado" style="color:#ef4444;font-size:.7rem;"></i>';
+                    } else if (est <= estMin) {
+                        estoqueStatus = 'baixo';
+                        estoqueCor = '#f97316';
+                        estoqueIcone = '<i class="fa-solid fa-triangle-exclamation" title="Estoque baixo" style="color:#f97316;font-size:.7rem;"></i>';
+                    } else if (est <= estMin * 1.5) {
+                        estoqueCor = 'var(--gold)';
+                    } else {
+                        estoqueCor = '#22c55e';
+                    }
+                } else {
+                    // Sem estoque mínimo configurado — heurística antiga
+                    if (est <= 5) estoqueCor = '#ef4444';
+                    else if (est <= 10) estoqueCor = '#f59e0b';
+                }
+                // Margem (se tiver custo)
+                const custoNum = Number(p.custo) || 0;
+                const valorNum = Number(p.valor) || 0;
+                let margemHtml = '';
+                if (custoNum > 0 && valorNum > 0) {
+                    const lucro = valorNum - custoNum;
+                    const pct = (lucro / valorNum) * 100;
+                    const corMargem = pct >= 50 ? '#22c55e' : pct >= 25 ? 'var(--gold)' : pct >= 0 ? '#f97316' : '#ef4444';
+                    margemHtml = `<span title="Margem: ${formatMoney(lucro)} por unidade" style="font-size:.65rem;color:${corMargem};font-weight:700;background:rgba(${pct>=50?'34,197,94':pct>=25?'212,175,55':pct>=0?'249,115,22':'239,68,68'},.1);padding:.1rem .4rem;border-radius:.25rem;margin-left:.4rem;">${pct.toFixed(0)}%</span>`;
+                }
+                return `
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:1rem;align-items:center;padding:.7rem 1rem;background:#0f0f12;border:1px solid ${estoqueStatus==='esgotado'?'rgba(239,68,68,.3)':estoqueStatus==='baixo'?'rgba(249,115,22,.3)':'#1e1e23'};border-radius:.6rem;margin-bottom:.3rem;">
+                    <div>
+                        <div style="font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:.3rem;">${estoqueIcone} ${p.nome} ${margemHtml}</div>
+                        ${p.descricao ? `<div style="font-size:.75rem;color:#71717a;">${p.descricao}</div>` : ''}
+                        ${custoNum > 0 ? `<div style="font-size:.65rem;color:#52525b;margin-top:.15rem;">Custo: ${formatMoney(custoNum)}</div>` : ''}
+                    </div>
+                    <div style="font-family:var(--font-mono);font-weight:700;font-size:.9rem;color:#22c55e;white-space:nowrap;">${formatMoney(p.valor)}</div>
+                    <div style="display:flex;align-items:center;gap:.3rem;" title="${estMin>0?`Mínimo: ${estMin}`:'Sem estoque mínimo configurado'}">
+                        <span style="font-size:.7rem;color:#52525b;">Est:</span>
+                        <span style="font-size:.85rem;font-weight:700;color:${estoqueCor};">${est}${estMin>0?`<span style="font-size:.6rem;color:#52525b;font-weight:400;">/${estMin}</span>`:''}</span>
+                    </div>
+                    <div style="display:flex;gap:.4rem;">
+                        <button onclick="editarProduto('${p.id}')" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.4rem;padding:.3rem .55rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="removerProduto('${p.id}')" class="btn-danger" style="padding:.3rem .55rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>`;
+            }).join('')}
         </div>
     `).join('');
 
@@ -16527,6 +16647,31 @@ function openModalProduto() {
     openModal('modal-produto');
 }
 
+function atualizarMargemProduto() {
+    const valor = parseFloat(document.getElementById('prod-valor').value) || 0;
+    const custo = parseFloat(document.getElementById('prod-custo').value) || 0;
+    const el = document.getElementById('prod-margem-info');
+    if (!el) return;
+    if (custo <= 0 || valor <= 0) {
+        el.style.display = 'none';
+        return;
+    }
+    const lucro = valor - custo;
+    const margemPct = (lucro / valor) * 100;
+    let cor, icone;
+    if (margemPct >= 50)      { cor = '#22c55e'; icone = '🟢'; }
+    else if (margemPct >= 25) { cor = 'var(--gold)'; icone = '🟡'; }
+    else if (margemPct >= 0)  { cor = '#f97316'; icone = '🟠'; }
+    else                      { cor = '#ef4444'; icone = '🔴'; }
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="color:#71717a;">${icone} <strong style="color:#e4e4e7;">Lucro por unidade:</strong></span>
+            <span style="color:${cor};font-weight:800;font-family:var(--font-mono);">${formatMoney(lucro)} (${margemPct.toFixed(1)}%)</span>
+        </div>
+    `;
+}
+
 function salvarProduto() {
     const nome = document.getElementById('prod-nome').value.trim();
     if (!nome) return showToast('⚠️ Nome obrigatório');
@@ -16534,6 +16679,10 @@ function salvarProduto() {
     if (!valor || valor <= 0) return showToast('⚠️ Valor inválido');
     const grupo = document.getElementById('prod-grupo').value;
     if (!grupo) return showToast('⚠️ Selecione um grupo');
+
+    const custo       = parseFloat(document.getElementById('prod-custo').value) || 0;
+    const estoque     = parseInt(document.getElementById('prod-estoque').value) || 0;
+    const estoqueMin  = parseInt(document.getElementById('prod-estoque-min').value) || 0;
 
     const editId = document.getElementById('prod-edit-id').value;
     if (editId) {
@@ -16543,8 +16692,10 @@ function salvarProduto() {
                 nome,
                 descricao: document.getElementById('prod-descricao').value.trim(),
                 valor,
+                custo,
                 grupo,
-                estoque: parseInt(document.getElementById('prod-estoque').value) || 0,
+                estoque,
+                estoqueMin,
             };
         }
         showToast('✅ Produto atualizado!');
@@ -16554,8 +16705,10 @@ function salvarProduto() {
             nome,
             descricao: document.getElementById('prod-descricao').value.trim(),
             valor,
+            custo,
             grupo,
-            estoque: parseInt(document.getElementById('prod-estoque').value) || 0,
+            estoque,
+            estoqueMin,
         });
         showToast('✅ Produto cadastrado!');
     }
@@ -16563,6 +16716,9 @@ function salvarProduto() {
     closeModal('modal-produto');
     limparFormProduto();
     renderProdutos();
+    // Re-renderiza alertas
+    atualizarBadgeEstoqueBaixo && atualizarBadgeEstoqueBaixo();
+    renderDashboard && renderDashboard();
 }
 
 function editarProduto(id) {
@@ -16572,14 +16728,18 @@ function editarProduto(id) {
     const el = document.getElementById('modal-produto');
     barPreFillModal('modal-produto');
     document.getElementById('modal-produto-titulo').innerText = 'Editar Produto';
-    document.getElementById('prod-edit-id').value    = p.id;
-    document.getElementById('prod-nome').value       = p.nome;
-    document.getElementById('prod-descricao').value  = p.descricao || '';
-    document.getElementById('prod-valor').value      = p.valor;
-    document.getElementById('prod-estoque').value    = p.estoque;
+    document.getElementById('prod-edit-id').value      = p.id;
+    document.getElementById('prod-nome').value         = p.nome;
+    document.getElementById('prod-descricao').value    = p.descricao || '';
+    document.getElementById('prod-valor').value        = p.valor;
+    document.getElementById('prod-custo').value        = p.custo || '';
+    document.getElementById('prod-estoque').value      = p.estoque || 0;
+    document.getElementById('prod-estoque-min').value  = p.estoqueMin || 0;
     const sel = document.getElementById('prod-grupo');
     sel.innerHTML = barGrupos.map(g => `<option value="${g}" ${g===p.grupo?'selected':''}>${g}</option>`).join('');
     sel.value = p.grupo;
+    // Atualiza indicador de margem
+    atualizarMargemProduto();
     el.classList.add('open');
 }
 
@@ -16588,16 +16748,22 @@ function removerProduto(id) {
     barProdutos = barProdutos.filter(p => p.id !== id);
     saveData();
     renderProdutos();
+    atualizarBadgeEstoqueBaixo && atualizarBadgeEstoqueBaixo();
+    renderDashboard && renderDashboard();
     showToast('🗑️ Produto removido');
 }
 
 function limparFormProduto() {
     document.getElementById('modal-produto-titulo').innerText = 'Novo Produto';
-    document.getElementById('prod-edit-id').value   = '';
-    document.getElementById('prod-nome').value      = '';
-    document.getElementById('prod-descricao').value = '';
-    document.getElementById('prod-valor').value     = '';
-    document.getElementById('prod-estoque').value   = '0';
+    document.getElementById('prod-edit-id').value       = '';
+    document.getElementById('prod-nome').value          = '';
+    document.getElementById('prod-descricao').value     = '';
+    document.getElementById('prod-valor').value         = '';
+    document.getElementById('prod-custo').value         = '';
+    document.getElementById('prod-estoque').value       = '0';
+    document.getElementById('prod-estoque-min').value   = '0';
+    const margemEl = document.getElementById('prod-margem-info');
+    if (margemEl) margemEl.style.display = 'none';
 }
 
 // --- COMANDAS ---
@@ -22493,29 +22659,87 @@ function renderRelBar() {
     document.getElementById('rb-ticket').innerText = formatMoney(ticket);
     document.getElementById('rb-itens').innerText = itens;
 
-    // Top produtos
+    // Top produtos + por grupo + agregação pra CMV
     const produtosVendidos = {};
     const porGrupo = {};
+    let cmvTotal = 0;       // custo das mercadorias vendidas
+    let qtdComCusto = 0;    // quantidade de itens vendidos que têm custo cadastrado
+    let qtdSemCusto = 0;    // quantidade de itens vendidos sem custo cadastrado
     comandasPeriodo.forEach(c => {
         c.itens.forEach(it => {
             const p = barProdutos.find(x => x.id === it.produtoId);
             if (!p) return;
-            if (!produtosVendidos[it.produtoId]) produtosVendidos[it.produtoId] = { nome:p.nome, qtd:0, valor:0 };
+            if (!produtosVendidos[it.produtoId]) produtosVendidos[it.produtoId] = {
+                nome: p.nome, qtd: 0, valor: 0, custo: 0, lucro: 0,
+            };
             produtosVendidos[it.produtoId].qtd += it.qtd;
             produtosVendidos[it.produtoId].valor += it.subtotal;
+            const custoUn = Number(p.custo) || 0;
+            const custoItem = custoUn * it.qtd;
+            produtosVendidos[it.produtoId].custo += custoItem;
+            produtosVendidos[it.produtoId].lucro += (it.subtotal - custoItem);
+            cmvTotal += custoItem;
+            if (custoUn > 0) qtdComCusto += it.qtd; else qtdSemCusto += it.qtd;
             porGrupo[p.grupo] = (porGrupo[p.grupo] || 0) + it.subtotal;
         });
     });
 
+    const lucro = fat - cmvTotal;
+    const margemMedia = fat > 0 ? (lucro / fat) * 100 : 0;
+
+    // KPIs financeiros
+    document.getElementById('rb-cmv').innerText = formatMoney(cmvTotal);
+    const cmvInfo = document.getElementById('rb-cmv-info');
+    if (cmvInfo) {
+        cmvInfo.innerHTML = qtdSemCusto > 0
+            ? `<span style="color:#f59e0b;">⚠️ ${qtdSemCusto} unid. sem custo cadastrado</span>`
+            : (qtdComCusto > 0 ? `${qtdComCusto} unid. com custo` : 'Sem dados de custo');
+    }
+    document.getElementById('rb-lucro').innerText = formatMoney(lucro);
+    const lucroInfo = document.getElementById('rb-lucro-info');
+    if (lucroInfo) lucroInfo.innerText = qtdComCusto > 0 ? 'Faturamento − CMV' : 'Cadastre custo dos produtos';
+    document.getElementById('rb-margem').innerText = qtdComCusto > 0 ? margemMedia.toFixed(1) + '%' : '—';
+    const margemEl = document.getElementById('rb-margem');
+    if (margemEl) {
+        if (qtdComCusto > 0) {
+            margemEl.style.color = margemMedia >= 50 ? '#22c55e' : margemMedia >= 25 ? 'var(--gold)' : margemMedia >= 0 ? '#f97316' : '#ef4444';
+        } else {
+            margemEl.style.color = '#52525b';
+        }
+    }
+    // Valor em estoque (atual, não do período — é foto de agora)
+    let valorEstoque = 0;
+    let qtdProdutosEstoque = 0;
+    (barProdutos || []).forEach(p => {
+        if (p.ativo === false) return;
+        const est = Number(p.estoque) || 0;
+        const custoUn = Number(p.custo) || 0;
+        if (est > 0) {
+            valorEstoque += est * custoUn;
+            qtdProdutosEstoque++;
+        }
+    });
+    document.getElementById('rb-estoque-valor').innerText = formatMoney(valorEstoque);
+    const estoqueInfo = document.getElementById('rb-estoque-info');
+    if (estoqueInfo) estoqueInfo.innerText = `${qtdProdutosEstoque} produto${qtdProdutosEstoque!==1?'s':''} em estoque`;
+
+    // Top Produtos
     const topEl = document.getElementById('rb-top-produtos');
     const topList = Object.values(produtosVendidos).sort((a,b) => b.qtd - a.qtd).slice(0, 10);
-    topEl.innerHTML = topList.length ? topList.map(p => `
-        <div style="display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
+    topEl.innerHTML = topList.length ? topList.map(p => {
+        const pct = p.valor > 0 ? (p.lucro / p.valor) * 100 : 0;
+        const corPct = p.custo === 0 ? '#52525b' : pct >= 50 ? '#22c55e' : pct >= 25 ? 'var(--gold)' : '#f97316';
+        const pctTxt = p.custo === 0 ? '—' : pct.toFixed(0) + '%';
+        return `
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:.5rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
             <span style="font-weight:700;">${p.nome}</span>
             <span style="font-family:var(--font-mono);color:#71717a;">${p.qtd}x</span>
             <span style="font-family:var(--font-mono);color:#22c55e;font-weight:700;">${formatMoney(p.valor)}</span>
-        </div>`).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Sem vendas</div>';
+            <span title="Margem" style="font-family:var(--font-mono);color:${corPct};font-weight:700;font-size:.7rem;min-width:42px;text-align:right;">${pctTxt}</span>
+        </div>`;
+    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Sem vendas</div>';
 
+    // Por grupo
     const grEl = document.getElementById('rb-por-grupo');
     const grList = Object.entries(porGrupo).sort((a,b) => b[1] - a[1]);
     grEl.innerHTML = grList.length ? grList.map(([g,v]) => `
@@ -22523,6 +22747,157 @@ function renderRelBar() {
             <span style="font-weight:700;">${g}</span>
             <span style="font-family:var(--font-mono);color:#22c55e;font-weight:700;">${formatMoney(v)}</span>
         </div>`).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem;">Sem vendas</div>';
+
+    // Tabela detalhada de estoque (foto atual)
+    renderRelBarEstoque();
+}
+
+function renderRelBarEstoque() {
+    const tab = document.getElementById('rb-estoque-tabela');
+    if (!tab) return;
+    const produtos = (barProdutos || [])
+        .filter(p => p && p.ativo !== false)
+        .sort((a, b) => (a.grupo || '').localeCompare(b.grupo || '') || (a.nome || '').localeCompare(b.nome || ''));
+    if (!produtos.length) {
+        tab.innerHTML = '<div style="color:#3f3f46;font-size:.8rem;padding:2rem;text-align:center;">Nenhum produto cadastrado</div>';
+        return;
+    }
+    tab.innerHTML = `
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+                <thead>
+                    <tr style="background:#161618;">
+                        <th style="text-align:left;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Produto</th>
+                        <th style="text-align:left;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Grupo</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Preço Venda</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Custo</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Margem</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Estoque</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Valor Estoque</th>
+                        <th style="text-align:center;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${produtos.map(p => {
+                        const venda = Number(p.valor) || 0;
+                        const custo = Number(p.custo) || 0;
+                        const est = Number(p.estoque) || 0;
+                        const estMin = Number(p.estoqueMin) || 0;
+                        const lucro = venda - custo;
+                        const pct = venda > 0 ? (lucro / venda) * 100 : 0;
+                        const margemTxt = custo > 0 ? `${formatMoney(lucro)} (${pct.toFixed(0)}%)` : '<span style="color:#52525b;">—</span>';
+                        const corMargem = custo === 0 ? '#52525b' : pct >= 50 ? '#22c55e' : pct >= 25 ? 'var(--gold)' : pct >= 0 ? '#f97316' : '#ef4444';
+                        let statusHtml;
+                        if (estMin === 0) statusHtml = '<span style="font-size:.65rem;color:#52525b;">Sem alerta</span>';
+                        else if (est === 0) statusHtml = '<span style="font-size:.65rem;color:#ef4444;font-weight:700;background:rgba(239,68,68,.1);padding:.15rem .45rem;border-radius:.25rem;">ESGOTADO</span>';
+                        else if (est <= estMin) statusHtml = '<span style="font-size:.65rem;color:#f97316;font-weight:700;background:rgba(249,115,22,.1);padding:.15rem .45rem;border-radius:.25rem;">REPOR</span>';
+                        else statusHtml = '<span style="font-size:.65rem;color:#22c55e;background:rgba(34,197,94,.1);padding:.15rem .45rem;border-radius:.25rem;">OK</span>';
+                        return `
+                        <tr style="border-top:1px solid #1e1e23;">
+                            <td style="padding:.5rem .75rem;font-weight:700;">${p.nome}</td>
+                            <td style="padding:.5rem .75rem;color:#71717a;">${p.grupo || '—'}</td>
+                            <td style="padding:.5rem .75rem;text-align:right;font-family:var(--font-mono);color:#22c55e;font-weight:700;">${formatMoney(venda)}</td>
+                            <td style="padding:.5rem .75rem;text-align:right;font-family:var(--font-mono);color:${custo>0?'#ef4444':'#52525b'};">${custo>0?formatMoney(custo):'—'}</td>
+                            <td style="padding:.5rem .75rem;text-align:right;font-family:var(--font-mono);color:${corMargem};font-weight:700;">${margemTxt}</td>
+                            <td style="padding:.5rem .75rem;text-align:right;font-family:var(--font-mono);font-weight:700;">${est}${estMin>0?`<span style="color:#52525b;font-weight:400;"> /${estMin}</span>`:''}</td>
+                            <td style="padding:.5rem .75rem;text-align:right;font-family:var(--font-mono);color:#06b6d4;">${formatMoney(est * custo)}</td>
+                            <td style="padding:.5rem .75rem;text-align:center;">${statusHtml}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function switchBarSubtab(name, btn) {
+    document.querySelectorAll('.rb-subtab').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('#rel-bar .tab-btn').forEach(b => b.classList.remove('active'));
+    const target = document.getElementById('rb-sub-' + name);
+    if (target) target.style.display = 'block';
+    if (btn) btn.classList.add('active');
+}
+
+function exportRelBarCSV() {
+    const { comandasPeriodo } = getDadosPeriodo();
+
+    // CSV 1: Detalhamento por produto vendido no período
+    const linhas = [];
+    linhas.push(['Produto', 'Grupo', 'Qtd Vendida', 'Faturamento', 'Custo Total', 'Lucro', 'Margem %', 'Preço Venda Un', 'Custo Un', 'Estoque Atual', 'Estoque Mínimo']);
+
+    const agg = {};
+    comandasPeriodo.forEach(c => {
+        c.itens.forEach(it => {
+            const p = barProdutos.find(x => x.id === it.produtoId);
+            if (!p) return;
+            if (!agg[it.produtoId]) agg[it.produtoId] = { p, qtd: 0, fat: 0 };
+            agg[it.produtoId].qtd += it.qtd;
+            agg[it.produtoId].fat += it.subtotal;
+        });
+    });
+
+    // Adiciona produtos vendidos no período
+    Object.values(agg).forEach(({ p, qtd, fat }) => {
+        const custoUn = Number(p.custo) || 0;
+        const custoTotal = custoUn * qtd;
+        const lucro = fat - custoTotal;
+        const pct = fat > 0 ? (lucro / fat) * 100 : 0;
+        linhas.push([
+            p.nome,
+            p.grupo || '',
+            qtd,
+            fat.toFixed(2).replace('.', ','),
+            custoTotal.toFixed(2).replace('.', ','),
+            lucro.toFixed(2).replace('.', ','),
+            custoUn > 0 ? pct.toFixed(1).replace('.', ',') : '',
+            (Number(p.valor) || 0).toFixed(2).replace('.', ','),
+            custoUn.toFixed(2).replace('.', ','),
+            Number(p.estoque) || 0,
+            Number(p.estoqueMin) || 0,
+        ]);
+    });
+
+    // Adiciona produtos NÃO vendidos no período (mas cadastrados) — pra ver estoque parado
+    (barProdutos || []).forEach(p => {
+        if (p.ativo === false) return;
+        if (agg[p.id]) return;  // já incluído
+        const custoUn = Number(p.custo) || 0;
+        linhas.push([
+            p.nome,
+            p.grupo || '',
+            0,
+            '0,00',
+            '0,00',
+            '0,00',
+            '',
+            (Number(p.valor) || 0).toFixed(2).replace('.', ','),
+            custoUn.toFixed(2).replace('.', ','),
+            Number(p.estoque) || 0,
+            Number(p.estoqueMin) || 0,
+        ]);
+    });
+
+    // Gera CSV (separador ;)
+    const csv = linhas.map(l => l.map(c => {
+        const s = String(c);
+        // Se contém ; ou " ou \n, encerra em aspas
+        if (/[;"\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+    }).join(';')).join('\n');
+
+    // Download
+    const periodoInfo = (document.getElementById('rp-info') || {}).innerText || 'periodo';
+    const fileName = `relatorio-bar-${periodoInfo.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`📊 Relatório exportado: ${fileName}`);
 }
 
 // ============================================================
@@ -23779,6 +24154,9 @@ function abrirDetalhesCliente(jid) {
 let _dashRelogioInterval = null;
 
 function renderDashboard() {
+    // Atualiza badge de estoque baixo (sidebar)
+    atualizarBadgeEstoqueBaixo && atualizarBadgeEstoqueBaixo();
+
     // Evita rodar se usuário não está na página do dashboard
     const hoje = new Date();
     const hojeInicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
@@ -24019,6 +24397,28 @@ function renderDashAlertas() {
         const s = getSaldoJogador(j.id);
         if (s < -500) alertas.push({ tipo:'info', icone:'fa-hand-holding-dollar', titulo:`${j.nome} deve ${formatMoney(Math.abs(s))}`, desc:'Saldo devedor elevado' });
     });
+
+    // Alerta: produtos do bar com estoque baixo ou esgotado
+    try {
+        const estoqueBaixo = getProdutosEstoqueBaixo();
+        estoqueBaixo.forEach(p => {
+            if (p._status === 'critico') {
+                alertas.push({
+                    tipo: 'erro',
+                    icone: 'fa-box-archive',
+                    titulo: `${p.nome} esgotado`,
+                    desc: `Estoque mínimo: ${p.estoqueMin} · Reposição necessária`,
+                });
+            } else {
+                alertas.push({
+                    tipo: 'aviso',
+                    icone: 'fa-triangle-exclamation',
+                    titulo: `${p.nome} com estoque baixo (${p.estoque}/${p.estoqueMin})`,
+                    desc: `Faltam ${p._gap} unidade${p._gap !== 1 ? 's' : ''} para atingir o estoque mínimo`,
+                });
+            }
+        });
+    } catch(e) { console.warn('[DASHBOARD] erro alertas estoque:', e); }
 
     // Renderiza
     if (!alertas.length) {
