@@ -7576,12 +7576,12 @@ function renderFuncionarios() {
     const lista = document.getElementById('lista-funcionarios');
     if (!lista) return;
     
-    const busca = (document.getElementById('filtro-funcionario-busca')?.value || '').toLowerCase().trim();
+    const busca = _normSearch(document.getElementById('filtro-funcionario-busca')?.value || '');
     const cargoFiltro = document.getElementById('filtro-funcionario-cargo')?.value || '';
     const statusFiltro = document.getElementById('filtro-funcionario-status')?.value;
     
     let filtrados = [...funcionarios];
-    if (busca) filtrados = filtrados.filter(f => (f.nome || '').toLowerCase().includes(busca));
+    if (busca) filtrados = filtrados.filter(f => _normSearch(f.nome || '').includes(busca));
     if (cargoFiltro) filtrados = filtrados.filter(f => f.cargo === cargoFiltro);
     if (statusFiltro) filtrados = filtrados.filter(f => f.status === statusFiltro);
     
@@ -8681,18 +8681,19 @@ function renderAuditoria() {
         filtrados = filtrados.filter(l => l.categoria === _filtroAuditoria.categoria);
     }
 
-    // Filtro por usuário
+    // Filtro por usuário (normalizado — insensível a acento)
     if (_filtroAuditoria.usuario) {
-        filtrados = filtrados.filter(l => (l.usuario || '').toLowerCase().includes(_filtroAuditoria.usuario.toLowerCase()));
+        const u = _normSearch(_filtroAuditoria.usuario);
+        filtrados = filtrados.filter(l => _normSearch(l.usuario || '').includes(u));
     }
 
-    // Filtro por busca
+    // Filtro por busca (normalizado — insensível a acento)
     if (_filtroAuditoria.busca) {
-        const b = _filtroAuditoria.busca.toLowerCase();
+        const b = _normSearch(_filtroAuditoria.busca);
         filtrados = filtrados.filter(l =>
-            (l.descricao || '').toLowerCase().includes(b) ||
-            (l.categoria || '').toLowerCase().includes(b) ||
-            (l.usuario || '').toLowerCase().includes(b)
+            _normSearch(l.descricao || '').includes(b) ||
+            _normSearch(l.categoria || '').includes(b) ||
+            _normSearch(l.usuario || '').includes(b)
         );
     }
 
@@ -12140,15 +12141,15 @@ async function adminCarregarClubes() {
 }
 
 function adminFiltrarClubes() {
-    const q = (document.getElementById('admin-clubes-busca').value || '').toLowerCase().trim();
+    const q = _normSearch(document.getElementById('admin-clubes-busca').value || '');
     if (!q) {
         adminRenderClubes(_adminClubesCache);
         return;
     }
     const filtrados = _adminClubesCache.filter(c => 
-        (c.nome || '').toLowerCase().includes(q) ||
-        (c.email_dono || '').toLowerCase().includes(q) ||
-        (c.cnpj || '').toLowerCase().includes(q)
+        _normSearch(c.nome || '').includes(q) ||
+        _normSearch(c.email_dono || '').includes(q) ||
+        _normSearch(c.cnpj || '').includes(q)
     );
     adminRenderClubes(filtrados);
 }
@@ -13297,9 +13298,9 @@ async function removerJogador(id) {
 }
 
 function filtrarJogadores(val) {
-    const v = val.toLowerCase();
+    const v = _normSearch(val);
     renderJogadores(jogadores.filter(j =>
-        j.nome.toLowerCase().includes(v) || (j.apelido || '').toLowerCase().includes(v)
+        _normSearch(j.nome).includes(v) || _normSearch(j.apelido || '').includes(v)
     ));
 }
 
@@ -16088,6 +16089,27 @@ function formatMoney(v) {
 }
 
 // ============================================================
+// BUSCA INTELIGENTE — normalização para buscas insensíveis a acentos e caixa
+// ============================================================
+// Uso: _normSearch('João') === 'joao'
+//      _matchSearch('João', 'joa') === true (encontra "joao" dentro)
+//      _matchSearch('café', 'cafe') === true (mesmo com acento na fonte)
+function _normSearch(s) {
+    return (s == null ? '' : String(s))
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')   // remove diacríticos (acentos)
+        .trim();
+}
+
+// Helper rápido: testa se 'haystack' contém 'needle' (ambos normalizados)
+// Retorna true se needle estiver vazia (sem filtro)
+function _matchSearch(haystack, needle) {
+    if (!needle) return true;
+    return _normSearch(haystack).includes(_normSearch(needle));
+}
+
+// ============================================================
 // MODAL / UTIL
 // ============================================================
 function openModal(id) {
@@ -16522,12 +16544,12 @@ function renderProdutos() {
     const pager = document.getElementById('bar-produtos-pager');
     const countEl = document.getElementById('bar-produtos-count');
     const filtroGrupo = (document.getElementById('bar-filtro-grupo') || {}).value || '';
-    const busca = ((document.getElementById('bar-produtos-busca') || {}).value || '').toLowerCase().trim();
+    const busca = _normSearch((document.getElementById('bar-produtos-busca') || {}).value || '');
 
     let lista = filtroGrupo ? barProdutos.filter(p => p.grupo === filtroGrupo) : [...barProdutos];
     if (busca) lista = lista.filter(p =>
-        (p.nome || '').toLowerCase().includes(busca) ||
-        (p.descricao || '').toLowerCase().includes(busca)
+        _normSearch(p.nome).includes(busca) ||
+        _normSearch(p.descricao || '').includes(busca)
     );
 
     if (countEl) countEl.innerText = `(${lista.length})`;
@@ -16777,14 +16799,13 @@ function renderComandas() {
 
     let abertas = barComandas.filter(c => c.status === 'aberta');
 
-    // Filtro por busca
-    const busca = ((document.getElementById('bar-comandas-busca') || {}).value || '').toLowerCase().trim();
+    // Filtro por busca (normalizada — insensível a acento)
+    const busca = _normSearch((document.getElementById('bar-comandas-busca') || {}).value || '');
     if (busca) {
         abertas = abertas.filter(c => {
             const j = jogadores.find(x => x.id === c.jogadorId);
             if (!j) return false;
-            const texto = `${j.nome} ${j.apelido || ''}`.toLowerCase();
-            return texto.includes(busca);
+            return _normSearch(j.nome).includes(busca) || _normSearch(j.apelido || '').includes(busca);
         });
     }
 
@@ -19499,14 +19520,13 @@ function renderComandasAbertasCaixa_DEPRECATED() {
     }
     wrap.style.display = 'block';
 
-    // Filtro
-    const busca = ((document.getElementById('caixa-comandas-busca') || {}).value || '').toLowerCase().trim();
+    // Filtro normalizado (insensível a acento)
+    const busca = _normSearch((document.getElementById('caixa-comandas-busca') || {}).value || '');
     if (busca) {
         abertas = abertas.filter(c => {
             const j = jogadores.find(x => x.id === c.jogadorId);
             if (!j) return false;
-            const texto = `${j.nome} ${j.apelido || ''}`.toLowerCase();
-            return texto.includes(busca);
+            return _normSearch(j.nome).includes(busca) || _normSearch(j.apelido || '').includes(busca);
         });
     }
 
@@ -22928,12 +22948,12 @@ function renderRelClientes() {
         }
     });
 
-    const busca = ((document.getElementById('rcli-busca') || {}).value || '').toLowerCase();
+    const busca = _normSearch((document.getElementById('rcli-busca') || {}).value || '');
     let lista = Object.entries(porCliente).map(([jid, d]) => {
         const j = jogadores.find(x => x.id === jid);
         return { jogadorId: jid, nome: j ? j.nome : '?', ...d };
     }).sort((a,b) => b.gasto - a.gasto);
-    if (busca) lista = lista.filter(c => c.nome.toLowerCase().includes(busca));
+    if (busca) lista = lista.filter(c => _normSearch(c.nome).includes(busca));
 
     const listaEl = document.getElementById('rcli-lista');
     if (!lista.length) {
@@ -24550,7 +24570,7 @@ function abrirBuscaGlobal() {
 }
 
 function executarBuscaGlobal(query) {
-    const q = (query || '').toLowerCase().trim();
+    const q = _normSearch(query || '');
     _buscaResultados = [];
 
     if (!q) {
@@ -24562,9 +24582,9 @@ function executarBuscaGlobal(query) {
             { tipo:'sugestao', titulo:'Ver Relatórios', subtitulo:'Análises e exportações', icon:'fa-chart-line', cor:'#ec4899', acao:() => showPage('relatorios') },
         ].filter(r => userHasAccess(r.titulo.toLowerCase().replace('ver ','')) !== false);
     } else {
-        // Busca jogadores
+        // Busca jogadores (insensível a acento)
         jogadores.forEach(j => {
-            const nomeBusca = (j.nome + ' ' + (j.apelido||'') + ' ' + (j.cidade||'')).toLowerCase();
+            const nomeBusca = _normSearch(j.nome + ' ' + (j.apelido||'') + ' ' + (j.cidade||''));
             if (nomeBusca.includes(q)) {
                 const saldo = getSaldoJogador(j.id);
                 _buscaResultados.push({
@@ -24578,9 +24598,9 @@ function executarBuscaGlobal(query) {
             }
         });
 
-        // Busca torneios
+        // Busca torneios (insensível a acento)
         torneios.forEach(t => {
-            if (t.nome.toLowerCase().includes(q)) {
+            if (_normSearch(t.nome).includes(q)) {
                 const idx = torneios.indexOf(t);
                 _buscaResultados.push({
                     tipo:'torneio',
@@ -24593,9 +24613,9 @@ function executarBuscaGlobal(query) {
             }
         });
 
-        // Busca mesas cash
+        // Busca mesas cash (insensível a acento)
         cashMesas.forEach(m => {
-            if (m.nome.toLowerCase().includes(q)) {
+            if (_normSearch(m.nome).includes(q)) {
                 _buscaResultados.push({
                     tipo:'cash',
                     titulo: m.nome + ' (Cash)',
@@ -24607,9 +24627,9 @@ function executarBuscaGlobal(query) {
             }
         });
 
-        // Busca produtos do bar
+        // Busca produtos do bar (insensível a acento)
         barProdutos.forEach(p => {
-            if (p.nome.toLowerCase().includes(q)) {
+            if (_normSearch(p.nome).includes(q)) {
                 _buscaResultados.push({
                     tipo:'produto',
                     titulo: p.nome + ' (Produto)',
@@ -24621,7 +24641,7 @@ function executarBuscaGlobal(query) {
             }
         });
 
-        // Navegação direta
+        // Navegação direta (insensível a acento)
         const paginas = [
             { pg:'dashboard', nome:'Dashboard', icon:'fa-house', cor:'var(--gold)' },
             { pg:'jogadores', nome:'Jogadores', icon:'fa-users', cor:'#06b6d4' },
@@ -24634,7 +24654,7 @@ function executarBuscaGlobal(query) {
             { pg:'usuarios',  nome:'Usuários',  icon:'fa-user-shield', cor:'#a78bfa' },
         ];
         paginas.forEach(p => {
-            if (p.nome.toLowerCase().includes(q) && userHasAccess(p.pg)) {
+            if (_normSearch(p.nome).includes(q) && userHasAccess(p.pg)) {
                 _buscaResultados.push({
                     tipo:'pagina',
                     titulo:'Ir para ' + p.nome,
