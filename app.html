@@ -8611,6 +8611,450 @@ function logAudit(categoria, descricao, detalhes) {
 }
 
 // ============================================================
+// SUITE DE TESTES — Validação automatizada dos cálculos
+// ============================================================
+// Uso no console do navegador: testarSuite()
+// Roda 12+ cenários técnicos que validam rake, staff, prize, jackpot, last chance.
+// Não toca em dados reais — cria objetos torneio em memória, valida e descarta.
+// ============================================================
+
+const TestRunner = (function() {
+    let passed = 0;
+    let failed = 0;
+    let resultados = [];
+
+    function _mkTorneio(opts) {
+        // Cria torneio fake com defaults seguros
+        return {
+            id: 'test-' + Math.random().toString(36).slice(2, 8),
+            nome: opts.nome || 'TESTE',
+            status: 'ativo',
+            tipo: opts.tipo || 'normal',
+            buyin: opts.buyin || 100,
+            rake: opts.rake != null ? opts.rake : 0,
+            staffPct: opts.staffPct || 0,
+            taxaAdministrativa: opts.taxaAdm || 0,
+            lastChanceValor: opts.lastChanceValor || 50,
+            lastChanceFichas: opts.lastChanceFichas || 5000,
+            lastChancePagaRake: opts.lastChancePagaRake || false,
+            jackpotValor: opts.jackpotValor || 20,
+            jackpotFichas: opts.jackpotFichas || 5000,
+            bountyValor: opts.bountyValor || 0,
+            pkoSplit: opts.pkoSplit || 50,
+            entries: opts.entries || [],
+            jackpotCompras: opts.jackpotCompras || [],
+            eliminados: opts.eliminados || [],
+            estornos: opts.estornos || [],
+        };
+    }
+
+    function _entrada(tipo, valor, jogadorId) {
+        return {
+            id: 'e-' + Math.random().toString(36).slice(2, 8),
+            tipo,
+            valor: valor,
+            jogadorId: jogadorId || ('j-' + Math.random().toString(36).slice(2, 6)),
+            ts: Date.now(),
+        };
+    }
+
+    function assertEqual(label, actual, expected, tolerance = 0.01) {
+        const diff = Math.abs(actual - expected);
+        const ok = diff <= tolerance;
+        resultados.push({
+            label,
+            actual: typeof actual === 'number' ? actual.toFixed(2) : actual,
+            expected: typeof expected === 'number' ? expected.toFixed(2) : expected,
+            ok,
+            diff: diff.toFixed(4),
+        });
+        if (ok) passed++; else failed++;
+        return ok;
+    }
+
+    function assertTrue(label, condicao) {
+        const ok = !!condicao;
+        resultados.push({ label, actual: ok, expected: true, ok, diff: '0' });
+        if (ok) passed++; else failed++;
+        return ok;
+    }
+
+    function reset() {
+        passed = 0;
+        failed = 0;
+        resultados = [];
+    }
+
+    function imprimirResultados() {
+        const total = passed + failed;
+        const taxa = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
+        const cor = failed === 0 ? '#22c55e' : '#ef4444';
+
+        console.log('\n%c╔══════════════════════════════════════════════════════════╗', 'font-weight:bold;color:' + cor + ';');
+        console.log('%c║       🧪 STACKOS · SUITE DE TESTES DE CÁLCULOS         ║', 'font-weight:bold;color:' + cor + ';');
+        console.log('%c╚══════════════════════════════════════════════════════════╝', 'font-weight:bold;color:' + cor + ';');
+        console.log('%cTotal: ' + total + ' · ✅ Passou: ' + passed + ' · ❌ Falhou: ' + failed + ' · Taxa: ' + taxa + '%',
+            'font-size:13px;font-weight:bold;color:' + cor + ';');
+        console.log('');
+
+        // Tabela de resultados
+        const tabela = resultados.map(r => ({
+            '✓': r.ok ? '✅' : '❌',
+            'Cenário': r.label,
+            'Esperado': r.expected,
+            'Obtido': r.actual,
+            'Diff': r.ok ? '0' : r.diff,
+        }));
+        console.table(tabela);
+
+        // Resumo final
+        if (failed === 0) {
+            console.log('%c🎉 TODOS OS TESTES PASSARAM!', 'font-size:14px;font-weight:bold;color:#22c55e;');
+        } else {
+            console.log('%c⚠️  ' + failed + ' teste(s) falharam. Veja a tabela acima.', 'font-size:14px;font-weight:bold;color:#ef4444;');
+        }
+
+        return { passed, failed, total, taxa, resultados };
+    }
+
+    return { _mkTorneio, _entrada, assertEqual, assertTrue, reset, imprimirResultados,
+             get passed() { return passed; }, get failed() { return failed; } };
+})();
+
+function testarSuite() {
+    TestRunner.reset();
+    const { _mkTorneio, _entrada, assertEqual, assertTrue } = TestRunner;
+
+    console.log('%c🧪 Iniciando suite de testes...', 'font-size:14px;color:#06b6d4;font-weight:bold;');
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 1: Torneio simples — 10 buy-ins, 20% rake, sem staff
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C1: Buy-in simples',
+            buyin: 100, rake: 20,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+        });
+        // Bruto: 10 × 100 = 1000
+        // Rake: 1000 × 20% = 200
+        // Prize: 1000 - 200 = 800
+        assertEqual('C1: Bruto para rake (10×100)', _getBrutoParaRake(t), 1000);
+        assertEqual('C1: Rake 20% (1000×20%)', getRake(t), 200);
+        assertEqual('C1: Staff 0%', getStaff(t), 0);
+        assertEqual('C1: Prize (1000-200)', getPrize(t), 800);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 2: Torneio com rebuys simples e duplos
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C2: Rebuys',
+            buyin: 100, rake: 20,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:2}, () => _entrada('rebuy_simples', 100)),
+                ...Array.from({length:2}, () => _entrada('rebuy_duplo', 200)),
+            ],
+        });
+        // Bruto: 1000 + 200 + 400 = 1600
+        // Rake: 1600 × 20% = 320
+        // Prize: 1600 - 320 = 1280
+        assertEqual('C2: Bruto (1000+200+400)', _getBrutoParaRake(t), 1600);
+        assertEqual('C2: Rake 20%', getRake(t), 320);
+        assertEqual('C2: Prize (1600-320)', getPrize(t), 1280);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 3: Re-entry deve pagar rake como buy-in
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C3: Re-entry',
+            buyin: 100, rake: 20,
+            entries: [
+                ...Array.from({length:8}, () => _entrada('buyin', 100)),
+                ...Array.from({length:3}, () => _entrada('reentry', 100)),
+            ],
+        });
+        // 11 × 100 = 1100; rake 220; prize 880
+        assertEqual('C3: Bruto (8 buyin + 3 reentry)', _getBrutoParaRake(t), 1100);
+        assertEqual('C3: Rake 20%', getRake(t), 220);
+        assertEqual('C3: Prize', getPrize(t), 880);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 4: Add-on paga rake como qualquer entrada
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C4: Add-on',
+            buyin: 100, rake: 20, addonValor: 50,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:5}, () => _entrada('addon', 50)),
+            ],
+        });
+        // 1000 + 250 = 1250; rake 250; prize 1000
+        assertEqual('C4: Bruto (buyin + addon)', _getBrutoParaRake(t), 1250);
+        assertEqual('C4: Rake 20%', getRake(t), 250);
+        assertEqual('C4: Prize', getPrize(t), 1000);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 5: Last Chance OPT-IN (paga rake)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C5: LC opt-in',
+            buyin: 100, rake: 20,
+            lastChancePagaRake: true,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:5}, () => _entrada('last_chance', 50)),
+            ],
+        });
+        // LC paga rake: 1000 + 250 = 1250; rake 250; prize 1000
+        assertEqual('C5: LC opt-in entra em bruto rake', _getBrutoParaRake(t), 1250);
+        assertEqual('C5: LC opt-in bruto sem rake = 0', _getBrutoSemRake(t), 0);
+        assertEqual('C5: Rake', getRake(t), 250);
+        assertEqual('C5: Prize', getPrize(t), 1000);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 6: Last Chance OPT-OUT (não paga rake — 100% vai pro prize)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C6: LC opt-out',
+            buyin: 100, rake: 20,
+            lastChancePagaRake: false,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:5}, () => _entrada('last_chance', 50)),
+            ],
+        });
+        // LC NÃO paga rake. Bruto pra rake: 1000. Bruto sem rake: 250.
+        // Rake: 1000 × 20% = 200. Prize: (1000 - 200) + 250 = 1050
+        assertEqual('C6: LC opt-out fora do bruto rake', _getBrutoParaRake(t), 1000);
+        assertEqual('C6: LC opt-out vai pro bruto sem rake', _getBrutoSemRake(t), 250);
+        assertEqual('C6: Rake só sobre buy-ins', getRake(t), 200);
+        assertEqual('C6: Prize inclui LC integral', getPrize(t), 1050);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 7: Jackpot NÃO entra no prize (vai pra Caixa do Clube)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C7: Jackpot fora do prize',
+            buyin: 100, rake: 20,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+            jackpotCompras: Array.from({length:10}, (_, i) => ({
+                jogadorId: 'j' + i, qtd: 1, valor: 20, fichas: 5000, ts: Date.now(),
+            })),
+        });
+        // Jackpot R$ 200 vai pra Caixa do Clube, NÃO pro prize
+        assertEqual('C7: Bruto rake (sem jackpot)', _getBrutoParaRake(t), 1000);
+        assertEqual('C7: Bruto sem rake (sem jackpot)', _getBrutoSemRake(t), 0);
+        assertEqual('C7: Prize sem jackpot', getPrize(t), 800);  // 1000 - 200 rake
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 8: Staff em cascata (sobre líquido pós-rake)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C8: Staff cascata',
+            buyin: 100, rake: 20, staffPct: 3,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+        });
+        // Bruto: 1000. Rake: 200. Sobra: 800. Staff: 800 × 3% = 24. Prize: 1000 - 200 - 24 = 776
+        assertEqual('C8: Rake 20%', getRake(t), 200);
+        assertEqual('C8: Staff cascata 3% sobre 800', getStaff(t), 24);
+        assertEqual('C8: Prize (1000-200-24)', getPrize(t), 776);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 9: TORNEIO REAL DO CLIENTE — Rake Cashback
+    // ──────────────────────────────────────────────────────────────
+    // Configurado pelo cliente:
+    //   buyin 100, rake 20%, staff 3%, jackpot 20 (10 compras)
+    //   10 buy-ins, 2 rebuy simples, 2 rebuy duplo
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C9: Torneio Rake Cashback (real)',
+            buyin: 100, rake: 20, staffPct: 3,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:2}, () => _entrada('rebuy_simples', 100)),
+                ...Array.from({length:2}, () => _entrada('rebuy_duplo', 200)),
+            ],
+            jackpotCompras: Array.from({length:10}, (_, i) => ({
+                jogadorId: 'j' + i, qtd: 1, valor: 20, fichas: 5000, ts: Date.now(),
+            })),
+        });
+        // Bruto: 1000 + 200 + 400 = 1600 (jackpot fora)
+        // Rake: 1600 × 20% = 320
+        // Staff: (1600 - 320) × 3% = 38.40
+        // Prize: 1600 - 320 - 38.40 = 1241.60
+        assertEqual('C9: Bruto pra rake (jackpot fora)', _getBrutoParaRake(t), 1600);
+        assertEqual('C9: Rake 20%', getRake(t), 320);
+        assertEqual('C9: Staff 3% cascata', getStaff(t), 38.40);
+        assertEqual('C9: Prize Pool (correto = 1241.60)', getPrize(t), 1241.60);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 10: Combinação Last Chance + Jackpot + Rake
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C10: LC+JP+Rake combinado',
+            buyin: 100, rake: 20, staffPct: 0,
+            lastChancePagaRake: false,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:3}, () => _entrada('last_chance', 50)),
+            ],
+            jackpotCompras: Array.from({length:5}, (_, i) => ({
+                jogadorId: 'j' + i, qtd: 1, valor: 20, fichas: 5000, ts: Date.now(),
+            })),
+        });
+        // Bruto rake: 1000 (só buy-ins)
+        // Bruto sem rake: 150 (last chance opt-out)
+        // Jackpot fora.
+        // Rake: 200. Prize: 1000 - 200 + 150 = 950
+        assertEqual('C10: Bruto rake só buy-ins', _getBrutoParaRake(t), 1000);
+        assertEqual('C10: Bruto sem rake só LC', _getBrutoSemRake(t), 150);
+        assertEqual('C10: Rake só sobre buy-ins', getRake(t), 200);
+        assertEqual('C10: Prize (buyin pos-rake + LC)', getPrize(t), 950);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 11: Torneio Bounty
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C11: Bounty',
+            tipo: 'bounty',
+            buyin: 100, rake: 20, bountyValor: 30,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+        });
+        // Bruto: 1000. Rake: 200. Bounties: 10 × 30 = 300
+        // Líquido: 1000 - 200 = 800. Prize: 800 - 300 = 500
+        assertEqual('C11: Bounty Rake', getRake(t), 200);
+        assertEqual('C11: Bounty Prize (líquido - bounties)', getPrize(t), 500);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 12: Torneio Knockout (100% nos bounties, prize = 0)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C12: Knockout',
+            tipo: 'knockout',
+            buyin: 100, rake: 20,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+        });
+        assertEqual('C12: Knockout Prize = 0 (tudo bounty)', getPrize(t), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 13: Torneio PKO (split 50/50)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C13: PKO 50/50',
+            tipo: 'pko',
+            buyin: 100, rake: 20, pkoSplit: 50,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+        });
+        // Líquido: 800. PKO 50% vira bounty, 50% prize.
+        assertEqual('C13: PKO Prize (50% do líquido)', getPrize(t), 400);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 14: Torneio vazio (sem entries)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({ nome: 'C14: Vazio', rake: 20 });
+        assertEqual('C14: Vazio Bruto', _getBrutoParaRake(t), 0);
+        assertEqual('C14: Vazio Rake', getRake(t), 0);
+        assertEqual('C14: Vazio Prize', getPrize(t), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 15: Sem rake (clube isento)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C15: Sem rake',
+            buyin: 100, rake: 0,
+            entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+        });
+        assertEqual('C15: Rake 0', getRake(t), 0);
+        assertEqual('C15: Prize = bruto', getPrize(t), 1000);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 16: Múltiplos rakes (10%, 30%, 50%)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        [10, 30, 50].forEach(rkPct => {
+            const t = _mkTorneio({
+                nome: `C16: Rake ${rkPct}%`,
+                buyin: 100, rake: rkPct,
+                entries: Array.from({length:10}, () => _entrada('buyin', 100)),
+            });
+            const esperadoRake = 1000 * (rkPct / 100);
+            const esperadoPrize = 1000 - esperadoRake;
+            assertEqual(`C16: Rake ${rkPct}%`, getRake(t), esperadoRake);
+            assertEqual(`C16: Prize com rake ${rkPct}%`, getPrize(t), esperadoPrize);
+        });
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 17: Função _lastChancePagaRake existe e responde
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        assertTrue('C17: _lastChancePagaRake existe', typeof _lastChancePagaRake === 'function');
+        const t1 = _mkTorneio({ lastChancePagaRake: true });
+        const t2 = _mkTorneio({ lastChancePagaRake: false });
+        assertTrue('C17: Opt-in true detectado', _lastChancePagaRake(t1) === true);
+        assertTrue('C17: Opt-out false detectado', _lastChancePagaRake(t2) === false);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // CENÁRIO 18: Conservação — Total entrada = Prize + Rake + Staff
+    //              (excluindo jackpot que vai pra outro caixa)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneio({
+            nome: 'C18: Conservação',
+            buyin: 100, rake: 20, staffPct: 3,
+            lastChancePagaRake: false,
+            entries: [
+                ...Array.from({length:10}, () => _entrada('buyin', 100)),
+                ...Array.from({length:2}, () => _entrada('rebuy_simples', 100)),
+                ...Array.from({length:3}, () => _entrada('last_chance', 50)),
+            ],
+        });
+        const totalEntrada = (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
+        const rake = getRake(t);
+        const staff = getStaff(t);
+        const prize = getPrize(t);
+        // Conservação: Total = Prize + Rake + Staff
+        assertEqual('C18: Total entrada = Prize + Rake + Staff', prize + rake + staff, totalEntrada);
+    })();
+
+    return TestRunner.imprimirResultados();
+}
+
+// Atalho global pra rodar do console
+window.testarSuite = testarSuite;
+
+// ============================================================
 // BACKUP AUTOMÁTICO
 // ============================================================
 let _backupTimer = null;
