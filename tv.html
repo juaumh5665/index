@@ -1652,6 +1652,7 @@ function montarCarouselPremiacao(d) {
       nivel_atual: t.nivel_atual,
       tv_layout: t.tv_layout,
       tv_show_prize: t.tv_show_prize,
+      pwStatsVis: t.pw_stats_visiveis || null,  // detecta mudanças no modal "Estatísticas da TV"
       entriesQtd: (t.entries || []).length,
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
@@ -1920,16 +1921,21 @@ function montarCarouselPremiacao(d) {
     const jackpotsQtd = jackpotCompras.length;  // cada linha = 1 compra
     const jackpotFichas = jackpotCompras.reduce((s, j) => s + Number(j.fichas || 0), 0);
     
-    // Stats strip — espelha EXATAMENTE a lógica do app (sempre mostra cards configurados)
+    // Stats strip — espelha EXATAMENTE a lógica do app
+    // Respeita configuração do operador em "Estatísticas da TV" (pw_stats_visiveis)
+    // Default: tudo visível (se nunca configurado pelo operador)
+    const pwVis = t.pw_stats_visiveis || {};
+    const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true;
+    
     const statsStrip = [];
-    statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
-    if (reentriesQtd) statsStrip.push({ label: 'RE-ENTRY', value: reentriesQtd });
-    if (Number(t.jackpot_valor || 0) > 0) statsStrip.push({ label: 'JACKPOT', value: jackpotsQtd });
-    // REBUY/ADD-ON: mostra se está configurado no torneio (mesmo com 0 entries)
-    if (Number(t.rebuy_valor || 0) > 0 || rebuysSimplesQtd > 0) statsStrip.push({ label: 'REBUY SIMPLES', value: rebuysSimplesQtd });
-    if (Number(t.rebuy_duplo_valor || 0) > 0 || rebuysDuplosQtd > 0) statsStrip.push({ label: 'REBUY DUPLO', value: rebuysDuplosQtd });
-    if (Number(t.addon_fichas || 0) > 0) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
-    if (Number(t.last_chance_valor || 0) > 0) statsStrip.push({ label: 'LAST CHANCE', value: lastChanceQtd });
+    if (defVis('buyin')) statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
+    if (defVis('reentry') && reentriesQtd) statsStrip.push({ label: 'RE-ENTRY', value: reentriesQtd });
+    if (defVis('jackpot') && Number(t.jackpot_valor || 0) > 0) statsStrip.push({ label: 'JACKPOT', value: jackpotsQtd });
+    // REBUY/ADD-ON: mostra se está configurado no torneio OU tem entries cadastradas
+    if (defVis('rebuy_simples') && (Number(t.rebuy_valor || 0) > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label: 'REBUY SIMPLES', value: rebuysSimplesQtd });
+    if (defVis('rebuy_duplo')   && (Number(t.rebuy_duplo_valor || 0) > 0 || rebuysDuplosQtd > 0)) statsStrip.push({ label: 'REBUY DUPLO', value: rebuysDuplosQtd });
+    if (defVis('addon') && Number(t.addon_fichas || 0) > 0) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
+    if (defVis('last_chance') && Number(t.last_chance_valor || 0) > 0) statsStrip.push({ label: 'LAST CHANCE', value: lastChanceQtd });
     
     // === CHIP COUNT (replicando EXATAMENTE a lógica do app) ===
     // Cada entry recebe fichas de acordo com seu tipo:
