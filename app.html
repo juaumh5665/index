@@ -18448,18 +18448,8 @@ function initVendaRapida() {
             barGrupos.map(g => `<option value="${g}">${g}</option>`).join('');
     }
 
-    // Popula picker de jogador usando PlayerSearch (combobox autocomplete já existente)
-    const pickerEl = document.getElementById('vr-jogador-picker');
-    if (pickerEl && typeof PlayerSearch !== 'undefined') {
-        pickerEl.innerHTML = '';
-        PlayerSearch.mount(pickerEl, {
-            placeholder: 'Digite nome, apelido ou cidade...',
-            onSelect: (j) => {
-                _vrJogadorId = j ? j.id : null;
-                vrAtualizarBotao();
-            },
-        });
-    }
+    // Cria/atualiza picker de jogador (combobox autocomplete)
+    _vrMontarPickerJogador();
 
     // Limpa inputs visuais
     const busca = document.getElementById('vr-busca');
@@ -18471,13 +18461,12 @@ function initVendaRapida() {
     vrAtualizarBotao();
 
     // Registra atalhos de teclado (só nessa aba)
+    if (_vrKeyHandler) document.removeEventListener('keydown', _vrKeyHandler);
     _vrKeyHandler = function(e) {
-        // Só ativa se a aba estiver visível e foco não estiver em input/textarea
         const aba = document.getElementById('bar-venda-rapida');
         if (!aba || aba.style.display === 'none') return;
         const tag = (document.activeElement && document.activeElement.tagName || '').toUpperCase();
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-            // Permite Enter pra confirmar mesmo dentro de input
             if (e.key === 'Enter' && _vrCarrinho.length && _vrJogadorId && _vrMetodoPagamento) {
                 e.preventDefault();
                 vrConfirmarVenda();
@@ -18494,6 +18483,43 @@ function initVendaRapida() {
         }
     };
     document.addEventListener('keydown', _vrKeyHandler);
+}
+
+// Cria um <select> dinâmico dentro do container e monta o PlayerSearch nele
+function _vrMontarPickerJogador() {
+    const container = document.getElementById('vr-jogador-picker');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Cria select com todos jogadores do clube atual
+    const select = document.createElement('select');
+    select.id = 'vr-jogador-select';
+    select.className = 'inp';
+    select.innerHTML = '<option value="">Selecione...</option>' +
+        (jogadores || [])
+            .slice()
+            .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''))
+            .map(j => `<option value="${j.id}">${j.nome}${j.apelido ? ' (' + j.apelido + ')' : ''}</option>`)
+            .join('');
+
+    // Listener: atualiza state quando muda
+    select.addEventListener('change', () => {
+        _vrJogadorId = select.value || null;
+        vrAtualizarBotao();
+    });
+
+    container.appendChild(select);
+
+    // Monta PlayerSearch em cima do select (combobox com busca)
+    if (typeof PlayerSearch !== 'undefined') {
+        try {
+            PlayerSearch.mount('vr-jogador-select', {
+                placeholder: 'Digite nome, apelido ou cidade...',
+            });
+        } catch(e) {
+            console.warn('[VR] PlayerSearch falhou, usando select padrão:', e);
+        }
+    }
 }
 
 function renderVendaRapidaProdutos() {
@@ -18677,17 +18703,30 @@ async function vrConfirmarVenda() {
     if (!_vrJogadorId)             return showToast('⚠️ Selecione o jogador');
     if (!_vrMetodoPagamento)       return showToast('⚠️ Selecione o método de pagamento');
 
-    const total = _vrCarrinho.reduce((s, it) => s + it.subtotal, 0);
-    if (total <= 0) return showToast('⚠️ Total inválido');
+    // 🔒 SEGURANÇA MULTI-TENANT: garante que existe clube atual e que o jogador pertence a ele
+    if (!sbClube || !sbClube.id) {
+        return showToast('⚠️ Clube não identificado. Faça login novamente.');
+    }
 
     const jogador = jogadores.find(j => j.id === _vrJogadorId);
-    if (!jogador) return showToast('⚠️ Jogador não encontrado');
+    if (!jogador) {
+        return showToast('⚠️ Jogador não encontrado neste clube');
+    }
+    // Defesa extra: valida que o UUID do jogador é mesmo válido (não vazio, não 'undefined')
+    if (typeof jogador.id !== 'string' || jogador.id.length < 10) {
+        console.warn('[VR] UUID de jogador inválido:', jogador.id);
+        return showToast('⚠️ ID do jogador inválido');
+    }
+
+    const total = _vrCarrinho.reduce((s, it) => s + it.subtotal, 0);
+    if (total <= 0) return showToast('⚠️ Total inválido');
 
     // Cria a "comanda" da venda direta (fechada na hora)
     const agora = Date.now();
     const venda = {
         id: _genUuid(),
-        jogadorId: _vrJogadorId,
+        clubeId: sbClube.id,                              // 🔒 vínculo explícito
+        jogadorId: jogador.id,                            // UUID já validado
         status: 'fechada',
         tipoVenda: 'direta',                              // 🔥 marca como venda à vista
         itens: _vrCarrinho.map(it => ({
@@ -18715,11 +18754,9 @@ async function vrConfirmarVenda() {
         }
     });
 
-    // Registra transação na conta do jogador (entrada de pagamento)
-    // Como é à vista, registramos uma transação que NÃO afeta o saldo do jogador no caixa geral
-    // (já que ele pagou na hora): débito da venda + crédito do pagamento = 0
+    // Registra transações na conta do jogador (vinculadas ao clube via _transacaoToDb)
     registrarTransacao({
-        jogadorId: _vrJogadorId,
+        jogadorId: jogador.id,
         tipo: 'bar_direta',
         valor: -total,
         descricao: `Venda direta no bar (${_vrCarrinho.length} ${_vrCarrinho.length>1?'itens':'item'}) · pago em ${_vrMetodoPagamento}`,
@@ -18727,7 +18764,7 @@ async function vrConfirmarVenda() {
         refId: venda.id,
     });
     registrarTransacao({
-        jogadorId: _vrJogadorId,
+        jogadorId: jogador.id,
         tipo: 'pagamento_direto',
         valor: total,
         descricao: `Pagamento à vista (${_vrMetodoPagamento})`,
@@ -18739,8 +18776,8 @@ async function vrConfirmarVenda() {
     // Auditoria
     if (typeof logAudit === 'function') {
         logAudit('VENDA_DIRETA', `Venda direta de ${jogador.nome} · ${formatMoney(total)} via ${_vrMetodoPagamento}`, {
-            vendaId: venda.id, jogadorId: _vrJogadorId, total, metodo: _vrMetodoPagamento,
-            itens: _vrCarrinho.length,
+            vendaId: venda.id, jogadorId: jogador.id, clubeId: sbClube.id,
+            total, metodo: _vrMetodoPagamento, itens: _vrCarrinho.length,
         });
     }
 
@@ -18754,15 +18791,8 @@ async function vrConfirmarVenda() {
     _vrJogadorId = null;
     _vrMetodoPagamento = null;
 
-    // Limpa picker de jogador
-    const pickerEl = document.getElementById('vr-jogador-picker');
-    if (pickerEl && typeof PlayerSearch !== 'undefined') {
-        pickerEl.innerHTML = '';
-        PlayerSearch.mount(pickerEl, {
-            placeholder: 'Digite nome, apelido ou cidade...',
-            onSelect: (j) => { _vrJogadorId = j ? j.id : null; vrAtualizarBotao(); },
-        });
-    }
+    // Recria o picker de jogador (combobox fresh)
+    _vrMontarPickerJogador();
 
     renderVendaRapidaProdutos();
     renderVendaRapidaCarrinho();
