@@ -1652,7 +1652,7 @@ function montarCarouselPremiacao(d) {
       nivel_atual: t.nivel_atual,
       tv_layout: t.tv_layout,
       tv_show_prize: t.tv_show_prize,
-      pwStatsVis: t.pw_stats_visiveis || null,  // detecta mudanças no modal "Estatísticas da TV"
+      pwStatsVis: t.pw_stats_visiveis || t.pwStatsVisiveis || null,  // detecta mudanças no modal "Estatísticas da TV"
       entriesQtd: (t.entries || []).length,
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
@@ -1922,16 +1922,21 @@ function montarCarouselPremiacao(d) {
     const jackpotFichas = jackpotCompras.reduce((s, j) => s + Number(j.fichas || 0), 0);
     
     // Stats strip — espelha EXATAMENTE a lógica do app
-    // Respeita configuração do operador em "Estatísticas da TV" (pw_stats_visiveis)
-    // Default: tudo visível (se nunca configurado pelo operador)
-    const pwVis = t.pw_stats_visiveis || {};
+    // Respeita configuração do operador em "Estatísticas da TV"
+    // Aceita ambos formatos: snake_case (banco) e camelCase (app local)
+    const pwVis = t.pw_stats_visiveis || t.pwStatsVisiveis || {};
     const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true;
+    
+    // Debug: loga as configurações de stats (só uma vez por torneio)
+    if (window._lastStatsLogId !== t.id) {
+      window._lastStatsLogId = t.id;
+      console.log('[TV PUBLIC] pwStatsVisiveis para torneio', t.nome, ':', pwVis);
+    }
     
     const statsStrip = [];
     if (defVis('buyin')) statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
     if (defVis('reentry') && reentriesQtd) statsStrip.push({ label: 'RE-ENTRY', value: reentriesQtd });
     if (defVis('jackpot') && Number(t.jackpot_valor || 0) > 0) statsStrip.push({ label: 'JACKPOT', value: jackpotsQtd });
-    // REBUY/ADD-ON: mostra se está configurado no torneio OU tem entries cadastradas
     if (defVis('rebuy_simples') && (Number(t.rebuy_valor || 0) > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label: 'REBUY SIMPLES', value: rebuysSimplesQtd });
     if (defVis('rebuy_duplo')   && (Number(t.rebuy_duplo_valor || 0) > 0 || rebuysDuplosQtd > 0)) statsStrip.push({ label: 'REBUY DUPLO', value: rebuysDuplosQtd });
     if (defVis('addon') && Number(t.addon_fichas || 0) > 0) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
