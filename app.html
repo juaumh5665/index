@@ -3186,9 +3186,10 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div id="bar-caixa-banner" style="margin-bottom:1rem;padding:1rem 1.25rem;border-radius:.75rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;"></div>
 
                 <!-- Subtabs Bar -->
-                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;">
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
                     <button class="tab-btn active" id="bartab-btn-produtos"   onclick="switchBarTab('bar-produtos', this)"><i class="fa-solid fa-box-open"></i> Produtos</button>
                     <button class="tab-btn"         id="bartab-btn-comandas"  onclick="switchBarTab('bar-comandas', this)"><i class="fa-solid fa-receipt"></i> Comandas</button>
+                    <button class="tab-btn"         id="bartab-btn-venda-rapida" onclick="switchBarTab('bar-venda-rapida', this)"><i class="fa-solid fa-bolt"></i> Venda Rápida</button>
                     <button class="tab-btn"         id="bartab-btn-historico" onclick="switchBarTab('bar-historico', this)"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
                     <button class="tab-btn"         id="bartab-btn-relatorio" onclick="switchBarTab('bar-relatorio', this)"><i class="fa-solid fa-chart-bar"></i> Relatório</button>
                 </div>
@@ -3294,6 +3295,73 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <i class="fa-solid fa-check"></i> Acerto Total
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBTAB: VENDA RÁPIDA (PDV à vista) -->
+                <div id="bar-venda-rapida" class="bartab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start;">
+
+                        <!-- COLUNA ESQUERDA: Busca + Filtros + Grade de Produtos -->
+                        <div>
+                            <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem;">
+                                <input id="vr-busca" oninput="renderVendaRapidaProdutos()" placeholder="🔍 Buscar produto..." class="inp" style="flex:1;padding:.5rem .75rem;font-size:.85rem;">
+                                <select id="vr-filtro-grupo" onchange="renderVendaRapidaProdutos()" class="inp" style="padding:.5rem .65rem;font-size:.8rem;width:160px;">
+                                    <option value="">Todos os grupos</option>
+                                </select>
+                            </div>
+                            <div id="vr-produtos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.6rem;"></div>
+                        </div>
+
+                        <!-- COLUNA DIREITA: Carrinho + Pagamento -->
+                        <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:1.1rem;position:sticky;top:1rem;">
+                            <!-- Seleção de jogador (obrigatório) -->
+                            <div style="margin-bottom:1rem;">
+                                <label class="inp-label" style="display:flex;align-items:center;gap:.4rem;color:var(--gold);">
+                                    <i class="fa-solid fa-user"></i> Jogador <span style="color:#ef4444;">*</span>
+                                </label>
+                                <div id="vr-jogador-picker"></div>
+                            </div>
+
+                            <!-- Carrinho -->
+                            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center;">
+                                <span><i class="fa-solid fa-cart-shopping"></i> Carrinho <span id="vr-carrinho-count" style="color:#52525b;">(0)</span></span>
+                                <button onclick="vrLimparCarrinho()" id="vr-btn-limpar" style="background:none;border:none;color:#ef4444;font-size:.7rem;cursor:pointer;display:none;">Limpar</button>
+                            </div>
+                            <div id="vr-carrinho-list" style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.75rem;min-height:60px;">
+                                <div style="text-align:center;color:#3f3f46;font-size:.8rem;padding:1.5rem 0;">Clique nos produtos pra adicionar</div>
+                            </div>
+
+                            <!-- Totais -->
+                            <div style="border-top:1px solid #1e1e23;padding-top:.75rem;margin-bottom:.85rem;">
+                                <div style="display:flex;justify-content:space-between;font-size:.75rem;color:#71717a;margin-bottom:.25rem;">
+                                    <span>Itens</span>
+                                    <span id="vr-total-itens">0</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;font-size:1.5rem;font-weight:800;font-family:var(--font-mono);">
+                                    <span>Total</span>
+                                    <span id="vr-total-valor" style="color:#22c55e;">R$ 0,00</span>
+                                </div>
+                            </div>
+
+                            <!-- Método de Pagamento -->
+                            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem;">Pagamento *</div>
+                            <div id="vr-metodos" style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.85rem;">
+                                <button onclick="vrSelecionarMetodo('dinheiro', this)" class="vr-metodo" data-met="dinheiro" style="background:#1a1a1f;border:1px solid #27272a;color:#a1a1aa;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-money-bill-wave"></i> Dinheiro</button>
+                                <button onclick="vrSelecionarMetodo('pix', this)" class="vr-metodo" data-met="pix" style="background:#1a1a1f;border:1px solid #27272a;color:#a1a1aa;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-qrcode"></i> PIX</button>
+                                <button onclick="vrSelecionarMetodo('debito', this)" class="vr-metodo" data-met="debito" style="background:#1a1a1f;border:1px solid #27272a;color:#a1a1aa;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-credit-card"></i> Débito</button>
+                                <button onclick="vrSelecionarMetodo('credito', this)" class="vr-metodo" data-met="credito" style="background:#1a1a1f;border:1px solid #27272a;color:#a1a1aa;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-credit-card"></i> Crédito</button>
+                            </div>
+
+                            <!-- Confirmar -->
+                            <button onclick="vrConfirmarVenda()" id="vr-btn-confirmar" class="btn-gold" style="width:100%;padding:.85rem;font-size:.9rem;font-weight:800;border-radius:.5rem;opacity:.5;cursor:not-allowed;" disabled>
+                                <i class="fa-solid fa-check"></i> Confirmar Venda
+                            </button>
+
+                            <div style="font-size:.65rem;color:#52525b;text-align:center;margin-top:.65rem;line-height:1.5;">
+                                <i class="fa-regular fa-keyboard"></i> Atalhos: <strong style="color:#71717a;">F1</strong>=PIX, <strong style="color:#71717a;">F2</strong>=Dinheiro, <strong style="color:#71717a;">F3</strong>=Débito, <strong style="color:#71717a;">F4</strong>=Crédito, <strong style="color:#71717a;">Enter</strong>=Confirmar
                             </div>
                         </div>
                     </div>
@@ -9343,6 +9411,139 @@ function testarSuite() {
         ]);
         // -100 -100 -25 +150 = -75 → ainda deve R$75
         assertEqual('F20: Cenário real cliente → deve 75', _calcSaldo(txs, 'j-joao'), -75);
+    })();
+
+    // ════════════════════════════════════════════════════════════════
+    // VENDA DIRETA (PDV À VISTA) — bar paga na hora
+    // ════════════════════════════════════════════════════════════════
+
+    // ──────────────────────────────────────────────────────────────
+    // V1: Venda direta zera o saldo do jogador
+    //     (débito da venda + crédito do pagamento = 0)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const total = 24;  // 2 coca + 1 cerveja
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'bar_direta', valor: -total, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: total, origem: 'pagamento', metodo: 'pix' },
+        ]);
+        assertEqual('V1: Venda direta não muda saldo (paga na hora)', _calcSaldo(txs, 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V2: Venda direta soma no faturamento do bar
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const venda = {
+            id: 'v1', status: 'fechada', tipoVenda: 'direta',
+            itens: [
+                { qtd: 2, valor: 6, subtotal: 12 },
+                { qtd: 1, valor: 12, subtotal: 12 },
+            ],
+            total: 24,
+        };
+        assertEqual('V2: Total da venda direta calculado', _calcTotalComanda(venda), 24);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V3: Múltiplas vendas diretas somam corretamente
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const vendas = [
+            { itens: [{ qtd: 1, valor: 6, subtotal: 6 }] },
+            { itens: [{ qtd: 2, valor: 12, subtotal: 24 }] },
+            { itens: [{ qtd: 3, valor: 5, subtotal: 15 }] },
+        ];
+        const totalGeral = vendas.reduce((s, v) => s + _calcTotalComanda(v), 0);
+        assertEqual('V3: 3 vendas diretas somam', totalGeral, 45);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V4: Faturamento bruto = comandas + vendas diretas
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const comandas = [
+            { status: 'fechada', total: 100 },           // comanda normal
+            { status: 'fechada', total: 50, tipoVenda: 'direta' },  // venda direta
+            { status: 'fechada', total: 30, tipoVenda: 'direta' },  // venda direta
+        ];
+        // Filtra só fechadas e soma todas (incluindo as diretas)
+        const totalGeral = comandas
+            .filter(c => c.status === 'fechada')
+            .reduce((s, c) => s + c.total, 0);
+        assertEqual('V4: Faturamento bar = comandas + vendas diretas', totalGeral, 180);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V5: Venda direta NÃO afeta saldo devedor mesmo com várias
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            // Buy-in de torneio (deve)
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            // 2 vendas diretas (pagas na hora — não muda saldo)
+            { jogadorId: 'j1', tipo: 'bar_direta', valor: -15, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: 15, origem: 'pagamento', metodo: 'dinheiro' },
+            { jogadorId: 'j1', tipo: 'bar_direta', valor: -22, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: 22, origem: 'pagamento', metodo: 'pix' },
+        ]);
+        // Continua devendo só os 100 do torneio (vendas diretas se anulam)
+        assertEqual('V5: Vendas diretas não acumulam dívida', _calcSaldo(txs, 'j1'), -100);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V6: Venda direta por método — conta por forma de pagamento
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: 20, origem: 'pagamento', metodo: 'dinheiro' },
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: 30, origem: 'pagamento', metodo: 'pix' },
+            { jogadorId: 'j2', tipo: 'pagamento_direto', valor: 15, origem: 'pagamento', metodo: 'pix' },
+            { jogadorId: 'j2', tipo: 'pagamento_direto', valor: 10, origem: 'pagamento', metodo: 'debito' },
+        ]);
+        const porMetodo = {};
+        txs.forEach(t => {
+            if (t.tipo === 'pagamento_direto') {
+                porMetodo[t.metodo] = (porMetodo[t.metodo] || 0) + t.valor;
+            }
+        });
+        assertEqual('V6: Total em dinheiro', porMetodo.dinheiro, 20);
+        assertEqual('V6: Total em PIX', porMetodo.pix, 45);
+        assertEqual('V6: Total em débito', porMetodo.debito, 10);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V7: Venda direta + comanda do mesmo jogador (cenário misto)
+    //     Comanda continua devendo, venda direta paga na hora
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            // Cliente abriu comanda do bar (R$ 45 ainda em aberto)
+            { jogadorId: 'j1', tipo: 'bar', valor: -45, origem: 'bar', descricao: 'Comanda aberta' },
+            // Mas também comprou uma água à vista
+            { jogadorId: 'j1', tipo: 'bar_direta', valor: -3, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: 3, origem: 'pagamento', metodo: 'dinheiro' },
+        ]);
+        // Saldo: -45 -3 +3 = -45 (só a comanda aberta)
+        assertEqual('V7: Venda direta + comanda — só comanda fica em aberto', _calcSaldo(txs, 'j1'), -45);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // V8: Conservação financeira em venda direta
+    //     Soma de débitos + créditos = 0 (paga na hora, dinheiro só "passa")
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'bar_direta', valor: -50, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'pagamento_direto', valor: 50, origem: 'pagamento' },
+            { jogadorId: 'j2', tipo: 'bar_direta', valor: -30, origem: 'bar' },
+            { jogadorId: 'j2', tipo: 'pagamento_direto', valor: 30, origem: 'pagamento' },
+            { jogadorId: 'j3', tipo: 'bar_direta', valor: -100, origem: 'bar' },
+            { jogadorId: 'j3', tipo: 'pagamento_direto', valor: 100, origem: 'pagamento' },
+        ]);
+        // Soma total deve ser 0 (todas pagas na hora)
+        const movLiq = txs.reduce((s, t) => s + t.valor, 0);
+        assertEqual('V8: Conservação venda direta (líquido = 0)', movLiq, 0);
     })();
 
     return TestRunner.imprimirResultados();
@@ -18217,10 +18418,361 @@ function switchBarTab(tabId, btn) {
     document.querySelectorAll('#page-bar .tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).style.display = 'block';
     btn.classList.add('active');
-    if (tabId === 'bar-produtos')  { renderGrupos(); renderProdutos(); }
-    if (tabId === 'bar-comandas')  { renderComandas(); if(activeComandaId) renderDetalheComanda(); }
-    if (tabId === 'bar-historico') renderHistorico();
-    if (tabId === 'bar-relatorio') { setBarRelPeriodo(_barRelPeriodo.tipo || 'hoje'); }
+    if (tabId === 'bar-produtos')      { renderGrupos(); renderProdutos(); }
+    if (tabId === 'bar-comandas')      { renderComandas(); if(activeComandaId) renderDetalheComanda(); }
+    if (tabId === 'bar-venda-rapida')  { initVendaRapida(); }
+    if (tabId === 'bar-historico')     renderHistorico();
+    if (tabId === 'bar-relatorio')     { setBarRelPeriodo(_barRelPeriodo.tipo || 'hoje'); }
+}
+
+// ============================================================
+// VENDA RÁPIDA (PDV) — bar à vista
+// Cliente paga no ato; cria uma "comanda especial" fechada
+// com tipoVenda='direta' (reaproveita modelo de comandas existente).
+// ============================================================
+let _vrCarrinho = [];          // [{ produtoId, nome, qtd, valor, subtotal }]
+let _vrJogadorId = null;
+let _vrMetodoPagamento = null;
+let _vrKeyHandler = null;      // handler de atalhos (registrado/desregistrado por aba)
+
+function initVendaRapida() {
+    // Reset state
+    _vrCarrinho = [];
+    _vrJogadorId = null;
+    _vrMetodoPagamento = null;
+
+    // Popula filtro de grupos
+    const filGr = document.getElementById('vr-filtro-grupo');
+    if (filGr) {
+        filGr.innerHTML = '<option value="">Todos os grupos</option>' +
+            barGrupos.map(g => `<option value="${g}">${g}</option>`).join('');
+    }
+
+    // Popula picker de jogador usando PlayerSearch (combobox autocomplete já existente)
+    const pickerEl = document.getElementById('vr-jogador-picker');
+    if (pickerEl && typeof PlayerSearch !== 'undefined') {
+        pickerEl.innerHTML = '';
+        PlayerSearch.mount(pickerEl, {
+            placeholder: 'Digite nome, apelido ou cidade...',
+            onSelect: (j) => {
+                _vrJogadorId = j ? j.id : null;
+                vrAtualizarBotao();
+            },
+        });
+    }
+
+    // Limpa inputs visuais
+    const busca = document.getElementById('vr-busca');
+    if (busca) busca.value = '';
+
+    // Renderiza
+    renderVendaRapidaProdutos();
+    renderVendaRapidaCarrinho();
+    vrAtualizarBotao();
+
+    // Registra atalhos de teclado (só nessa aba)
+    _vrKeyHandler = function(e) {
+        // Só ativa se a aba estiver visível e foco não estiver em input/textarea
+        const aba = document.getElementById('bar-venda-rapida');
+        if (!aba || aba.style.display === 'none') return;
+        const tag = (document.activeElement && document.activeElement.tagName || '').toUpperCase();
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            // Permite Enter pra confirmar mesmo dentro de input
+            if (e.key === 'Enter' && _vrCarrinho.length && _vrJogadorId && _vrMetodoPagamento) {
+                e.preventDefault();
+                vrConfirmarVenda();
+            }
+            return;
+        }
+        if (e.key === 'F1') { e.preventDefault(); vrSelecionarMetodo('pix'); }
+        else if (e.key === 'F2') { e.preventDefault(); vrSelecionarMetodo('dinheiro'); }
+        else if (e.key === 'F3') { e.preventDefault(); vrSelecionarMetodo('debito'); }
+        else if (e.key === 'F4') { e.preventDefault(); vrSelecionarMetodo('credito'); }
+        else if (e.key === 'Enter' && _vrCarrinho.length && _vrJogadorId && _vrMetodoPagamento) {
+            e.preventDefault();
+            vrConfirmarVenda();
+        }
+    };
+    document.addEventListener('keydown', _vrKeyHandler);
+}
+
+function renderVendaRapidaProdutos() {
+    const el = document.getElementById('vr-produtos-grid');
+    if (!el) return;
+    const busca = _normSearch((document.getElementById('vr-busca') || {}).value || '');
+    const filGrupo = (document.getElementById('vr-filtro-grupo') || {}).value || '';
+
+    let lista = (barProdutos || []).filter(p => p && p.ativo !== false);
+    if (filGrupo) lista = lista.filter(p => p.grupo === filGrupo);
+    if (busca) lista = lista.filter(p =>
+        _normSearch(p.nome).includes(busca) || _normSearch(p.descricao || '').includes(busca)
+    );
+
+    // Agrupa por grupo pra exibir bem
+    lista.sort((a, b) => (a.grupo || '').localeCompare(b.grupo || '') || (a.nome || '').localeCompare(b.nome || ''));
+
+    if (!lista.length) {
+        el.innerHTML = `<div style="grid-column:1/-1;padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum produto encontrado</div>`;
+        return;
+    }
+
+    el.innerHTML = lista.map(p => {
+        const est = Number(p.estoque) || 0;
+        const estMin = Number(p.estoqueMin) || 0;
+        const semEstoque = estMin > 0 && est === 0;
+        const baixo = estMin > 0 && est > 0 && est <= estMin;
+        const qtdNoCarrinho = (_vrCarrinho.find(it => it.produtoId === p.id) || {}).qtd || 0;
+
+        return `
+        <div onclick="${semEstoque ? '' : `vrAddProduto('${p.id}')`}" style="
+            background:#0f0f12;
+            border:${qtdNoCarrinho>0?'2px solid var(--gold)':'1px solid '+(semEstoque?'rgba(239,68,68,.25)':baixo?'rgba(249,115,22,.3)':'#1e1e23')};
+            border-radius:.55rem;padding:.75rem;text-align:center;
+            cursor:${semEstoque?'not-allowed':'pointer'};
+            opacity:${semEstoque?'.45':'1'};
+            transition:all .12s;position:relative;
+            ${qtdNoCarrinho>0 ? 'background:rgba(212,175,55,.08);' : ''}
+        " onmouseover="if(${!semEstoque})this.style.borderColor='var(--gold)'" onmouseout="if(${qtdNoCarrinho===0 && !semEstoque})this.style.borderColor='#1e1e23'">
+            ${qtdNoCarrinho > 0 ? `<div style="position:absolute;top:.3rem;right:.3rem;background:var(--gold);color:#0a0a0b;font-size:.65rem;font-weight:800;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;">${qtdNoCarrinho}</div>` : ''}
+            ${semEstoque ? '<div style="position:absolute;top:.3rem;left:.3rem;background:rgba(239,68,68,.15);color:#ef4444;font-size:.55rem;font-weight:800;padding:.1rem .35rem;border-radius:.25rem;text-transform:uppercase;letter-spacing:.05em;">Esgotado</div>' : (baixo ? '<div style="position:absolute;top:.3rem;left:.3rem;background:rgba(249,115,22,.15);color:#f97316;font-size:.55rem;font-weight:800;padding:.1rem .35rem;border-radius:.25rem;text-transform:uppercase;letter-spacing:.05em;">Baixo</div>' : '')}
+            <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;">${p.grupo || '—'}</div>
+            <div style="font-weight:700;font-size:.85rem;margin-bottom:.15rem;line-height:1.2;">${p.nome}</div>
+            ${p.descricao ? `<div style="font-size:.65rem;color:#71717a;margin-bottom:.35rem;line-height:1.25;">${p.descricao}</div>` : ''}
+            <div style="font-family:var(--font-mono);font-weight:800;font-size:1.05rem;color:${semEstoque?'#52525b':'#22c55e'};margin-top:.4rem;">${formatMoney(p.valor)}</div>
+            ${estMin > 0 ? `<div style="font-size:.6rem;color:#52525b;margin-top:.2rem;">Estoque: ${est}/${estMin}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function vrAddProduto(produtoId) {
+    const p = barProdutos.find(x => x.id === produtoId);
+    if (!p) return;
+    const est = Number(p.estoque) || 0;
+    const estMin = Number(p.estoqueMin) || 0;
+    if (estMin > 0 && est === 0) return showToast('⚠️ Produto esgotado');
+
+    const existente = _vrCarrinho.find(it => it.produtoId === produtoId);
+    // Limita pela quantidade em estoque (se configurado)
+    const qtdNoCarrinho = existente ? existente.qtd : 0;
+    if (estMin > 0 && qtdNoCarrinho >= est) {
+        return showToast(`⚠️ Só restam ${est} ${p.nome}(s) em estoque`);
+    }
+
+    if (existente) {
+        existente.qtd += 1;
+        existente.subtotal = existente.qtd * existente.valor;
+    } else {
+        _vrCarrinho.push({
+            produtoId: p.id,
+            nome: p.nome,
+            qtd: 1,
+            valor: Number(p.valor) || 0,
+            subtotal: Number(p.valor) || 0,
+        });
+    }
+    renderVendaRapidaProdutos();
+    renderVendaRapidaCarrinho();
+    vrAtualizarBotao();
+}
+
+function vrAlterarQtd(produtoId, delta) {
+    const it = _vrCarrinho.find(x => x.produtoId === produtoId);
+    if (!it) return;
+    const novaQtd = it.qtd + delta;
+    if (novaQtd <= 0) {
+        _vrCarrinho = _vrCarrinho.filter(x => x.produtoId !== produtoId);
+    } else {
+        const p = barProdutos.find(x => x.id === produtoId);
+        if (p) {
+            const est = Number(p.estoque) || 0;
+            const estMin = Number(p.estoqueMin) || 0;
+            if (estMin > 0 && novaQtd > est) {
+                return showToast(`⚠️ Só restam ${est} ${p.nome}(s) em estoque`);
+            }
+        }
+        it.qtd = novaQtd;
+        it.subtotal = it.qtd * it.valor;
+    }
+    renderVendaRapidaProdutos();
+    renderVendaRapidaCarrinho();
+    vrAtualizarBotao();
+}
+
+function vrRemoverItem(produtoId) {
+    _vrCarrinho = _vrCarrinho.filter(x => x.produtoId !== produtoId);
+    renderVendaRapidaProdutos();
+    renderVendaRapidaCarrinho();
+    vrAtualizarBotao();
+}
+
+function vrLimparCarrinho() {
+    if (!_vrCarrinho.length) return;
+    if (!confirm('Limpar carrinho?')) return;
+    _vrCarrinho = [];
+    renderVendaRapidaProdutos();
+    renderVendaRapidaCarrinho();
+    vrAtualizarBotao();
+}
+
+function renderVendaRapidaCarrinho() {
+    const lista = document.getElementById('vr-carrinho-list');
+    const cnt = document.getElementById('vr-carrinho-count');
+    const totalItens = document.getElementById('vr-total-itens');
+    const totalValor = document.getElementById('vr-total-valor');
+    const btnLimpar = document.getElementById('vr-btn-limpar');
+    if (!lista) return;
+
+    const qtdItens = _vrCarrinho.reduce((s, it) => s + it.qtd, 0);
+    const totalGeral = _vrCarrinho.reduce((s, it) => s + it.subtotal, 0);
+
+    if (cnt) cnt.innerText = `(${_vrCarrinho.length})`;
+    if (totalItens) totalItens.innerText = qtdItens;
+    if (totalValor) totalValor.innerText = formatMoney(totalGeral);
+    if (btnLimpar) btnLimpar.style.display = _vrCarrinho.length ? 'inline-block' : 'none';
+
+    if (!_vrCarrinho.length) {
+        lista.innerHTML = `<div style="text-align:center;color:#3f3f46;font-size:.8rem;padding:1.5rem 0;">Clique nos produtos pra adicionar</div>`;
+        return;
+    }
+
+    lista.innerHTML = _vrCarrinho.map(it => `
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:.5rem;align-items:center;padding:.45rem .6rem;background:#16161a;border:1px solid #1e1e23;border-radius:.35rem;font-size:.78rem;">
+            <div>
+                <div style="font-weight:700;">${it.nome}</div>
+                <div style="font-size:.65rem;color:#52525b;">${formatMoney(it.valor)} cada</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.25rem;">
+                <button onclick="vrAlterarQtd('${it.produtoId}', -1)" style="background:none;border:1px solid #27272a;color:#71717a;width:22px;height:22px;border-radius:.25rem;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;">−</button>
+                <span style="font-family:var(--font-mono);font-weight:700;min-width:22px;text-align:center;">${it.qtd}</span>
+                <button onclick="vrAlterarQtd('${it.produtoId}', 1)" style="background:none;border:1px solid #27272a;color:#71717a;width:22px;height:22px;border-radius:.25rem;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;">+</button>
+            </div>
+            <div style="font-family:var(--font-mono);font-weight:700;color:#22c55e;min-width:64px;text-align:right;">${formatMoney(it.subtotal)}</div>
+        </div>
+    `).join('');
+}
+
+function vrSelecionarMetodo(metodo, btn) {
+    _vrMetodoPagamento = metodo;
+    // Atualiza visual de todos botões
+    document.querySelectorAll('#vr-metodos .vr-metodo').forEach(b => {
+        const ativo = b.getAttribute('data-met') === metodo;
+        b.style.background     = ativo ? 'rgba(212,175,55,.15)' : '#1a1a1f';
+        b.style.borderColor    = ativo ? 'var(--gold)'          : '#27272a';
+        b.style.color          = ativo ? 'var(--gold)'          : '#a1a1aa';
+    });
+    vrAtualizarBotao();
+}
+
+function vrAtualizarBotao() {
+    const btn = document.getElementById('vr-btn-confirmar');
+    if (!btn) return;
+    const ok = _vrCarrinho.length > 0 && _vrJogadorId && _vrMetodoPagamento;
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '1' : '.5';
+    btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+}
+
+async function vrConfirmarVenda() {
+    if (!_vrCarrinho.length)       return showToast('⚠️ Carrinho vazio');
+    if (!_vrJogadorId)             return showToast('⚠️ Selecione o jogador');
+    if (!_vrMetodoPagamento)       return showToast('⚠️ Selecione o método de pagamento');
+
+    const total = _vrCarrinho.reduce((s, it) => s + it.subtotal, 0);
+    if (total <= 0) return showToast('⚠️ Total inválido');
+
+    const jogador = jogadores.find(j => j.id === _vrJogadorId);
+    if (!jogador) return showToast('⚠️ Jogador não encontrado');
+
+    // Cria a "comanda" da venda direta (fechada na hora)
+    const agora = Date.now();
+    const venda = {
+        id: _genUuid(),
+        jogadorId: _vrJogadorId,
+        status: 'fechada',
+        tipoVenda: 'direta',                              // 🔥 marca como venda à vista
+        itens: _vrCarrinho.map(it => ({
+            id: _genUuid(),
+            produtoId: it.produtoId,
+            nome: it.nome,
+            qtd: it.qtd,
+            valor: it.valor,
+            subtotal: it.subtotal,
+        })),
+        abertoEm: agora,
+        fechadoEm: agora,
+        pagamento: _vrMetodoPagamento,
+        total,
+        operador: currentUser ? currentUser.nome : '-',
+        fechadaPeloCaixa: false,
+    };
+    barComandas.push(venda);
+
+    // Baixa o estoque
+    _vrCarrinho.forEach(it => {
+        const p = barProdutos.find(x => x.id === it.produtoId);
+        if (p && Number(p.estoque) > 0) {
+            p.estoque = Math.max(0, Number(p.estoque) - it.qtd);
+        }
+    });
+
+    // Registra transação na conta do jogador (entrada de pagamento)
+    // Como é à vista, registramos uma transação que NÃO afeta o saldo do jogador no caixa geral
+    // (já que ele pagou na hora): débito da venda + crédito do pagamento = 0
+    registrarTransacao({
+        jogadorId: _vrJogadorId,
+        tipo: 'bar_direta',
+        valor: -total,
+        descricao: `Venda direta no bar (${_vrCarrinho.length} ${_vrCarrinho.length>1?'itens':'item'}) · pago em ${_vrMetodoPagamento}`,
+        origem: 'bar',
+        refId: venda.id,
+    });
+    registrarTransacao({
+        jogadorId: _vrJogadorId,
+        tipo: 'pagamento_direto',
+        valor: total,
+        descricao: `Pagamento à vista (${_vrMetodoPagamento})`,
+        origem: 'pagamento',
+        refId: venda.id,
+        metodo: _vrMetodoPagamento,
+    });
+
+    // Auditoria
+    if (typeof logAudit === 'function') {
+        logAudit('VENDA_DIRETA', `Venda direta de ${jogador.nome} · ${formatMoney(total)} via ${_vrMetodoPagamento}`, {
+            vendaId: venda.id, jogadorId: _vrJogadorId, total, metodo: _vrMetodoPagamento,
+            itens: _vrCarrinho.length,
+        });
+    }
+
+    saveData();
+
+    // Toast com botão de desfazer (5s)
+    showToast(`✅ Venda ${formatMoney(total)} registrada para ${jogador.nome} via ${_vrMetodoPagamento.toUpperCase()}`);
+
+    // Reset rápido — mantém jogador? não, limpa tudo pra próximo cliente
+    _vrCarrinho = [];
+    _vrJogadorId = null;
+    _vrMetodoPagamento = null;
+
+    // Limpa picker de jogador
+    const pickerEl = document.getElementById('vr-jogador-picker');
+    if (pickerEl && typeof PlayerSearch !== 'undefined') {
+        pickerEl.innerHTML = '';
+        PlayerSearch.mount(pickerEl, {
+            placeholder: 'Digite nome, apelido ou cidade...',
+            onSelect: (j) => { _vrJogadorId = j ? j.id : null; vrAtualizarBotao(); },
+        });
+    }
+
+    renderVendaRapidaProdutos();
+    renderVendaRapidaCarrinho();
+    vrAtualizarBotao();
+
+    // Atualiza outras telas que dependem disso
+    if (typeof atualizarBadgeEstoqueBaixo === 'function') atualizarBadgeEstoqueBaixo();
+    if (typeof renderProdutos === 'function')              renderProdutos();
+    if (typeof renderHistorico === 'function')             renderHistorico();
+    if (typeof renderDashboard === 'function')             renderDashboard();
 }
 
 // Bar modal pre-fill hooks - called from openModal
