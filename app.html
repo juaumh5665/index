@@ -16347,8 +16347,8 @@ function updateTV(idx) {
     if (defVis('buyin'))     statsStrip.push({ label:'BUY IN',   value:buyinsQtd });
     if (defVis('reentry') && reentriesQtd) statsStrip.push({ label:'RE-ENTRY', value:reentriesQtd });
     if (defVis('jackpot') && (t.jackpotValor > 0)) statsStrip.push({ label:'JACKPOT', value:jackpotsQtd });
-    if (defVis('rebuy_simples') && t.rebuySimples > 0) statsStrip.push({ label:'REBUY SIMPLES',  value:rebuysSimplesQtd });
-    if (defVis('rebuy_duplo')   && t.rebuyDuplo   > 0) statsStrip.push({ label:'REBUY DUPLO',    value:rebuysDuplosQtd });
+    if (defVis('rebuy_simples') && (t.rebuySimples > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label:'REBUY SIMPLES',  value:rebuysSimplesQtd });
+    if (defVis('rebuy_duplo')   && (t.rebuyDuplo   > 0 || rebuysDuplosQtd  > 0)) statsStrip.push({ label:'REBUY DUPLO',    value:rebuysDuplosQtd });
     if (defVis('addon') && (t.addonFichas > 0))        statsStrip.push({ label:'ADD-ON', value:addonsQtd });
 
     const prox = t.blinds[t.nivelAtual + 1];
@@ -16831,13 +16831,21 @@ function abrirConfigStatsTV() {
     if (!t) return;
     if (!t.pwStatsVisiveis) t.pwStatsVisiveis = { buyin:true, reentry:true, jackpot:true, rebuy_simples:true, rebuy_duplo:true, addon:true };
 
+    // Conta entries do torneio (pra detectar uso real mesmo sem config preenchida)
+    const ent = t.entries || [];
+    const qtdRebuySimples = ent.filter(e => e.tipo === 'rebuy_simples').length;
+    const qtdRebuyDuplo   = ent.filter(e => e.tipo === 'rebuy_duplo').length;
+    const qtdAddon        = ent.filter(e => e.tipo === 'addon').length;
+    const qtdReentry      = ent.filter(e => e.tipo === 'reentry').length;
+    const qtdJackpot      = (t.jackpotCompras || []).length;
+
     const stats = [
         { key:'buyin',          label:'Buy-in',                         icon:'fa-ticket' },
         { key:'reentry',        label:'Re-entries',                     icon:'fa-rotate-left' },
-        { key:'jackpot',        label:'Jackpot',                        icon:'fa-gem',  cond: () => t.jackpotValor > 0 },
-        { key:'rebuy_simples',  label:'Rebuy Simples', icon:'fa-coins', cond: () => t.rebuySimples > 0 },
-        { key:'rebuy_duplo',    label:'Rebuy Duplo',   icon:'fa-coins', cond: () => t.rebuyDuplo > 0 },
-        { key:'addon',          label:'Add-on',                         icon:'fa-plus',  cond: () => t.addonFichas > 0 },
+        { key:'jackpot',        label:'Jackpot',                        icon:'fa-gem',  cond: () => t.jackpotValor > 0 || qtdJackpot > 0 },
+        { key:'rebuy_simples',  label:'Rebuy Simples', icon:'fa-coins', cond: () => t.rebuySimples > 0 || qtdRebuySimples > 0 },
+        { key:'rebuy_duplo',    label:'Rebuy Duplo',   icon:'fa-coins', cond: () => t.rebuyDuplo > 0 || qtdRebuyDuplo > 0 },
+        { key:'addon',          label:'Add-on',                         icon:'fa-plus',  cond: () => t.addonFichas > 0 || qtdAddon > 0 },
     ];
 
     const lista = document.getElementById('stats-tv-list');
