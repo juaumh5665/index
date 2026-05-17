@@ -9048,6 +9048,303 @@ function testarSuite() {
         assertEqual('C18: Total entrada = Prize + Rake + Staff', prize + rake + staff, totalEntrada);
     })();
 
+    // ════════════════════════════════════════════════════════════════
+    // FINANCEIRO — PAGAMENTOS, COMANDAS E SALDOS
+    // ════════════════════════════════════════════════════════════════
+
+    // Helpers pra testes financeiros (não tocam em dados reais)
+    function _mkTransacoes(transList) {
+        return transList.map((dados, i) => ({
+            id: 'tx-' + i,
+            ts: Date.now() - (transList.length - i) * 1000,
+            fechamentoId: null,
+            ...dados,
+        }));
+    }
+    function _calcSaldo(transacoes, jogadorId) {
+        return transacoes
+            .filter(t => t.jogadorId === jogadorId)
+            .reduce((s, t) => s + t.valor, 0);
+    }
+    function _calcSaldoCaixaGeral(transacoes, jogadorId) {
+        return transacoes
+            .filter(t => t.jogadorId === jogadorId && t.origem !== 'cash')
+            .reduce((s, t) => s + t.valor, 0);
+    }
+    function _mkComanda(itens) {
+        return { id: 'c-1', status: 'aberta', itens };
+    }
+    function _calcTotalComanda(c) {
+        if (!c || !c.itens) return 0;
+        return c.itens.reduce((s, it) => {
+            if (it.subtotal != null && !isNaN(it.subtotal)) return s + Number(it.subtotal);
+            const qtd = Number(it.qtd || 0);
+            const valor = Number(it.valor || 0);
+            return s + (qtd * valor);
+        }, 0);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // F1: Saldo inicial vazio = 0
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        assertEqual('F1: Saldo sem transações', _calcSaldo([], 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F2: Buy-in de torneio gera saldo devedor
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio', descricao: 'Buy-in TORNEIO X' },
+        ]);
+        assertEqual('F2: Buy-in R$100 → saldo -100', _calcSaldo(txs, 'j1'), -100);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F3: Pagamento à vista zera saldo devedor
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 100, origem: 'pagamento', metodo: 'pix' },
+        ]);
+        assertEqual('F3: Buy-in + Pagamento integral → 0', _calcSaldo(txs, 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F4: Pagamento parcial deixa saldo devedor restante
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 60, origem: 'pagamento', metodo: 'dinheiro' },
+        ]);
+        // Devia ainda 40
+        assertEqual('F4: Buy-in 100 + Pago 60 → saldo -40', _calcSaldo(txs, 'j1'), -40);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F5: Múltiplos buy-ins acumulam dívida
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'rebuy_simples', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'rebuy_duplo', valor: -200, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'addon', valor: -50, origem: 'torneio' },
+        ]);
+        // Total devedor: 450
+        assertEqual('F5: Múltiplas entradas acumulam', _calcSaldo(txs, 'j1'), -450);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F6: Pagamento com troco (jogador pagou mais que devia)
+    //     Sobra como crédito
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 150, origem: 'pagamento' },
+        ]);
+        // Pagou 150 pra dívida de 100 → fica com +50 de crédito
+        assertEqual('F6: Pago mais que devia → crédito +50', _calcSaldo(txs, 'j1'), 50);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F7: Premiação aumenta saldo do jogador
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'premiacao', valor: 500, origem: 'torneio', descricao: '1º lugar' },
+        ]);
+        // Devia 100, ganhou 500 → saldo +400
+        assertEqual('F7: Buy-in + Premiação → saldo +400', _calcSaldo(txs, 'j1'), 400);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F8: Cash game NÃO entra no caixa geral
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'buyin_cash', valor: -500, origem: 'cash' },  // CASH
+            { jogadorId: 'j1', tipo: 'saida_cash', valor: 700, origem: 'cash' },   // CASH
+        ]);
+        // Saldo total: -100 - 500 + 700 = 100
+        assertEqual('F8a: Saldo TOTAL inclui cash', _calcSaldo(txs, 'j1'), 100);
+        // Saldo caixa geral: só -100 (ignora cash)
+        assertEqual('F8b: Saldo CAIXA GERAL ignora cash', _calcSaldoCaixaGeral(txs, 'j1'), -100);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F9: Comanda do bar — total simples
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const c = _mkComanda([
+            { qtd: 2, valor: 8, subtotal: 16 },   // 2 cervejas R$ 8
+            { qtd: 1, valor: 15, subtotal: 15 },  // 1 hamburguer
+            { qtd: 3, valor: 5, subtotal: 15 },   // 3 refris
+        ]);
+        assertEqual('F9: Comanda 3 itens → R$ 46', _calcTotalComanda(c), 46);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F10: Comanda sem subtotal (calcula qtd × valor)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const c = _mkComanda([
+            { qtd: 4, valor: 7.50 },  // sem subtotal
+            { qtd: 2, valor: 12 },
+        ]);
+        // 4×7.50 + 2×12 = 30 + 24 = 54
+        assertEqual('F10: Comanda sem subtotal', _calcTotalComanda(c), 54);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F11: Comanda vazia = 0
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        assertEqual('F11: Comanda vazia', _calcTotalComanda({ itens: [] }), 0);
+        assertEqual('F11: Comanda null', _calcTotalComanda(null), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F12: Cenário REAL completo — jogador que joga torneio + bar
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio', descricao: 'Buy-in' },
+            { jogadorId: 'j1', tipo: 'rebuy_simples', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'bar', valor: -45, origem: 'bar', descricao: 'Comanda bar' },
+            { jogadorId: 'j1', tipo: 'premiacao', valor: 300, origem: 'torneio', descricao: '3º lugar' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 55, origem: 'pagamento' },
+        ]);
+        // Saldo: -100 -100 -45 +300 +55 = +110 (saldo positivo, jogador tem crédito)
+        assertEqual('F12: Cenário real → crédito +110', _calcSaldo(txs, 'j1'), 110);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F13: Split de pagamento — pix + dinheiro somam corretamente
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -200, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 120, origem: 'pagamento', metodo: 'pix' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 80,  origem: 'pagamento', metodo: 'dinheiro' },
+        ]);
+        // 120 + 80 = 200 → zera dívida
+        assertEqual('F13: Split de pagamento (pix+dinheiro) = 0', _calcSaldo(txs, 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F14: Estorno de buy-in (devolve o valor)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'estorno', valor: 100, origem: 'torneio', descricao: 'Estorno buy-in' },
+        ]);
+        // Buy-in -100, estorno +100 → saldo 0
+        assertEqual('F14: Buy-in + Estorno → 0', _calcSaldo(txs, 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F15: Vários jogadores não se misturam
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j2', tipo: 'buyin', valor: -200, origem: 'torneio' },
+            { jogadorId: 'j3', tipo: 'buyin', valor: -50,  origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 100, origem: 'pagamento' },
+        ]);
+        assertEqual('F15: J1 saldo (pago)', _calcSaldo(txs, 'j1'), 0);
+        assertEqual('F15: J2 saldo (não pago)', _calcSaldo(txs, 'j2'), -200);
+        assertEqual('F15: J3 saldo (não pago)', _calcSaldo(txs, 'j3'), -50);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F16: Depósito antecipado (cliente bota crédito antes de jogar)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'deposito', valor: 500, origem: 'deposito', descricao: 'Depósito antecipado' },
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'bar', valor: -45, origem: 'bar' },
+        ]);
+        // 500 - 100 - 45 = 355 (ainda tem crédito)
+        assertEqual('F16: Depósito + gastos → crédito 355', _calcSaldo(txs, 'j1'), 355);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F17: Soma de TODAS as transações de TODOS jogadores deve fechar
+    //      com a "movimentação líquida" do caixa
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            // Jogador 1: deve 100, paga 100 (zerou)
+            { jogadorId: 'j1', tipo: 'buyin', valor: -100, origem: 'torneio' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 100, origem: 'pagamento' },
+            // Jogador 2: deve 200, paga 150 (ainda deve 50)
+            { jogadorId: 'j2', tipo: 'buyin', valor: -200, origem: 'torneio' },
+            { jogadorId: 'j2', tipo: 'pagamento', valor: 150, origem: 'pagamento' },
+            // Jogador 3: depositou 300, gastou 50 (tem 250 crédito)
+            { jogadorId: 'j3', tipo: 'deposito', valor: 300, origem: 'deposito' },
+            { jogadorId: 'j3', tipo: 'bar', valor: -50, origem: 'bar' },
+        ]);
+        // Soma de saldos: 0 + (-50) + 250 = 200
+        const totalSaldos = ['j1','j2','j3'].reduce((s, id) => s + _calcSaldo(txs, id), 0);
+        // Movimentação líquida = soma de todos os valores
+        const movLiquida = txs.reduce((s, t) => s + t.valor, 0);
+        // Eles têm que bater (conservação financeira)
+        assertEqual('F17: Soma saldos = Movimentação líquida', totalSaldos, movLiquida);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F18: Pagamento de premiação ao jogador (saída do caixa do clube)
+    //      Saldo positivo do jogador → operador paga o valor
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'premiacao', valor: 500, origem: 'torneio', descricao: '1º lugar' },
+            { jogadorId: 'j1', tipo: 'pagamento_positivo', valor: -500, origem: 'pagamento', descricao: 'Pago em dinheiro' },
+        ]);
+        // Ganhou 500, recebeu 500 → saldo zerado
+        assertEqual('F18: Premiação + Pagamento ao jogador → 0', _calcSaldo(txs, 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F19: Centavos — verificação de precisão em valores quebrados
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const txs = _mkTransacoes([
+            { jogadorId: 'j1', tipo: 'bar', valor: -12.50, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'bar', valor: -8.75, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'bar', valor: -3.20, origem: 'bar' },
+            { jogadorId: 'j1', tipo: 'pagamento', valor: 24.45, origem: 'pagamento' },
+        ]);
+        // -12.50 -8.75 -3.20 = -24.45 → +24.45 = 0
+        assertEqual('F19: Centavos precisão (deve ser ~0)', _calcSaldo(txs, 'j1'), 0);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // F20: Cenário cliente real: jogador deve do dia + comanda aberta
+    //      simulando o fluxo de fechamento do dia
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        // Jogador "João" — dia movimentado
+        const txs = _mkTransacoes([
+            { jogadorId: 'j-joao', tipo: 'buyin', valor: -100, origem: 'torneio', descricao: 'Buy-in Torneio Tudo no Pano' },
+            { jogadorId: 'j-joao', tipo: 'rebuy_simples', valor: -100, origem: 'torneio', descricao: 'Rebuy' },
+            { jogadorId: 'j-joao', tipo: 'bar', valor: -25, origem: 'bar', descricao: 'Comanda bar (fechamento dia)' },
+            { jogadorId: 'j-joao', tipo: 'pagamento', valor: 150, origem: 'pagamento', metodo: 'pix', descricao: 'Pago parcial' },
+        ]);
+        // -100 -100 -25 +150 = -75 → ainda deve R$75
+        assertEqual('F20: Cenário real cliente → deve 75', _calcSaldo(txs, 'j-joao'), -75);
+    })();
+
     return TestRunner.imprimirResultados();
 }
 
