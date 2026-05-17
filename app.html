@@ -7317,6 +7317,7 @@ function _rankingToDb(r) {
         clube_id: sbClube ? sbClube.id : null,
         nome: r.nome || 'Ranking',
         descricao: r.descricao || null,
+        slug: r.slug || null,
         data_inicio: r.inicio || null,
         data_fim:    r.fim || null,
         formula:     r.formula || null,
@@ -7328,9 +7329,10 @@ function _rankingToDb(r) {
 
 function _rankingFromDb(row) {
     return {
-        id: row.id,                              // UUID
+        id: row.id,
         nome: row.nome,
         descricao: row.descricao || '',
+        slug: row.slug || null,
         inicio: row.data_inicio || '',
         fim:    row.data_fim || '',
         formula: row.formula || '',
@@ -21266,6 +21268,97 @@ function popularSelectRankings() {
     }
 }
 
+// ============================================================
+// COMPARTILHAR RANKING — gera slug + link público compartilhável
+// ============================================================
+function _slugify(s) {
+    return String(s || 'ranking')
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // remove acentos
+        .replace(/[^a-z0-9]+/g, '-')                          // troca não-alfanum por hífen
+        .replace(/^-+|-+$/g, '')                              // remove hífens das pontas
+        .substring(0, 50);                                    // limita a 50 chars
+}
+
+async function compartilharRanking(rankId) {
+    const r = rankings.find(x => String(x.id) === String(rankId));
+    if (!r) return showToast('⚠️ Ranking não encontrado');
+
+    // Se já tem slug, só copia o link
+    if (r.slug) {
+        return _copiarLinkRanking(r.slug, r.nome);
+    }
+
+    // Gera slug a partir do nome
+    let slugBase = _slugify(r.nome);
+    if (!slugBase) slugBase = 'ranking-' + Date.now();
+
+    // Verifica disponibilidade no Supabase e adiciona sufixo se preciso
+    let slugFinal = slugBase;
+    let tentativa = 0;
+    while (tentativa < 10) {
+        try {
+            const { data, error } = await sb.from('rankings').select('id').eq('slug', slugFinal).maybeSingle();
+            if (error) {
+                console.warn('[RANKING] check slug:', error);
+                break;
+            }
+            if (!data) break;  // slug disponível
+            // Já existe: gera variação
+            tentativa++;
+            const sufixo = Math.floor(Math.random() * 9000) + 1000;
+            slugFinal = slugBase + '-' + sufixo;
+        } catch(e) {
+            console.warn('[RANKING] verificação falhou:', e);
+            break;
+        }
+    }
+
+    // Salva slug no ranking (local + Supabase)
+    r.slug = slugFinal;
+    try { localStorage.setItem('ps_rankings', JSON.stringify(rankings)); } catch(_){}
+
+    if (sbClube && typeof sb !== 'undefined') {
+        try {
+            const { error } = await sb.from('rankings').update({ slug: slugFinal }).eq('id', r.id);
+            if (error) {
+                console.warn('[RANKING] atualizar slug falhou:', error.message);
+                showToast('⚠️ Erro ao gerar link: ' + error.message);
+                return;
+            }
+        } catch(e) {
+            console.warn('[RANKING] atualizar slug erro:', e);
+            return showToast('❌ Erro ao gerar link público');
+        }
+    }
+
+    _copiarLinkRanking(slugFinal, r.nome);
+}
+
+function _copiarLinkRanking(slug, nomeRanking) {
+    const url = window.location.origin + '/r/' + slug;
+    // Tenta copiar pra clipboard
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('🔗 Link copiado! ' + url);
+            _abrirModalCompartilhar(url, nomeRanking);
+        }).catch(() => {
+            _abrirModalCompartilhar(url, nomeRanking);
+        });
+    } else {
+        _abrirModalCompartilhar(url, nomeRanking);
+    }
+}
+
+function _abrirModalCompartilhar(url, nomeRanking) {
+    // Pergunta se quer abrir WhatsApp
+    const msg = `🏆 *${nomeRanking}*\n\nConfira a classificação atualizada do ranking:\n${url}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    if (confirm(`Link público gerado!\n\n${url}\n\n(já copiado para a área de transferência)\n\nAbrir WhatsApp para compartilhar?`)) {
+        window.open(whatsappUrl, '_blank');
+    }
+}
+
 async function salvarRanking() {
     const nome = document.getElementById('rk-nome').value.trim();
     if (!nome) return showToast('⚠️ Nome obrigatório');
@@ -21380,8 +21473,9 @@ function renderRankingsList() {
                     ${r.inicio ? `<div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">📅 ${r.inicio} → ${r.fim||'—'}</div>` : ''}
                 </div>
                 <div style="display:flex;gap:.4rem;">
-                    <button onclick="editarRanking(${r.id})" class="btn-ghost" style="padding:.35rem .65rem;font-size:.75rem;"><i class="fa-solid fa-pen"></i></button>
-                    <button onclick="removerRanking(${r.id})" class="btn-danger" style="padding:.35rem .65rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="compartilharRanking('${r.id}')" title="Gerar link público" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:.4rem;padding:.35rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" onmouseover="this.style.background='rgba(34,197,94,.2)'" onmouseout="this.style.background='rgba(34,197,94,.12)'"><i class="fa-solid fa-share-nodes"></i> Compartilhar</button>
+                    <button onclick="editarRanking('${r.id}')" class="btn-ghost" style="padding:.35rem .65rem;font-size:.75rem;"><i class="fa-solid fa-pen"></i></button>
+                    <button onclick="removerRanking('${r.id}')" class="btn-danger" style="padding:.35rem .65rem;font-size:.75rem;"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem;">
@@ -21412,7 +21506,7 @@ function renderRankingsList() {
                     </div>`;
                 }).join('')}
             </div>` : '<div style="color:#3f3f46;font-size:.8rem;padding:.5rem 0;">Sem participantes ainda</div>'}
-            ${pontuacoes.length > 3 ? `<button onclick="abrirRankingCompleto(${r.id})" class="btn-ghost" style="width:100%;font-size:.75rem;padding:.4rem;">Ver ranking completo (${pontuacoes.length} jogadores)</button>` : ''}
+            ${pontuacoes.length > 3 ? `<button onclick="abrirRankingCompleto('${r.id}')" class="btn-ghost" style="width:100%;font-size:.75rem;padding:.4rem;">Ver ranking completo (${pontuacoes.length} jogadores)</button>` : ''}
         </div>`;
     }).join('');
 }
@@ -21476,7 +21570,7 @@ function calcularPontosParaPosicao(r, pos, total, buyin) {
 }
 
 function abrirRankingCompleto(rankId) {
-    const r = rankings.find(x => x.id === rankId);
+    const r = rankings.find(x => String(x.id) === String(rankId));
     if (!r) return;
     const pontuacoes = calcularPontuacoesRanking(r);
     const torneiosVinc = torneios.filter(t => t.rankingId == r.id);

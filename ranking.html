@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ranking · StackOS</title>
+<meta name="description" content="Confira a classificação atualizada do ranking do clube">
+
+<!-- Open Graph (preview no WhatsApp) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ranking do Clube">
+<meta property="og:description" content="Veja a classificação atualizada do ranking">
+<meta property="og:site_name" content="StackOS">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 0;
+    background: #0a0a0b;
+    color: #e4e4e7;
+    font-family: 'Manrope', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+.container {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 0 0 80px;
+}
+.header {
+    background: linear-gradient(160deg, rgba(19,55,32,.4) 0%, rgba(10,10,11,.95) 70%);
+    padding: 32px 20px 28px;
+    text-align: center;
+    border-bottom: 1px solid rgba(212,175,55,.12);
+}
+.clube-logo {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba(212,175,55,.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+    color: #d4af37;
+    font-size: 30px;
+    overflow: hidden;
+    border: 2px solid rgba(212,175,55,.3);
+}
+.clube-logo img { width: 100%; height: 100%; object-fit: cover; }
+.clube-nome {
+    font-size: 12px;
+    color: #d4af37;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.ranking-titulo {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    line-height: 1.15;
+    color: #fff;
+}
+.ranking-info {
+    font-size: 12px;
+    color: #71717a;
+    margin: 4px 0 0;
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: #1e1e23;
+    border-bottom: 1px solid #1e1e23;
+}
+.kpi {
+    background: #0a0a0b;
+    padding: 16px 12px;
+    text-align: center;
+}
+.kpi-label {
+    font-size: 10px;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+.kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+}
+.kpi-gold .kpi-value { color: #d4af37; }
+.kpi-sub {
+    font-size: 10px;
+    color: #52525b;
+    margin-top: 2px;
+}
+
+.section-title {
+    font-size: 11px;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    padding: 18px 20px 8px;
+}
+
+.podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 20px 12px;
+}
+.podium-card {
+    flex: 1;
+    text-align: center;
+    background: #111113;
+    padding: 14px 6px;
+    border-radius: 10px;
+    border: 1px solid #1e1e23;
+}
+.podium-card.first {
+    flex: 1.2;
+    background: rgba(212,175,55,.08);
+    border: 1px solid rgba(212,175,55,.4);
+    padding: 18px 6px;
+}
+.podium-medal { font-size: 24px; line-height: 1; }
+.podium-card.first .podium-medal { font-size: 30px; }
+.podium-nome {
+    font-size: 12px;
+    color: #fff;
+    margin: 6px 0 2px;
+    font-weight: 700;
+    line-height: 1.25;
+    word-break: break-word;
+}
+.podium-card.first .podium-nome { color: #d4af37; font-size: 13px; }
+.podium-pontos {
+    font-size: 11px;
+    color: #71717a;
+    font-weight: 700;
+}
+.podium-card.first .podium-pontos { color: #d4af37; }
+
+.lista {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.lista-row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #0f0f12;
+    border: 1px solid #1e1e23;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.lista-pos {
+    color: #71717a;
+    font-weight: 800;
+    font-size: 13px;
+}
+.lista-nome {
+    color: #fff;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lista-pts {
+    color: #22c55e;
+    font-family: 'Courier New', monospace;
+    font-weight: 800;
+}
+
+.empty {
+    padding: 60px 20px;
+    text-align: center;
+    color: #52525b;
+}
+.empty i { font-size: 40px; margin-bottom: 12px; color: #27272a; }
+
+.loading {
+    padding: 100px 20px;
+    text-align: center;
+    color: #71717a;
+}
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #1e1e23;
+    border-top-color: #d4af37;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.atualizado {
+    text-align: center;
+    padding: 12px 20px 0;
+    font-size: 10px;
+    color: #52525b;
+}
+
+.footer {
+    margin-top: 40px;
+    padding: 24px 20px;
+    text-align: center;
+    border-top: 1px solid #1e1e23;
+}
+.footer-brand {
+    font-size: 11px;
+    color: #52525b;
+    margin-bottom: 4px;
+}
+.footer-stackos {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    color: #d4af37;
+    text-decoration: none;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.footer-stackos:hover { color: #f4c542; }
+.footer-tag {
+    font-size: 10px;
+    color: #52525b;
+    margin-top: 6px;
+}
+
+.err {
+    padding: 80px 20px;
+    text-align: center;
+    color: #ef4444;
+}
+.err h2 { color: #fff; margin: 0 0 10px; }
+.err p { color: #71717a; font-size: 14px; margin: 0; }
+</style>
+</head>
+<body>
+<div class="container" id="root">
+    <div class="loading">
+        <div class="spinner"></div>
+        <div>Carregando ranking...</div>
+    </div>
+</div>
+
+<script>
+// === CONFIG SUPABASE (chave pública anon — sem dados sensíveis) ===
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dmdka2pvaGZvbXVhZnNhZnN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcxNjE5MjMsImV4cCI6MjA2MjczNzkyM30.IUBpRzlSf99fwVK20fk2gKn5RkAIYwgmDPfWuPXFLcA';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// === Pega slug da URL (formato ?r=slug ou /r/slug) ===
+function getSlugFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get('r') || params.get('ranking');
+    if (slug) return slug.toLowerCase().trim();
+    // fallback: tenta extrair de path /r/slug
+    const m = window.location.pathname.match(/\/r\/([a-z0-9-]+)/i);
+    return m ? m[1].toLowerCase() : null;
+}
+
+function formatMoney(v) {
+    return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+function renderErro(titulo, msg) {
+    document.getElementById('root').innerHTML = `
+        <div class="err">
+            <i class="fa-solid fa-circle-exclamation" style="font-size:48px;color:#ef4444;margin-bottom:16px;display:block;"></i>
+            <h2>${escapeHtml(titulo)}</h2>
+            <p>${escapeHtml(msg)}</p>
+            <div style="margin-top:24px;">
+                <a href="https://stackos.com.br" style="color:#d4af37;text-decoration:none;font-weight:700;font-size:14px;">← Voltar para StackOS</a>
+            </div>
+        </div>
+    `;
+}
+
+// === Calcular pontos baseado na fórmula do ranking ===
+// Fórmulas: 'fixed' (posicao -> custom_pontos[posicao-1])
+//           'entrants_minus_pos' (entrantes - posicao + 1)
+//           'sqrt_entrants_div_pos' (sqrt(entrantes) / posicao * 10)
+//           'log_entrants' (log(entrantes) * 50 / posicao)
+function calcularPontos(formula, posicao, entrantes, customPontos) {
+    if (!posicao || posicao < 1) return 0;
+    if (formula === 'fixed' || !formula) {
+        if (Array.isArray(customPontos) && customPontos.length > 0) {
+            return customPontos[posicao - 1] || 0;
+        }
+        // Fallback padrão: 100, 80, 60, 50, 40, 30, 25, 20, 15, 10
+        const padrao = [100, 80, 60, 50, 40, 30, 25, 20, 15, 10];
+        return padrao[posicao - 1] || 0;
+    }
+    if (formula === 'entrants_minus_pos') {
+        return Math.max(0, (entrantes || 0) - posicao + 1);
+    }
+    if (formula === 'sqrt_entrants_div_pos') {
+        return Math.round(Math.sqrt(entrantes || 0) / posicao * 10);
+    }
+    if (formula === 'log_entrants') {
+        return Math.round(Math.log((entrantes || 1) + 1) * 50 / posicao);
+    }
+    return 0;
+}
+
+// === Calcular ranking real a partir dos torneios vinculados ===
+async function calcularRanking(rankingId, clubeId, formula, customPontos) {
+    // Busca torneios vinculados ao ranking
+    const { data: torneios, error: errTorneios } = await sb
+        .from('torneios')
+        .select('id, nome, status, entries, torneio_eliminados, ranking_id, clube_id')
+        .eq('clube_id', clubeId)
+        .eq('ranking_id', rankingId);
+
+    if (errTorneios) {
+        console.warn('[RANKING] erro torneios:', errTorneios);
+        return { jogadoresOrdenados: [], qtdTorneios: 0, premioAcumulado: 0 };
+    }
+
+    if (!torneios || !torneios.length) {
+        return { jogadoresOrdenados: [], qtdTorneios: 0, premioAcumulado: 0 };
+    }
+
+    // Carrega eliminações e entries de todos esses torneios
+    const ids = torneios.map(t => t.id);
+    const [{ data: eliminados }, { data: entries }] = await Promise.all([
+        sb.from('torneio_eliminados').select('*').in('torneio_id', ids),
+        sb.from('torneio_entries').select('*').in('torneio_id', ids),
+    ]);
+
+    // Mapa jogador_id → { totalPontos, torneiosJogados }
+    const ptsMap = new Map();
+
+    torneios.forEach(t => {
+        const elims = (eliminados || []).filter(e => e.torneio_id === t.id);
+        const tEntries = (entries || []).filter(e => e.torneio_id === t.id);
+        const entrantesCount = new Set(tEntries.filter(e => e.tipo !== 'addon').map(e => e.jogador_id)).size;
+
+        // Ordena eliminados: primeiros a sair têm pior colocação
+        // Posição = (entrantes - índice de eliminação)
+        const elimOrdenados = [...elims].sort((a, b) => (a.ts || a.eliminado_em || 0) - (b.ts || b.eliminado_em || 0));
+
+        elimOrdenados.forEach((e, idx) => {
+            const posicao = entrantesCount - idx;  // último eliminado = posição 1 (campeão)
+            const pts = calcularPontos(formula, posicao, entrantesCount, customPontos);
+
+            const jid = e.jogador_id;
+            if (!ptsMap.has(jid)) ptsMap.set(jid, { pontos: 0, torneios: 0 });
+            const stats = ptsMap.get(jid);
+            stats.pontos += pts;
+            stats.torneios += 1;
+        });
+    });
+
+    // Busca nomes dos jogadores
+    const jogadorIds = Array.from(ptsMap.keys());
+    let jogadoresMap = new Map();
+    if (jogadorIds.length > 0) {
+        const { data: jogadores } = await sb
+            .from('jogadores')
+            .select('id, nome, apelido')
+            .in('id', jogadorIds);
+        (jogadores || []).forEach(j => jogadoresMap.set(j.id, j));
+    }
+
+    // Monta lista ordenada
+    const jogadoresOrdenados = jogadorIds.map(jid => {
+        const j = jogadoresMap.get(jid);
+        const stats = ptsMap.get(jid);
+        return {
+            id: jid,
+            nome: j ? j.nome : 'Jogador',
+            apelido: j ? j.apelido : '',
+            pontos: stats.pontos,
+            torneios: stats.torneios,
+        };
+    }).filter(x => x.pontos > 0).sort((a, b) => b.pontos - a.pontos);
+
+    // Premiação acumulada (% do rake de cada torneio vai pro ranking)
+    // Aqui assumimos campo `ranking_rake_pct` no torneio + cálculo do rake
+    // Por simplicidade, somamos um campo `premio_ranking` se existir
+    let premioAcumulado = 0;
+    torneios.forEach(t => {
+        if (t.premio_ranking) premioAcumulado += Number(t.premio_ranking) || 0;
+    });
+
+    return { jogadoresOrdenados, qtdTorneios: torneios.length, premioAcumulado };
+}
+
+// === Renderiza a página ===
+async function carregarRanking() {
+    const slug = getSlugFromUrl();
+    if (!slug) {
+        return renderErro('Link inválido', 'Esse link não tem um ranking válido.');
+    }
+
+    // Busca ranking pela view pública
+    const { data: rk, error } = await sb
+        .from('rankings_publicos')
+        .select('*')
+        .eq('slug', slug)
+        .maybeSingle();
+
+    if (error || !rk) {
+        return renderErro('Ranking não encontrado', 'Esse ranking não existe mais ou o link está incorreto.');
+    }
+
+    // Atualiza meta tags pra preview do WhatsApp
+    document.title = `${rk.ranking_nome} · ${rk.clube_nome}`;
+    document.querySelector('meta[property="og:title"]').setAttribute('content', `${rk.ranking_nome} — ${rk.clube_nome}`);
+    document.querySelector('meta[property="og:description"]').setAttribute('content', `Ranking atualizado do ${rk.clube_nome}. Veja a classificação completa.`);
+    if (rk.clube_logo) {
+        const og = document.createElement('meta');
+        og.setAttribute('property', 'og:image');
+        og.setAttribute('content', rk.clube_logo);
+        document.head.appendChild(og);
+    }
+
+    // Calcula ranking real
+    const { jogadoresOrdenados, qtdTorneios, premioAcumulado } = await calcularRanking(
+        rk.id,
+        rk.clube_id,
+        rk.formula,
+        rk.custom_pontos,
+    );
+
+    // Formato de data
+    const fmtData = (s) => {
+        if (!s) return '';
+        const d = new Date(s);
+        return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+    };
+    const periodoTxt = rk.data_inicio && rk.data_fim
+        ? `${fmtData(rk.data_inicio)} — ${fmtData(rk.data_fim)}`
+        : (rk.data_inicio ? `desde ${fmtData(rk.data_inicio)}` : '');
+
+    const agora = new Date().toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+
+    const logoHtml = rk.clube_logo
+        ? `<img src="${escapeHtml(rk.clube_logo)}" alt="${escapeHtml(rk.clube_nome)}">`
+        : `<i class="fa-solid fa-cards"></i>`;
+
+    // Top 3
+    const top3 = jogadoresOrdenados.slice(0, 3);
+    const restantes = jogadoresOrdenados.slice(3);
+
+    let podiumHtml = '';
+    if (top3.length > 0) {
+        const p1 = top3[0], p2 = top3[1], p3 = top3[2];
+        podiumHtml = `
+            <div class="section-title">Top 3</div>
+            <div class="podium">
+                ${p2 ? `<div class="podium-card"><div class="podium-medal">🥈</div><div class="podium-nome">${escapeHtml(p2.nome)}</div><div class="podium-pontos">${p2.pontos} pts</div></div>` : '<div></div>'}
+                ${p1 ? `<div class="podium-card first"><div class="podium-medal">🏆</div><div class="podium-nome">${escapeHtml(p1.nome)}</div><div class="podium-pontos">${p1.pontos} pts</div></div>` : '<div></div>'}
+                ${p3 ? `<div class="podium-card"><div class="podium-medal">🥉</div><div class="podium-nome">${escapeHtml(p3.nome)}</div><div class="podium-pontos">${p3.pontos} pts</div></div>` : '<div></div>'}
+            </div>
+        `;
+    }
+
+    let listaHtml = '';
+    if (restantes.length > 0) {
+        listaHtml = `
+            <div class="section-title">Classificação completa</div>
+            <div class="lista">
+                ${restantes.map((j, i) => `
+                    <div class="lista-row">
+                        <span class="lista-pos">${i + 4}º</span>
+                        <span class="lista-nome">${escapeHtml(j.nome)}</span>
+                        <span class="lista-pts">${j.pontos}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    let conteudoHtml = '';
+    if (jogadoresOrdenados.length === 0) {
+        conteudoHtml = `
+            <div class="empty">
+                <i class="fa-regular fa-clock"></i>
+                <div style="font-size:14px;color:#a1a1aa;margin-bottom:6px;font-weight:700;">Ranking ainda não começou</div>
+                <div style="font-size:12px;">Aguarde os primeiros torneios serem disputados.</div>
+            </div>
+        `;
+    } else {
+        conteudoHtml = podiumHtml + listaHtml;
+    }
+
+    document.getElementById('root').innerHTML = `
+        <div class="header">
+            <div class="clube-logo">${logoHtml}</div>
+            <div class="clube-nome">${escapeHtml(rk.clube_nome)}</div>
+            <h1 class="ranking-titulo">${escapeHtml(rk.ranking_nome)}</h1>
+            ${periodoTxt ? `<div class="ranking-info">${periodoTxt}</div>` : ''}
+        </div>
+        <div class="kpis">
+            <div class="kpi kpi-gold">
+                <div class="kpi-label">Premiação</div>
+                <div class="kpi-value">${formatMoney(premioAcumulado)}</div>
+                <div class="kpi-sub">acumulado</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Torneios</div>
+                <div class="kpi-value">${qtdTorneios}</div>
+                <div class="kpi-sub">disputados</div>
+            </div>
+        </div>
+        ${conteudoHtml}
+        <div class="atualizado">Atualizado em ${agora}</div>
+        <div class="footer">
+            <div class="footer-brand">Sistema de gestão do clube</div>
+            <a href="https://stackos.com.br" class="footer-stackos">⚡ StackOS</a>
+            <div class="footer-tag">Acesse stackos.com.br</div>
+        </div>
+    `;
+}
+
+carregarRanking().catch(e => {
+    console.error('[RANKING] erro:', e);
+    renderErro('Algo deu errado', 'Não foi possível carregar o ranking. Tente novamente em alguns minutos.');
+});
+</script>
+</body>
+</html>
