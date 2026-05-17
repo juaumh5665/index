@@ -16434,8 +16434,17 @@ function _jackpotPagaRake(t) {
     return false;
 }
 function _lastChancePagaRake(t) {
-    if (t && (t.last_chance_paga_rake === 1 || t.last_chance_paga_rake === true)) return true;
-    if (t && (t.last_chance_paga_rake === 0 || t.last_chance_paga_rake === false)) return false;
+    // Aceita tanto o formato local (camelCase) quanto o do banco (snake_case).
+    // Prioridade: configuração explícita no torneio > configuração global do clube.
+    if (t) {
+        // 1) Tenta camelCase primeiro (formato local da UI)
+        if (t.lastChancePagaRake === true)  return true;
+        if (t.lastChancePagaRake === false) return false;
+        // 2) Tenta snake_case (formato vindo direto do banco)
+        if (t.last_chance_paga_rake === 1 || t.last_chance_paga_rake === true)  return true;
+        if (t.last_chance_paga_rake === 0 || t.last_chance_paga_rake === false) return false;
+    }
+    // 3) Fallback: configuração global do clube
     if (sbClube && sbClube.cfg_last_chance_paga_rake === true) return true;
     return false;
 }
