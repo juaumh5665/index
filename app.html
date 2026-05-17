@@ -9546,11 +9546,204 @@ function testarSuite() {
         assertEqual('V8: Conservação venda direta (líquido = 0)', movLiq, 0);
     })();
 
+    // ════════════════════════════════════════════════════════════════
+    // INTEGRIDADE DE TORNEIO — rebuy duplo + jogadores únicos
+    // (cobertura do bug "12 de 10" detectado em prod)
+    // ════════════════════════════════════════════════════════════════
+
+    // Simulação do getAtivos e getJogadoresUnicos (mesma fórmula do app)
+    function _getAtivos(t) {
+        const eliminadosIds = new Set((t.eliminados || []).map(e => String(e.jogadorId)));
+        const entriesIds    = new Set((t.entries || []).filter(e=>e.tipo!=='addon').map(e=>String(e.jogadorId)));
+        return [...entriesIds].filter(id => !eliminadosIds.has(id)).length;
+    }
+    function _getJogadoresUnicos(t) {
+        if (!t || !t.entries) return 0;
+        return new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => String(e.jogadorId))).size;
+    }
+    function _calcChipcount(t) {
+        const stack = Number(t.stack || 0);
+        const rebuyDuploFichas = Number(t.rebuyDuploFichas || stack * 2);
+        const rebuySimplesFichas = Number(t.rebuySimplesFichas || stack);
+        const addonFichas = Number(t.addonFichas || 0);
+        let total = 0;
+        (t.entries || []).forEach(e => {
+            if (e.tipo === 'rebuy_simples')  total += rebuySimplesFichas;
+            else if (e.tipo === 'rebuy_duplo') total += rebuyDuploFichas;
+            else if (e.tipo === 'addon')       total += addonFichas;
+            else                                total += stack;
+        });
+        return total;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // T1: 10 jogadores, sem rebuy → 10 únicos, chipcount = 10×stack
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            stack: 20000, rebuyDuploFichas: 40000,
+            entries: Array.from({length:10}, (_, i) => ({ jogadorId:'p'+i, tipo:'buyin' })),
+            eliminados: [],
+        };
+        assertEqual('T1: 10 jogadores → 10 únicos', _getJogadoresUnicos(t), 10);
+        assertEqual('T1: 10 jogadores → 10 ativos', _getAtivos(t), 10);
+        assertEqual('T1: Chipcount 10×20.000', _calcChipcount(t), 200000);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // T2: 10 jogadores + 1 rebuy duplo do MESMO jogador → 10 únicos
+    //      (rebuy não cria novo jogador)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            stack: 20000, rebuyDuploFichas: 40000,
+            entries: [
+                ...Array.from({length:10}, (_, i) => ({ jogadorId:'p'+i, tipo:'buyin' })),
+                { jogadorId:'p0', tipo:'rebuy_duplo' },   // p0 já fez buy-in
+            ],
+            eliminados: [],
+        };
+        assertEqual('T2: 10 buy-ins + 1 rebuy duplo → 10 únicos', _getJogadoresUnicos(t), 10);
+        assertEqual('T2: 10 buy-ins + 1 rebuy duplo → 10 ativos', _getAtivos(t), 10);
+        // Chipcount: 10×20.000 + 1×40.000 = 240.000
+        assertEqual('T2: Chipcount com 1 rebuy duplo', _calcChipcount(t), 240000);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // T3: BUG DETECTADO — rebuy duplo de jogador FANTASMA
+    //      (entrada órfã sem buy-in correspondente)
+    //      Resultado: jogadores únicos seria 11 (errado), reparo remove
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            stack: 20000, rebuyDuploFichas: 40000,
+            entries: [
+                ...Array.from({length:10}, (_, i) => ({ jogadorId:'p'+i, tipo:'buyin' })),
+                { jogadorId:'fantasma', tipo:'rebuy_duplo' },  // SEM buy-in!
+            ],
+            eliminados: [],
+        };
+        // Detecta o bug: 11 únicos quando deveria ser 10
+        assertEqual('T3: Bug detectado — 11 únicos com fantasma', _getJogadoresUnicos(t), 11);
+
+        // Função de detecção de órfãos
+        const comBuyin = new Set(t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'reentry').map(e => String(e.jogadorId)));
+        const orfas = t.entries.filter(e =>
+            ['rebuy_simples','rebuy_duplo','addon'].includes(e.tipo)
+            && !comBuyin.has(String(e.jogadorId))
+        );
+        assertEqual('T3: Detecção de órfãos encontra 1', orfas.length, 1);
+        assertTrue('T3: Órfã é do tipo rebuy_duplo', orfas[0].tipo === 'rebuy_duplo');
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // T4: Comparação de jogadorId com tipo diferente (string vs number)
+    //      String(x) === String(y) deve detectar como mesmo jogador
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            stack: 20000, rebuyDuploFichas: 40000,
+            entries: [
+                { jogadorId: 123, tipo:'buyin' },           // number
+                { jogadorId: '123', tipo:'rebuy_duplo' },   // string (mesmo jogador!)
+            ],
+            eliminados: [],
+        };
+        // Com String() seguro, deve detectar como 1 jogador único
+        assertEqual('T4: number vs string → mesmo jogador', _getJogadoresUnicos(t), 1);
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // T5: Múltiplos rebuys do mesmo jogador → continua 1 único
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            stack: 20000, rebuyDuploFichas: 40000, rebuySimplesFichas: 20000,
+            entries: [
+                { jogadorId:'p1', tipo:'buyin' },
+                { jogadorId:'p1', tipo:'rebuy_simples' },
+                { jogadorId:'p1', tipo:'rebuy_duplo' },
+                { jogadorId:'p1', tipo:'rebuy_simples' },
+            ],
+            eliminados: [],
+        };
+        assertEqual('T5: Múltiplos rebuys mesmo jogador → 1 único', _getJogadoresUnicos(t), 1);
+        // Chipcount: 20k buy-in + 20k rebuy + 40k duplo + 20k rebuy = 100k
+        assertEqual('T5: Chipcount múltiplos rebuys', _calcChipcount(t), 100000);
+    })();
+
     return TestRunner.imprimirResultados();
 }
 
 // Atalho global pra rodar do console
 window.testarSuite = testarSuite;
+
+// ============================================================
+// DIAGNÓSTICO DE TORNEIO — captura estado real para análise
+// Uso no console: diagTorneio()
+// ============================================================
+function diagTorneio(idx) {
+    const i = (idx != null) ? idx : (typeof activeTorneioIdx === 'number' ? activeTorneioIdx : 0);
+    const t = torneios[i];
+    if (!t) { console.error('Torneio não encontrado em índice', i); return null; }
+
+    // Conta entries por tipo
+    const porTipo = {};
+    (t.entries || []).forEach(e => { porTipo[e.tipo] = (porTipo[e.tipo] || 0) + 1; });
+
+    // Jogadores únicos por tipo
+    const unicosPorTipo = {};
+    Object.keys(porTipo).forEach(tipo => {
+        unicosPorTipo[tipo] = new Set((t.entries || []).filter(e => e.tipo === tipo).map(e => e.jogadorId)).size;
+    });
+
+    // Cálculos
+    const ativos = (typeof getAtivos === 'function') ? getAtivos(t) : '?';
+    const eliminadosCount = (t.eliminados || []).length;
+    const jogadoresUnicosNaoAddon = new Set((t.entries || []).filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
+    const setBuyinReentry = new Set((t.entries || []).filter(e => e.tipo === 'buyin' || e.tipo === 'reentry').map(e => e.jogadorId)).size;
+
+    // Fichas
+    let totalFichas = 0;
+    (t.entries || []).forEach(e => {
+        if (e.tipo === 'rebuy_simples')      totalFichas += (t.rebuySimplesFichas || t.stack);
+        else if (e.tipo === 'rebuy_duplo')   totalFichas += (t.rebuyDuploFichas || t.stack*2);
+        else if (e.tipo === 'addon')         totalFichas += (t.addonFichas || 0);
+        else if (e.tipo === 'last_chance')   totalFichas += (t.last_chance_fichas || 0);
+        else                                  totalFichas += t.stack;
+    });
+    const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
+    const chipCount = totalFichas + jackpotFichas;
+    const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
+
+    console.log('%c🔬 DIAGNÓSTICO TORNEIO: ' + t.nome, 'color:#06b6d4;font-weight:bold;font-size:14px;');
+    console.log('Total entries:', (t.entries || []).length);
+    console.log('Eliminados:', eliminadosCount);
+    console.log('Jackpot compras:', (t.jackpotCompras || []).length);
+    console.log('\nEntries por TIPO:');
+    console.table(porTipo);
+    console.log('\nJogadores ÚNICOS por tipo:');
+    console.table(unicosPorTipo);
+    console.log('\n📊 Cálculos:');
+    console.log('  getAtivos(t):', ativos, '← deveria ser jogadores únicos não eliminados');
+    console.log('  Jogadores únicos (não-addon):', jogadoresUnicosNaoAddon);
+    console.log('  Set buyin+reentry (totalEntries TV):', setBuyinReentry);
+    console.log('\n🎰 Fichas:');
+    console.log('  Total fichas (entries):', totalFichas);
+    console.log('  Jackpot fichas:', jackpotFichas);
+    console.log('  Chip count total:', chipCount);
+    console.log('  Avg (chipCount/ativos):', avg);
+    console.log('\n📦 t.mesas:', t.mesas);
+    if (t.mesas && t.mesas.length) {
+        t.mesas.forEach((m, idx) => {
+            const jogs = (m.jogadores || m.seats || []).filter(Boolean);
+            console.log(`  Mesa ${idx+1}: ${jogs.length} jogador(es) →`, jogs);
+        });
+    }
+
+    return { t, porTipo, unicosPorTipo, ativos, jogadoresUnicosNaoAddon, setBuyinReentry, chipCount, avg };
+}
+window.diagTorneio = diagTorneio;
 
 // ============================================================
 // BACKUP AUTOMÁTICO
@@ -14912,7 +15105,11 @@ function updateModalTorneio() {
     }
     document.getElementById('mt-prox-blinds').innerText = proxTexto;
 
-    document.getElementById('mt-entries').innerText = t.entries.filter(e => e.tipo !== 'addon').length;
+    // 🛡 Card "Entradas" mostra JOGADORES ÚNICOS (não eventos individuais).
+    // Antes mostrava t.entries.filter(...).length que contava cada rebuy separado.
+    document.getElementById('mt-entries').innerText = (typeof getJogadoresUnicos === 'function')
+        ? getJogadoresUnicos(t)
+        : new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
     document.getElementById('mt-ativos').innerText  = ativos;
     document.getElementById('mt-prize').innerText   = formatMoney(prize);
     document.getElementById('mt-rake-val').innerText = formatMoney(rake);
@@ -15730,12 +15927,21 @@ function _registrarEntradaImpl() {
         return showToast('🔒 ' + trava.motivo);
     }
 
-    const jaEntrou = t.entries.some(e => e.jogadorId === jid && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
-    const eliminado = t.eliminados.some(e => e.jogadorId === jid);
+    const jaEntrou = t.entries.some(e => String(e.jogadorId) === String(jid) && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
+    const eliminado = t.eliminados.some(e => String(e.jogadorId) === String(jid));
 
     if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Rebuy ou Re-entry.');
     // (validações de nível agora são feitas pela trava unificada acima — _tipoBloqueadoPorTrava)
     if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
+
+    // 🛡 Validação: rebuy só pra quem JÁ tem buy-in (evita criar "jogadores fantasma" no torneio)
+    if ((tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') && !jaEntrou) {
+        return showToast('⚠️ Rebuy só pra quem já fez Buy-in. Selecione "Buy-in" pra entrada inicial.');
+    }
+    // 🛡 Validação: rebuy não pode ser feito por jogador eliminado (precisa fazer re-entry primeiro)
+    if ((tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') && eliminado) {
+        return showToast('⚠️ Jogador eliminado deve fazer Re-entry, não Rebuy');
+    }
     
     // Suspender realtime durante toda a inscrição (8s)
     if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
@@ -16205,7 +16411,9 @@ function updateTV(idx) {
         blinds:   (blindsRef.sb || 0).toLocaleString() + ' / ' + (blindsRef.bb || 0).toLocaleString(),
         ante:     (blindsRef.ante || 0).toLocaleString(),
         players:  ativos,
-        totalEntries: new Set(t.entries.filter(e=>e.tipo==='buyin' || e.tipo==='reentry').map(e=>e.jogadorId)).size,
+        totalEntries: (typeof getJogadoresUnicos === 'function')
+            ? getJogadoresUnicos(t)
+            : new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId)).size,
         avg:      avg.toLocaleString(),
         avgBBs:   avgBBs,
         chipCount: chipCount.toLocaleString(),
@@ -16369,7 +16577,12 @@ function _computarDadosMiniTV(t) {
     if (!t || !t.blinds) return {};
     const ativos = (typeof getAtivos === 'function') ? getAtivos(t) : 0;
     const eliminadosIds = new Set((t.eliminados || []).map(e => e.jogadorId));
-    const totalEntries = new Set((t.entries || []).filter(e => e.tipo === 'buyin' || e.tipo === 'reentry').map(e => e.jogadorId)).size;
+    // totalEntries = jogadores únicos no torneio (qualquer tipo exceto addon)
+    // Inclui rebuy_simples, rebuy_duplo, buyin, reentry, last_chance.
+    // Não conta addon (porque add-on só dá fichas extras, jogador já estava na mesa).
+    const totalEntries = (typeof getJogadoresUnicos === 'function')
+        ? getJogadoresUnicos(t)
+        : new Set((t.entries || []).filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
     // Fichas (mesma fórmula do updateTV)
     const totalFichas = (t.entries || []).reduce((s, e) => {
         if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
@@ -16879,10 +17092,128 @@ setInterval(() => {
 // HELPERS
 // ============================================================
 function getAtivos(t) {
-    const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
-    const entriesIds    = new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId));
+    const eliminadosIds = new Set((t.eliminados || []).map(e => String(e.jogadorId)));
+    const entriesIds    = new Set((t.entries || []).filter(e=>e.tipo!=='addon').map(e=>String(e.jogadorId)));
     return [...entriesIds].filter(id => !eliminadosIds.has(id)).length;
 }
+
+// Retorna a QUANTIDADE de jogadores únicos que entraram no torneio
+// (não conta rebuys, addons, reentries como nova "pessoa")
+// Re-entry conta como nova entrada se for jogador novo (mas o tipo='reentry' do mesmo
+// jogador é eliminação anterior + nova compra → mesmo jogadorId, conta como 1 pessoa).
+function getJogadoresUnicos(t) {
+    if (!t || !t.entries) return 0;
+    return new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => String(e.jogadorId))).size;
+}
+
+// ============================================================
+// REPARO DE TORNEIO — detecta e remove entries órfãos
+// ============================================================
+// Caso típico: rebuy duplo cadastrado com jogadorId diferente do buy-in
+// (jogador fantasma). Esta função detecta e oferece reparo.
+//
+// Uso no console: diagnosticarTorneio(idx) ou diagnosticarTorneio() pra ativo
+//                 repararTorneio(idx) pra remover entries órfãos
+// ============================================================
+function diagnosticarTorneio(idx) {
+    if (idx == null) idx = activeTorneioIdx;
+    const t = torneios[idx];
+    if (!t) { console.error('Torneio não encontrado'); return; }
+
+    console.log('%c🔬 DIAGNÓSTICO: ' + t.nome, 'color:#06b6d4;font-weight:bold;font-size:14px;');
+
+    // Identifica jogadores com buy-in (entrada legítima)
+    const comBuyin = new Set(
+        t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'reentry')
+                 .map(e => String(e.jogadorId))
+    );
+
+    // Identifica rebuys/addon de jogadores SEM buy-in (entries órfãs)
+    const orfas = [];
+    t.entries.forEach(e => {
+        if (['rebuy_simples','rebuy_duplo','addon'].includes(e.tipo)) {
+            if (!comBuyin.has(String(e.jogadorId))) {
+                const j = jogadores.find(x => String(x.id) === String(e.jogadorId));
+                orfas.push({
+                    entryId: e.id,
+                    jogadorId: e.jogadorId,
+                    jogadorNome: j ? j.nome : '(jogador não encontrado)',
+                    tipo: e.tipo,
+                    valor: e.valor,
+                    ts: e.ts,
+                    data: e.ts ? new Date(e.ts).toLocaleString('pt-BR') : '-',
+                });
+            }
+        }
+    });
+
+    const entriesIds = new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>String(e.jogadorId)));
+    const total = t.entries.length;
+    const buyins = t.entries.filter(e => e.tipo === 'buyin').length;
+    const rebuysSimples = t.entries.filter(e => e.tipo === 'rebuy_simples').length;
+    const rebuysDuplos = t.entries.filter(e => e.tipo === 'rebuy_duplo').length;
+    const addons = t.entries.filter(e => e.tipo === 'addon').length;
+    const reentries = t.entries.filter(e => e.tipo === 'reentry').length;
+
+    console.log('\n📊 Entradas:');
+    console.log('  Total:', total);
+    console.log('  Buy-ins:', buyins);
+    console.log('  Re-entries:', reentries);
+    console.log('  Rebuys simples:', rebuysSimples);
+    console.log('  Rebuys duplos:', rebuysDuplos);
+    console.log('  Add-ons:', addons);
+    console.log('\n👥 Jogadores:');
+    console.log('  Únicos (não-addon):', entriesIds.size);
+    console.log('  Com buy-in/reentry:', comBuyin.size);
+
+    if (orfas.length > 0) {
+        console.warn(`\n⚠️ ENCONTRADAS ${orfas.length} ENTRIES ÓRFÃS (sem buy-in correspondente):`);
+        console.table(orfas);
+        console.log('\n%c💡 Pra reparar, rode: repararTorneio(' + idx + ')', 'color:#22c55e;font-weight:bold;');
+    } else {
+        console.log('\n%c✅ Torneio íntegro — nenhuma entrada órfã detectada', 'color:#22c55e;font-weight:bold;');
+    }
+    return { total, buyins, rebuysSimples, rebuysDuplos, addons, reentries, jogadoresUnicos: entriesIds.size, orfas };
+}
+
+function repararTorneio(idx) {
+    if (idx == null) idx = activeTorneioIdx;
+    const t = torneios[idx];
+    if (!t) { console.error('Torneio não encontrado'); return; }
+
+    const diag = diagnosticarTorneio(idx);
+    if (!diag.orfas.length) return showToast('✅ Torneio já está íntegro');
+
+    if (!confirm(`Detectadas ${diag.orfas.length} entradas órfãs (rebuys/addons sem buy-in correspondente).\n\nIsso causa números incorretos no chipcount, média e contagem de jogadores.\n\nRemover essas entradas órfãs?`)) return;
+
+    const orfanIds = new Set(diag.orfas.map(o => o.entryId));
+    const antes = t.entries.length;
+    t.entries = t.entries.filter(e => !orfanIds.has(e.id));
+    const removidas = antes - t.entries.length;
+
+    // Também limpa eliminados órfãos (jogadores que não têm buy-in)
+    const comBuyin = new Set(
+        t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'reentry')
+                 .map(e => String(e.jogadorId))
+    );
+    t.eliminados = t.eliminados.filter(e => comBuyin.has(String(e.jogadorId)));
+
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('REPARO_TORNEIO', `Removidas ${removidas} entradas órfãs do torneio ${t.nome}`, {
+            torneioId: t.id, removidas, detalhes: diag.orfas,
+        });
+    }
+
+    showToast(`🔧 Removidas ${removidas} entradas órfãs. Torneio reparado!`);
+
+    // Atualiza UI
+    if (typeof renderTorneioControle === 'function')   renderTorneioControle();
+    if (typeof updateTV === 'function')                updateTV();
+    if (typeof renderTorneiosList === 'function')      renderTorneiosList();
+}
+window.diagnosticarTorneio = diagnosticarTorneio;
+window.repararTorneio = repararTorneio;
 
 // ============================================================
 // LOTE 3: Modelo financeiro correto — rake + staff em cascata
