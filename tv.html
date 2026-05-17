@@ -1656,6 +1656,7 @@ function montarCarouselPremiacao(d) {
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
       tempoAlvo: t.tempo_alvo,  // timestamp absoluto — só muda em pause/resume/+1min
+      blindsLen: Array.isArray(t.blinds) ? t.blinds.length : 0,  // blinds podem mudar (edição)
     });
   }
   
@@ -1824,6 +1825,33 @@ function montarCarouselPremiacao(d) {
         elapsedEls.forEach(el => { if (el) el.textContent = elapsedStr; });
       }
     }
+
+    // 🔥 Atualizar INTERVALO EM em tempo real (regressivo)
+    // Soma o tempo restante do nível atual + tempo dos níveis seguintes até achar um break
+    try {
+      const blinds = Array.isArray(t.blinds) ? t.blinds : [];
+      const nivelAtual = Math.max(0, Math.min((t.nivel_atual || 0), blinds.length - 1));
+      let secsAteBreak = ts;
+      let achouBreak = false;
+      for (let i = nivelAtual + 1; i < blinds.length; i++) {
+        if (blinds[i] && blinds[i].isBreak) { achouBreak = true; break; }
+        secsAteBreak += (blinds[i].tempo || Number(t.tempo_nivel || 15)) * 60;
+      }
+      let breakInStr = '—';
+      if (achouBreak) {
+        const bH = Math.floor(secsAteBreak / 3600);
+        const bM = Math.floor((secsAteBreak % 3600) / 60);
+        const bS = secsAteBreak % 60;
+        breakInStr = (bH > 0 ? bH + ':' : '') + bM.toString().padStart(bH > 0 ? 2 : 1, '0') + ':' + bS.toString().padStart(2, '0');
+      }
+      const breakEls = [
+        document.getElementById('pw-break-in'),
+        document.getElementById('break-in'),
+      ];
+      breakEls.forEach(el => { if (el) el.textContent = breakInStr; });
+    } catch(e) {
+      console.warn('[TIMER] Erro ao atualizar break-in:', e);
+    }
   }
   
   let _renderLock = false;
@@ -1885,6 +1913,7 @@ function montarCarouselPremiacao(d) {
     const rebuysDuplosQtd = entries.filter(e => e.tipo === 'rebuy_duplo').length;
     const rebuysQtd = rebuysSimplesQtd + rebuysDuplosQtd;
     const addonsQtd = entries.filter(e => e.tipo === 'addon').length;
+    const lastChanceQtd = entries.filter(e => e.tipo === 'last_chance').length;
     
     // Jackpot: somar do array jackpot_compras
     const jackpotCompras = Array.isArray(t.jackpot_compras) ? t.jackpot_compras : [];
@@ -1900,6 +1929,7 @@ function montarCarouselPremiacao(d) {
     if (Number(t.rebuy_valor || 0) > 0) statsStrip.push({ label: 'REBUY ' + t.rebuy_valor, value: rebuysSimplesQtd });
     if (Number(t.rebuy_duplo_valor || 0) > 0) statsStrip.push({ label: 'REBUY ' + t.rebuy_duplo_valor + ' (DUPLO)', value: rebuysDuplosQtd });
     if (Number(t.addon_fichas || 0) > 0) statsStrip.push({ label: 'ADD-ON', value: addonsQtd });
+    if (Number(t.last_chance_valor || 0) > 0) statsStrip.push({ label: 'LAST CHANCE', value: lastChanceQtd });
     
     // === CHIP COUNT (replicando EXATAMENTE a lógica do app) ===
     // Cada entry recebe fichas de acordo com seu tipo:
@@ -1907,15 +1937,18 @@ function montarCarouselPremiacao(d) {
     //   rebuy_simples → rebuy_fichas (ou stack como fallback)
     //   rebuy_duplo   → rebuy_duplo_fichas (ou stack*2)
     //   addon         → addon_fichas
+    //   last_chance   → last_chance_fichas
     const stackInicial = Number(t.stack || 0);
     const rebuySimplesFichas = Number(t.rebuy_fichas || stackInicial);
     const rebuyDuploFichas = Number(t.rebuy_duplo_fichas || stackInicial * 2);
     const addonFichasQtd = Number(t.addon_fichas || 0);
+    const lastChanceFichasQtd = Number(t.last_chance_fichas || 0);
     
     let totalFichas = entries.reduce((s, e) => {
       if (e.tipo === 'rebuy_simples') return s + rebuySimplesFichas;
       if (e.tipo === 'rebuy_duplo')   return s + rebuyDuploFichas;
       if (e.tipo === 'addon')         return s + addonFichasQtd;
+      if (e.tipo === 'last_chance')   return s + lastChanceFichasQtd;
       return s + stackInicial;  // buyin, reentry
     }, 0);
     
