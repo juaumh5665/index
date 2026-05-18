@@ -4853,6 +4853,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <div style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:#22c55e;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">
                                         <i class="fa-solid fa-bullhorn" style="font-size:.85rem;"></i>
                                         <span>Janela de Inscrição Aberta</span>
+                                        <span id="mt-janela-tipo" style="font-size:.6rem;color:#a1a1aa;font-weight:600;letter-spacing:0;text-transform:none;"></span>
                                     </div>
                                     <div style="font-size:.78rem;color:#a1a1aa;margin-top:.35rem;line-height:1.45;">
                                         Re-entry, Rebuy Simples/Duplo e Add-on liberados durante este intervalo. Jogadores eliminados podem voltar.
@@ -4878,6 +4879,13 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <i class="fa-solid fa-unlock"></i> Reabrir
                                 </button>
                             </div>
+                        </div>
+
+                        <!-- 🔓 LINK PARA ABRIR JANELA MANUALMENTE (sutil, só quando não está em janela) -->
+                        <div id="mt-abrir-janela-link" style="display:none;text-align:center;padding:.2rem 0;">
+                            <button onclick="abrirJanelaManual()" style="background:transparent;border:none;color:#71717a;font-size:.7rem;cursor:pointer;font-family:'Manrope',sans-serif;text-decoration:underline;" title="Liberar Re-entry + Rebuy + Add-on fora do break marcado">
+                                <i class="fa-solid fa-unlock"></i> Abrir Janela de Inscrição Manualmente
+                            </button>
                         </div>
 
                         <!-- Extra: jackpot info -->
@@ -6521,6 +6529,7 @@ function _torneioToDb(t) {
         tempo_nivel: t.tempoNivel || 15,
         reentry_ate: t.reentryAte || 0,
         compras_encerradas: !!(t.compras_encerradas || t.comprasEncerradas),  // janela de break: operador encerrou compras
+        janela_compras_aberta_manual: !!(t.janela_compras_aberta_manual || t.janelaComprasAbertaManual),  // override manual da janela
         addon_valor: t.addonValor || 0,
         addon_fichas: t.addonFichas || 0,
         staff_valor: t.staffValor || 0,
@@ -7318,6 +7327,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         reentryAte: r.reentry_ate || 0,
         compras_encerradas: !!r.compras_encerradas,
         comprasEncerradas: !!r.compras_encerradas,
+        janela_compras_aberta_manual: !!r.janela_compras_aberta_manual,
+        janelaComprasAbertaManual: !!r.janela_compras_aberta_manual,
         addonValor: parseFloat(r.addon_valor || 0),
         addonFichas: r.addon_fichas || 0,
         staffValor: parseFloat(r.staff_valor || 0),
@@ -9738,31 +9749,50 @@ function testarSuite() {
     // ════════════════════════════════════════════════════════════════
     // JANELA DE BREAK ESPECIAL — Re-entry + Rebuy + Add-on no intervalo
     // (regra do poker: jogador eliminado pode voltar no break final)
+    // Lógica NOVA: depende da flag `breakDeCompras` no blind atual
+    // OU do override manual (janela_compras_aberta_manual)
     // ════════════════════════════════════════════════════════════════
 
-    // Simula a função _emJanelaBreakEspecial
     function _testJanela(t) {
         if (!t) return false;
         if (t.compras_encerradas === true || t.comprasEncerradas === true) return false;
-        if (!t.is_break && !t.isBreak) return false;
-        const maxCompras = Number(t.reentryAte || 0);
-        if (!maxCompras) return false;
-        const nivelAtualHumano = Number(t.nivelAtual || 0) + 1;
-        return nivelAtualHumano === (maxCompras + 1);
+        // Override manual sempre vence
+        if (t.janela_compras_aberta_manual === true || t.janelaComprasAbertaManual === true) return true;
+        // Caminho automático: precisa estar em break + break marcado
+        const emBreak = !!(t.is_break || t.isBreak);
+        if (!emBreak) return false;
+        const blinds = Array.isArray(t.blinds) ? t.blinds : [];
+        const nivelAtual = Number(t.nivelAtual || 0);
+        const blindAtual = blinds[nivelAtual];
+        if (!blindAtual) return false;
+        return blindAtual.breakDeCompras === true || blindAtual.break_de_compras === true;
+    }
+
+    // Helper pra montar estrutura de blinds com break marcado
+    function _mkBlinds(qtdNiveis, posBreakCompras) {
+        const blinds = [];
+        for (let i = 0; i < qtdNiveis; i++) {
+            blinds.push({ sb: (i+1)*100, bb: (i+1)*200, ante: 0, tempo: 15 });
+            // Adiciona break marcado se for a posição certa
+            if (i + 1 === posBreakCompras) {
+                blinds.push({ isBreak: true, tempo: 15, breakDeCompras: true });
+            }
+        }
+        return blinds;
     }
 
     // ──────────────────────────────────────────────────────────────
-    // B1: Janela aberta — torneio em break logo após max
-    //     reentryAte=10, em break do nível 11 → JANELA ABERTA
+    // B1: Break marcado como "de compras" → JANELA ABERTA
     // ──────────────────────────────────────────────────────────────
     (() => {
         const t = {
-            iniciadoEm: Date.now(), reentryAte: 10,
-            nivelAtual: 10, // 0-indexed → nível humano 11
+            iniciadoEm: Date.now(),
+            blinds: _mkBlinds(15, 10),  // break marcado depois do nível 10
+            nivelAtual: 10,  // posição 10 no array = o BREAK marcado
             is_break: true,
             compras_encerradas: false,
         };
-        assertTrue('B1: Janela aberta no break 10→11', _testJanela(t));
+        assertTrue('B1: Break marcado → janela aberta', _testJanela(t));
     })();
 
     // ──────────────────────────────────────────────────────────────
@@ -9770,7 +9800,8 @@ function testarSuite() {
     // ──────────────────────────────────────────────────────────────
     (() => {
         const t = {
-            iniciadoEm: Date.now(), reentryAte: 10,
+            iniciadoEm: Date.now(),
+            blinds: _mkBlinds(15, 10),
             nivelAtual: 10, is_break: true,
             compras_encerradas: true,  // ENCERRADO
         };
@@ -9778,40 +9809,96 @@ function testarSuite() {
     })();
 
     // ──────────────────────────────────────────────────────────────
-    // B3: Janela NÃO abre se não estiver em break
+    // B3: Não está em break → não importa marcação
     // ──────────────────────────────────────────────────────────────
     (() => {
         const t = {
-            iniciadoEm: Date.now(), reentryAte: 10,
-            nivelAtual: 10, is_break: false,  // não está em break
+            iniciadoEm: Date.now(),
+            blinds: _mkBlinds(15, 10),
+            nivelAtual: 9, is_break: false,
         };
-        assertTrue('B3: Janela só abre em break', !_testJanela(t));
+        assertTrue('B3: Sem break → janela fechada', !_testJanela(t));
     })();
 
     // ──────────────────────────────────────────────────────────────
-    // B4: Janela NÃO abre em break errado (não é o break final)
-    //     Ex: reentryAte=10, break no nível 5 (meio do torneio)
+    // B4: Break SEM marcação de "compras" → NÃO abre janela
+    //     (cenário onde tem breaks no meio, apenas o do nível 10 está marcado)
     // ──────────────────────────────────────────────────────────────
     (() => {
+        const blinds = [];
+        for (let i = 0; i < 12; i++) {
+            blinds.push({ sb: 100, bb: 200, ante: 0, tempo: 15 });
+            // Break em todo nível par, mas SÓ depois do 10 é "de compras"
+            if (i + 1 === 4) blinds.push({ isBreak: true, tempo: 5, breakDeCompras: false });  // break do meio
+            if (i + 1 === 10) blinds.push({ isBreak: true, tempo: 15, breakDeCompras: true });  // o marcado
+        }
         const t = {
-            iniciadoEm: Date.now(), reentryAte: 10,
-            nivelAtual: 4, // nível 5 humano
+            iniciadoEm: Date.now(),
+            blinds,
+            nivelAtual: 4,  // posição 4 = break NÃO marcado (do nível 4)
             is_break: true,
         };
-        assertTrue('B4: Break do meio do torneio não abre janela', !_testJanela(t));
+        assertTrue('B4: Break do meio não abre janela', !_testJanela(t));
     })();
 
     // ──────────────────────────────────────────────────────────────
-    // B5: Janela com config customizada — reentryAte=12
-    //     break entre 12 e 13 → ABRE janela
+    // B5: Override manual abre janela MESMO sem break marcado
+    //     E mesmo sem estar em break
     // ──────────────────────────────────────────────────────────────
     (() => {
         const t = {
-            iniciadoEm: Date.now(), reentryAte: 12,
-            nivelAtual: 12, // nível 13 humano
+            iniciadoEm: Date.now(),
+            blinds: _mkBlinds(15, 10),  // tem break marcado mas nem está em break
+            nivelAtual: 5, is_break: false,
+            janela_compras_aberta_manual: true,  // operador ABRIU manual
+        };
+        assertTrue('B5: Override manual sempre abre', _testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B6: Override manual + Compras encerradas → AINDA FECHA
+    //     (encerrar é mais forte que abrir manual)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(),
+            blinds: _mkBlinds(15, 10),
+            nivelAtual: 10, is_break: true,
+            janela_compras_aberta_manual: true,
+            compras_encerradas: true,  // ENCERRADO vence o manual
+        };
+        assertTrue('B6: Compras encerradas vence override manual', !_testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B7: Estrutura customizada — break depois do nível 12
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(),
+            blinds: _mkBlinds(20, 12),  // 20 níveis, break marcado depois do 12
+            nivelAtual: 12,  // posição 12 = o break marcado
             is_break: true,
         };
-        assertTrue('B5: Janela abre em torneio com reentryAte=12', _testJanela(t));
+        assertTrue('B7: Janela funciona em torneio com break depois do nível 12', _testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B8: Torneio sem break marcado → não abre (precisa override manual)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const blinds = [];
+        for (let i = 0; i < 12; i++) {
+            blinds.push({ sb: 100, bb: 200, ante: 0, tempo: 15 });
+            if (i + 1 === 10) blinds.push({ isBreak: true, tempo: 15 });  // SEM marcação
+        }
+        const t = {
+            iniciadoEm: Date.now(),
+            blinds,
+            nivelAtual: 10,  // está no break (mas não marcado)
+            is_break: true,
+        };
+        assertTrue('B8: Sem marcação no break → não abre', !_testJanela(t));
     })();
 
     return TestRunner.imprimirResultados();
@@ -14669,13 +14756,19 @@ function renderBlindsInputs() {
         `;
         
         if (b.isBreak) {
+            const isBreakCompras = !!b.breakDeCompras;
             // Linha de intervalo
             return `
-            <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:1.25rem 2rem 1fr 3rem 2rem;gap:.35rem;background:rgba(6,182,212,.08);border:1px dashed rgba(6,182,212,.35);padding:.4rem .5rem;border-radius:.35rem;">
+            <div class="blind-row" id="blindrow-${i}" style="display:grid;grid-template-columns:1.25rem 2rem 1fr auto 3rem 2rem;gap:.35rem;background:${isBreakCompras ? 'rgba(34,197,94,.1)' : 'rgba(6,182,212,.08)'};border:1px dashed ${isBreakCompras ? 'rgba(34,197,94,.5)' : 'rgba(6,182,212,.35)'};padding:.4rem .5rem;border-radius:.35rem;">
                 ${btnsReorder}
-                <span style="font-size:.75rem;color:#06b6d4;font-weight:800;align-self:center;"><i class="fa-solid fa-pause"></i></span>
-                <span style="font-size:.75rem;color:#06b6d4;font-weight:700;align-self:center;">INTERVALO</span>
-                <input type="number" value="${b.tempo || 10}" min="1" onchange="blindStructure[${i}].tempo=parseInt(this.value)||10; _atualizarResumoTorneio()" style="padding:.25rem .4rem;font-size:.8rem;font-family:var(--font-mono);text-align:center;background:#0f0f12;border:1px solid rgba(6,182,212,.3);border-radius:.3rem;color:#06b6d4;font-weight:700;" title="Tempo em minutos">
+                <span style="font-size:.75rem;color:${isBreakCompras ? '#22c55e' : '#06b6d4'};font-weight:800;align-self:center;"><i class="fa-solid fa-pause"></i></span>
+                <span style="font-size:.75rem;color:${isBreakCompras ? '#22c55e' : '#06b6d4'};font-weight:700;align-self:center;">
+                    ${isBreakCompras ? '★ INTERVALO DE COMPRAS' : 'INTERVALO'}
+                </span>
+                <button onclick="toggleBreakDeCompras(${i})" title="${isBreakCompras ? 'Desmarcar como intervalo de compras' : 'Marcar este intervalo como JANELA DE INSCRIÇÃO (libera Re-entry + Rebuy + Add-on)'}" style="background:transparent;border:1px solid ${isBreakCompras ? 'rgba(34,197,94,.5)' : '#27272a'};color:${isBreakCompras ? '#22c55e' : '#52525b'};padding:.15rem .4rem;font-size:.65rem;border-radius:.25rem;cursor:pointer;align-self:center;font-family:'Manrope',sans-serif;font-weight:700;white-space:nowrap;">
+                    ${isBreakCompras ? '★ Compras' : '☆ Compras'}
+                </button>
+                <input type="number" value="${b.tempo || 10}" min="1" onchange="blindStructure[${i}].tempo=parseInt(this.value)||10; _atualizarResumoTorneio()" style="padding:.25rem .4rem;font-size:.8rem;font-family:var(--font-mono);text-align:center;background:#0f0f12;border:1px solid ${isBreakCompras ? 'rgba(34,197,94,.3)' : 'rgba(6,182,212,.3)'};border-radius:.3rem;color:${isBreakCompras ? '#22c55e' : '#06b6d4'};font-weight:700;" title="Tempo em minutos">
                 <button onclick="removeBlindRow(${i})" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.75rem;padding:0;align-self:center;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-times"></i></button>
             </div>`;
         }
@@ -14707,6 +14800,33 @@ function renderBlindsInputs() {
 // ============================================================
 // REORDENAR NÍVEIS/INTERVALOS COM BOTÕES ↑↓
 // ============================================================
+// Marca/desmarca este break como "Intervalo de Compras" (libera Re-entry + Rebuy + Add-on)
+// Apenas UM break por estrutura pode ser de compras — clicar em outro auto-desmarca os anteriores
+function toggleBreakDeCompras(indice) {
+    if (!blindStructure[indice] || !blindStructure[indice].isBreak) return;
+    
+    const novoValor = !blindStructure[indice].breakDeCompras;
+    
+    // Se está marcando, desmarca todos os outros (garante unicidade)
+    if (novoValor) {
+        blindStructure.forEach((b, i) => {
+            if (b.isBreak && i !== indice) b.breakDeCompras = false;
+        });
+    }
+    
+    blindStructure[indice].breakDeCompras = novoValor;
+    renderBlindsInputs();
+    _atualizarResumoTorneio();
+    
+    if (typeof showToast === 'function') {
+        showToast(novoValor 
+            ? '★ Intervalo marcado como Janela de Inscrição (Re-entry + Rebuy + Add-on liberados)' 
+            : '☆ Marcação de Intervalo de Compras removida'
+        );
+    }
+}
+window.toggleBreakDeCompras = toggleBreakDeCompras;
+
 function moverBlind(indice, direcao) {
     // direcao: -1 = sobe (troca com anterior), +1 = desce (troca com próximo)
     const novoIndice = indice + direcao;
@@ -15342,27 +15462,40 @@ function updateModalTorneio() {
         }
     }
 
-    // 🔥 Card da Janela de Break Especial / Compras Encerradas
+    // 🔥 Card da Janela de Break Especial / Compras Encerradas / Link Abrir Manual
     const janelaCard = document.getElementById('mt-janela-break-card');
     const encerrCard = document.getElementById('mt-compras-encerradas-card');
+    const abrirLink  = document.getElementById('mt-abrir-janela-link');
+    const tipoLabel  = document.getElementById('mt-janela-tipo');
     if (janelaCard && encerrCard) {
         const emJanela = _emJanelaBreakEspecial(t);
         const encerrado = !!(t.compras_encerradas || t.comprasEncerradas);
+        const aberturaManual = !!(t.janela_compras_aberta_manual || t.janelaComprasAbertaManual);
+        const torneioAtivo = !!t.iniciadoEm && !t.encerrado;
         
         // Cenário 1: Janela aberta (e não encerrado manualmente)
         if (emJanela && !encerrado) {
             janelaCard.style.display = 'block';
             encerrCard.style.display = 'none';
+            if (abrirLink) abrirLink.style.display = 'none';
+            // Indica se a janela está aberta automaticamente ou via override
+            if (tipoLabel) {
+                tipoLabel.innerHTML = aberturaManual 
+                    ? '· <a href="javascript:void(0)" onclick="fecharJanelaManual()" style="color:#a1a1aa;text-decoration:underline;">(manual — fechar)</a>'
+                    : '· (break marcado)';
+            }
         }
-        // Cenário 2: Operador encerrou compras (só mostra durante este torneio, não em torneios sem janela)
+        // Cenário 2: Operador encerrou compras
         else if (encerrado) {
             janelaCard.style.display = 'none';
             encerrCard.style.display = 'block';
+            if (abrirLink) abrirLink.style.display = 'none';
         }
-        // Cenário 3: Nenhuma das duas situações
+        // Cenário 3: Torneio rodando mas fora de janela → mostra link sutil pra abrir manual
         else {
             janelaCard.style.display = 'none';
             encerrCard.style.display = 'none';
+            if (abrirLink) abrirLink.style.display = torneioAtivo ? 'block' : 'none';
         }
     }
 
@@ -15925,25 +16058,31 @@ function _resolverNivelMaxAddon(t) {
 // Verifica se o torneio está na "janela de break especial"
 // (intervalo entre o último nível de compras e o próximo, onde libera combo Re-entry+Rebuy+Add-on)
 // Regras:
-// 1. Torneio precisa estar em break (is_break = true)
-// 2. O break precisa estar IMEDIATAMENTE depois do nível máximo de compras
-// 3. Operador NÃO pode ter encerrado as compras manualmente (compras_encerradas)
+// 1. Operador NÃO pode ter encerrado as compras manualmente (compras_encerradas)
+// 2. EITHER:
+//    a) Override manual: operador abriu janela via botão (janela_compras_aberta_manual = true)
+//    b) Break marcado: torneio em break (is_break = true) E o break atual tem flag breakDeCompras = true
 function _emJanelaBreakEspecial(t) {
     if (!t) return false;
-    // Operador já encerrou compras manualmente
+    // Operador já encerrou compras manualmente — bloqueia tudo
     if (t.compras_encerradas === true || t.comprasEncerradas === true) return false;
-    // Não está em break
-    if (!t.is_break && !t.isBreak) return false;
     
-    const maxCompras = _resolverNivelMaxCompras(t);
-    if (maxCompras == null) return false;
+    // Override manual: operador abriu via botão "Abrir Janela de Inscrição"
+    if (t.janela_compras_aberta_manual === true || t.janelaComprasAbertaManual === true) {
+        return true;
+    }
     
-    // nivelAtual é 0-indexed, mostrar 1-indexed
-    const nivelAtualHumano = Number(t.nivelAtual || 0) + 1;
+    // Caminho automático: precisa estar em break + break marcado como "de compras"
+    const emBreak = !!(t.is_break || t.isBreak);
+    if (!emBreak) return false;
     
-    // O break tem que estar IMEDIATAMENTE após o nível max (= max + 1)
-    // Por exemplo: max = 10, break do nível 11 → janela aberta
-    return nivelAtualHumano === (maxCompras + 1);
+    const blinds = Array.isArray(t.blinds) ? t.blinds : [];
+    const nivelAtual = Number(t.nivelAtual || 0);
+    const blindAtual = blinds[nivelAtual];
+    if (!blindAtual) return false;
+    
+    // Aceita ambos os formatos (camelCase no JS, snake_case se vier do banco)
+    return blindAtual.breakDeCompras === true || blindAtual.break_de_compras === true;
 }
 
 // Tipos que entram na trava de "entradas" (todos os tipos de compra pra continuar)
@@ -16087,8 +16226,81 @@ async function reabrirCompras() {
     
     if (typeof renderTorneioControle === 'function') renderTorneioControle();
 }
+
+// Abrir janela de inscrição MANUALMENTE (override) — caso operador queira
+// liberar Re-entry/Rebuy/Add-on fora do break marcado
+async function abrirJanelaManual() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (_emJanelaBreakEspecial(t)) {
+        return showToast('ℹ️ Janela de inscrição já está aberta');
+    }
+    
+    if (!confirm('Abrir Janela de Inscrição manualmente?\n\nIsso vai LIBERAR Re-entry, Rebuy e Add-on FORA do break marcado como "Intervalo de Compras".\n\nUse essa opção apenas se a estrutura de blinds não está marcada corretamente.')) return;
+    
+    t.janela_compras_aberta_manual = true;
+    t.janelaComprasAbertaManual = true;
+    // Se compras estavam encerradas, reabre
+    t.compras_encerradas = false;
+    t.comprasEncerradas = false;
+    
+    if (sbClube && typeof sb !== 'undefined') {
+        try {
+            await sb.from('torneios').update({ 
+                janela_compras_aberta_manual: true, 
+                compras_encerradas: false 
+            }).eq('id', t.id);
+        } catch(e) {
+            console.warn('[ABRIR_JANELA] sync falhou:', e);
+        }
+    }
+    
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('ABRIR_JANELA_INSCRICAO', `Janela de inscrição aberta manualmente · ${t.nome}`, {
+            torneioId: t.id, nivelAtual: (t.nivelAtual || 0) + 1,
+        });
+    }
+    showToast('🔓 Janela de inscrição aberta. Re-entry, Rebuy e Add-on liberados.');
+    
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    if (typeof renderTorneiosList === 'function') renderTorneiosList();
+}
+
+// Fecha o override manual (volta pro comportamento automático baseado em break)
+async function fecharJanelaManual() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (!(t.janela_compras_aberta_manual || t.janelaComprasAbertaManual)) {
+        return showToast('ℹ️ Janela não estava aberta manualmente');
+    }
+    
+    t.janela_compras_aberta_manual = false;
+    t.janelaComprasAbertaManual = false;
+    
+    if (sbClube && typeof sb !== 'undefined') {
+        try {
+            await sb.from('torneios').update({ janela_compras_aberta_manual: false }).eq('id', t.id);
+        } catch(e) {
+            console.warn('[FECHAR_JANELA] sync falhou:', e);
+        }
+    }
+    
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('FECHAR_JANELA_INSCRICAO', `Override manual desfeito · ${t.nome}`, { torneioId: t.id });
+    }
+    showToast('🔒 Janela manual fechada.');
+    
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+}
+
 window.encerrarCompras = encerrarCompras;
 window.reabrirCompras = reabrirCompras;
+window.abrirJanelaManual = abrirJanelaManual;
+window.fecharJanelaManual = fecharJanelaManual;
 
 function openModalEntrada(idx) {
     const t = torneios[idx];
