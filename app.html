@@ -4846,6 +4846,40 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div id="mt-staff-val" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#38bdf8;">R$ 0</div>
                             </div>
                         </div>
+                        <!-- 🔥 JANELA DE BREAK ESPECIAL — combo Re-entry + Rebuy + Add-on -->
+                        <div id="mt-janela-break-card" class="stat-card" style="padding:1rem;display:none;background:linear-gradient(135deg,rgba(34,197,94,.12) 0%,rgba(34,197,94,.05) 100%);border:1px solid rgba(34,197,94,.45);">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap;">
+                                <div style="flex:1;min-width:200px;">
+                                    <div style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:#22c55e;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">
+                                        <i class="fa-solid fa-bullhorn" style="font-size:.85rem;"></i>
+                                        <span>Janela de Inscrição Aberta</span>
+                                    </div>
+                                    <div style="font-size:.78rem;color:#a1a1aa;margin-top:.35rem;line-height:1.45;">
+                                        Re-entry, Rebuy Simples/Duplo e Add-on liberados durante este intervalo. Jogadores eliminados podem voltar.
+                                    </div>
+                                </div>
+                                <button onclick="encerrarCompras()" id="mt-btn-encerrar-compras" style="background:#dc2626;color:#fff;border:none;border-radius:.4rem;padding:.55rem .9rem;font-size:.78rem;font-weight:700;font-family:'Manrope',sans-serif;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:.35rem;">
+                                    <i class="fa-solid fa-lock"></i> Encerrar Compras
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 🔒 COMPRAS ENCERRADAS — depois que operador clicou em Encerrar -->
+                        <div id="mt-compras-encerradas-card" class="stat-card" style="padding:.85rem 1rem;display:none;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.35);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;">
+                                    <i class="fa-solid fa-lock" style="color:#ef4444;font-size:.9rem;"></i>
+                                    <div>
+                                        <div style="font-size:.75rem;color:#ef4444;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">Compras Encerradas</div>
+                                        <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Re-entry, Rebuy e Add-on bloqueados</div>
+                                    </div>
+                                </div>
+                                <button onclick="reabrirCompras()" style="background:transparent;color:#a1a1aa;border:1px solid #3f3f46;border-radius:.35rem;padding:.4rem .65rem;font-size:.72rem;cursor:pointer;font-family:'Manrope',sans-serif;">
+                                    <i class="fa-solid fa-unlock"></i> Reabrir
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Extra: jackpot info -->
                         <div id="mt-jackpot-card" class="stat-card" style="padding:.85rem 1rem;display:none;background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.2);">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -6486,6 +6520,7 @@ function _torneioToDb(t) {
         stack: t.stack || 0,
         tempo_nivel: t.tempoNivel || 15,
         reentry_ate: t.reentryAte || 0,
+        compras_encerradas: !!(t.compras_encerradas || t.comprasEncerradas),  // janela de break: operador encerrou compras
         addon_valor: t.addonValor || 0,
         addon_fichas: t.addonFichas || 0,
         staff_valor: t.staffValor || 0,
@@ -7281,6 +7316,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         stack: r.stack || 0,
         tempoNivel: r.tempo_nivel || 15,
         reentryAte: r.reentry_ate || 0,
+        compras_encerradas: !!r.compras_encerradas,
+        comprasEncerradas: !!r.compras_encerradas,
         addonValor: parseFloat(r.addon_valor || 0),
         addonFichas: r.addon_fichas || 0,
         staffValor: parseFloat(r.staff_valor || 0),
@@ -9696,6 +9733,85 @@ function testarSuite() {
         assertEqual('T5: Múltiplos rebuys mesmo jogador → 1 único', _getJogadoresUnicos(t), 1);
         // Chipcount: 20k buy-in + 20k rebuy + 40k duplo + 20k rebuy = 100k
         assertEqual('T5: Chipcount múltiplos rebuys', _calcChipcount(t), 100000);
+    })();
+
+    // ════════════════════════════════════════════════════════════════
+    // JANELA DE BREAK ESPECIAL — Re-entry + Rebuy + Add-on no intervalo
+    // (regra do poker: jogador eliminado pode voltar no break final)
+    // ════════════════════════════════════════════════════════════════
+
+    // Simula a função _emJanelaBreakEspecial
+    function _testJanela(t) {
+        if (!t) return false;
+        if (t.compras_encerradas === true || t.comprasEncerradas === true) return false;
+        if (!t.is_break && !t.isBreak) return false;
+        const maxCompras = Number(t.reentryAte || 0);
+        if (!maxCompras) return false;
+        const nivelAtualHumano = Number(t.nivelAtual || 0) + 1;
+        return nivelAtualHumano === (maxCompras + 1);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // B1: Janela aberta — torneio em break logo após max
+    //     reentryAte=10, em break do nível 11 → JANELA ABERTA
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(), reentryAte: 10,
+            nivelAtual: 10, // 0-indexed → nível humano 11
+            is_break: true,
+            compras_encerradas: false,
+        };
+        assertTrue('B1: Janela aberta no break 10→11', _testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B2: Janela fechada — operador encerrou compras manualmente
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(), reentryAte: 10,
+            nivelAtual: 10, is_break: true,
+            compras_encerradas: true,  // ENCERRADO
+        };
+        assertTrue('B2: Janela fechada após Encerrar Compras', !_testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B3: Janela NÃO abre se não estiver em break
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(), reentryAte: 10,
+            nivelAtual: 10, is_break: false,  // não está em break
+        };
+        assertTrue('B3: Janela só abre em break', !_testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B4: Janela NÃO abre em break errado (não é o break final)
+    //     Ex: reentryAte=10, break no nível 5 (meio do torneio)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(), reentryAte: 10,
+            nivelAtual: 4, // nível 5 humano
+            is_break: true,
+        };
+        assertTrue('B4: Break do meio do torneio não abre janela', !_testJanela(t));
+    })();
+
+    // ──────────────────────────────────────────────────────────────
+    // B5: Janela com config customizada — reentryAte=12
+    //     break entre 12 e 13 → ABRE janela
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = {
+            iniciadoEm: Date.now(), reentryAte: 12,
+            nivelAtual: 12, // nível 13 humano
+            is_break: true,
+        };
+        assertTrue('B5: Janela abre em torneio com reentryAte=12', _testJanela(t));
     })();
 
     return TestRunner.imprimirResultados();
@@ -15226,6 +15342,30 @@ function updateModalTorneio() {
         }
     }
 
+    // 🔥 Card da Janela de Break Especial / Compras Encerradas
+    const janelaCard = document.getElementById('mt-janela-break-card');
+    const encerrCard = document.getElementById('mt-compras-encerradas-card');
+    if (janelaCard && encerrCard) {
+        const emJanela = _emJanelaBreakEspecial(t);
+        const encerrado = !!(t.compras_encerradas || t.comprasEncerradas);
+        
+        // Cenário 1: Janela aberta (e não encerrado manualmente)
+        if (emJanela && !encerrado) {
+            janelaCard.style.display = 'block';
+            encerrCard.style.display = 'none';
+        }
+        // Cenário 2: Operador encerrou compras (só mostra durante este torneio, não em torneios sem janela)
+        else if (encerrado) {
+            janelaCard.style.display = 'none';
+            encerrCard.style.display = 'block';
+        }
+        // Cenário 3: Nenhuma das duas situações
+        else {
+            janelaCard.style.display = 'none';
+            encerrCard.style.display = 'none';
+        }
+    }
+
     // Card do jackpot no resumo financeiro
     const jpCard = document.getElementById('mt-jackpot-card');
     if (jpCard) {
@@ -15782,6 +15922,30 @@ function _resolverNivelMaxAddon(t) {
     return null; // sem trava
 }
 
+// Verifica se o torneio está na "janela de break especial"
+// (intervalo entre o último nível de compras e o próximo, onde libera combo Re-entry+Rebuy+Add-on)
+// Regras:
+// 1. Torneio precisa estar em break (is_break = true)
+// 2. O break precisa estar IMEDIATAMENTE depois do nível máximo de compras
+// 3. Operador NÃO pode ter encerrado as compras manualmente (compras_encerradas)
+function _emJanelaBreakEspecial(t) {
+    if (!t) return false;
+    // Operador já encerrou compras manualmente
+    if (t.compras_encerradas === true || t.comprasEncerradas === true) return false;
+    // Não está em break
+    if (!t.is_break && !t.isBreak) return false;
+    
+    const maxCompras = _resolverNivelMaxCompras(t);
+    if (maxCompras == null) return false;
+    
+    // nivelAtual é 0-indexed, mostrar 1-indexed
+    const nivelAtualHumano = Number(t.nivelAtual || 0) + 1;
+    
+    // O break tem que estar IMEDIATAMENTE após o nível max (= max + 1)
+    // Por exemplo: max = 10, break do nível 11 → janela aberta
+    return nivelAtualHumano === (maxCompras + 1);
+}
+
 // Tipos que entram na trava de "entradas" (todos os tipos de compra pra continuar)
 const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
 
@@ -15793,6 +15957,25 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     // BUG FIX: trava deve valer SEMPRE que o torneio já começou (rodando OU pausado).
     // Só não vale antes de iniciar (iniciadoEm null = nem começou ainda)
     if (!t.iniciadoEm) return { bloqueado: false, motivo: '' };
+    
+    // 🔥 JANELA DE BREAK ESPECIAL — libera Re-entry + Rebuy + Add-on no intervalo final
+    // (regra do poker: jogador eliminado pode voltar no break entre os 2 últimos níveis de compra)
+    if (_emJanelaBreakEspecial(t)) {
+        // Durante o break especial, libera todos os tipos de compra
+        if (['reentry', 'rebuy_simples', 'rebuy_duplo', 'addon'].includes(tipo)) {
+            return { bloqueado: false, motivo: '' };
+        }
+    }
+    
+    // Se compras foram encerradas manualmente, bloqueia tudo
+    if (t.compras_encerradas === true || t.comprasEncerradas === true) {
+        if (_TIPOS_COMPRA.includes(tipo) || tipo === 'addon') {
+            return {
+                bloqueado: true,
+                motivo: 'Compras encerradas pelo operador'
+            };
+        }
+    }
     
     const nivelAtual = Number(t.nivelAtual) + 1; // nivelAtual é 0-indexed, mostrar 1-indexed
     
@@ -15834,6 +16017,78 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     
     return { bloqueado: false, motivo: '' };
 }
+
+// ============================================================
+// ENCERRAR / REABRIR COMPRAS — controle manual do operador
+// Usado pra fechar a janela de break especial quando todos
+// terminaram de entrar
+// ============================================================
+async function encerrarCompras() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (!_emJanelaBreakEspecial(t)) {
+        return showToast('⚠️ Só pode encerrar compras durante o intervalo da janela especial');
+    }
+    
+    const totalEntries = (t.entries || []).length;
+    if (!confirm(`Encerrar compras do torneio?\n\nIsso vai BLOQUEAR Re-entry, Rebuy e Add-on a partir de agora.\n\nTotal de entradas até o momento: ${totalEntries}\n\nÉ irreversível pelo torneio (mas pode reabrir se precisar).`)) return;
+    
+    t.compras_encerradas = true;
+    t.comprasEncerradas = true;  // espelho camelCase
+    
+    // Sync no banco
+    if (sbClube && typeof sb !== 'undefined') {
+        try {
+            await sb.from('torneios').update({ compras_encerradas: true }).eq('id', t.id);
+        } catch(e) {
+            console.warn('[ENCERRAR_COMPRAS] sync falhou:', e);
+        }
+    }
+    
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('ENCERRAR_COMPRAS', `Compras encerradas no torneio ${t.nome} · ${totalEntries} entradas registradas`, {
+            torneioId: t.id, nivelAtual: t.nivelAtual + 1, totalEntries,
+        });
+    }
+    showToast('🔒 Compras encerradas. Re-entry, Rebuy e Add-on bloqueados.');
+    
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    if (typeof renderTorneiosList === 'function') renderTorneiosList();
+}
+
+async function reabrirCompras() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (!(t.compras_encerradas || t.comprasEncerradas)) {
+        return showToast('ℹ️ As compras já estão abertas');
+    }
+    
+    if (!confirm('Reabrir compras?\n\nIsso vai LIBERAR Re-entry, Rebuy e Add-on novamente (se ainda estiver na janela permitida).')) return;
+    
+    t.compras_encerradas = false;
+    t.comprasEncerradas = false;
+    
+    if (sbClube && typeof sb !== 'undefined') {
+        try {
+            await sb.from('torneios').update({ compras_encerradas: false }).eq('id', t.id);
+        } catch(e) {
+            console.warn('[REABRIR_COMPRAS] sync falhou:', e);
+        }
+    }
+    
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('REABRIR_COMPRAS', `Compras reabertas no torneio ${t.nome}`, { torneioId: t.id });
+    }
+    showToast('🔓 Compras reabertas.');
+    
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+}
+window.encerrarCompras = encerrarCompras;
+window.reabrirCompras = reabrirCompras;
 
 function openModalEntrada(idx) {
     const t = torneios[idx];
