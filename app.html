@@ -15504,12 +15504,14 @@ function renderTabFinanceiro() {
         linhas.push({ label: 'Re-entries', sub: `${reentryEntries.length} × ${formatMoney(t.buyin)}`, val: formatMoney(reentryTotal), tipo: 'normal' });
     }
     
-    if (t.rebuySimples > 0 || rebuyS.length > 0) {
-        linhas.push({ label: 'Rebuy Simples', sub: `${rebuyS.length} × ${formatMoney(t.rebuySimples || 0)}`, val: formatMoney(rebuySTotal), tipo: 'normal' });
+    if (t.rebuyValor > 0 || t.rebuySimples > 0 || rebuyS.length > 0) {
+        const rsVal = Number(t.rebuyValor || t.rebuySimples || 0);
+        linhas.push({ label: 'Rebuy Simples', sub: `${rebuyS.length} × ${formatMoney(rsVal)}`, val: formatMoney(rebuySTotal), tipo: 'normal' });
     }
     
-    if (t.rebuyDuplo > 0 || rebuyD.length > 0) {
-        linhas.push({ label: 'Rebuy Duplo', sub: `${rebuyD.length} × ${formatMoney(t.rebuyDuplo || 0)}`, val: formatMoney(rebuyDTotal), tipo: 'normal' });
+    if (t.rebuyDuploValor > 0 || t.rebuyDuplo > 0 || rebuyD.length > 0) {
+        const rdVal = Number(t.rebuyDuploValor || t.rebuyDuplo || 0);
+        linhas.push({ label: 'Rebuy Duplo', sub: `${rebuyD.length} × ${formatMoney(rdVal)}`, val: formatMoney(rebuyDTotal), tipo: 'normal' });
     }
     
     if (t.addonFichas > 0 || addonEntries.length > 0) {
@@ -15861,8 +15863,30 @@ function openModalEntrada(idx) {
     };
     
     const opts = [addOpt('buyin', `Buy-in (entrada normal) — R$ ${t.buyin}`)];
-    if (t.rebuySimples > 0) opts.push(addOpt('rebuy_simples', `Rebuy Simples — R$ ${t.rebuySimples} (${(t.rebuySimplesFichas||0).toLocaleString()} fichas)`));
-    if (t.rebuyDuplo > 0)   opts.push(addOpt('rebuy_duplo', `Rebuy Duplo — R$ ${t.rebuyDuplo} (${(t.rebuyDuploFichas||0).toLocaleString()} fichas)`));
+    // Aceita tanto rebuySimples/rebuyDuplo (nomes antigos) quanto rebuyValor/rebuyDuploValor (corretos do DB)
+    const rebuySimpVal = Number(t.rebuyValor || t.rebuySimples || 0);
+    const rebuySimpFichas = Number(t.rebuyFichas || t.rebuySimplesFichas || 0);
+    const rebuyDupVal = Number(t.rebuyDuploValor || t.rebuyDuplo || 0);
+    const rebuyDupFichas = Number(t.rebuyDuploFichas || 0);
+    
+    // Conta se já existem rebuys cadastrados (cenário de torneio com config 0 mas com entries históricas)
+    const jaTemRebuySimples = (t.entries || []).some(e => e.tipo === 'rebuy_simples');
+    const jaTemRebuyDuplo   = (t.entries || []).some(e => e.tipo === 'rebuy_duplo');
+    
+    // Mostra Rebuy Simples se: tem valor configurado OU já tem rebuys cadastrados
+    if (rebuySimpVal > 0) {
+        opts.push(addOpt('rebuy_simples', `Rebuy Simples — R$ ${rebuySimpVal} (${rebuySimpFichas.toLocaleString()} fichas)`));
+    } else if (jaTemRebuySimples) {
+        opts.push(`<option value="rebuy_simples" disabled style="color:#71717a;">🔒 Rebuy Simples — valor não configurado (já tem ${(t.entries || []).filter(e => e.tipo === 'rebuy_simples').length} cadastrados)</option>`);
+    }
+    
+    // Mostra Rebuy Duplo se: tem valor configurado OU já tem rebuys cadastrados
+    if (rebuyDupVal > 0) {
+        opts.push(addOpt('rebuy_duplo', `Rebuy Duplo — R$ ${rebuyDupVal} (${rebuyDupFichas.toLocaleString()} fichas)`));
+    } else if (jaTemRebuyDuplo) {
+        opts.push(`<option value="rebuy_duplo" disabled style="color:#71717a;">🔒 Rebuy Duplo — valor não configurado (já tem ${(t.entries || []).filter(e => e.tipo === 'rebuy_duplo').length} cadastrados)</option>`);
+    }
+    
     if (t.reentryAte > 0)   opts.push(addOpt('reentry', `Re-entry — R$ ${t.buyin}`));
     if (t.addonFichas > 0)  {
         const addonLabel = (t.addonValor && t.addonValor > 0)
@@ -15904,8 +15928,8 @@ function atualizarResumoEntrada() {
     let valorBase = 0;
     if (tipo === 'buyin')          valorBase = Number(t.buyin) || 0;
     else if (tipo === 'reentry')   valorBase = Number(t.buyin) || 0;
-    else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuySimples) || 0;
-    else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuplo) || 0;
+    else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
+    else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
     else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
     
     let staff = 0; // staff zerado sempre (agora é dedução do prize)
@@ -15980,8 +16004,8 @@ function _registrarEntradaImpl() {
 
     // Determina valor BASE em R$ com base no tipo
     let valorBase = t.buyin;
-    if (tipo === 'rebuy_simples') valorBase = t.rebuySimples;
-    if (tipo === 'rebuy_duplo')   valorBase = t.rebuyDuplo;
+    if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
+    if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     
     // LOTE 5: Taxa Administrativa — cobrada APENAS no buy-in (1ª entrada)
@@ -16374,8 +16398,8 @@ function updateTV(idx) {
     if (defVis('buyin'))     statsStrip.push({ label:'BUY IN',   value:buyinsQtd });
     if (defVis('reentry') && reentriesQtd) statsStrip.push({ label:'RE-ENTRY', value:reentriesQtd });
     if (defVis('jackpot') && (t.jackpotValor > 0)) statsStrip.push({ label:'JACKPOT', value:jackpotsQtd });
-    if (defVis('rebuy_simples') && (t.rebuySimples > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label:'REBUY SIMPLES',  value:rebuysSimplesQtd });
-    if (defVis('rebuy_duplo')   && (t.rebuyDuplo   > 0 || rebuysDuplosQtd  > 0)) statsStrip.push({ label:'REBUY DUPLO',    value:rebuysDuplosQtd });
+    if (defVis('rebuy_simples') && (t.rebuyValor > 0 || t.rebuySimples > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label:'REBUY SIMPLES',  value:rebuysSimplesQtd });
+    if (defVis('rebuy_duplo')   && (t.rebuyDuploValor > 0 || t.rebuyDuplo   > 0 || rebuysDuplosQtd  > 0)) statsStrip.push({ label:'REBUY DUPLO',    value:rebuysDuplosQtd });
     if (defVis('addon') && (t.addonFichas > 0))        statsStrip.push({ label:'ADD-ON', value:addonsQtd });
     if (defVis('last_chance') && (t.lastChanceValor > 0 || lastChanceQtd > 0)) statsStrip.push({ label:'LAST CHANCE', value:lastChanceQtd });
 
@@ -16872,8 +16896,8 @@ function abrirConfigStatsTV() {
         { key:'buyin',          label:'Buy-in',                         icon:'fa-ticket' },
         { key:'reentry',        label:'Re-entries',                     icon:'fa-rotate-left' },
         { key:'jackpot',        label:'Jackpot',                        icon:'fa-gem',         cond: () => t.jackpotValor > 0 || qtdJackpot > 0 },
-        { key:'rebuy_simples',  label:'Rebuy Simples',                  icon:'fa-coins',       cond: () => t.rebuySimples > 0 || qtdRebuySimples > 0 },
-        { key:'rebuy_duplo',    label:'Rebuy Duplo',                    icon:'fa-coins',       cond: () => t.rebuyDuplo > 0 || qtdRebuyDuplo > 0 },
+        { key:'rebuy_simples',  label:'Rebuy Simples',                  icon:'fa-coins',       cond: () => t.rebuyValor > 0 || t.rebuySimples > 0 || qtdRebuySimples > 0 },
+        { key:'rebuy_duplo',    label:'Rebuy Duplo',                    icon:'fa-coins',       cond: () => t.rebuyDuploValor > 0 || t.rebuyDuplo > 0 || qtdRebuyDuplo > 0 },
         { key:'addon',          label:'Add-on',                         icon:'fa-plus',        cond: () => t.addonFichas > 0 || qtdAddon > 0 },
         { key:'last_chance',    label:'Last Chance',                    icon:'fa-clock-rotate-left', cond: () => t.lastChanceValor > 0 || qtdLastChance > 0 },
     ];
@@ -24476,8 +24500,8 @@ function renderRelTorneios() {
         t.entries.forEach(e => {
             if (e.tipo === 'buyin') buyins += e.valor || t.buyin;
             else if (e.tipo === 'reentry') reentries += e.valor || t.buyin;
-            else if (e.tipo === 'rebuy_simples') buyins += e.valor || t.rebuySimples || 0;
-            else if (e.tipo === 'rebuy_duplo') buyins += e.valor || t.rebuyDuplo || 0;
+            else if (e.tipo === 'rebuy_simples') buyins += e.valor || t.rebuyValor || t.rebuySimples || 0;
+            else if (e.tipo === 'rebuy_duplo') buyins += e.valor || t.rebuyDuploValor || t.rebuyDuplo || 0;
         });
     });
     const rake = torneiosPeriodo.reduce((s,t) => s + getRake(t), 0);
