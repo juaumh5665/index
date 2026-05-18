@@ -2884,6 +2884,14 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <i class="fa-solid fa-copy"></i> Copiar
                                     </button>
                                 </div>
+                                <div style="margin-top:.6rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem;">
+                                    <div style="font-size:.7rem;color:#71717a;line-height:1.4;">
+                                        <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i> Detecção automática: se a TV for muito antiga, redireciona pra versão Legacy automaticamente.
+                                    </div>
+                                    <button onclick="copiarUrlTVLegacy()" style="padding:.4rem .7rem;border-radius:.3rem;background:transparent;border:1px solid #3f3f46;color:#a1a1aa;font-size:.7rem;cursor:pointer;white-space:nowrap;" title="Cole essa URL pra forçar versão ultra-compatível com TVs muito antigas (sem JS moderno)">
+                                        <i class="fa-solid fa-tv"></i> URL Legacy
+                                    </button>
+                                </div>
                             </div>
                             
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:1rem;">
@@ -5926,6 +5934,24 @@ async function copiarUrlTV() {
         input.select();
         document.execCommand('copy');
         alert('URL copiada!');
+    }
+}
+
+// Copia URL legacy (versão ultra-compatível com TVs antigas)
+async function copiarUrlTVLegacy() {
+    const input = document.getElementById('cfg-tv-url');
+    if (!input || !input.value || input.value.startsWith('Erro')) {
+        alert('URL ainda não está disponível. Aguarde o carregamento.');
+        return;
+    }
+    // Converte /tv/SLUG → /tv-legacy/SLUG
+    const urlLegacy = input.value.replace(/\/tv\//, '/tv-legacy/');
+    try {
+        await navigator.clipboard.writeText(urlLegacy);
+        if (typeof showToast === 'function') showToast('✓ URL Legacy copiada: ' + urlLegacy);
+        else alert('URL copiada:\n' + urlLegacy);
+    } catch(e) {
+        prompt('Copie esta URL:', urlLegacy);
     }
 }
 
@@ -16337,6 +16363,7 @@ function updateTV(idx) {
     const rebuysDuplosQtd = t.entries.filter(e => e.tipo === 'rebuy_duplo').length;
     const rebuysQtd = rebuysSimplesQtd + rebuysDuplosQtd;
     const addonsQtd = t.entries.filter(e => e.tipo === 'addon').length;
+    const lastChanceQtd = t.entries.filter(e => e.tipo === 'last_chance').length;
     const jackpotsQtd = (t.jackpotCompras || []).reduce((s, j) => s + (j.qtd || 1), 0);
 
     // Stats strip do layout Pro Live (configuração por torneio)
@@ -16350,6 +16377,7 @@ function updateTV(idx) {
     if (defVis('rebuy_simples') && (t.rebuySimples > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label:'REBUY SIMPLES',  value:rebuysSimplesQtd });
     if (defVis('rebuy_duplo')   && (t.rebuyDuplo   > 0 || rebuysDuplosQtd  > 0)) statsStrip.push({ label:'REBUY DUPLO',    value:rebuysDuplosQtd });
     if (defVis('addon') && (t.addonFichas > 0))        statsStrip.push({ label:'ADD-ON', value:addonsQtd });
+    if (defVis('last_chance') && (t.lastChanceValor > 0 || lastChanceQtd > 0)) statsStrip.push({ label:'LAST CHANCE', value:lastChanceQtd });
 
     const prox = t.blinds[t.nivelAtual + 1];
 
@@ -16829,7 +16857,7 @@ function syncTVControls() {
 function abrirConfigStatsTV() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    if (!t.pwStatsVisiveis) t.pwStatsVisiveis = { buyin:true, reentry:true, jackpot:true, rebuy_simples:true, rebuy_duplo:true, addon:true };
+    if (!t.pwStatsVisiveis) t.pwStatsVisiveis = { buyin:true, reentry:true, jackpot:true, rebuy_simples:true, rebuy_duplo:true, addon:true, last_chance:true };
 
     // Conta entries do torneio (pra detectar uso real mesmo sem config preenchida)
     const ent = t.entries || [];
@@ -16837,15 +16865,17 @@ function abrirConfigStatsTV() {
     const qtdRebuyDuplo   = ent.filter(e => e.tipo === 'rebuy_duplo').length;
     const qtdAddon        = ent.filter(e => e.tipo === 'addon').length;
     const qtdReentry      = ent.filter(e => e.tipo === 'reentry').length;
+    const qtdLastChance   = ent.filter(e => e.tipo === 'last_chance').length;
     const qtdJackpot      = (t.jackpotCompras || []).length;
 
     const stats = [
         { key:'buyin',          label:'Buy-in',                         icon:'fa-ticket' },
         { key:'reentry',        label:'Re-entries',                     icon:'fa-rotate-left' },
-        { key:'jackpot',        label:'Jackpot',                        icon:'fa-gem',  cond: () => t.jackpotValor > 0 || qtdJackpot > 0 },
-        { key:'rebuy_simples',  label:'Rebuy Simples', icon:'fa-coins', cond: () => t.rebuySimples > 0 || qtdRebuySimples > 0 },
-        { key:'rebuy_duplo',    label:'Rebuy Duplo',   icon:'fa-coins', cond: () => t.rebuyDuplo > 0 || qtdRebuyDuplo > 0 },
-        { key:'addon',          label:'Add-on',                         icon:'fa-plus',  cond: () => t.addonFichas > 0 || qtdAddon > 0 },
+        { key:'jackpot',        label:'Jackpot',                        icon:'fa-gem',         cond: () => t.jackpotValor > 0 || qtdJackpot > 0 },
+        { key:'rebuy_simples',  label:'Rebuy Simples',                  icon:'fa-coins',       cond: () => t.rebuySimples > 0 || qtdRebuySimples > 0 },
+        { key:'rebuy_duplo',    label:'Rebuy Duplo',                    icon:'fa-coins',       cond: () => t.rebuyDuplo > 0 || qtdRebuyDuplo > 0 },
+        { key:'addon',          label:'Add-on',                         icon:'fa-plus',        cond: () => t.addonFichas > 0 || qtdAddon > 0 },
+        { key:'last_chance',    label:'Last Chance',                    icon:'fa-clock-rotate-left', cond: () => t.lastChanceValor > 0 || qtdLastChance > 0 },
     ];
 
     const lista = document.getElementById('stats-tv-list');
