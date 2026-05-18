@@ -1458,6 +1458,42 @@ function montarCarouselPremiacao(d) {
             body: params || {}
           });
         },
+        // Cliente mínimo de tabela: suporta .select().in() e .select().eq()
+        // (chainable, retorna Promise no .then ou no await)
+        from: function(table) {
+          var qs = [];
+          var selectCols = '*';
+          
+          var query = {
+            select: function(cols) {
+              selectCols = cols || '*';
+              return query;
+            },
+            in: function(col, vals) {
+              if (Array.isArray(vals) && vals.length > 0) {
+                // formato PostgREST: col=in.(v1,v2,v3)
+                var enc = vals.map(function(v) { return encodeURIComponent(v); }).join(',');
+                qs.push(encodeURIComponent(col) + '=in.(' + enc + ')');
+              }
+              return query;
+            },
+            eq: function(col, val) {
+              qs.push(encodeURIComponent(col) + '=eq.' + encodeURIComponent(val));
+              return query;
+            },
+            limit: function(n) {
+              qs.push('limit=' + Number(n));
+              return query;
+            },
+            // Suporta await direto (thenable)
+            then: function(resolve, reject) {
+              var url = '/rest/v1/' + encodeURIComponent(table) + '?select=' + encodeURIComponent(selectCols);
+              if (qs.length) url += '&' + qs.join('&');
+              return fetchJson(url, { method: 'GET' }).then(resolve, reject);
+            }
+          };
+          return query;
+        },
         // Stub do channel — TV em modo público vai usar polling em vez de realtime
         // (já existe polling a cada 30s no código original, suficiente pra TV pública)
         channel: function(name) {
