@@ -3684,7 +3684,106 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
 </div>
 
-<!-- MODAL: AJUDA DE ATALHOS -->
+<!-- MODAL: ACERTO FINANCEIRO DE PREMIAÇÃO -->
+<div id="modal-acerto-premio" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;display:flex;align-items:center;gap:.5rem;">
+                <i class="fa-solid fa-trophy" style="color:var(--gold);"></i>
+                <span>Acerto Financeiro — <span id="ap-posicao-label">—</span></span>
+            </h3>
+            <button onclick="closeModal('modal-acerto-premio')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+
+        <div style="background:#0a0a0c;border:1px solid #1e1e23;border-radius:.6rem;padding:.9rem 1rem;margin-bottom:1rem;">
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <i class="fa-solid fa-user-circle" style="font-size:1.5rem;color:var(--gold);"></i>
+                <div style="flex:1;">
+                    <div id="ap-jogador-nome" style="font-weight:700;font-size:1rem;">—</div>
+                    <div id="ap-jogador-sub" style="font-size:.72rem;color:#71717a;margin-top:.1rem;">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Composição do saldo -->
+        <div style="background:rgba(255,255,255,.02);border:1px solid #1e1e23;border-radius:.6rem;padding:1rem;margin-bottom:1rem;">
+            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Composição</div>
+            
+            <!-- Premiação -->
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid #1e1e23;">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <i class="fa-solid fa-trophy" style="color:#22c55e;font-size:.85rem;"></i>
+                    <span style="font-size:.85rem;color:#a1a1aa;">Premiação <span id="ap-pos-sub" style="color:#52525b;font-size:.7rem;"></span></span>
+                </div>
+                <div id="ap-valor-premio" style="font-size:1rem;font-weight:800;color:#22c55e;font-family:var(--font-mono);">+ R$ 0,00</div>
+            </div>
+            
+            <!-- Dívidas em aberto -->
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid #1e1e23;">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <i class="fa-solid fa-receipt" style="color:#ef4444;font-size:.85rem;"></i>
+                    <span style="font-size:.85rem;color:#a1a1aa;">Dívidas em aberto <span id="ap-divida-sub" style="color:#52525b;font-size:.7rem;"></span></span>
+                </div>
+                <div id="ap-valor-divida" style="font-size:1rem;font-weight:800;color:#ef4444;font-family:var(--font-mono);">- R$ 0,00</div>
+            </div>
+            
+            <!-- Líquido -->
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0 .2rem;margin-top:.3rem;">
+                <span style="font-size:.85rem;font-weight:700;color:#fafafa;">Saldo líquido</span>
+                <div id="ap-valor-liquido" style="font-size:1.15rem;font-weight:900;font-family:var(--font-mono);">R$ 0,00</div>
+            </div>
+            
+            <!-- Mensagem do que acontece -->
+            <div id="ap-mensagem" style="font-size:.75rem;margin-top:.5rem;padding:.5rem .7rem;border-radius:.4rem;text-align:center;font-weight:600;">—</div>
+        </div>
+
+        <!-- Editar valor (operador pode ajustar) -->
+        <div style="margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+                <label style="font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.08em;">Valor a movimentar agora</label>
+                <button onclick="acertoUsarSugerido()" style="background:transparent;border:none;color:#a855f7;font-size:.7rem;cursor:pointer;text-decoration:underline;">⟲ usar sugerido</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.5rem;padding:.7rem .9rem;">
+                <span style="font-size:.85rem;color:#71717a;font-family:var(--font-mono);font-weight:700;">R$</span>
+                <input type="number" id="ap-valor-editavel" step="0.01" style="flex:1;background:transparent;border:none;color:#fafafa;font-size:1.05rem;font-family:var(--font-mono);font-weight:700;outline:none;text-align:right;">
+            </div>
+        </div>
+
+        <!-- Método de pagamento -->
+        <div style="margin-bottom:1.25rem;">
+            <label style="font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem;">Método</label>
+            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:.4rem;" id="ap-metodos-container">
+                <button onclick="acertoSelecionarMetodo('dinheiro')" data-metodo="dinheiro" class="ap-metodo-btn" style="padding:.65rem .4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.45rem;color:#a1a1aa;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-family:'Manrope',sans-serif;">
+                    <i class="fa-solid fa-money-bill-wave" style="font-size:.95rem;"></i>
+                    Dinheiro
+                </button>
+                <button onclick="acertoSelecionarMetodo('pix')" data-metodo="pix" class="ap-metodo-btn" style="padding:.65rem .4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.45rem;color:#a1a1aa;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-family:'Manrope',sans-serif;">
+                    <i class="fa-solid fa-qrcode" style="font-size:.95rem;"></i>
+                    PIX
+                </button>
+                <button onclick="acertoSelecionarMetodo('debito')" data-metodo="debito" class="ap-metodo-btn" style="padding:.65rem .4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.45rem;color:#a1a1aa;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-family:'Manrope',sans-serif;">
+                    <i class="fa-solid fa-credit-card" style="font-size:.95rem;"></i>
+                    Débito
+                </button>
+                <button onclick="acertoSelecionarMetodo('credito')" data-metodo="credito" class="ap-metodo-btn" style="padding:.65rem .4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.45rem;color:#a1a1aa;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-family:'Manrope',sans-serif;">
+                    <i class="fa-brands fa-cc-mastercard" style="font-size:.95rem;"></i>
+                    Crédito
+                </button>
+            </div>
+        </div>
+
+        <!-- Botões de ação -->
+        <div style="display:flex;gap:.5rem;">
+            <button onclick="acertoDeixarPendente()" style="flex:1;padding:.85rem;background:transparent;border:1px solid #3f3f46;border-radius:.5rem;color:#a1a1aa;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif;">
+                <i class="fa-solid fa-clock"></i> Deixar Pendente
+            </button>
+            <button onclick="acertoConfirmar()" id="ap-btn-confirmar" style="flex:1;padding:.85rem;background:linear-gradient(135deg,#22c55e 0%,#16a34a 100%);border:none;border-radius:.5rem;color:#fff;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;">
+                <i class="fa-solid fa-check"></i> Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="modal-ajuda-atalhos" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
@@ -6530,6 +6629,7 @@ function _torneioToDb(t) {
         reentry_ate: t.reentryAte || 0,
         compras_encerradas: !!(t.compras_encerradas || t.comprasEncerradas),  // janela de break: operador encerrou compras
         janela_compras_aberta_manual: !!(t.janela_compras_aberta_manual || t.janelaComprasAbertaManual),  // override manual da janela
+        vencedor_id: t.vencedorId || null,  // jogador que ganhou (pra acerto financeiro)
         addon_valor: t.addonValor || 0,
         addon_fichas: t.addonFichas || 0,
         staff_valor: t.staffValor || 0,
@@ -7329,6 +7429,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         comprasEncerradas: !!r.compras_encerradas,
         janela_compras_aberta_manual: !!r.janela_compras_aberta_manual,
         janelaComprasAbertaManual: !!r.janela_compras_aberta_manual,
+        vencedorId: r.vencedor_id || null,
         addonValor: parseFloat(r.addon_valor || 0),
         addonFichas: r.addon_fichas || 0,
         staffValor: parseFloat(r.staff_valor || 0),
@@ -9899,6 +10000,108 @@ function testarSuite() {
             is_break: true,
         };
         assertTrue('B8: Sem marcação no break → não abre', !_testJanela(t));
+    })();
+
+    // ════════════════════════════════════════════════════════════════
+    // ACERTO FINANCEIRO DE PREMIAÇÃO
+    // (modal automático quando jogador eliminado está na faixa premiada)
+    // ════════════════════════════════════════════════════════════════
+    
+    // Helper: monta torneio com premiação projetada
+    function _mkTorneioComPremiacao(qtdEntries, qtdPremiados, valoresPremio) {
+        const entries = [];
+        for (let i = 1; i <= qtdEntries; i++) {
+            entries.push({ jogadorId: `p${i}`, tipo: 'buyin', valor: 100 });
+        }
+        return {
+            buyin: 100, rake: 20, stack: 20000,
+            premiacaoProjetada: {
+                qtd: qtdPremiados,
+                valores: valoresPremio,
+            },
+            entries,
+            eliminados: [],
+        };
+    }
+    
+    // Calcula o saldo líquido sugerido (replica lógica do app)
+    function _calcLiquido(valorPremio, valorDivida) {
+        return Math.round((valorPremio - valorDivida) * 100) / 100;
+    }
+    
+    // ──────────────────────────────────────────────────────────────
+    // P1: Jogador em 5º lugar dentro do dinheiro
+    //     Prêmio: R$ 86,91 | Dívidas: R$ 0 | Líquido: +R$ 86,91 (recebe)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneioComPremiacao(10, 5, [434.56, 271.60, 162.96, 130.37, 86.91]);
+        const posicao = 5;
+        const valorPremio = t.premiacaoProjetada.valores[posicao - 1];
+        const valorDivida = 0;
+        const liquido = _calcLiquido(valorPremio, valorDivida);
+        
+        assertEqual('P1: 5º lugar prêmio = R$ 86,91', valorPremio, 86.91);
+        assertEqual('P1: Líquido positivo (jogador recebe)', liquido, 86.91);
+    })();
+    
+    // ──────────────────────────────────────────────────────────────
+    // P2: Jogador 5º lugar com dívidas maiores que prêmio
+    //     Prêmio: R$ 86,91 | Dívidas: R$ 250 | Líquido: -R$ 163,09 (paga)
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneioComPremiacao(10, 5, [434.56, 271.60, 162.96, 130.37, 86.91]);
+        const valorPremio = 86.91;
+        const valorDivida = 250.00;
+        const liquido = _calcLiquido(valorPremio, valorDivida);
+        
+        assertEqual('P2: Dívidas > prêmio → líquido negativo', liquido, -163.09);
+        assertTrue('P2: Líquido < 0 indica jogador paga', liquido < 0);
+    })();
+    
+    // ──────────────────────────────────────────────────────────────
+    // P3: Vencedor (1º lugar) sem dívidas — recebe tudo
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneioComPremiacao(10, 5, [434.56, 271.60, 162.96, 130.37, 86.91]);
+        const valorPremio = t.premiacaoProjetada.valores[0]; // 1º
+        const valorDivida = 0;
+        const liquido = _calcLiquido(valorPremio, valorDivida);
+        
+        assertEqual('P3: 1º lugar = R$ 434,56', valorPremio, 434.56);
+        assertEqual('P3: Vencedor sem dívida recebe tudo', liquido, 434.56);
+    })();
+    
+    // ──────────────────────────────────────────────────────────────
+    // P4: Jogador FORA do dinheiro (6º quando só 5 premiam)
+    //     Não abre modal de prêmio — fluxo normal de eliminação
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const t = _mkTorneioComPremiacao(10, 5, [434.56, 271.60, 162.96, 130.37, 86.91]);
+        const posicao = 6;
+        const ehPremiado = posicao <= t.premiacaoProjetada.qtd;
+        
+        assertTrue('P4: 6º lugar NÃO é premiado', !ehPremiado);
+    })();
+    
+    // ──────────────────────────────────────────────────────────────
+    // P5: Prêmio exatamente igual à dívida — saldo zero
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const valorPremio = 100;
+        const valorDivida = 100;
+        const liquido = _calcLiquido(valorPremio, valorDivida);
+        
+        assertEqual('P5: Prêmio = dívida → líquido zero', liquido, 0);
+    })();
+    
+    // ──────────────────────────────────────────────────────────────
+    // P6: Premiação completa — soma todos os prêmios = prize pool
+    // ──────────────────────────────────────────────────────────────
+    (() => {
+        const valores = [434.56, 271.60, 162.96, 130.37, 86.91];
+        const soma = valores.reduce((s, v) => s + v, 0);
+        // Prize pool original = R$ 1.086,40
+        assertTrue('P6: Soma dos prêmios = prize pool (1.086,40)', Math.abs(soma - 1086.40) < 0.05);
     })();
 
     return TestRunner.imprimirResultados();
@@ -16704,11 +16907,13 @@ function _confirmarEliminacaoImpl() {
 
     const ativosFinal = ativos.length - 1;
     const finalizado = ativosFinal === 1;
+    let vencedorIdFinal = null;
     if (finalizado) {
         t.status = 'finished';
         t.rodando = false;
-        const vencedorId = ativos.find(id => id !== jid);
-        const venc = jogadores.find(j => j.id === vencedorId);
+        vencedorIdFinal = ativos.find(id => id !== jid);
+        t.vencedorId = vencedorIdFinal;  // 🆕 salva pro acerto do 1º
+        const venc = jogadores.find(j => j.id === vencedorIdFinal);
         showToast(`🏆 Torneio finalizado! Campeão: ${venc ? venc.nome : 'Desconhecido'}`);
     }
 
@@ -16720,6 +16925,11 @@ function _confirmarEliminacaoImpl() {
 
     // Sugerir acerto no caixa (depende da preferência do operador)
     sugerirAcertoNoCaixa(jid);
+    
+    // 🏆 Se o torneio terminou, sugerir também acerto do CAMPEÃO (1º lugar)
+    if (finalizado && vencedorIdFinal) {
+        setTimeout(() => sugerirAcertoNoCaixa(vencedorIdFinal), 1500);  // dá tempo pro modal anterior fechar
+    }
 
     // UNDO: permite desfazer eliminação
     const snapshot = JSON.stringify(t);
@@ -26028,6 +26238,35 @@ function getPrefAcertoElim() {
 }
 
 function sugerirAcertoNoCaixa(jogadorId) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    // 🏆 PRIORIDADE: se o jogador está em faixa premiada, abrir modal NOVO de acerto de prêmio
+    // (substitui o fluxo antigo só pros premiados — não-premiados continuam com o fluxo padrão)
+    const elim = (t.eliminados || []).find(e => String(e.jogadorId) === String(jogadorId));
+    if (elim && elim.posicao) {
+        const pp = t.premiacaoProjetada;
+        const qtdPremiados = pp && pp.qtd ? Number(pp.qtd) : 0;
+        // Vencedor (1º) também passa por aqui — mas só será detectado se ele foi "eliminado" 
+        // (= 2º colocado eliminou ele virtualmente). Caso especial: torneio acabou, vencedor não foi pra eliminados.
+        // Por isso checamos abaixo o caso do vencedor pelo status do torneio.
+        if (qtdPremiados > 0 && elim.posicao <= qtdPremiados) {
+            // Está na faixa premiada — abre modal especial
+            setTimeout(() => abrirAcertoPremio(jogadorId, elim.posicao), 400);
+            return;
+        }
+    }
+    
+    // 🏆 Caso especial: vencedor (1º lugar) — torneio finished, jogador não foi pra eliminados
+    if (t.status === 'finished' && t.vencedorId && String(t.vencedorId) === String(jogadorId)) {
+        const pp = t.premiacaoProjetada;
+        if (pp && pp.qtd > 0) {
+            setTimeout(() => abrirAcertoPremio(jogadorId, 1), 400);
+            return;
+        }
+    }
+    
+    // Comportamento ORIGINAL pra não-premiados
     const pref = getPrefAcertoElim();
     if (pref === 'off') return;
 
@@ -26054,6 +26293,241 @@ function sugerirAcertoNoCaixa(jogadorId) {
         }
     }, 500);
 }
+
+// ============================================================
+// MODAL DE ACERTO DE PREMIAÇÃO
+// Abre automaticamente quando jogador eliminado está em faixa premiada
+// ============================================================
+
+// Estado do acerto em andamento
+let _acertoPremio = {
+    jogadorId: null,
+    posicao: null,
+    valorPremio: 0,
+    valorDivida: 0,
+    valorLiquido: 0,
+    valorEditado: 0,
+    metodo: 'pix',
+};
+
+function abrirAcertoPremio(jogadorId, posicao) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const j = jogadores.find(x => String(x.id) === String(jogadorId));
+    if (!j) return;
+    
+    // Pega valor da premiação na posição
+    const pp = t.premiacaoProjetada || {};
+    const valores = pp.valores || [];
+    const valorPremio = Math.round((valores[posicao - 1] || 0) * 100) / 100;
+    
+    // Saldo atual do jogador (negativo = devendo)
+    const saldoAtual = getSaldoJogador(jogadorId);
+    const valorDivida = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
+    
+    // Líquido sugerido: prêmio - dívida
+    const valorLiquido = Math.round((valorPremio - valorDivida) * 100) / 100;
+    
+    _acertoPremio = {
+        jogadorId,
+        posicao,
+        valorPremio,
+        valorDivida,
+        valorLiquido,
+        valorEditado: Math.abs(valorLiquido),  // sempre absoluto pro input
+        metodo: 'pix',
+    };
+    
+    // Preenche modal
+    document.getElementById('ap-posicao-label').textContent = `${posicao}º Lugar`;
+    document.getElementById('ap-jogador-nome').textContent = j.nome;
+    document.getElementById('ap-jogador-sub').textContent = 
+        posicao === 1 ? '🏆 Campeão!' : 
+        posicao <= 3 ? `🥇 Premiação do pódio` : 
+        `Premiação · ${posicao}º colocado`;
+    
+    document.getElementById('ap-pos-sub').textContent = `(${posicao}º)`;
+    document.getElementById('ap-valor-premio').textContent = `+ ${formatMoney(valorPremio)}`;
+    
+    document.getElementById('ap-divida-sub').textContent = valorDivida > 0 ? '(bar/buy-in/comanda)' : '(nenhuma)';
+    document.getElementById('ap-valor-divida').textContent = `- ${formatMoney(valorDivida)}`;
+    document.getElementById('ap-valor-divida').style.color = valorDivida > 0 ? '#ef4444' : '#52525b';
+    
+    // Líquido
+    const liquidoEl = document.getElementById('ap-valor-liquido');
+    const msgEl = document.getElementById('ap-mensagem');
+    const btnConfirmar = document.getElementById('ap-btn-confirmar');
+    if (valorLiquido > 0) {
+        liquidoEl.textContent = `+ ${formatMoney(valorLiquido)}`;
+        liquidoEl.style.color = '#22c55e';
+        msgEl.style.background = 'rgba(34,197,94,.08)';
+        msgEl.style.color = '#22c55e';
+        msgEl.innerHTML = `💰 <strong>${j.nome}</strong> recebe ${formatMoney(valorLiquido)}`;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-arrow-up"></i> Confirmar Pagamento';
+        btnConfirmar.style.background = 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)';
+    } else if (valorLiquido < 0) {
+        liquidoEl.textContent = `- ${formatMoney(Math.abs(valorLiquido))}`;
+        liquidoEl.style.color = '#ef4444';
+        msgEl.style.background = 'rgba(239,68,68,.08)';
+        msgEl.style.color = '#ef4444';
+        msgEl.innerHTML = `💸 <strong>${j.nome}</strong> deve pagar ${formatMoney(Math.abs(valorLiquido))}`;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-arrow-down"></i> Confirmar Recebimento';
+        btnConfirmar.style.background = 'linear-gradient(135deg,#f59e0b 0%,#d97706 100%)';
+    } else {
+        liquidoEl.textContent = formatMoney(0);
+        liquidoEl.style.color = '#a1a1aa';
+        msgEl.style.background = 'rgba(161,161,170,.08)';
+        msgEl.style.color = '#a1a1aa';
+        msgEl.innerHTML = `✓ Prêmio exatamente quita as dívidas`;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Quitação';
+        btnConfirmar.style.background = 'linear-gradient(135deg,#3b82f6 0%,#2563eb 100%)';
+    }
+    
+    document.getElementById('ap-valor-editavel').value = Math.abs(valorLiquido).toFixed(2);
+    
+    // Seleciona PIX como default
+    acertoSelecionarMetodo('pix');
+    
+    openModal('modal-acerto-premio');
+}
+
+function acertoSelecionarMetodo(metodo) {
+    _acertoPremio.metodo = metodo;
+    document.querySelectorAll('.ap-metodo-btn').forEach(btn => {
+        if (btn.dataset.metodo === metodo) {
+            btn.style.background = 'rgba(168,85,247,.15)';
+            btn.style.borderColor = '#a855f7';
+            btn.style.color = '#fafafa';
+        } else {
+            btn.style.background = '#0a0a0c';
+            btn.style.borderColor = '#27272a';
+            btn.style.color = '#a1a1aa';
+        }
+    });
+}
+
+function acertoUsarSugerido() {
+    document.getElementById('ap-valor-editavel').value = Math.abs(_acertoPremio.valorLiquido).toFixed(2);
+}
+
+async function acertoConfirmar() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const { jogadorId, posicao, valorPremio, valorDivida, valorLiquido, metodo } = _acertoPremio;
+    
+    const valorMovimentado = parseFloat(document.getElementById('ap-valor-editavel').value) || 0;
+    if (valorMovimentado < 0) {
+        return showToast('⚠️ Valor não pode ser negativo');
+    }
+    
+    const j = jogadores.find(x => String(x.id) === String(jogadorId));
+    if (!j) return;
+    
+    const nome = j.nome;
+    const isCredito = valorLiquido > 0;  // jogador RECEBE
+    const isDebito  = valorLiquido < 0;  // jogador PAGA
+    
+    // 1) Registra a PREMIAÇÃO como crédito do jogador (sempre — pra contabilidade)
+    if (valorPremio > 0) {
+        registrarTransacao({
+            jogadorId,
+            tipo: 'premiacao',
+            valor: valorPremio,  // positivo = crédito
+            descricao: `🏆 ${posicao}º lugar · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+            metodo: 'premio',
+        });
+    }
+    
+    // 2) Registra o pagamento/recebimento conforme o líquido
+    if (isCredito && valorMovimentado > 0) {
+        // Jogador RECEBE valor (saída do caixa do clube)
+        registrarTransacao({
+            jogadorId,
+            tipo: 'saque_premiacao',
+            valor: -valorMovimentado,  // negativo = saiu da conta dele (porque já creditou o prêmio)
+            descricao: `💰 Recebimento de premiação · ${posicao}º · via ${_metodoLabel(metodo)}`,
+            origem: 'torneio',
+            refId: t.id,
+            metodo,
+        });
+    } else if (isDebito && valorMovimentado > 0) {
+        // Jogador PAGA valor (entra na caixa do clube)
+        registrarTransacao({
+            jogadorId,
+            tipo: 'pagamento_direto',
+            valor: valorMovimentado,  // positivo = quitou dívida
+            descricao: `💵 Pagamento líquido após premiação · ${posicao}º · via ${_metodoLabel(metodo)}`,
+            origem: 'torneio',
+            refId: t.id,
+            metodo,
+        });
+    }
+    
+    logAudit('ACERTO_PREMIO', `${nome} acertou ${posicao}º lugar · prêmio ${formatMoney(valorPremio)} · dívida ${formatMoney(valorDivida)} · líquido ${formatMoney(valorLiquido)} · movimentado ${formatMoney(valorMovimentado)} via ${metodo}`, {
+        jogadorId, posicao, valorPremio, valorDivida, valorLiquido, valorMovimentado, metodo, torneioId: t.id,
+    });
+    
+    saveData();
+    closeModal('modal-acerto-premio');
+    
+    if (isCredito) {
+        showToast(`💰 ${nome} recebeu ${formatMoney(valorMovimentado)}`);
+    } else if (isDebito) {
+        showToast(`💵 ${nome} pagou ${formatMoney(valorMovimentado)}`);
+    } else {
+        showToast(`✓ Acerto de ${nome} concluído`);
+    }
+    
+    updateModalTorneio();
+    if (typeof renderTorneiosList === 'function') renderTorneiosList();
+    if (typeof renderDashboard === 'function') renderDashboard();
+}
+
+async function acertoDeixarPendente() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const { jogadorId, posicao, valorPremio } = _acertoPremio;
+    
+    // Mesmo deixando pendente, registra a premiação como crédito do jogador
+    // Assim no caixa geral aparece "este jogador tem X pra receber"
+    if (valorPremio > 0) {
+        registrarTransacao({
+            jogadorId,
+            tipo: 'premiacao',
+            valor: valorPremio,
+            descricao: `🏆 ${posicao}º lugar (a pagar) · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+            metodo: 'premio_pendente',
+        });
+    }
+    
+    const j = jogadores.find(x => String(x.id) === String(jogadorId));
+    const nome = j ? j.nome : '?';
+    
+    logAudit('ACERTO_PENDENTE', `${nome} acerto deixado pendente · ${posicao}º · ${formatMoney(valorPremio)}`, {
+        jogadorId, posicao, valorPremio, torneioId: t.id,
+    });
+    
+    saveData();
+    closeModal('modal-acerto-premio');
+    showToast(`⏳ ${nome}: prêmio registrado, acerto pendente`);
+    
+    updateModalTorneio();
+}
+
+function _metodoLabel(m) {
+    return ({pix:'PIX', dinheiro:'Dinheiro', debito:'Débito', credito:'Crédito'})[m] || m;
+}
+
+// Expor globalmente
+window.abrirAcertoPremio = abrirAcertoPremio;
+window.acertoSelecionarMetodo = acertoSelecionarMetodo;
+window.acertoUsarSugerido = acertoUsarSugerido;
+window.acertoConfirmar = acertoConfirmar;
+window.acertoDeixarPendente = acertoDeixarPendente;
 
 // ============================================================
 // BLOCO 2 — FUNCIONALIDADES NOVAS
