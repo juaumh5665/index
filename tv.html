@@ -1708,6 +1708,36 @@ function montarCarouselPremiacao(d) {
         return tsB - tsA;
       });
       
+      // 🔥 FALLBACK: busca direto da tabela `torneios` os campos que o RPC pode não retornar
+      // (pw_stats_visiveis, last_chance_valor, last_chance_fichas, etc)
+      // Esse SELECT roda ANTES do hash-check porque essas configurações influenciam no hash.
+      try {
+        const ids = rodando.map(t => t.id);
+        const { data: extras, error: errExtras } = await sb
+          .from('torneios')
+          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_show_prize')
+          .in('id', ids);
+        
+        if (!errExtras && Array.isArray(extras)) {
+          extras.forEach(ext => {
+            const t = rodando.find(x => x.id === ext.id);
+            if (t) {
+              // SEMPRE sobrescreve com o valor da tabela (fonte da verdade)
+              t.pw_stats_visiveis = ext.pw_stats_visiveis;
+              t.last_chance_valor = ext.last_chance_valor;
+              t.last_chance_fichas = ext.last_chance_fichas;
+              if (ext.tv_layout != null) t.tv_layout = ext.tv_layout;
+              if (ext.tv_show_prize != null) t.tv_show_prize = ext.tv_show_prize;
+            }
+          });
+          if (window._debugTv) console.log('[TV PUBLIC] campos extras:', extras);
+        } else if (errExtras) {
+          console.warn('[TV PUBLIC] erro ao ler tabela torneios:', errExtras);
+        }
+      } catch(e) {
+        console.warn('[TV PUBLIC] não foi possível carregar campos extras:', e);
+      }
+      
       // Detectar se só mudou o timer (sincroniza local) — evita re-render completo
       const novoTorneio = rodando[0];
       const torneioAtual = pubState.torneios[pubState.activeIdx];
@@ -1724,34 +1754,6 @@ function montarCarouselPremiacao(d) {
       // Mudança estrutural — recarrega e renderiza
       pubState.torneios = rodando;
       pubState.activeIdx = 0;
-      
-      // 🔥 FALLBACK: busca direto da tabela `torneios` os campos que o RPC pode não retornar
-      // (pw_stats_visiveis, last_chance_valor, last_chance_fichas, etc)
-      // Usa SELECT específico via SDK em paralelo — barato e robusto.
-      try {
-        const ids = rodando.map(t => t.id);
-        const { data: extras, error: errExtras } = await sb
-          .from('torneios')
-          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_show_prize')
-          .in('id', ids);
-        
-        if (!errExtras && Array.isArray(extras)) {
-          extras.forEach(ext => {
-            const t = pubState.torneios.find(x => x.id === ext.id);
-            if (t) {
-              // Mescla apenas campos faltantes (não sobrescreve se RPC já trouxe)
-              if (t.pw_stats_visiveis === undefined) t.pw_stats_visiveis = ext.pw_stats_visiveis;
-              if (t.last_chance_valor === undefined) t.last_chance_valor = ext.last_chance_valor;
-              if (t.last_chance_fichas === undefined) t.last_chance_fichas = ext.last_chance_fichas;
-              if (t.tv_layout === undefined) t.tv_layout = ext.tv_layout;
-              if (t.tv_show_prize === undefined) t.tv_show_prize = ext.tv_show_prize;
-            }
-          });
-          console.log('[TV PUBLIC] campos extras carregados:', extras.length, 'torneios');
-        }
-      } catch(e) {
-        console.warn('[TV PUBLIC] não foi possível carregar campos extras:', e);
-      }
       
       hidePublicEmpty();
       renderizarPubTorneioAtivo();
@@ -1955,11 +1957,8 @@ function montarCarouselPremiacao(d) {
     const pwVis = t.pw_stats_visiveis || t.pwStatsVisiveis || {};
     const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true;
     
-    // Debug: loga as configurações de stats (só uma vez por torneio)
-    if (window._lastStatsLogId !== t.id) {
-      window._lastStatsLogId = t.id;
-      console.log('[TV PUBLIC] pwStatsVisiveis para torneio', t.nome, ':', pwVis);
-    }
+    // Log SEMPRE — pra debug do problema de configuração não aplicada
+    console.log('[TV PUBLIC] Render torneio:', t.nome, '| pwStatsVisiveis:', JSON.stringify(pwVis));
     
     const statsStrip = [];
     if (defVis('buyin')) statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
