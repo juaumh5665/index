@@ -15435,7 +15435,7 @@ function renderTorneiosList() {
                     <div style="display:flex;gap:.5rem;align-items:center;margin-top:.35rem;flex-wrap:wrap;">
                         <span class="tag ${statusTag.cls}">${statusTag.label}</span>
                         ${t.tipo && t.tipo!=='normal' ? `<span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);">${ {bounty:'💰 Bounty',pko:'🎯 PKO',knockout:'⚡ KO'}[t.tipo] }</span>` : ''}
-                        <span style="font-size:.75rem;color:#52525b;">${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].isBreak) ? `Intervalo` : `Nível ${t.nivelAtual+1} &bull; ${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].sb) || 0}/${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].bb) || 0}`}</span>
+                        <span style="font-size:.75rem;color:#52525b;">${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].isBreak) ? `Intervalo` : `Nível ${_nivelHumano(t)} &bull; ${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].sb) || 0}/${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].bb) || 0}`}</span>
                     </div>
                 </div>
                 <button onclick="abrirDetalhesTorneio(${i})" class="btn-gold" style="font-size:.85rem;">Abrir <i class="fa-solid fa-arrow-right"></i></button>
@@ -15526,7 +15526,7 @@ function updateModalTorneio() {
         if (el) el.style.color = color;
     };
 
-    _setText('mt-nivel-label', t.isBreak ? 'INTERVALO' : `Nível ${t.nivelAtual + 1}`);
+    _setText('mt-nivel-label', t.isBreak ? 'INTERVALO' : `Nível ${_nivelHumano(t)}`);
     _setText('mt-timer', formatTime(t.tempoRestante));
     // Em break ou últimos 60s: pinta de vermelho. Caso contrário, preserva cor do tema (inherit).
     _setColor('mt-timer', t.isBreak ? '#ef4444' : (t.tempoRestante < 60 ? '#ef4444' : ''));
@@ -16291,6 +16291,26 @@ function _emJanelaBreakEspecial(t) {
 // Tipos que entram na trava de "entradas" (todos os tipos de compra pra continuar)
 const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
 
+// Retorna o "nível humano" — só conta níveis de jogo, ignora breaks.
+// Por exemplo: se a estrutura é [N1, N2, BREAK, N3] e nivelAtual=2 (= BREAK),
+// retorna 2 (o último nível JOGADO foi o 2, depois vem o break).
+// Quando avança pra nivelAtual=3 (= N3 real), retorna 3.
+function _nivelHumano(t) {
+    if (!t || !Array.isArray(t.blinds)) return 1;
+    const idx = Number(t.nivelAtual || 0);
+    let contaJogo = 0;
+    for (let i = 0; i <= idx; i++) {
+        const b = t.blinds[i];
+        if (b && !b.isBreak) contaJogo++;
+    }
+    // Se o nivelAtual atual é um break, retorna o número do último nível JOGADO
+    // (ainda no "nível X" pra fins de trava — está no break depois dele)
+    if (t.blinds[idx] && t.blinds[idx].isBreak) {
+        return Math.max(1, contaJogo);
+    }
+    return contaJogo || 1;
+}
+
 // Verifica se um tipo de entrada está bloqueado por trava no torneio atual
 // Retorna { bloqueado: bool, motivo: string }
 function _tipoBloqueadoPorTrava(t, tipo) {
@@ -16300,11 +16320,11 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     // Só não vale antes de iniciar (iniciadoEm null = nem começou ainda)
     if (!t.iniciadoEm) return { bloqueado: false, motivo: '' };
     
-    // 🔥 JANELA DE BREAK ESPECIAL — libera Re-entry + Rebuy + Add-on no intervalo final
-    // (regra do poker: jogador eliminado pode voltar no break entre os 2 últimos níveis de compra)
+    // 🔥 JANELA DE BREAK ESPECIAL — libera TUDO no intervalo final
+    // (regra do poker: jogador eliminado/novo pode entrar no break com qualquer tipo de compra)
+    // Inclui Buy-in pra novos jogadores que chegam só no intervalo do add-on
     if (_emJanelaBreakEspecial(t)) {
-        // Durante o break especial, libera todos os tipos de compra
-        if (['reentry', 'rebuy_simples', 'rebuy_duplo', 'addon'].includes(tipo)) {
+        if (['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo', 'addon'].includes(tipo)) {
             return { bloqueado: false, motivo: '' };
         }
     }
@@ -16319,7 +16339,10 @@ function _tipoBloqueadoPorTrava(t, tipo) {
         }
     }
     
-    const nivelAtual = Number(t.nivelAtual) + 1; // nivelAtual é 0-indexed, mostrar 1-indexed
+    // 🔧 CORREÇÃO: usa _nivelHumano (ignora breaks no count) ao invés de nivelAtual+1
+    // Antes: estrutura [N1..N10, BREAK, N11] com nivelAtual=10 (=BREAK) retornava 11 (errado!)
+    // Agora: retorna 10 (correto — ainda na janela de compras do nível 10)
+    const nivelAtual = _nivelHumano(t);
     
     // Entradas (buy-in, re-entry, rebuy simples, rebuy duplo) — mesma trava
     if (_TIPOS_COMPRA.includes(tipo)) {
@@ -16519,9 +16542,39 @@ function openModalEntrada(idx) {
         // Mostra todos, filtrando lógica no submit
         sel.innerHTML += `<option value="${j.id}" ${jaElim?'':''}>${j.nome}${jaElim?' (elim.)': jaEntrou?' (inscrito)':''}</option>`;
     });
+    
+    // Monta opções iniciais (sem jogador selecionado ainda)
+    _renderOpcoesEntrada(t, null);
+    
+    // Quando o jogador muda, re-renderiza opções (esconde Buy-in se já inscrito, Add-on se já comprou)
+    sel.onchange = () => _renderOpcoesEntrada(t, sel.value || null);
+    
+    // LOTE 3: Staff não é mais cobrado no buy-in (vira % do prize pool em cascata)
+    const staffWrap = document.getElementById('entrada-staff-wrap');
+    if (staffWrap) staffWrap.style.display = 'none';
+    
+    atualizarResumoEntrada();
+    openModal('modal-entrada');
+}
 
-    // Ajuste opções de tipo (com travas do Lote 1+2)
+// Renderiza opções do tipo de entrada considerando:
+// - Travas de nível (já existente)
+// - Janela de break especial (já existente)
+// - Add-on: só pra quem AINDA NÃO comprou (regra: 1 add-on por jogador)
+// - Buy-in: só pra quem AINDA NÃO está no torneio
+function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
     const tipoSel = document.getElementById('entrada-tipo');
+    if (!tipoSel) return;
+    
+    // Determina o status do jogador selecionado (se houver)
+    const entriesIds = new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => String(e.jogadorId)));
+    const addonsIds  = new Set(t.entries.filter(e => e.tipo === 'addon').map(e => String(e.jogadorId)));
+    const elimIds    = new Set(t.eliminados.map(e => String(e.jogadorId)));
+    
+    const jid = jogadorSelecionadoId ? String(jogadorSelecionadoId) : null;
+    const jogadorJaInscrito  = jid && entriesIds.has(jid);
+    const jogadorJaTemAddon  = jid && addonsIds.has(jid);
+    const jogadorFoiEliminado = jid && elimIds.has(jid);
     
     // Helper para adicionar opção considerando trava
     const addOpt = (tipo, label) => {
@@ -16532,38 +16585,61 @@ function openModalEntrada(idx) {
         return `<option value="${tipo}">${label}</option>`;
     };
     
-    const opts = [addOpt('buyin', `Buy-in (entrada normal) — R$ ${t.buyin}`)];
-    // Aceita tanto rebuySimples/rebuyDuplo (nomes antigos) quanto rebuyValor/rebuyDuploValor (corretos do DB)
+    const opts = [];
+    
+    // 🔧 BUY-IN: só pra quem AINDA NÃO está inscrito no torneio
+    // (regra: jogador no torneio só pode usar Rebuy/Add-on, não Buy-in de novo)
+    if (!jogadorJaInscrito) {
+        opts.push(addOpt('buyin', `Buy-in (entrada normal) — R$ ${t.buyin}`));
+    } else {
+        opts.push(`<option value="buyin" disabled style="color:#71717a;">🔒 Buy-in — jogador já está no torneio</option>`);
+    }
+    
+    // REBUY SIMPLES e DUPLO
     const rebuySimpVal = Number(t.rebuyValor || t.rebuySimples || 0);
     const rebuySimpFichas = Number(t.rebuyFichas || t.rebuySimplesFichas || 0);
     const rebuyDupVal = Number(t.rebuyDuploValor || t.rebuyDuplo || 0);
     const rebuyDupFichas = Number(t.rebuyDuploFichas || 0);
-    
-    // Conta se já existem rebuys cadastrados (cenário de torneio com config 0 mas com entries históricas)
     const jaTemRebuySimples = (t.entries || []).some(e => e.tipo === 'rebuy_simples');
     const jaTemRebuyDuplo   = (t.entries || []).some(e => e.tipo === 'rebuy_duplo');
     
-    // Mostra Rebuy Simples se: tem valor configurado OU já tem rebuys cadastrados
     if (rebuySimpVal > 0) {
         opts.push(addOpt('rebuy_simples', `Rebuy Simples — R$ ${rebuySimpVal} (${rebuySimpFichas.toLocaleString()} fichas)`));
     } else if (jaTemRebuySimples) {
-        opts.push(`<option value="rebuy_simples" disabled style="color:#71717a;">🔒 Rebuy Simples — valor não configurado (já tem ${(t.entries || []).filter(e => e.tipo === 'rebuy_simples').length} cadastrados)</option>`);
+        opts.push(`<option value="rebuy_simples" disabled style="color:#71717a;">🔒 Rebuy Simples — valor não configurado</option>`);
     }
     
-    // Mostra Rebuy Duplo se: tem valor configurado OU já tem rebuys cadastrados
     if (rebuyDupVal > 0) {
         opts.push(addOpt('rebuy_duplo', `Rebuy Duplo — R$ ${rebuyDupVal} (${rebuyDupFichas.toLocaleString()} fichas)`));
     } else if (jaTemRebuyDuplo) {
-        opts.push(`<option value="rebuy_duplo" disabled style="color:#71717a;">🔒 Rebuy Duplo — valor não configurado (já tem ${(t.entries || []).filter(e => e.tipo === 'rebuy_duplo').length} cadastrados)</option>`);
+        opts.push(`<option value="rebuy_duplo" disabled style="color:#71717a;">🔒 Rebuy Duplo — valor não configurado</option>`);
     }
     
-    if (t.reentryAte > 0)   opts.push(addOpt('reentry', `Re-entry — R$ ${t.buyin}`));
-    if (t.addonFichas > 0)  {
+    // RE-ENTRY
+    if (t.reentryAte > 0) opts.push(addOpt('reentry', `Re-entry — R$ ${t.buyin}`));
+    
+    // 🔧 ADD-ON: só pra quem AINDA NÃO comprou (regra: 1 add-on por jogador)
+    if (t.addonFichas > 0) {
         const addonLabel = (t.addonValor && t.addonValor > 0)
             ? `Add-on — R$ ${t.addonValor} (${t.addonFichas.toLocaleString()} fichas extras)`
             : `Add-on — Cortesia (${t.addonFichas.toLocaleString()} fichas extras)`;
-        opts.push(addOpt('addon', addonLabel));
+        
+        if (jogadorJaTemAddon) {
+            opts.push(`<option value="addon" disabled style="color:#71717a;">🔒 Add-on — jogador já comprou (1 por jogador)</option>`);
+        } else {
+            opts.push(addOpt('addon', addonLabel));
+        }
     }
+    
+    // LAST CHANCE
+    if (t.lastChanceAtivo || t.last_chance_ativo) {
+        const lcValor = Number(t.lastChanceValor || t.last_chance_valor || 0);
+        const lcFichas = Number(t.lastChanceFichas || t.last_chance_fichas || 0);
+        if (lcValor > 0 || lcFichas > 0) {
+            opts.push(addOpt('last_chance', `Last Chance — R$ ${lcValor} (${lcFichas.toLocaleString()} fichas)`));
+        }
+    }
+    
     tipoSel.innerHTML = opts.join('');
     
     // Auto-selecionar primeiro tipo NÃO bloqueado
@@ -16572,14 +16648,9 @@ function openModalEntrada(idx) {
         tipoSel.value = primeiraOpcaoValida.value;
     }
     
-    // LOTE 3: Staff não é mais cobrado no buy-in (vira % do prize pool em cascata)
-    // Esconde o wrap legado pra não confundir o operador.
-    const staffWrap = document.getElementById('entrada-staff-wrap');
-    if (staffWrap) staffWrap.style.display = 'none';
-    
     atualizarResumoEntrada();
-    openModal('modal-entrada');
 }
+window._renderOpcoesEntrada = _renderOpcoesEntrada;
 
 // Atualiza visibilidade do staff e valor total mostrado no modal
 function atualizarResumoEntrada() {
