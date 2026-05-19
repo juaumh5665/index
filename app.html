@@ -10226,7 +10226,7 @@ function diagTorneio(idx) {
     // Fichas
     let totalFichas = 0;
     (t.entries || []).forEach(e => {
-        if (e.tipo === 'rebuy_simples')      totalFichas += (t.rebuySimplesFichas || t.stack);
+        if (e.tipo === 'rebuy_simples')      totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         else if (e.tipo === 'rebuy_duplo')   totalFichas += (t.rebuyDuploFichas || t.stack*2);
         else if (e.tipo === 'addon')         totalFichas += (t.addonFichas || 0);
         else if (e.tipo === 'last_chance')   totalFichas += (t.last_chance_fichas || 0);
@@ -15430,9 +15430,14 @@ function saveTournament() {
         staffValor:   0, // legado - não usado mais (compat)
         staffPct:     parseFloat(document.getElementById('t-staff-pct').value) || 0,
         // Rebuy structure
+        // BUG FIX: salva em AMBOS os nomes (rebuyFichas é o nome do banco, rebuySimplesFichas é o nome histórico do form)
+        // Pra evitar dessincronização entre criação local e leitura do banco
         rebuySimples:       parseFloat(document.getElementById('t-rebuy-simples').value)        || 0,
         rebuySimplesFichas: parseInt(document.getElementById('t-rebuy-simples-fichas').value)   || 0,
+        rebuyValor:         parseFloat(document.getElementById('t-rebuy-simples').value)        || 0,
+        rebuyFichas:        parseInt(document.getElementById('t-rebuy-simples-fichas').value)   || 0,
         rebuyDuplo:         parseFloat(document.getElementById('t-rebuy-duplo').value)          || 0,
+        rebuyDuploValor:    parseFloat(document.getElementById('t-rebuy-duplo').value)          || 0,
         rebuyDuploFichas:   parseInt(document.getElementById('t-rebuy-duplo-fichas').value)     || 0,
         // Last Chance (3ª compra após add-on)
         last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
@@ -17573,8 +17578,9 @@ function updateTV(idx) {
     const ativos = getAtivos(t);
 
     // Calcular fichas totais corretamente com rebuys/addons + jackpots + last chance
+    // ATENÇÃO: o nome correto do campo é `rebuyFichas` (rebuySimplesFichas era um typo histórico)
     const totalFichas = t.entries.reduce((s, e) => {
-        if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
+        if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
         if (e.tipo === 'last_chance')   return s + (t.last_chance_fichas || 0);
@@ -17847,9 +17853,9 @@ function _computarDadosMiniTV(t) {
     const totalEntries = (typeof getJogadoresUnicos === 'function')
         ? getJogadoresUnicos(t)
         : new Set((t.entries || []).filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
-    // Fichas (mesma fórmula do updateTV)
+    // Fichas (mesma fórmula do updateTV) — fallback robusto rebuyFichas / rebuySimplesFichas
     const totalFichas = (t.entries || []).reduce((s, e) => {
-        if (e.tipo === 'rebuy_simples') return s + (t.rebuySimplesFichas || t.stack);
+        if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
         if (e.tipo === 'last_chance')   return s + (t.last_chance_fichas || 0);
@@ -24104,7 +24110,7 @@ function getClassificadosDaSerie(seriesId) {
                 let fichas = 0;
                 entriesJog.forEach(e => {
                     if (e.tipo === 'buyin' || e.tipo === 'reentry') fichas += t.stack;
-                    else if (e.tipo === 'rebuy_simples') fichas += t.rebuySimplesFichas || t.stack;
+                    else if (e.tipo === 'rebuy_simples') fichas += t.rebuyFichas || t.rebuySimplesFichas || t.stack;
                     else if (e.tipo === 'rebuy_duplo')   fichas += t.rebuyDuploFichas || (t.stack*2);
                     else if (e.tipo === 'addon')         fichas += t.addonFichas || 0;
                 });
@@ -24669,7 +24675,7 @@ function _getEstornoTipoLabel(tipo) {
 function _calcularFichasReverter(t, entry) {
     if (!entry) return 0;
     if (entry.tipo === 'buyin' || entry.tipo === 'reentry') return t.stack || 0;
-    if (entry.tipo === 'rebuy_simples') return t.rebuySimplesFichas || t.stack || 0;
+    if (entry.tipo === 'rebuy_simples') return t.rebuyFichas || t.rebuySimplesFichas || t.stack || 0;
     if (entry.tipo === 'rebuy_duplo') return (t.rebuyDuploFichas || (t.stack||0) * 2);
     if (entry.tipo === 'addon') return t.addonFichas || 0;
     if (entry.tipo === 'last_chance') return t.last_chance_fichas || 0;
@@ -27625,7 +27631,7 @@ function estimarStackJogador(t, jid) {
     let fichas = 0;
     entriesJog.forEach(e => {
         if (e.tipo === 'buyin' || e.tipo === 'reentry') fichas += t.stack;
-        else if (e.tipo === 'rebuy_simples') fichas += t.rebuySimplesFichas || t.stack;
+        else if (e.tipo === 'rebuy_simples') fichas += t.rebuyFichas || t.rebuySimplesFichas || t.stack;
         else if (e.tipo === 'rebuy_duplo')   fichas += t.rebuyDuploFichas || (t.stack*2);
         else if (e.tipo === 'addon')         fichas += t.addonFichas || 0;
     });

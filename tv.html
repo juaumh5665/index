@@ -1782,12 +1782,19 @@ function montarCarouselPremiacao(d) {
       nivel_atual: t.nivel_atual,
       tv_layout: t.tv_layout,
       tv_show_prize: t.tv_show_prize,
-      pwStatsVis: t.pw_stats_visiveis || t.pwStatsVisiveis || null,  // detecta mudanças no modal "Estatísticas da TV"
+      pwStatsVis: t.pw_stats_visiveis || t.pwStatsVisiveis || null,
       entriesQtd: (t.entries || []).length,
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
-      tempoAlvo: t.tempo_alvo,  // timestamp absoluto — só muda em pause/resume/+1min
-      blindsLen: Array.isArray(t.blinds) ? t.blinds.length : 0,  // blinds podem mudar (edição)
+      tempoAlvo: t.tempo_alvo,
+      blindsLen: Array.isArray(t.blinds) ? t.blinds.length : 0,
+      // 🆕 Configs de fichas — se o operador editar isso (ex: mudar rebuy_duplo_fichas de 40k pra 50k),
+      // o chipcount muda e precisamos re-renderizar
+      stack: t.stack,
+      rebuyFichas: t.rebuy_fichas,
+      rebuyDuploFichas: t.rebuy_duplo_fichas,
+      addonFichas: t.addon_fichas,
+      lastChanceFichas: t.last_chance_fichas,
     });
   }
   
@@ -1828,6 +1835,13 @@ function montarCarouselPremiacao(d) {
       );
       
       if (rodando.length === 0) {
+        // 🛡️ Anti-flicker: se já tinha um torneio rodando carregado e agora vem vazio,
+        // pode ser race condition do RPC (timeout, network). Não esconde o que tá na tela.
+        // Só mostra "Nenhum torneio" se for o primeiro carregamento (pubState.torneios vazio).
+        if (pubState.torneios && pubState.torneios.length > 0) {
+          if (window._debugTv) console.warn('[TV PUBLIC] RPC retornou vazio mas tinha torneio na tela, ignorando flicker');
+          return;  // mantém a tela como está
+        }
         return showPublicEmpty(pubState.clube, todosAtivos.length > 0);
       }
       
@@ -1839,13 +1853,13 @@ function montarCarouselPremiacao(d) {
       });
       
       // 🔥 FALLBACK: busca direto da tabela `torneios` os campos que o RPC pode não retornar
-      // (pw_stats_visiveis, last_chance_valor, last_chance_fichas, etc)
+      // (pw_stats_visiveis, last_chance_valor, last_chance_fichas, fichas dos rebuys, etc)
       // Esse SELECT roda ANTES do hash-check porque essas configurações influenciam no hash.
       try {
         const ids = rodando.map(t => t.id);
         const { data: extras, error: errExtras } = await sb
           .from('torneios')
-          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_show_prize')
+          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor')
           .in('id', ids);
         
         if (!errExtras && Array.isArray(extras)) {
@@ -1858,6 +1872,15 @@ function montarCarouselPremiacao(d) {
               t.last_chance_fichas = ext.last_chance_fichas;
               if (ext.tv_layout != null) t.tv_layout = ext.tv_layout;
               if (ext.tv_show_prize != null) t.tv_show_prize = ext.tv_show_prize;
+              // 🆕 Fichas e valores — só sobrescreve se RPC não retornou
+              // (preserva valor do RPC se já vier, evita race con. com cache)
+              if (ext.stack != null && (t.stack == null || t.stack === 0)) t.stack = ext.stack;
+              if (ext.rebuy_fichas != null && (t.rebuy_fichas == null || t.rebuy_fichas === 0)) t.rebuy_fichas = ext.rebuy_fichas;
+              if (ext.rebuy_duplo_fichas != null && (t.rebuy_duplo_fichas == null || t.rebuy_duplo_fichas === 0)) t.rebuy_duplo_fichas = ext.rebuy_duplo_fichas;
+              if (ext.addon_fichas != null && (t.addon_fichas == null || t.addon_fichas === 0)) t.addon_fichas = ext.addon_fichas;
+              if (ext.rebuy_valor != null && (t.rebuy_valor == null || t.rebuy_valor === 0)) t.rebuy_valor = ext.rebuy_valor;
+              if (ext.rebuy_duplo_valor != null && (t.rebuy_duplo_valor == null || t.rebuy_duplo_valor === 0)) t.rebuy_duplo_valor = ext.rebuy_duplo_valor;
+              if (ext.addon_valor != null && (t.addon_valor == null || t.addon_valor === 0)) t.addon_valor = ext.addon_valor;
             }
           });
           if (window._debugTv) console.log('[TV PUBLIC] campos extras:', extras);
