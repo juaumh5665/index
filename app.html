@@ -5089,7 +5089,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
                         <!-- AÇÕES AVANÇADAS -->
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.75rem;">
-                            <button onclick="abrirEditorBlindsAndamento(activeTorneioIdx)" class="btn-ghost" style="padding:.55rem;font-size:.75rem;"><i class="fa-solid fa-sliders"></i> Editar Blinds</button>
+                            <button onclick="irParaAbaBlinds()" class="btn-ghost" style="padding:.55rem;font-size:.75rem;" title="Ver e editar estrutura completa na aba Blinds"><i class="fa-solid fa-list-ol"></i> Ver/Editar Estrutura</button>
                             <button id="btn-stacks-dia1" onclick="abrirStackFinalDia1(activeTorneioIdx)" class="btn-ghost" style="display:none;padding:.55rem;font-size:.75rem;"><i class="fa-solid fa-layer-group"></i> Stacks Finais (Dia 1)</button>
                         </div>
                         <div id="btn-encerrar-torneio-wrap" style="margin-top:.4rem;">
@@ -5181,8 +5181,39 @@ document.addEventListener('DOMContentLoaded', function(){
 
             <!-- TAB: BLINDS -->
             <div id="tab-blinds" class="tab-content" style="display:none;">
-                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Estrutura Completa de Blinds</div>
-                <div id="mt-blinds-full" style="display:flex;flex-direction:column;gap:.3rem;"></div>
+                <!-- Cabeçalho da aba -->
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.85rem;gap:1rem;flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura Completa</div>
+                        <div id="eba-info-inline" style="font-size:.75rem;color:#71717a;margin-top:.25rem;"></div>
+                    </div>
+                    <button onclick="salvarBlindsInline()" id="btn-salvar-blinds-inline" class="btn-gold" style="padding:.55rem .9rem;font-size:.8rem;border-radius:.45rem;display:none;">
+                        <i class="fa-solid fa-save"></i> Salvar Alterações
+                    </button>
+                </div>
+
+                <!-- Aplicar tempo em massa -->
+                <div style="padding:.7rem .85rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;margin-bottom:.85rem;">
+                    <div style="font-size:.6rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;"><i class="fa-solid fa-clock"></i> Aplicar Tempo em Massa</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
+                        <div><label class="inp-label">A partir do nível</label><input id="eba-inline-partir" type="number" min="1" value="11" class="inp" style="padding:.3rem .5rem;font-size:.78rem;"></div>
+                        <div><label class="inp-label">Novo tempo (min)</label><input id="eba-inline-tempo" type="number" min="1" value="20" class="inp" style="padding:.3rem .5rem;font-size:.78rem;"></div>
+                        <button onclick="aplicarTempoEmMassaInline()" class="btn-ghost" style="padding:.45rem .75rem;font-size:.72rem;">Aplicar</button>
+                    </div>
+                </div>
+
+                <!-- Headers da tabela -->
+                <div style="display:grid;grid-template-columns:2.5rem 1fr 1fr 1fr 3.5rem 5rem;gap:.4rem;padding:.3rem .55rem;background:#0a0a0c;border-radius:.35rem;margin-bottom:.3rem;">
+                    <span style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;">Nv</span>
+                    <span style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;text-align:center;">SB</span>
+                    <span style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;text-align:center;">BB</span>
+                    <span style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;text-align:center;">Ante</span>
+                    <span style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;text-align:center;">Min</span>
+                    <span style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;text-align:center;">Status</span>
+                </div>
+
+                <!-- Estrutura completa -->
+                <div id="mt-blinds-full" style="display:flex;flex-direction:column;gap:.25rem;max-height:60vh;overflow-y:auto;"></div>
             </div>
             
             <!-- TAB: DEALERS / CAPILÉ -->
@@ -14856,6 +14887,23 @@ function switchTab(tabId, btn) {
     if (tabId === 'tab-estornos')  renderTabEstornosTorneio();
 }
 
+// Atalho pra abrir a aba Blinds (usado pelo botão "Ver/Editar Estrutura")
+function irParaAbaBlinds() {
+    // Acha o botão da aba Blinds e clica nele
+    const btnBlinds = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
+        (b.getAttribute('onclick') || '').includes('tab-blinds')
+    );
+    if (btnBlinds) {
+        btnBlinds.click();
+        // Rola pro topo da aba pra ver
+        setTimeout(() => {
+            const tabContent = document.getElementById('tab-blinds');
+            if (tabContent) tabContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+}
+window.irParaAbaBlinds = irParaAbaBlinds;
+
 // ============================================================
 // JOGADORES
 // ============================================================
@@ -16111,19 +16159,213 @@ function renderTabFinanceiro() {
     renderPayout(t, 'mt-payout-full', true);
 }
 
+// Estado: marca se há mudanças não salvas na aba inline
+let _blindsInlineDirty = false;
+
 function renderTabBlinds() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    document.getElementById('mt-blinds-full').innerHTML = t.blinds.map((b, i) => `
-        <div class="blind-row ${i === t.nivelAtual ? 'current-level' : ''}">
-            <span style="font-size:.7rem;font-weight:700;color:${i===t.nivelAtual?'var(--gold)':'#52525b'};">${i+1}</span>
-            <div style="text-align:right;font-size:.8rem;font-weight:700;${i===t.nivelAtual?'color:#e4e4e7':'color:#71717a'}">${b.sb.toLocaleString()}</div>
-            <div style="text-align:right;font-size:.8rem;font-weight:700;${i===t.nivelAtual?'color:#e4e4e7':'color:#71717a'}">${b.bb.toLocaleString()}</div>
-            <div style="text-align:right;font-size:.8rem;font-weight:700;${i===t.nivelAtual?'color:#e4e4e7':'color:#71717a'}">${b.ante.toLocaleString()}</div>
-            ${i===t.nivelAtual ? '<span style="color:var(--gold);font-size:.6rem;font-weight:800;">◀ ATUAL</span>' : '<span></span>'}
-        </div>
-    `).join('');
+    
+    // Info no cabeçalho
+    const infoEl = document.getElementById('eba-info-inline');
+    if (infoEl) {
+        const nivelHumano = _nivelHumano(t);
+        const totalNiveis = (t.blinds || []).filter(b => !b.isBreak).length;
+        const totalBreaks = (t.blinds || []).filter(b => b.isBreak).length;
+        infoEl.innerHTML = `Nível atual: <strong style="color:var(--gold);">${nivelHumano}</strong> de ${totalNiveis} · ${totalBreaks} intervalo${totalBreaks !== 1 ? 's' : ''} · níveis já passados ficam bloqueados pra edição`;
+    }
+    
+    // Reset flag de mudanças (renderizou do zero)
+    _blindsInlineDirty = false;
+    const btnSalvar = document.getElementById('btn-salvar-blinds-inline');
+    if (btnSalvar) btnSalvar.style.display = 'none';
+    
+    const container = document.getElementById('mt-blinds-full');
+    if (!container) return;
+    
+    // Contador de níveis "humanos" pra exibir
+    let contadorNivel = 0;
+    
+    container.innerHTML = (t.blinds || []).map((b, i) => {
+        const isAtual = i === t.nivelAtual;
+        const jaPassou = i < t.nivelAtual;
+        const disabled = jaPassou ? 'disabled' : '';
+        const opacity = jaPassou ? '.5' : '1';
+        
+        if (b.isBreak) {
+            // ━━━━━━━━━━ Linha de BREAK ━━━━━━━━━━
+            const isBreakCompras = !!b.breakDeCompras;
+            const bgColor = isAtual ? 'rgba(6,182,212,.15)' : isBreakCompras ? 'rgba(34,197,94,.06)' : 'rgba(6,182,212,.05)';
+            const borderColor = isAtual ? '#06b6d4' : isBreakCompras ? 'rgba(34,197,94,.4)' : 'rgba(6,182,212,.25)';
+            const labelColor = isBreakCompras ? '#22c55e' : '#06b6d4';
+            
+            return `
+                <div style="display:grid;grid-template-columns:2.5rem 1fr 3.5rem 5rem;gap:.4rem;align-items:center;padding:.4rem .55rem;background:${bgColor};border:1px dashed ${borderColor};border-radius:.4rem;opacity:${opacity};">
+                    <span style="font-size:.65rem;color:${labelColor};font-weight:800;text-align:center;">
+                        <i class="fa-solid fa-pause"></i>
+                    </span>
+                    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                        <span style="font-size:.7rem;color:${labelColor};font-weight:700;">
+                            ${isBreakCompras ? '★ INTERVALO DE COMPRAS' : 'INTERVALO'}
+                        </span>
+                        ${isAtual ? '<span style="background:#06b6d4;color:#000;font-size:.55rem;font-weight:800;padding:.1rem .35rem;border-radius:.2rem;letter-spacing:.05em;">◀ ATUAL</span>' : ''}
+                        ${!jaPassou ? `<button onclick="toggleBreakDeComprasInline(${i})" title="${isBreakCompras ? 'Desmarcar' : 'Marcar como Janela de Inscrição (libera Re-entry/Rebuy/Add-on)'}" style="background:transparent;border:1px solid ${isBreakCompras ? 'rgba(34,197,94,.5)' : '#27272a'};color:${isBreakCompras ? '#22c55e' : '#52525b'};padding:.1rem .35rem;font-size:.6rem;border-radius:.2rem;cursor:pointer;font-family:'Manrope',sans-serif;font-weight:700;white-space:nowrap;">${isBreakCompras ? '★ Compras' : '☆ Compras'}</button>` : ''}
+                    </div>
+                    <input type="number" data-idx="${i}" data-field="tempo" value="${b.tempo || 5}" ${disabled} min="1" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;background:#0f0f12;border:1px solid ${borderColor};border-radius:.25rem;color:${labelColor};font-weight:700;">
+                    <span style="font-size:.6rem;color:${labelColor};font-weight:600;text-align:center;">${jaPassou ? 'passou' : isAtual ? 'rolando' : 'pendente'}</span>
+                </div>`;
+        }
+        
+        // ━━━━━━━━━━ Linha de NÍVEL normal ━━━━━━━━━━
+        contadorNivel++;
+        const bgColor = isAtual ? 'rgba(245,158,11,.1)' : jaPassou ? '#0a0a0c' : '#0f0f12';
+        const borderColor = isAtual ? 'var(--gold)' : '#1e1e23';
+        const numColor = isAtual ? 'var(--gold)' : jaPassou ? '#3f3f46' : '#71717a';
+        
+        return `
+            <div style="display:grid;grid-template-columns:2.5rem 1fr 1fr 1fr 3.5rem 5rem;gap:.4rem;align-items:center;padding:.4rem .55rem;background:${bgColor};border:1px solid ${borderColor};border-radius:.4rem;opacity:${opacity};">
+                <span style="font-size:.78rem;font-weight:800;color:${numColor};text-align:center;">
+                    ${contadorNivel}${isAtual ? '◀' : ''}
+                </span>
+                <input type="number" data-idx="${i}" data-field="sb" value="${b.sb || 0}" ${disabled} min="0" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
+                <input type="number" data-idx="${i}" data-field="bb" value="${b.bb || 0}" ${disabled} min="0" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
+                <input type="number" data-idx="${i}" data-field="ante" value="${b.ante || 0}" ${disabled} min="0" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
+                <input type="number" data-idx="${i}" data-field="tempo" value="${b.tempo || t.tempoNivel || 15}" ${disabled} min="1" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
+                <span style="font-size:.6rem;color:${isAtual ? 'var(--gold)' : jaPassou ? '#3f3f46' : '#71717a'};font-weight:600;text-align:center;">${isAtual ? 'rolando' : jaPassou ? 'passou' : 'pendente'}</span>
+            </div>`;
+    }).join('');
 }
+
+// Marca que tem alterações não salvas e mostra o botão Salvar
+function _marcarBlindsDirty() {
+    _blindsInlineDirty = true;
+    const btn = document.getElementById('btn-salvar-blinds-inline');
+    if (btn) btn.style.display = 'inline-flex';
+}
+window._marcarBlindsDirty = _marcarBlindsDirty;
+
+// Toggle ★ Compras inline (igual ao editor de blinds antigo)
+function toggleBreakDeComprasInline(idx) {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.blinds || !t.blinds[idx] || !t.blinds[idx].isBreak) return;
+    
+    const novoValor = !t.blinds[idx].breakDeCompras;
+    
+    // Garante unicidade: desmarca outros breaks
+    if (novoValor) {
+        t.blinds.forEach((b, i) => {
+            if (b.isBreak && i !== idx) b.breakDeCompras = false;
+        });
+    }
+    t.blinds[idx].breakDeCompras = novoValor;
+    
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('TOGGLE_BREAK_COMPRAS', `${novoValor ? 'Marcou' : 'Desmarcou'} break #${idx+1} como Intervalo de Compras · ${t.nome}`, { torneioId: t.id, idx });
+    }
+    
+    showToast(novoValor 
+        ? '★ Intervalo marcado como Janela de Inscrição'
+        : '☆ Marcação removida'
+    );
+    
+    // Re-renderiza pra atualizar visual
+    renderTabBlinds();
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    updateModalTorneio();
+}
+window.toggleBreakDeComprasInline = toggleBreakDeComprasInline;
+
+// Aplicar tempo em massa (inline)
+function aplicarTempoEmMassaInline() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const partirDe = parseInt(document.getElementById('eba-inline-partir').value) || 1;
+    const novoTempo = parseInt(document.getElementById('eba-inline-tempo').value) || 15;
+    if (partirDe < 1) return showToast('⚠️ Nível inválido');
+    
+    // Conta níveis humanos pra achar índice no array
+    let contadorNivel = 0;
+    let indiceInicio = -1;
+    for (let i = 0; i < t.blinds.length; i++) {
+        if (!t.blinds[i].isBreak) {
+            contadorNivel++;
+            if (contadorNivel === partirDe) {
+                indiceInicio = i;
+                break;
+            }
+        }
+    }
+    if (indiceInicio === -1) return showToast(`⚠️ Nível ${partirDe} não existe`);
+    
+    // Aplica o novo tempo nos inputs (visual) — só níveis não-bloqueados
+    let qtdAplicado = 0;
+    for (let i = indiceInicio; i < t.blinds.length; i++) {
+        const b = t.blinds[i];
+        if (b.isBreak) continue; // não aplica em break
+        const inp = document.querySelector(`.eba-inline-inp[data-idx="${i}"][data-field="tempo"]`);
+        if (inp && !inp.disabled) {
+            inp.value = novoTempo;
+            qtdAplicado++;
+        }
+    }
+    
+    if (qtdAplicado > 0) {
+        _marcarBlindsDirty();
+        showToast(`✓ Tempo ${novoTempo}min aplicado a ${qtdAplicado} níveis a partir do ${partirDe}`);
+    } else {
+        showToast('⚠️ Nenhum nível editável a partir desse ponto');
+    }
+}
+window.aplicarTempoEmMassaInline = aplicarTempoEmMassaInline;
+
+// Salvar alterações da aba Blinds
+function salvarBlindsInline() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (!_blindsInlineDirty) {
+        return showToast('ℹ️ Nenhuma alteração pra salvar');
+    }
+    
+    if (!confirm('⚠️ Edição de blinds em torneio em andamento é uma operação crítica.\n\nConfirma as alterações?')) return;
+    
+    const inputs = document.querySelectorAll('.eba-inline-inp');
+    inputs.forEach(inp => {
+        if (inp.disabled) return;
+        const idx = parseInt(inp.dataset.idx);
+        const field = inp.dataset.field;
+        const v = parseInt(inp.value) || 0;
+        if (!t.blinds[idx]) return;
+        t.blinds[idx][field] = v;
+    });
+    
+    // Se mudou o tempo do nível atual, atualiza tempoTotal/tempoRestante proporcionalmente
+    const nivelAtual = t.blinds[t.nivelAtual];
+    if (nivelAtual && nivelAtual.tempo) {
+        const novoTempoTotal = nivelAtual.tempo * 60;
+        const pct = t.tempoTotal > 0 ? (t.tempoRestante / t.tempoTotal) : 1;
+        t.tempoTotal = novoTempoTotal;
+        t.tempoRestante = Math.floor(novoTempoTotal * pct);
+    }
+    
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('EDIT_BLINDS_INLINE', `Estrutura de blinds editada · ${t.nome}`, { torneioId: t.id });
+    }
+    showToast('✅ Estrutura de blinds salva');
+    
+    _blindsInlineDirty = false;
+    const btnSalvar = document.getElementById('btn-salvar-blinds-inline');
+    if (btnSalvar) btnSalvar.style.display = 'none';
+    
+    // Re-renderiza tudo
+    renderTabBlinds();
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    updateModalTorneio();
+    if (typeof updateTV === 'function') updateTV(activeTorneioIdx);
+}
+window.salvarBlindsInline = salvarBlindsInline;
 
 // ============================================================
 // PAYOUT
