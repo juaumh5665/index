@@ -1271,8 +1271,10 @@ function montarCarouselPremiacao(d) {
         if (!bs) return;
         if (!d.isBreak) { bs.classList.remove('show'); return; }
         bs.classList.add('show');
-        // Timer: NÃO atualiza aqui — deixa o tickLocalTimer cuidar (anti-rollback)
-        // (break-timer está no array de timerEls do tickLocalTimer linha ~2056)
+        // Timer: só atualiza no POPUP — na TV pública, tickLocalTimer cuida (break-timer está no array)
+        if (!window._ehTvPublica) {
+            document.getElementById('break-timer').innerText = d.timer || '--:--';
+        }
         // Clube name
         const cn = document.getElementById('bs-clube-nome');
         if (cn) cn.innerText = d.clubeNome || '';
@@ -1371,8 +1373,13 @@ function montarCarouselPremiacao(d) {
             // Level
             const pwLevel = document.getElementById('pw-level-num');
             if (pwLevel) pwLevel.innerText = d.nivel;
-            // Timer: NÃO atualiza aqui — deixa o tickLocalTimer cuidar (tem anti-rollback)
-            // (sem essa proteção, o postMessage sobrescrevia o timer com drift novo causando pulos)
+            // Timer: só atualiza aqui no POPUP (modo interno do app).
+            // Na TV pública, deixa o tickLocalTimer cuidar (tem anti-rollback).
+            // Detecção: se NÃO é público (sem slug/clube/path tv/), é popup.
+            if (!window._ehTvPublica) {
+                const pwTimer = document.getElementById('pw-timer');
+                if (pwTimer) pwTimer.innerText = d.timer;
+            }
             // Players
             const pwPlayers = document.getElementById('pw-players');
             const pwTotal = document.getElementById('pw-total');
@@ -1424,7 +1431,10 @@ function montarCarouselPremiacao(d) {
         document.getElementById('clube-nome').innerText=d.clubeNome||'';
         const tipoLabels={normal:'Torneio Normal',bounty:'💰 Bounty',pko:'🎯 Progressive KO',knockout:'⚡ Somente KO'};
         document.getElementById('tournament-type').innerText=tipoLabels[d.tipo]||'';
-        // Timer: NÃO atualiza aqui — deixa o tickLocalTimer cuidar (anti-rollback)
+        // Timer: só atualiza no POPUP — na TV pública, tickLocalTimer cuida (anti-rollback)
+        if (!window._ehTvPublica) {
+            document.getElementById('timer').innerText=d.timer;
+        }
         document.getElementById('nivel').innerText=d.nivel;
         document.getElementById('nivel-total').innerText=' / '+d.totalNiveis;
         document.getElementById('blinds').innerText=d.blinds;
@@ -1577,6 +1587,11 @@ function montarCarouselPremiacao(d) {
   let slug = params.get('slug');
   if (!slug && pathParts.length >= 2 && pathParts[0] === 'tv') slug = pathParts[1];
   if (!slug && pathParts.length >= 2 && pathParts[0] === 'tv.html') slug = pathParts[1];
+  
+  // 🔥 Flag global pra distinguir TV PÚBLICA (com slug/clube, usa tickLocalTimer) 
+  // do POPUP INTERNO (recebe postMessage do app)
+  // Usada pelos handlers onmessage pra decidir se atualizam o timer no DOM
+  window._ehTvPublica = !!(slug || params.get('clube'));
   
   // Se NÃO tem slug nem ?clube=, assume modo popup (postMessage do parent)
   if (!slug && !params.get('clube')) {
