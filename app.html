@@ -3642,10 +3642,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
         <!-- Lista editável -->
         <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Distribuição</div>
-        <div style="padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;margin-bottom:.5rem;display:grid;grid-template-columns:3rem 1fr 1fr;gap:.5rem;font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">
+        <div style="padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;margin-bottom:.5rem;display:grid;grid-template-columns:3rem .9fr .9fr 1.4fr;gap:.5rem;font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">
             <span>Pos</span>
             <span style="text-align:center;">% Prize</span>
             <span style="text-align:right;">R$ Premiação</span>
+            <span style="text-align:left;padding-left:.4rem;">🎫 Vaga <span style="color:#3f3f46;font-weight:600;">(opcional)</span></span>
         </div>
         <div id="prm-payout-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:40vh;overflow-y:auto;margin-bottom:1rem;"></div>
 
@@ -3735,6 +3736,18 @@ document.addEventListener('DOMContentLoaded', function(){
             
             <!-- Mensagem do que acontece -->
             <div id="ap-mensagem" style="font-size:.75rem;margin-top:.5rem;padding:.5rem .7rem;border-radius:.4rem;text-align:center;font-weight:600;">—</div>
+        </div>
+
+        <!-- 🎫 VAGA EXTRA (só aparece se posição tem vaga configurada) -->
+        <div id="ap-vaga-card" style="display:none;margin-bottom:1rem;padding:.85rem 1rem;background:linear-gradient(135deg,rgba(245,158,11,.15) 0%,rgba(245,158,11,.05) 100%);border:1px solid rgba(245,158,11,.5);border-radius:.55rem;">
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <i class="fa-solid fa-ticket" style="font-size:1.15rem;color:var(--gold);"></i>
+                <div style="flex:1;">
+                    <div style="font-size:.65rem;color:var(--gold);font-weight:800;text-transform:uppercase;letter-spacing:.08em;">Vaga Extra</div>
+                    <div style="font-size:.95rem;font-weight:800;color:#fbbf24;margin-top:.15rem;" id="ap-vaga-nome">—</div>
+                    <div style="font-size:.7rem;color:#a1a1aa;margin-top:.2rem;">Esta vaga será registrada no histórico do jogador, separada do pagamento em dinheiro.</div>
+                </div>
+            </div>
         </div>
 
         <!-- Editar valor (operador pode ajustar) -->
@@ -16132,18 +16145,32 @@ function renderPayout(t, containerId, full = false) {
     const prize = getPrize(t);
     const ativos = getAtivos(t) + t.eliminados.length; // total entrantes
     const splits = calcPayout(ativos, prize);
-    c.innerHTML = splits.map((s, i) => `
+    
+    // 🎫 Lê vagas configuradas (se houver)
+    const vagas = (t.premiacaoProjetada && Array.isArray(t.premiacaoProjetada.vagas)) 
+        ? t.premiacaoProjetada.vagas : [];
+    // E os valores customizados (caso operador tenha editado)
+    const valoresCustom = (t.premiacaoProjetada && Array.isArray(t.premiacaoProjetada.valores))
+        ? t.premiacaoProjetada.valores : [];
+    
+    c.innerHTML = splits.map((s, i) => {
+        const valor = valoresCustom[i] != null ? valoresCustom[i] : (prize * s.pct);
+        const vaga = (vagas[i] || '').trim();
+        const vagaBadge = vaga 
+            ? `<span class="vaga-badge" style="display:inline-flex;align-items:center;gap:.25rem;background:linear-gradient(135deg,rgba(245,158,11,.18) 0%,rgba(245,158,11,.08) 100%);border:1px solid rgba(245,158,11,.4);color:var(--gold);font-size:.65rem;font-weight:800;padding:.15rem .45rem;border-radius:.3rem;letter-spacing:.02em;margin-left:.4rem;white-space:nowrap;"><i class="fa-solid fa-ticket" style="font-size:.6rem;"></i> ${vaga.toUpperCase()}</span>`
+            : '';
+        return `
         <div class="payout-item">
-            <div style="display:flex;align-items:center;gap:.5rem;">
-                <span style="font-size:.7rem;font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};width:1.5rem;">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                <span style="font-size:.7rem;font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};width:1.5rem;flex-shrink:0;">
                     ${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}
                 </span>
-                <span style="font-size:.8rem;font-weight:700;">${s.label}${full&&t.eliminados[ativos-i-2]?' — '+getJogadorNome(t.eliminados[ativos-i-2]?.jogadorId):''}
-                </span>
+                <span style="font-size:.8rem;font-weight:700;">${s.label}${full&&t.eliminados[ativos-i-2]?' — '+getJogadorNome(t.eliminados[ativos-i-2]?.jogadorId):''}</span>
+                ${vagaBadge}
             </div>
-            <span style="font-size:.85rem;font-weight:800;color:#22c55e;">${formatMoney(prize * s.pct)}</span>
+            <span style="font-size:.85rem;font-weight:800;color:#22c55e;white-space:nowrap;">${formatMoney(valor)}</span>
         </div>
-    `).join('');
+    `;}).join('');
 }
 
 function calcPayout(n, prize) {
@@ -26141,14 +26168,21 @@ function recalcularPayoutDist(forceRegen = false) {
     pp.modelo = modelo;
     pp.percentuais = pcts;
     pp.valores = pcts.map(pc => (prize * pc) / 100);
+    
+    // 🎫 VAGAS — preserva vagas existentes; preenche null para posições novas
+    if (!Array.isArray(pp.vagas)) pp.vagas = [];
+    // Ajusta tamanho do array de vagas pra bater com qtd (preserva o que tem)
+    while (pp.vagas.length < qtd) pp.vagas.push(null);
+    if (pp.vagas.length > qtd) pp.vagas = pp.vagas.slice(0, qtd);
 
     // Renderiza lista
     const lista = document.getElementById('prm-payout-list');
     lista.innerHTML = pcts.map((pct, i) => `
-        <div style="display:grid;grid-template-columns:3rem 1fr 1fr;gap:.5rem;align-items:center;padding:.4rem .6rem;background:${i===0?'rgba(245,158,11,.08)':i===1?'rgba(161,161,170,.05)':i===2?'rgba(146,97,10,.06)':'#0f0f12'};border:1px solid ${i===0?'rgba(245,158,11,.25)':i===1?'rgba(161,161,170,.15)':i===2?'rgba(146,97,10,.2)':'#1e1e23'};border-radius:.4rem;">
+        <div style="display:grid;grid-template-columns:3rem .9fr .9fr 1.4fr;gap:.5rem;align-items:center;padding:.4rem .6rem;background:${i===0?'rgba(245,158,11,.08)':i===1?'rgba(161,161,170,.05)':i===2?'rgba(146,97,10,.06)':'#0f0f12'};border:1px solid ${i===0?'rgba(245,158,11,.25)':i===1?'rgba(161,161,170,.15)':i===2?'rgba(146,97,10,.2)':'#1e1e23'};border-radius:.4rem;">
             <span style="font-weight:800;color:${i===0?'var(--gold)':i===1?'#a1a1aa':i===2?'#92610a':'#71717a'};">${i+1}º</span>
             <input type="number" step="0.1" min="0" value="${pct.toFixed(1)}" data-idx="${i}" class="prm-pct-inp inp" style="padding:.3rem .5rem;font-family:var(--font-mono);font-size:.8rem;text-align:center;">
             <input type="number" step="1" min="0" value="${Math.round(pp.valores[i])}" data-idx="${i}" class="prm-val-inp inp" style="padding:.3rem .5rem;font-family:var(--font-mono);font-size:.8rem;text-align:right;">
+            <input type="text" placeholder="Ex: Vaga 50K" value="${(pp.vagas[i] || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="prm-vaga-inp inp" maxlength="40" style="padding:.3rem .5rem;font-size:.78rem;font-family:'Manrope',sans-serif;color:var(--gold);font-weight:600;" title="Nome da vaga que esta posição ganha (opcional)">
         </div>
     `).join('');
 
@@ -26175,6 +26209,15 @@ function recalcularPayoutDist(forceRegen = false) {
             atualizarTotalPayout();
             const pctInp = document.querySelector(`.prm-pct-inp[data-idx="${i}"]`);
             if (pctInp) pctInp.value = t.premiacaoProjetada.percentuais[i].toFixed(1);
+        };
+    });
+    
+    // 🎫 Evento de edição da Vaga
+    document.querySelectorAll('.prm-vaga-inp').forEach(inp => {
+        inp.oninput = function() {
+            const i = parseInt(this.dataset.idx);
+            const v = (this.value || '').trim();
+            t.premiacaoProjetada.vagas[i] = v || null;
         };
     });
 
@@ -26677,6 +26720,20 @@ function abrirAcertoPremio(jogadorId, posicao) {
     document.getElementById('ap-valor-divida').textContent = `- ${formatMoney(valorDivida)}`;
     document.getElementById('ap-valor-divida').style.color = valorDivida > 0 ? '#ef4444' : '#52525b';
     
+    // 🎫 VAGA EXTRA — se a posição tem vaga configurada, mostra card especial
+    const vagas = (pp.vagas && Array.isArray(pp.vagas)) ? pp.vagas : [];
+    const vagaPos = (vagas[posicao - 1] || '').trim();
+    const vagaCard = document.getElementById('ap-vaga-card');
+    const vagaNomeEl = document.getElementById('ap-vaga-nome');
+    if (vagaPos) {
+        if (vagaCard) vagaCard.style.display = 'block';
+        if (vagaNomeEl) vagaNomeEl.textContent = `🎫 ${vagaPos.toUpperCase()}`;
+        _acertoPremio.vaga = vagaPos;
+    } else {
+        if (vagaCard) vagaCard.style.display = 'none';
+        _acertoPremio.vaga = null;
+    }
+    
     // Líquido
     const liquidoEl = document.getElementById('ap-valor-liquido');
     const msgEl = document.getElementById('ap-mensagem');
@@ -26885,6 +26942,20 @@ async function acertoConfirmar() {
         });
     }
     
+    // 🎫 1b) Registra a VAGA EXTRA no histórico (sem valor monetário, só pra registro)
+    const vagaExtra = (_acertoPremio.vaga || '').trim();
+    if (vagaExtra) {
+        registrarTransacao({
+            jogadorId,
+            tipo: 'vaga_premiacao',  // novo tipo, valor 0 (sem impacto financeiro)
+            valor: 0,
+            descricao: `🎫 ${posicao}º lugar — Vaga extra: ${vagaExtra} · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+            metodo: 'vaga',
+        });
+    }
+    
     // 2) Registra pagamentos — UM por forma de pagamento (misto) ou ÚNICO (simples)
     const pagamentosFinal = modoMisto ? pagamentos : [{ metodo, valor: valorMovimentado }];
     const labelMisto = modoMisto && pagamentos.length > 1 ? ` (${pagamentos.length} formas)` : '';
@@ -26953,7 +27024,6 @@ async function acertoDeixarPendente() {
     const { jogadorId, posicao, valorPremio } = _acertoPremio;
     
     // Mesmo deixando pendente, registra a premiação como crédito do jogador
-    // Assim no caixa geral aparece "este jogador tem X pra receber"
     if (valorPremio > 0) {
         registrarTransacao({
             jogadorId,
@@ -26963,6 +27033,20 @@ async function acertoDeixarPendente() {
             origem: 'torneio',
             refId: t.id,
             metodo: 'premio_pendente',
+        });
+    }
+    
+    // 🎫 Registra a vaga extra (igual no acertoConfirmar)
+    const vagaExtra = (_acertoPremio.vaga || '').trim();
+    if (vagaExtra) {
+        registrarTransacao({
+            jogadorId,
+            tipo: 'vaga_premiacao',
+            valor: 0,
+            descricao: `🎫 ${posicao}º lugar — Vaga extra: ${vagaExtra} · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+            metodo: 'vaga',
         });
     }
     

@@ -455,6 +455,24 @@
             text-shadow: 0 0 18px rgba(245,213,114,.5);
             letter-spacing: -.005em;
         }
+        /* 🎫 Badge dourada da Vaga — Pro Live */
+        .pw-prize-vaga {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(245,213,114,.25) 0%, rgba(245,213,114,.12) 100%);
+            border: 1.5px solid rgba(245,213,114,.6);
+            color: #ffe599;
+            font-size: clamp(.75rem, 1vw, .95rem);
+            font-weight: 800;
+            padding: .25rem .65rem;
+            border-radius: .35rem;
+            margin-left: .55rem;
+            letter-spacing: .04em;
+            text-shadow: 0 0 12px rgba(245,213,114,.5);
+            box-shadow: 0 0 16px rgba(245,213,114,.2), inset 0 0 8px rgba(245,213,114,.1);
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
         .pw-prize-sep {
             width: 6px; height: 6px;
             border-radius: 50%;
@@ -688,6 +706,23 @@
         .gt-value {
             font-size: clamp(.95rem, 1.3vw, 1.25rem);
             font-weight: 800;
+        }
+        /* 🎫 Badge dourada da Vaga — ticker global (Clássico, Minimalista, Feltro, Neon) */
+        .gt-vaga {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(245,213,114,.22) 0%, rgba(245,213,114,.1) 100%);
+            border: 1.5px solid rgba(245,213,114,.55);
+            color: #ffe599;
+            font-size: clamp(.7rem, .95vw, .9rem);
+            font-weight: 800;
+            padding: .2rem .55rem;
+            border-radius: .3rem;
+            margin-left: .5rem;
+            letter-spacing: .04em;
+            text-shadow: 0 0 10px rgba(245,213,114,.4);
+            white-space: nowrap;
+            text-transform: uppercase;
         }
         .gt-sep { width: 5px; height: 5px; border-radius: 50%; opacity: .35; flex-shrink: 0; }
 
@@ -1032,7 +1067,7 @@
         _mostrarControlesZoom();
     });
 
-    function criarItemTicker(i, valor) {
+    function criarItemTicker(i, valor, vagaNome) {
         var classe = '';
         if (i === 0)      classe = 'gold';
         else if (i === 1) classe = 'silver';
@@ -1055,6 +1090,14 @@
         valSpan.className = 'pw-prize-value';
         valSpan.textContent = 'R$ ' + (valor || 0).toLocaleString('pt-BR');
         item.appendChild(valSpan);
+        
+        // 🎫 Badge da Vaga (se houver)
+        if (vagaNome && String(vagaNome).trim()) {
+            var vagaBadge = document.createElement('span');
+            vagaBadge.className = 'pw-prize-vaga';
+            vagaBadge.textContent = '🎫 ' + String(vagaNome).trim().toUpperCase();
+            item.appendChild(vagaBadge);
+        }
 
         return item;
     }
@@ -1091,7 +1134,8 @@ function montarCarouselPremiacao(d) {
         var conjuntos = pp.valores.length <= 4 ? 8 : (pp.valores.length <= 6 ? 6 : 4);
         for (var pass = 0; pass < conjuntos; pass++) {
             for (var i = 0; i < pp.valores.length; i++) {
-                strip.appendChild(criarItemTicker(i, pp.valores[i]));
+                var vagaPos = (pp.vagas && pp.vagas[i]) ? pp.vagas[i] : null;
+                strip.appendChild(criarItemTicker(i, pp.valores[i], vagaPos));
             }
         }
 
@@ -1164,6 +1208,15 @@ function montarCarouselPremiacao(d) {
                     val.className = 'gt-value';
                     val.textContent = 'R$ ' + (pp.valores[i] || 0).toLocaleString('pt-BR');
                     item.appendChild(val);
+                    
+                    // 🎫 Badge da Vaga (se houver pra essa posição)
+                    var vagaNome = (pp.vagas && pp.vagas[i]) ? String(pp.vagas[i]).trim() : '';
+                    if (vagaNome) {
+                        var vagaBadge = document.createElement('span');
+                        vagaBadge.className = 'gt-vaga';
+                        vagaBadge.textContent = '🎫 ' + vagaNome.toUpperCase();
+                        item.appendChild(vagaBadge);
+                    }
 
                     strip.appendChild(item);
                 }
@@ -2159,6 +2212,7 @@ function montarCarouselPremiacao(d) {
         qtd: t.premiacao_proj.qtd,
         valores: (t.premiacao_proj.valores || []).map(v => Math.round(v)),
         percentuais: t.premiacao_proj.percentuais,
+        vagas: t.premiacao_proj.vagas || [],
       } : null,
     };
     
