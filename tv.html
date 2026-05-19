@@ -1834,6 +1834,14 @@ function montarCarouselPremiacao(d) {
         t.status === 'running' || t.status === 'paused' || t.status === 'break' || t.rodando === true
       );
       
+      // 🔍 DEBUG: detecta quando a RPC retorna torneio sem entries (causa raiz do bug de zerar tela)
+      rodando.forEach(t => {
+        const entriesQtd = Array.isArray(t.entries) ? t.entries.length : -1;
+        if (entriesQtd === 0 || entriesQtd === -1) {
+          console.warn('[TV PUBLIC] ⚠️ RPC retornou torneio "' + (t.nome || t.id) + '" sem entries (entries=', t.entries, ', tipo:', typeof t.entries, ')');
+        }
+      });
+      
       if (rodando.length === 0) {
         // 🛡️ Anti-flicker: se já tinha um torneio rodando carregado e agora vem vazio,
         // pode ser race condition do RPC (timeout, network). Não esconde o que tá na tela.
@@ -1899,9 +1907,18 @@ function montarCarouselPremiacao(d) {
       
       if (hashAntes && hashAntes === hashDepois && torneioAtual && torneioAtual.id === novoTorneio.id) {
         // MESMO nível, mesmo status → mantém timer LOCAL rodando
-        // Não sobrescreve tempo_restante (servidor pode ter dado desatualizado)
-        // Só atualiza dados secundários (entries qtd já está no hash, então não muda aqui)
         return;
+      }
+      
+      // 🛡️ ANTI-REGRESSÃO: se já tinha torneio com entries e o novo veio sem,
+      // provavelmente é uma resposta parcial. Mantém o anterior na tela.
+      if (torneioAtual && torneioAtual.id === novoTorneio.id) {
+        const entriesAntes = (torneioAtual.entries || []).length;
+        const entriesDepois = (novoTorneio.entries || []).length;
+        if (entriesAntes > 0 && entriesDepois === 0) {
+          console.warn('[TV PUBLIC] 🛡️ Anti-regressão: novo torneio veio com 0 entries (antes:', entriesAntes, '). Ignorando atualização parcial.');
+          return;  // mantém o atual
+        }
       }
       
       // Mudança estrutural — recarrega e renderiza
@@ -2081,6 +2098,22 @@ function montarCarouselPremiacao(d) {
     // Calcular ativos: entries que não estão na lista de eliminados
     const eliminadosIds = new Set((t.eliminados || []).map(el => el.jogador_id));
     const entries = t.entries || [];
+    
+    // 🛡️ ANTI-FLICKER: se a RPC retornou um torneio sem entries (ou com entries vazio)
+    // mas a gente JÁ TINHA dados renderizados antes, é provavelmente uma resposta
+    // parcial/incompleta do servidor — ignora pra não zerar a tela.
+    // Detecta isso comparando com o estado anterior salvo em pubState._ultimoEntriesCount
+    if (entries.length === 0) {
+      const ultimoEntriesCount = pubState._ultimoEntriesCount || 0;
+      if (ultimoEntriesCount > 0) {
+        console.warn('[TV PUBLIC] 🛡️ Ignorando render: entries veio vazio mas tinha', ultimoEntriesCount, 'antes. Provável resposta parcial da RPC.');
+        return;  // mantém a tela como estava
+      }
+    } else {
+      // Salva o último count válido pra detectar regressões
+      pubState._ultimoEntriesCount = entries.length;
+    }
+    
     const ativosIds = new Set();
     for (const e of entries) {
       if (!eliminadosIds.has(e.jogador_id)) ativosIds.add(e.jogador_id);
