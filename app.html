@@ -3692,7 +3692,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <i class="fa-solid fa-trophy" style="color:var(--gold);"></i>
                 <span>Acerto Financeiro — <span id="ap-posicao-label">—</span></span>
             </h3>
-            <button onclick="closeModal('modal-acerto-premio')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+            <button onclick="acertoFecharSemAcao()" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
 
         <div style="background:#0a0a0c;border:1px solid #1e1e23;border-radius:.6rem;padding:.9rem 1rem;margin-bottom:1rem;">
@@ -3745,13 +3745,18 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <div style="display:flex;align-items:center;gap:.4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.5rem;padding:.7rem .9rem;">
                 <span style="font-size:.85rem;color:#71717a;font-family:var(--font-mono);font-weight:700;">R$</span>
-                <input type="number" id="ap-valor-editavel" step="0.01" style="flex:1;background:transparent;border:none;color:#fafafa;font-size:1.05rem;font-family:var(--font-mono);font-weight:700;outline:none;text-align:right;">
+                <input type="number" id="ap-valor-editavel" step="0.01" onchange="acertoAtualizarSomaMisto()" oninput="acertoAtualizarSomaMisto()" style="flex:1;background:transparent;border:none;color:#fafafa;font-size:1.05rem;font-family:var(--font-mono);font-weight:700;outline:none;text-align:right;">
             </div>
         </div>
 
-        <!-- Método de pagamento -->
-        <div style="margin-bottom:1.25rem;">
-            <label style="font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem;">Método</label>
+        <!-- Método ÚNICO (modo simples) -->
+        <div id="ap-bloco-metodo-simples" style="margin-bottom:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+                <label style="font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.08em;">Método</label>
+                <button onclick="acertoTrocarModoMisto(true)" style="background:transparent;border:none;color:#a855f7;font-size:.7rem;cursor:pointer;text-decoration:underline;font-family:'Manrope',sans-serif;">
+                    💳 Pagamento misto (2+ formas)
+                </button>
+            </div>
             <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:.4rem;" id="ap-metodos-container">
                 <button onclick="acertoSelecionarMetodo('dinheiro')" data-metodo="dinheiro" class="ap-metodo-btn" style="padding:.65rem .4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.45rem;color:#a1a1aa;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-family:'Manrope',sans-serif;">
                     <i class="fa-solid fa-money-bill-wave" style="font-size:.95rem;"></i>
@@ -3769,6 +3774,45 @@ document.addEventListener('DOMContentLoaded', function(){
                     <i class="fa-brands fa-cc-mastercard" style="font-size:.95rem;"></i>
                     Crédito
                 </button>
+            </div>
+        </div>
+
+        <!-- Método MISTO (várias formas) -->
+        <div id="ap-bloco-metodo-misto" style="display:none;margin-bottom:1.25rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+                <label style="font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.08em;">Pagamento Misto</label>
+                <button onclick="acertoTrocarModoMisto(false)" style="background:transparent;border:none;color:#a1a1aa;font-size:.7rem;cursor:pointer;text-decoration:underline;font-family:'Manrope',sans-serif;">
+                    ← voltar pra método único
+                </button>
+            </div>
+            
+            <!-- Lista de pagamentos adicionados -->
+            <div id="ap-lista-pagamentos" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.5rem;"></div>
+            
+            <!-- Adicionar novo pagamento -->
+            <div style="background:#0a0a0c;border:1px dashed #3f3f46;border-radius:.45rem;padding:.6rem;display:grid;grid-template-columns:1fr 1fr auto;gap:.4rem;align-items:end;">
+                <div>
+                    <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;margin-bottom:.2rem;">Método</div>
+                    <select id="ap-misto-metodo" style="width:100%;padding:.4rem .5rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.35rem;color:#fafafa;font-size:.78rem;font-family:'Manrope',sans-serif;">
+                        <option value="dinheiro">💵 Dinheiro</option>
+                        <option value="pix" selected>📱 PIX</option>
+                        <option value="debito">💳 Débito</option>
+                        <option value="credito">💳 Crédito</option>
+                    </select>
+                </div>
+                <div>
+                    <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;margin-bottom:.2rem;">Valor</div>
+                    <input type="number" id="ap-misto-valor" step="0.01" placeholder="0,00" style="width:100%;padding:.4rem .5rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.35rem;color:#fafafa;font-size:.78rem;font-family:var(--font-mono);text-align:right;">
+                </div>
+                <button onclick="acertoAdicionarPagamento()" style="padding:.5rem .7rem;background:rgba(168,85,247,.15);border:1px solid #a855f7;border-radius:.35rem;color:#a855f7;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;white-space:nowrap;">
+                    <i class="fa-solid fa-plus"></i> Adicionar
+                </button>
+            </div>
+            
+            <!-- Resumo da soma -->
+            <div id="ap-misto-resumo" style="display:flex;justify-content:space-between;align-items:center;margin-top:.55rem;padding:.5rem .7rem;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:.4rem;font-size:.78rem;">
+                <span style="color:#71717a;">Soma dos pagamentos:</span>
+                <span id="ap-misto-soma" style="font-weight:800;color:#22c55e;font-family:var(--font-mono);">R$ 0,00</span>
             </div>
         </div>
 
@@ -5010,14 +5054,14 @@ document.addEventListener('DOMContentLoaded', function(){
                         <!-- Ações rápidas -->
                         <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-top:.5rem;">Ações Rápidas</div>
                         <div style="display:flex;flex-direction:column;gap:.5rem;">
-                            <button onclick="openModalEntrada(activeTorneioIdx)" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
-                                <i class="fa-solid fa-plus"></i> Nova Entrada / Buy-in
+                            <button onclick="onClickNovaEntrada()" id="btn-nova-entrada" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'" title="Cadastrar nova entrada (Buy-in, Rebuy, Add-on, etc)">
+                                <i class="fa-solid fa-plus"></i> <span id="btn-nova-entrada-label">Nova Entrada / Buy-in</span>
                             </button>
                             <button onclick="openModalEliminar(activeTorneioIdx)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">
                                 <i class="fa-solid fa-skull"></i> Eliminar Jogador
                             </button>
-                            <button onclick="abrirJackpot(activeTorneioIdx)" id="btn-jackpot" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'">
-                                <i class="fa-solid fa-gem"></i> Comprar Jackpot
+                            <button onclick="onClickComprarJackpot()" id="btn-jackpot" style="display:none;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:var(--gold);border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(245,158,11,.18)'" onmouseout="this.style.background='rgba(245,158,11,.08)'" title="Cadastrar compra de Jackpot">
+                                <i class="fa-solid fa-gem"></i> <span id="btn-jackpot-label">Comprar Jackpot</span>
                             </button>
                             <button onclick="abrirLastChance(activeTorneioIdx)" id="btn-last-chance" style="display:none;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);color:#a78bfa;border-radius:.6rem;padding:.75rem;font-family:'Manrope',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='rgba(168,85,247,.18)'" onmouseout="this.style.background='rgba(168,85,247,.08)'">
                                 <i class="fa-solid fa-star"></i> Comprar Last Chance
@@ -15701,6 +15745,12 @@ function updateModalTorneio() {
             if (abrirLink) abrirLink.style.display = torneioAtivo ? 'block' : 'none';
         }
     }
+    
+    // 🔥 Atualiza estado visual dos botões "Nova Entrada" e "Comprar Jackpot"
+    // (bloqueia com cadeado quando compras encerradas)
+    if (typeof atualizarBotoesNovaEntrada === 'function') {
+        atualizarBotoesNovaEntrada();
+    }
 
     // Card do jackpot no resumo financeiro
     const jpCard = document.getElementById('mt-jackpot-card');
@@ -16528,6 +16578,149 @@ window.reabrirCompras = reabrirCompras;
 window.abrirJanelaManual = abrirJanelaManual;
 window.fecharJanelaManual = fecharJanelaManual;
 
+// ============================================================
+// BLOQUEIO PÓS-JANELA: Nova Entrada e Jackpot
+// ============================================================
+// Regras:
+//  - Sem Last Chance configurado → bloqueia após compras encerradas OU passar do nível max
+//  - Com Last Chance configurado → bloqueia só após Last Chance encerrar também
+//  - Jackpot bloqueado junto com Nova Entrada
+function _todasComprasEncerradas(t) {
+    if (!t || !t.iniciadoEm) return false;
+    
+    // Compras explicitamente encerradas pelo operador
+    if (t.compras_encerradas || t.comprasEncerradas) {
+        // Mas se tem Last Chance ativo e ainda não passou da janela LC, continua liberado
+        if (t.last_chance_ativo || t.lastChanceAtivo) {
+            // Last Chance ativo: precisa também passar do nível dele
+            // Last Chance fica disponível após addonAte (já é uma regra existente)
+            // Aqui consideramos que enquanto LC ainda é disponível, não está "tudo encerrado"
+            const trava = _tipoBloqueadoPorTrava(t, 'last_chance');
+            if (!trava.bloqueado) {
+                return false;  // LC ainda disponível → não encerrou tudo
+            }
+        }
+        return true;
+    }
+    
+    // Verifica pelas travas: se TODOS os tipos de compra estão bloqueados, considera encerrado
+    const tiposCompra = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+    const todosBloqueados = tiposCompra.every(tipo => _tipoBloqueadoPorTrava(t, tipo).bloqueado);
+    
+    if (todosBloqueados) {
+        // Se tem LC e ainda tá liberado, não considera encerrado
+        if (t.last_chance_ativo || t.lastChanceAtivo) {
+            const lcBloq = _tipoBloqueadoPorTrava(t, 'last_chance').bloqueado;
+            if (!lcBloq) return false;
+        }
+        return true;
+    }
+    
+    return false;
+}
+window._todasComprasEncerradas = _todasComprasEncerradas;
+
+// Wrapper que checa bloqueio antes de abrir modal de entrada
+function onClickNovaEntrada() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (_todasComprasEncerradas(t)) {
+        const motivo = (t.last_chance_ativo || t.lastChanceAtivo)
+            ? 'Compras e Last Chance encerrados. Não é mais possível cadastrar entradas.'
+            : 'Compras encerradas. Não é mais possível cadastrar entradas neste torneio.';
+        return showToast(`🔒 ${motivo}`);
+    }
+    
+    openModalEntrada(activeTorneioIdx);
+}
+window.onClickNovaEntrada = onClickNovaEntrada;
+
+// Wrapper que checa bloqueio antes de abrir compra de jackpot
+function onClickComprarJackpot() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    if (_todasComprasEncerradas(t)) {
+        return showToast('🔒 Compras encerradas. Jackpot não pode mais ser cadastrado.');
+    }
+    
+    abrirJackpot(activeTorneioIdx);
+}
+window.onClickComprarJackpot = onClickComprarJackpot;
+
+// Atualiza UI dos botões (cadeado / hint / disable) conforme estado do torneio
+function atualizarBotoesNovaEntrada() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    
+    const btnEntrada = document.getElementById('btn-nova-entrada');
+    const labelEntrada = document.getElementById('btn-nova-entrada-label');
+    const btnJackpot = document.getElementById('btn-jackpot');
+    const labelJackpot = document.getElementById('btn-jackpot-label');
+    
+    if (!btnEntrada) return;
+    
+    const bloqueado = _todasComprasEncerradas(t);
+    const temLC = !!(t.last_chance_ativo || t.lastChanceAtivo);
+    
+    if (bloqueado) {
+        // Nova Entrada
+        btnEntrada.style.background = 'rgba(63,63,70,.3)';
+        btnEntrada.style.borderColor = '#3f3f46';
+        btnEntrada.style.color = '#71717a';
+        btnEntrada.style.cursor = 'not-allowed';
+        if (labelEntrada) labelEntrada.innerHTML = `🔒 Nova Entrada (bloqueado)`;
+        btnEntrada.title = temLC 
+            ? 'Compras e Last Chance encerrados. Sem novas entradas.'
+            : 'Compras encerradas. Sem novas entradas.';
+        btnEntrada.onmouseover = null;
+        btnEntrada.onmouseout = null;
+        
+        // Jackpot
+        if (btnJackpot) {
+            btnJackpot.style.background = 'rgba(63,63,70,.3)';
+            btnJackpot.style.borderColor = '#3f3f46';
+            btnJackpot.style.color = '#71717a';
+            btnJackpot.style.cursor = 'not-allowed';
+            if (labelJackpot) labelJackpot.innerHTML = `🔒 Jackpot (bloqueado)`;
+            btnJackpot.title = 'Compras encerradas. Jackpot bloqueado.';
+            btnJackpot.onmouseover = null;
+            btnJackpot.onmouseout = null;
+        }
+    } else {
+        // Restaura visual normal
+        btnEntrada.style.background = 'rgba(245,158,11,.08)';
+        btnEntrada.style.borderColor = 'rgba(245,158,11,.2)';
+        btnEntrada.style.color = 'var(--gold)';
+        btnEntrada.style.cursor = 'pointer';
+        if (labelEntrada) {
+            // Se tem LC e compras encerradas, mostra "Last Chance / Buy-in" como label
+            if (temLC && (t.compras_encerradas || t.comprasEncerradas)) {
+                labelEntrada.textContent = 'Last Chance / Buy-in';
+                btnEntrada.title = 'Compras encerradas mas Last Chance disponível';
+            } else {
+                labelEntrada.textContent = 'Nova Entrada / Buy-in';
+                btnEntrada.title = 'Cadastrar nova entrada (Buy-in, Rebuy, Add-on, etc)';
+            }
+        }
+        btnEntrada.onmouseover = function() { this.style.background = 'rgba(245,158,11,.18)'; };
+        btnEntrada.onmouseout = function() { this.style.background = 'rgba(245,158,11,.08)'; };
+        
+        if (btnJackpot) {
+            btnJackpot.style.background = 'rgba(245,158,11,.08)';
+            btnJackpot.style.borderColor = 'rgba(245,158,11,.2)';
+            btnJackpot.style.color = 'var(--gold)';
+            btnJackpot.style.cursor = 'pointer';
+            if (labelJackpot) labelJackpot.textContent = 'Comprar Jackpot';
+            btnJackpot.title = 'Cadastrar compra de Jackpot';
+            btnJackpot.onmouseover = function() { this.style.background = 'rgba(245,158,11,.18)'; };
+            btnJackpot.onmouseout = function() { this.style.background = 'rgba(245,158,11,.08)'; };
+        }
+    }
+}
+window.atualizarBotoesNovaEntrada = atualizarBotoesNovaEntrada;
+
 function openModalEntrada(idx) {
     const t = torneios[idx];
     const sel = document.getElementById('entrada-jogador');
@@ -16997,9 +17190,10 @@ function _confirmarEliminacaoImpl() {
     // Sugerir acerto no caixa (depende da preferência do operador)
     sugerirAcertoNoCaixa(jid);
     
-    // 🏆 Se o torneio terminou, sugerir também acerto do CAMPEÃO (1º lugar)
+    // 🏆 Se o torneio terminou, ENFILEIRA o acerto do CAMPEÃO (1º lugar)
+    // Vai abrir SÓ depois do modal do 2º colocado fechar (evita modais sobrepostos)
     if (finalizado && vencedorIdFinal) {
-        setTimeout(() => sugerirAcertoNoCaixa(vencedorIdFinal), 1500);  // dá tempo pro modal anterior fechar
+        _enfileirarAcerto(vencedorIdFinal, 1);
     }
 
     // UNDO: permite desfazer eliminação
@@ -26318,12 +26512,9 @@ function sugerirAcertoNoCaixa(jogadorId) {
     if (elim && elim.posicao) {
         const pp = t.premiacaoProjetada;
         const qtdPremiados = pp && pp.qtd ? Number(pp.qtd) : 0;
-        // Vencedor (1º) também passa por aqui — mas só será detectado se ele foi "eliminado" 
-        // (= 2º colocado eliminou ele virtualmente). Caso especial: torneio acabou, vencedor não foi pra eliminados.
-        // Por isso checamos abaixo o caso do vencedor pelo status do torneio.
         if (qtdPremiados > 0 && elim.posicao <= qtdPremiados) {
-            // Está na faixa premiada — abre modal especial
-            setTimeout(() => abrirAcertoPremio(jogadorId, elim.posicao), 400);
+            // Está na faixa premiada — enfileira (evita modais sobrepostos)
+            _enfileirarAcerto(jogadorId, elim.posicao);
             return;
         }
     }
@@ -26332,7 +26523,7 @@ function sugerirAcertoNoCaixa(jogadorId) {
     if (t.status === 'finished' && t.vencedorId && String(t.vencedorId) === String(jogadorId)) {
         const pp = t.premiacaoProjetada;
         if (pp && pp.qtd > 0) {
-            setTimeout(() => abrirAcertoPremio(jogadorId, 1), 400);
+            _enfileirarAcerto(jogadorId, 1);
             return;
         }
     }
@@ -26379,7 +26570,62 @@ let _acertoPremio = {
     valorLiquido: 0,
     valorEditado: 0,
     metodo: 'pix',
+    // Pagamento misto (múltiplas formas)
+    pagamentos: [],  // [{ metodo, valor }, ...]
 };
+
+// 🔥 Fila de acertos pendentes (evita modais sobrepostos)
+let _filaAcertos = [];
+let _acertoModalAberto = false;
+// Set de jogadores que JÁ foram processados nesta sessão de torneio
+// (evita reabertura se acertoConfirmar é chamado mais de uma vez por race condition)
+let _acertosProcessados = new Set();
+
+function _enfileirarAcerto(jogadorId, posicao) {
+    const jidStr = String(jogadorId);
+    // 1) Evita duplicatas na fila
+    if (_filaAcertos.some(a => String(a.jogadorId) === jidStr)) return;
+    // 2) Evita reabertura se já foi processado nesta sessão
+    if (_acertosProcessados.has(jidStr)) {
+        console.log('[FILA_ACERTOS] Já processado, ignorando:', jidStr);
+        return;
+    }
+    // 3) Evita reabertura se está com modal aberto pra esse jogador
+    if (_acertoModalAberto && String(_acertoPremio.jogadorId) === jidStr) {
+        console.log('[FILA_ACERTOS] Já está no modal atual, ignorando:', jidStr);
+        return;
+    }
+    _filaAcertos.push({ jogadorId, posicao });
+    _processarProximoAcerto();
+}
+
+function _processarProximoAcerto() {
+    if (_acertoModalAberto) return;  // já tem um aberto, espera fechar
+    if (_filaAcertos.length === 0) return;  // nada na fila
+    
+    const proximo = _filaAcertos.shift();
+    // Marca como processado ANTES de abrir (evita race condition se chamarem _enfileirarAcerto durante o setTimeout)
+    _acertosProcessados.add(String(proximo.jogadorId));
+    _acertoModalAberto = true;
+    // delay pequeno pro modal anterior fechar visualmente
+    setTimeout(() => abrirAcertoPremio(proximo.jogadorId, proximo.posicao), 300);
+}
+
+function _liberarFilaAcertos() {
+    _acertoModalAberto = false;
+    // Processa próximo (se houver)
+    if (_filaAcertos.length > 0) {
+        _processarProximoAcerto();
+    }
+}
+
+// Limpa estado de acertos (chamado ao abrir um novo torneio ou ao recarregar)
+function _resetFilaAcertos() {
+    _filaAcertos = [];
+    _acertoModalAberto = false;
+    _acertosProcessados = new Set();
+}
+window._resetFilaAcertos = _resetFilaAcertos;
 
 function abrirAcertoPremio(jogadorId, posicao) {
     const t = torneios[activeTorneioIdx];
@@ -26405,9 +26651,16 @@ function abrirAcertoPremio(jogadorId, posicao) {
         valorPremio,
         valorDivida,
         valorLiquido,
-        valorEditado: Math.abs(valorLiquido),  // sempre absoluto pro input
+        valorEditado: Math.abs(valorLiquido),
         metodo: 'pix',
+        pagamentos: [],  // 🆕 modo misto começa vazio
     };
+    
+    // Reset UI: começa no modo SIMPLES (pagamento único)
+    const blocoSimples = document.getElementById('ap-bloco-metodo-simples');
+    const blocoMisto = document.getElementById('ap-bloco-metodo-misto');
+    if (blocoSimples) blocoSimples.style.display = 'block';
+    if (blocoMisto) blocoMisto.style.display = 'none';
     
     // Preenche modal
     document.getElementById('ap-posicao-label').textContent = `${posicao}º Lugar`;
@@ -26479,16 +26732,137 @@ function acertoSelecionarMetodo(metodo) {
 
 function acertoUsarSugerido() {
     document.getElementById('ap-valor-editavel').value = Math.abs(_acertoPremio.valorLiquido).toFixed(2);
+    acertoAtualizarSomaMisto();
 }
+
+// ============================================================
+// PAGAMENTO MISTO — múltiplas formas de pagamento
+// ============================================================
+
+function acertoTrocarModoMisto(ativar) {
+    document.getElementById('ap-bloco-metodo-simples').style.display = ativar ? 'none' : 'block';
+    document.getElementById('ap-bloco-metodo-misto').style.display = ativar ? 'block' : 'none';
+    
+    if (ativar) {
+        // Pré-preenche com 1 pagamento usando o valor total e método atual
+        const valorTotal = parseFloat(document.getElementById('ap-valor-editavel').value) || 0;
+        if (valorTotal > 0 && _acertoPremio.pagamentos.length === 0) {
+            _acertoPremio.pagamentos = [{ metodo: _acertoPremio.metodo || 'pix', valor: valorTotal }];
+        }
+        acertoRenderizarPagamentos();
+    } else {
+        // Volta pro simples — limpa pagamentos
+        _acertoPremio.pagamentos = [];
+    }
+}
+window.acertoTrocarModoMisto = acertoTrocarModoMisto;
+
+function acertoAdicionarPagamento() {
+    const metodo = document.getElementById('ap-misto-metodo').value;
+    const valor = parseFloat(document.getElementById('ap-misto-valor').value) || 0;
+    
+    if (valor <= 0) {
+        return showToast('⚠️ Valor deve ser maior que zero');
+    }
+    
+    _acertoPremio.pagamentos.push({ metodo, valor });
+    
+    // Limpa o input pra próximo
+    document.getElementById('ap-misto-valor').value = '';
+    
+    acertoRenderizarPagamentos();
+}
+window.acertoAdicionarPagamento = acertoAdicionarPagamento;
+
+function acertoRemoverPagamento(idx) {
+    _acertoPremio.pagamentos.splice(idx, 1);
+    acertoRenderizarPagamentos();
+}
+window.acertoRemoverPagamento = acertoRemoverPagamento;
+
+function acertoRenderizarPagamentos() {
+    const lista = document.getElementById('ap-lista-pagamentos');
+    if (!lista) return;
+    
+    const valorAlvo = parseFloat(document.getElementById('ap-valor-editavel').value) || 0;
+    
+    if (_acertoPremio.pagamentos.length === 0) {
+        lista.innerHTML = `<div style="text-align:center;padding:.6rem;color:#52525b;font-size:.75rem;font-style:italic;">Nenhum pagamento adicionado ainda</div>`;
+    } else {
+        lista.innerHTML = _acertoPremio.pagamentos.map((p, i) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .7rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.4rem;">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <span style="font-size:.9rem;">${({pix:'📱', dinheiro:'💵', debito:'💳', credito:'💳'})[p.metodo] || '💳'}</span>
+                    <span style="font-size:.78rem;color:#fafafa;font-weight:600;">${_metodoLabel(p.metodo)}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <span style="font-family:var(--font-mono);font-weight:700;color:#fafafa;font-size:.85rem;">${formatMoney(p.valor)}</span>
+                    <button onclick="acertoRemoverPagamento(${i})" style="background:transparent;border:none;color:#71717a;cursor:pointer;padding:.1rem .3rem;" title="Remover">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    acertoAtualizarSomaMisto();
+}
+window.acertoRenderizarPagamentos = acertoRenderizarPagamentos;
+
+function acertoAtualizarSomaMisto() {
+    const somaEl = document.getElementById('ap-misto-soma');
+    const resumoEl = document.getElementById('ap-misto-resumo');
+    if (!somaEl) return;
+    
+    const valorAlvo = parseFloat(document.getElementById('ap-valor-editavel').value) || 0;
+    const soma = _acertoPremio.pagamentos.reduce((s, p) => s + Number(p.valor || 0), 0);
+    
+    somaEl.textContent = formatMoney(soma);
+    
+    // Color feedback baseado na diferença
+    const diff = Math.round((soma - valorAlvo) * 100) / 100;
+    if (resumoEl) {
+        if (Math.abs(diff) < 0.01) {
+            // Exato
+            resumoEl.style.background = 'rgba(34,197,94,.08)';
+            resumoEl.style.borderColor = 'rgba(34,197,94,.35)';
+            somaEl.style.color = '#22c55e';
+            somaEl.innerHTML = `${formatMoney(soma)} ✓`;
+        } else if (soma < valorAlvo) {
+            // Falta
+            resumoEl.style.background = 'rgba(245,158,11,.05)';
+            resumoEl.style.borderColor = 'rgba(245,158,11,.25)';
+            somaEl.style.color = '#f59e0b';
+            somaEl.innerHTML = `${formatMoney(soma)} <span style="font-size:.7rem;color:#71717a;">(faltam ${formatMoney(valorAlvo - soma)})</span>`;
+        } else {
+            // Passou
+            resumoEl.style.background = 'rgba(239,68,68,.05)';
+            resumoEl.style.borderColor = 'rgba(239,68,68,.25)';
+            somaEl.style.color = '#ef4444';
+            somaEl.innerHTML = `${formatMoney(soma)} <span style="font-size:.7rem;color:#71717a;">(passou ${formatMoney(soma - valorAlvo)})</span>`;
+        }
+    }
+}
+window.acertoAtualizarSomaMisto = acertoAtualizarSomaMisto;
 
 async function acertoConfirmar() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    const { jogadorId, posicao, valorPremio, valorDivida, valorLiquido, metodo } = _acertoPremio;
+    const { jogadorId, posicao, valorPremio, valorDivida, valorLiquido, metodo, pagamentos } = _acertoPremio;
     
     const valorMovimentado = parseFloat(document.getElementById('ap-valor-editavel').value) || 0;
     if (valorMovimentado < 0) {
         return showToast('⚠️ Valor não pode ser negativo');
+    }
+    
+    // 💳 Modo MISTO: valida que a soma dos pagamentos bate com o valor total
+    const modoMisto = (pagamentos && pagamentos.length > 0);
+    if (modoMisto) {
+        const somaMisto = pagamentos.reduce((s, p) => s + Number(p.valor || 0), 0);
+        const diff = Math.round((somaMisto - valorMovimentado) * 100) / 100;
+        if (Math.abs(diff) > 0.01) {
+            return showToast(`⚠️ Soma dos pagamentos (${formatMoney(somaMisto)}) deve ser igual ao valor total (${formatMoney(valorMovimentado)})`);
+        }
     }
     
     const j = jogadores.find(x => String(x.id) === String(jogadorId));
@@ -26503,7 +26877,7 @@ async function acertoConfirmar() {
         registrarTransacao({
             jogadorId,
             tipo: 'premiacao',
-            valor: valorPremio,  // positivo = crédito
+            valor: valorPremio,
             descricao: `🏆 ${posicao}º lugar · ${t.nome}`,
             origem: 'torneio',
             refId: t.id,
@@ -26511,42 +26885,56 @@ async function acertoConfirmar() {
         });
     }
     
-    // 2) Registra o pagamento/recebimento conforme o líquido
-    if (isCredito && valorMovimentado > 0) {
-        // Jogador RECEBE valor (saída do caixa do clube)
-        registrarTransacao({
-            jogadorId,
-            tipo: 'saque_premiacao',
-            valor: -valorMovimentado,  // negativo = saiu da conta dele (porque já creditou o prêmio)
-            descricao: `💰 Recebimento de premiação · ${posicao}º · via ${_metodoLabel(metodo)}`,
-            origem: 'torneio',
-            refId: t.id,
-            metodo,
-        });
-    } else if (isDebito && valorMovimentado > 0) {
-        // Jogador PAGA valor (entra na caixa do clube)
-        registrarTransacao({
-            jogadorId,
-            tipo: 'pagamento_direto',
-            valor: valorMovimentado,  // positivo = quitou dívida
-            descricao: `💵 Pagamento líquido após premiação · ${posicao}º · via ${_metodoLabel(metodo)}`,
-            origem: 'torneio',
-            refId: t.id,
-            metodo,
-        });
+    // 2) Registra pagamentos — UM por forma de pagamento (misto) ou ÚNICO (simples)
+    const pagamentosFinal = modoMisto ? pagamentos : [{ metodo, valor: valorMovimentado }];
+    const labelMisto = modoMisto && pagamentos.length > 1 ? ` (${pagamentos.length} formas)` : '';
+    
+    for (const pag of pagamentosFinal) {
+        if (Number(pag.valor) <= 0) continue;
+        
+        if (isCredito) {
+            // Jogador RECEBE — saída do caixa
+            registrarTransacao({
+                jogadorId,
+                tipo: 'saque_premiacao',
+                valor: -Number(pag.valor),
+                descricao: `💰 Recebimento de premiação${labelMisto} · ${posicao}º · ${_metodoLabel(pag.metodo)}`,
+                origem: 'torneio',
+                refId: t.id,
+                metodo: pag.metodo,
+            });
+        } else if (isDebito) {
+            // Jogador PAGA — entra na caixa
+            registrarTransacao({
+                jogadorId,
+                tipo: 'pagamento_direto',
+                valor: Number(pag.valor),
+                descricao: `💵 Pagamento líquido após premiação${labelMisto} · ${posicao}º · ${_metodoLabel(pag.metodo)}`,
+                origem: 'torneio',
+                refId: t.id,
+                metodo: pag.metodo,
+            });
+        }
     }
     
-    logAudit('ACERTO_PREMIO', `${nome} acertou ${posicao}º lugar · prêmio ${formatMoney(valorPremio)} · dívida ${formatMoney(valorDivida)} · líquido ${formatMoney(valorLiquido)} · movimentado ${formatMoney(valorMovimentado)} via ${metodo}`, {
-        jogadorId, posicao, valorPremio, valorDivida, valorLiquido, valorMovimentado, metodo, torneioId: t.id,
+    const metodosLog = modoMisto 
+        ? pagamentos.map(p => `${_metodoLabel(p.metodo)}:${formatMoney(p.valor)}`).join(' + ')
+        : _metodoLabel(metodo);
+    
+    logAudit('ACERTO_PREMIO', `${nome} acertou ${posicao}º · prêmio ${formatMoney(valorPremio)} · dívida ${formatMoney(valorDivida)} · líquido ${formatMoney(valorLiquido)} · movimentado ${formatMoney(valorMovimentado)} via ${metodosLog}`, {
+        jogadorId, posicao, valorPremio, valorDivida, valorLiquido, valorMovimentado, 
+        metodo: modoMisto ? 'misto' : metodo,
+        pagamentos: modoMisto ? pagamentos : null,
+        torneioId: t.id,
     });
     
     saveData();
     closeModal('modal-acerto-premio');
     
     if (isCredito) {
-        showToast(`💰 ${nome} recebeu ${formatMoney(valorMovimentado)}`);
+        showToast(`💰 ${nome} recebeu ${formatMoney(valorMovimentado)}${labelMisto}`);
     } else if (isDebito) {
-        showToast(`💵 ${nome} pagou ${formatMoney(valorMovimentado)}`);
+        showToast(`💵 ${nome} pagou ${formatMoney(valorMovimentado)}${labelMisto}`);
     } else {
         showToast(`✓ Acerto de ${nome} concluído`);
     }
@@ -26554,6 +26942,9 @@ async function acertoConfirmar() {
     updateModalTorneio();
     if (typeof renderTorneiosList === 'function') renderTorneiosList();
     if (typeof renderDashboard === 'function') renderDashboard();
+    
+    // 🔥 Libera fila — processa próximo acerto se houver
+    _liberarFilaAcertos();
 }
 
 async function acertoDeixarPendente() {
@@ -26587,7 +26978,17 @@ async function acertoDeixarPendente() {
     showToast(`⏳ ${nome}: prêmio registrado, acerto pendente`);
     
     updateModalTorneio();
+    
+    // 🔥 Libera fila
+    _liberarFilaAcertos();
 }
+
+// Fechar modal sem fazer nada (X) — libera fila pra continuar
+function acertoFecharSemAcao() {
+    closeModal('modal-acerto-premio');
+    _liberarFilaAcertos();
+}
+window.acertoFecharSemAcao = acertoFecharSemAcao;
 
 function _metodoLabel(m) {
     return ({pix:'PIX', dinheiro:'Dinheiro', debito:'Débito', credito:'Crédito'})[m] || m;
