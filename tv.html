@@ -1530,6 +1530,47 @@ function montarCarouselPremiacao(d) {
     return; // Modo popup: o postMessage do app cuida disso
   }
   
+  // === DETECÇÃO DE BROWSER ANTIGO ===
+  // Se o browser não suporta features básicas modernas, redireciona pra versão legacy
+  // (tv-legacy.html é ES5 puro, compatível com TVs/browsers de 2014+)
+  // Pular detecção se vier ?modern=1 ou ?legacy=0 (caso usuário queira forçar)
+  (function detectarBrowserAntigo() {
+    if (params.get('modern') === '1' || params.get('legacy') === '0') return;
+    if (params.get('legacy') === '1') {
+      // Force redirecionamento legacy
+      window.location.href = '/tv-legacy/' + (slug || '');
+      return;
+    }
+    
+    var precisaLegacy = false;
+    var razao = '';
+    
+    // 1) Sem Promise nativo
+    if (typeof Promise === 'undefined') { precisaLegacy = true; razao = 'Promise'; }
+    // 2) Sem fetch nativo
+    else if (typeof fetch === 'undefined') { precisaLegacy = true; razao = 'fetch'; }
+    // 3) Sem Object.assign (ES6)
+    else if (typeof Object.assign !== 'function') { precisaLegacy = true; razao = 'Object.assign'; }
+    // 4) Sem Array.from (ES6)
+    else if (typeof Array.from !== 'function') { precisaLegacy = true; razao = 'Array.from'; }
+    // 5) Sem Map/Set (ES6)
+    else if (typeof Map === 'undefined' || typeof Set === 'undefined') { precisaLegacy = true; razao = 'Map/Set'; }
+    // 6) Teste de arrow function via eval (vai dar SyntaxError em ES5)
+    else {
+      try { 
+        new Function('return (()=>1)()')(); 
+      } catch(e) { 
+        precisaLegacy = true; 
+        razao = 'arrow functions';
+      }
+    }
+    
+    if (precisaLegacy) {
+      console.log('[TV] Browser antigo detectado (sem ' + razao + '), redirecionando pra /tv-legacy/');
+      window.location.href = '/tv-legacy/' + (slug || '');
+    }
+  })();
+  
   // === MODO PÚBLICO ===
   console.log('[TV PUBLIC] Iniciando modo público com slug:', slug);
   

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, user-scalable=no">
+<title>StackOS TV — Legacy</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    height: 100%;
+    background: #0a3d1f;
+    color: #f5d572;
+    font-family: Arial, Helvetica, sans-serif;
+    overflow: hidden;
+}
+body {
+    background-image: linear-gradient(135deg, #0a3d1f 0%, #1a5a35 50%, #0a3d1f 100%);
+    padding: 20px;
+}
+.wrap {
+    width: 100%;
+    height: 100%;
+    display: table;
+}
+.cell {
+    display: table-cell;
+    vertical-align: middle;
+    text-align: center;
+}
+.title {
+    font-size: 38px;
+    font-weight: bold;
+    color: #f5d572;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+    letter-spacing: 2px;
+}
+.timer {
+    font-size: 180px;
+    font-weight: bold;
+    color: #f5d572;
+    font-family: "Courier New", monospace;
+    line-height: 1;
+    margin: 20px 0;
+}
+.bar {
+    width: 60%;
+    margin: 0 auto 30px auto;
+    height: 8px;
+    background: rgba(245, 213, 114, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.bar-fill {
+    height: 100%;
+    background: #f5d572;
+    width: 100%;
+    transition: width 1s linear;
+}
+.bar-fill.warn { background: #ef4444; }
+.blinds {
+    font-size: 50px;
+    font-weight: bold;
+    color: #fff;
+    font-family: "Courier New", monospace;
+    margin-bottom: 8px;
+}
+.ante {
+    font-size: 22px;
+    color: #a3a380;
+    margin-bottom: 30px;
+}
+.cols {
+    width: 100%;
+    margin-top: 30px;
+}
+.cols table {
+    width: 90%;
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+.col {
+    text-align: center;
+    padding: 0 20px;
+    border-right: 1px solid rgba(245, 213, 114, 0.2);
+}
+.col:last-child { border-right: 0; }
+.col-label {
+    font-size: 16px;
+    color: #a3a380;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    display: block;
+}
+.col-value {
+    font-size: 38px;
+    font-weight: bold;
+    color: #fff;
+    font-family: "Courier New", monospace;
+    line-height: 1.1;
+    display: block;
+}
+.col-sub {
+    font-size: 14px;
+    color: #a3a380;
+    margin-top: 4px;
+    display: block;
+}
+.stats {
+    width: 100%;
+    margin-top: 30px;
+    border-top: 2px solid rgba(245, 213, 114, 0.3);
+    padding-top: 20px;
+}
+.stats table {
+    width: 90%;
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+.stat-col {
+    text-align: center;
+    padding: 0 15px;
+}
+.stat-label {
+    font-size: 14px;
+    color: #a3a380;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 6px;
+}
+.stat-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #fff;
+    font-family: "Courier New", monospace;
+    display: block;
+}
+.loading { font-size: 32px; color: #f5d572; }
+.error { font-size: 28px; color: #ef4444; padding: 30px; }
+.empty { font-size: 32px; color: #a3a380; }
+.legacy-badge {
+    position: absolute;
+    bottom: 10px;
+    right: 15px;
+    font-size: 11px;
+    color: #5a8a40;
+    opacity: 0.6;
+}
+.break-screen {
+    text-align: center;
+    padding: 40px;
+}
+.break-title {
+    font-size: 60px;
+    color: #ef4444;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<div id="root" class="wrap">
+    <div class="cell">
+        <div class="loading">Carregando torneio...</div>
+    </div>
+</div>
+<div class="legacy-badge">StackOS Legacy v1</div>
+
+<script>
+// =============================================================
+// STACKOS TV LEGACY — Compatível com TVs antigas (ES5 puro)
+// Sem async/await, sem arrow functions, sem template literals
+// Sem fetch (usa XMLHttpRequest), sem Promise.all
+// Polling simples a cada 5 segundos
+// =============================================================
+
+var CONFIG = {
+    SUPABASE_URL: 'https://jvvgdkjohfomuafsafsx.supabase.co',
+    SUPABASE_ANON: 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA',
+    POLL_INTERVAL_MS: 5000  // a cada 5s busca dados novos
+};
+
+var state = {
+    slug: null,
+    clubeId: null,
+    token: null,
+    clube: null,
+    torneio: null,
+    tempoRestante: 0,
+    tempoAlvo: null,
+    rodando: false,
+    timerInterval: null,
+    pollInterval: null
+};
+
+// ============================================================
+// HTTP — XMLHttpRequest (compatível com IE6+)
+// ============================================================
+function httpPost(url, body, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', CONFIG.SUPABASE_URL + url, true);
+    xhr.setRequestHeader('apikey', CONFIG.SUPABASE_ANON);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + CONFIG.SUPABASE_ANON);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                var data = null;
+                try { data = JSON.parse(xhr.responseText); } catch(e) { data = null; }
+                callback(null, data);
+            } else {
+                callback({ status: xhr.status, message: xhr.responseText }, null);
+            }
+        }
+    };
+    try {
+        xhr.send(JSON.stringify(body || {}));
+    } catch(e) {
+        callback({ message: e.message }, null);
+    }
+}
+
+function httpGet(url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', CONFIG.SUPABASE_URL + url, true);
+    xhr.setRequestHeader('apikey', CONFIG.SUPABASE_ANON);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + CONFIG.SUPABASE_ANON);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                var data = null;
+                try { data = JSON.parse(xhr.responseText); } catch(e) { data = null; }
+                callback(null, data);
+            } else {
+                callback({ status: xhr.status }, null);
+            }
+        }
+    };
+    try {
+        xhr.send();
+    } catch(e) {
+        callback({ message: e.message }, null);
+    }
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function pad(n, len) {
+    var s = String(n);
+    while (s.length < (len || 2)) s = '0' + s;
+    return s;
+}
+
+function fmtNum(n) {
+    n = Number(n) || 0;
+    var s = String(Math.round(n));
+    var out = '';
+    var c = 0;
+    for (var i = s.length - 1; i >= 0; i--) {
+        out = s.charAt(i) + out;
+        c++;
+        if (c % 3 === 0 && i > 0) out = '.' + out;
+    }
+    return out;
+}
+
+function fmtTime(secs) {
+    secs = Math.max(0, Math.floor(secs || 0));
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    return pad(m) + ':' + pad(s);
+}
+
+function fmtElapsed(secs) {
+    secs = Math.max(0, Math.floor(secs || 0));
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor((secs % 3600) / 60);
+    var s = secs % 60;
+    return pad(h) + ':' + pad(m) + ':' + pad(s);
+}
+
+function escapeHtml(str) {
+    str = String(str || '');
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getSlug() {
+    var path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+    var parts = path.split('/');
+    for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === 'tv-legacy' || parts[i] === 'tv-legacy.html') {
+            if (parts[i+1]) return parts[i+1];
+        }
+    }
+    // fallback: ?slug=xxx
+    var m = window.location.search.match(/[?&]slug=([^&]+)/);
+    if (m) return decodeURIComponent(m[1]);
+    return null;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderError(msg) {
+    document.getElementById('root').innerHTML =
+        '<div class="cell"><div class="error">' + escapeHtml(msg) + '</div></div>';
+}
+
+function renderEmpty(clubeNome) {
+    document.getElementById('root').innerHTML =
+        '<div class="cell"><div class="empty">' +
+        '<div style="font-size:42px;margin-bottom:20px;">' + escapeHtml(clubeNome || 'Clube') + '</div>' +
+        '<div>Nenhum torneio em andamento</div>' +
+        '</div></div>';
+}
+
+function renderTorneio(t) {
+    var ativos = calcAtivos(t);
+    var totalEntries = calcTotalEntries(t);
+    var chipcount = calcChipcount(t);
+    var media = ativos > 0 ? Math.round(chipcount / ativos) : 0;
+    var elapsed = calcElapsed(t);
+
+    var blinds = Array.isArray(t.blinds) ? t.blinds : [];
+    var nivelAtual = Math.max(0, Math.min(t.nivel_atual || 0, blinds.length - 1));
+    var blindAtual = blinds[nivelAtual] || { sb: 0, bb: 0, ante: 0 };
+
+    // Se nível atual é break, pega o anterior não-break pros valores de SB/BB
+    if (blindAtual.isBreak) {
+        for (var k = nivelAtual - 1; k >= 0; k--) {
+            if (blinds[k] && !blinds[k].isBreak) { blindAtual = blinds[k]; break; }
+        }
+    }
+
+    // ============================================================
+    // BREAK SCREEN (intervalo)
+    // ============================================================
+    if (t.is_break) {
+        var html = '<div class="cell"><div class="break-screen">' +
+            '<div class="break-title">★ INTERVALO ★</div>' +
+            '<div class="timer" id="timer">' + fmtTime(state.tempoRestante) + '</div>' +
+            '<div class="bar"><div class="bar-fill" id="bar" style="width:100%"></div></div>' +
+            '<div style="font-size:28px;color:#fff;margin-top:30px;">' +
+            '<table style="width:90%;margin:0 auto;border-collapse:collapse;"><tr>' +
+            '<td class="col"><span class="col-label">Jogadores</span><span class="col-value">' + ativos + ' DE ' + totalEntries + '</span></td>' +
+            '<td class="col"><span class="col-label">Média</span><span class="col-value">' + fmtNum(media) + '</span></td>' +
+            '<td class="col"><span class="col-label">Chipcount</span><span class="col-value">' + fmtNum(chipcount) + '</span></td>' +
+            '</tr></table></div>' +
+            '</div></div>';
+        document.getElementById('root').innerHTML = html;
+        return;
+    }
+
+    // Calcular intervalo "em X"
+    var breakIn = calcBreakIn(t, state.tempoRestante);
+
+    // Stats strip (respeita pw_stats_visiveis)
+    var statsHtml = renderStats(t);
+
+    // Próximo nível (não-break)
+    var proxNaoBreak = null;
+    for (var i = nivelAtual + 1; i < blinds.length; i++) {
+        if (blinds[i] && !blinds[i].isBreak) { proxNaoBreak = blinds[i]; break; }
+    }
+    var proxHtml = '';
+    if (proxNaoBreak) {
+        proxHtml = 'Próximo: ' + fmtNum(proxNaoBreak.sb) + '/' + fmtNum(proxNaoBreak.bb);
+        if (proxNaoBreak.ante) proxHtml += ' (ante ' + fmtNum(proxNaoBreak.ante) + ')';
+    }
+
+    // Conta níveis de jogo (não-break)
+    var nivelJogo = 0;
+    for (var k2 = 0; k2 <= nivelAtual; k2++) {
+        if (blinds[k2] && !blinds[k2].isBreak) nivelJogo++;
+    }
+    var totalNiveisJogo = 0;
+    for (var k3 = 0; k3 < blinds.length; k3++) {
+        if (!blinds[k3].isBreak) totalNiveisJogo++;
+    }
+
+    var anteHtml = blindAtual.ante ? 'Ante ' + fmtNum(blindAtual.ante) : '';
+
+    var html2 = '<div class="cell">' +
+        '<div class="title">' + escapeHtml(t.nome) + '</div>' +
+        '<div style="font-size:18px;color:#a3a380;margin-bottom:15px;">Nível ' + nivelJogo + ' / ' + totalNiveisJogo + '</div>' +
+        '<div class="timer" id="timer">' + fmtTime(state.tempoRestante) + '</div>' +
+        '<div class="bar"><div class="bar-fill" id="bar" style="width:100%"></div></div>' +
+        '<div class="blinds">' + fmtNum(blindAtual.sb || 0) + ' / ' + fmtNum(blindAtual.bb || 0) + '</div>' +
+        '<div class="ante">' + anteHtml + (proxHtml ? '  ·  ' + proxHtml : '') + '</div>' +
+        '<div class="cols"><table><tr>' +
+        '<td class="col"><span class="col-label">Jogadores</span><span class="col-value">' + ativos + '</span><span class="col-sub">DE ' + totalEntries + '</span></td>' +
+        '<td class="col"><span class="col-label">Média</span><span class="col-value">' + fmtNum(media) + '</span></td>' +
+        '<td class="col"><span class="col-label">Chipcount</span><span class="col-value">' + fmtNum(chipcount) + '</span></td>' +
+        '<td class="col"><span class="col-label">Tempo Jogo</span><span class="col-value" id="elapsed">' + elapsed + '</span></td>' +
+        '<td class="col"><span class="col-label">Intervalo em</span><span class="col-value" id="break-in">' + breakIn + '</span></td>' +
+        '</tr></table></div>' +
+        statsHtml +
+        '</div>';
+
+    document.getElementById('root').innerHTML = html2;
+}
+
+function renderStats(t) {
+    var entries = t.entries || [];
+    var pwVis = t.pw_stats_visiveis || {};
+    function defVis(k) { return pwVis[k] !== undefined ? pwVis[k] : true; }
+
+    var buyinsQtd = 0, reentriesQtd = 0, rebuysSimplesQtd = 0, rebuysDuplosQtd = 0, addonsQtd = 0, lastChanceQtd = 0;
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e.tipo === 'buyin') buyinsQtd++;
+        else if (e.tipo === 'reentry') reentriesQtd++;
+        else if (e.tipo === 'rebuy_simples') rebuysSimplesQtd++;
+        else if (e.tipo === 'rebuy_duplo') rebuysDuplosQtd++;
+        else if (e.tipo === 'addon') addonsQtd++;
+        else if (e.tipo === 'last_chance') lastChanceQtd++;
+    }
+    var jackpotsQtd = (t.jackpot_compras || []).length;
+
+    var cards = [];
+    if (defVis('buyin'))   cards.push({ label: 'BUY IN', value: buyinsQtd });
+    if (defVis('reentry') && reentriesQtd) cards.push({ label: 'RE-ENTRY', value: reentriesQtd });
+    if (defVis('jackpot') && Number(t.jackpot_valor || 0) > 0) cards.push({ label: 'JACKPOT', value: jackpotsQtd });
+    if (defVis('rebuy_simples') && (Number(t.rebuy_valor || 0) > 0 || rebuysSimplesQtd > 0)) cards.push({ label: 'REBUY SIMPLES', value: rebuysSimplesQtd });
+    if (defVis('rebuy_duplo')   && (Number(t.rebuy_duplo_valor || 0) > 0 || rebuysDuplosQtd > 0)) cards.push({ label: 'REBUY DUPLO', value: rebuysDuplosQtd });
+    if (defVis('addon') && Number(t.addon_fichas || 0) > 0) cards.push({ label: 'ADD-ON', value: addonsQtd });
+    if (defVis('last_chance') && Number(t.last_chance_valor || 0) > 0) cards.push({ label: 'LAST CHANCE', value: lastChanceQtd });
+
+    if (cards.length === 0) return '';
+
+    var html = '<div class="stats"><table><tr>';
+    for (var j = 0; j < cards.length; j++) {
+        html += '<td class="stat-col">' +
+            '<span class="stat-label">' + escapeHtml(cards[j].label) + '</span>' +
+            '<span class="stat-value">' + cards[j].value + '</span>' +
+        '</td>';
+    }
+    html += '</tr></table></div>';
+    return html;
+}
+
+// ============================================================
+// CÁLCULOS (espelha tv.html moderno)
+// ============================================================
+function calcAtivos(t) {
+    var eliminados = {};
+    var eList = t.eliminados || [];
+    for (var i = 0; i < eList.length; i++) {
+        eliminados[String(eList[i].jogador_id)] = true;
+    }
+    var entries = t.entries || [];
+    var ativos = {};
+    for (var j = 0; j < entries.length; j++) {
+        var e = entries[j];
+        if (e.tipo === 'addon') continue;
+        var jid = String(e.jogador_id);
+        if (!eliminados[jid]) ativos[jid] = true;
+    }
+    var cnt = 0;
+    for (var k in ativos) cnt++;
+    return cnt;
+}
+
+function calcTotalEntries(t) {
+    var entries = t.entries || [];
+    var unicos = {};
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e.tipo === 'addon') continue;
+        unicos[String(e.jogador_id)] = true;
+    }
+    var cnt = 0;
+    for (var k in unicos) cnt++;
+    return cnt;
+}
+
+function calcChipcount(t) {
+    var stack = Number(t.stack || 0);
+    var rebuySimplesFichas = Number(t.rebuy_fichas || stack);
+    var rebuyDuploFichas = Number(t.rebuy_duplo_fichas || stack * 2);
+    var addonFichas = Number(t.addon_fichas || 0);
+    var lastChanceFichas = Number(t.last_chance_fichas || 0);
+    var entries = t.entries || [];
+    var total = 0;
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e.tipo === 'rebuy_simples') total += rebuySimplesFichas;
+        else if (e.tipo === 'rebuy_duplo') total += rebuyDuploFichas;
+        else if (e.tipo === 'addon') total += addonFichas;
+        else if (e.tipo === 'last_chance') total += lastChanceFichas;
+        else total += stack;
+    }
+    var jackpot = t.jackpot_compras || [];
+    for (var j = 0; j < jackpot.length; j++) {
+        total += Number(jackpot[j].fichas || 0);
+    }
+    return total;
+}
+
+function calcElapsed(t) {
+    if (!t.iniciado_em) return '00:00:00';
+    var iniciado = new Date(t.iniciado_em).getTime();
+    var agora = new Date().getTime();
+    return fmtElapsed(Math.floor((agora - iniciado) / 1000));
+}
+
+function calcBreakIn(t, tempoRestante) {
+    var blinds = Array.isArray(t.blinds) ? t.blinds : [];
+    var nivelAtual = Math.max(0, Math.min(t.nivel_atual || 0, blinds.length - 1));
+    var secs = tempoRestante;
+    var achou = false;
+    for (var i = nivelAtual + 1; i < blinds.length; i++) {
+        if (blinds[i] && blinds[i].isBreak) { achou = true; break; }
+        secs += (blinds[i].tempo || Number(t.tempo_nivel || 15)) * 60;
+    }
+    if (!achou) return '—';
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor((secs % 3600) / 60);
+    var s = secs % 60;
+    return (h > 0 ? h + ':' + pad(m) : m) + ':' + pad(s);
+}
+
+function calcTempoRestante(t) {
+    if (t.tempo_alvo) {
+        var alvo = new Date(t.tempo_alvo).getTime();
+        var agora = new Date().getTime();
+        return Math.max(0, Math.round((alvo - agora) / 1000));
+    }
+    return Number(t.tempo_restante || 0);
+}
+
+// ============================================================
+// TIMER LOCAL (atualiza só os elementos, sem re-renderizar tudo)
+// ============================================================
+function tickTimer() {
+    if (!state.torneio) return;
+    var t = state.torneio;
+    var ts = calcTempoRestante(t);
+    state.tempoRestante = ts;
+
+    var timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.innerHTML = fmtTime(ts);
+
+    var barEl = document.getElementById('bar');
+    if (barEl) {
+        var tempoTotal = Number(t.tempo_total || (Number(t.tempo_nivel || 15) * 60));
+        var pct = tempoTotal > 0 ? (ts / tempoTotal) * 100 : 100;
+        barEl.style.width = pct + '%';
+        if (pct < 20) barEl.className = 'bar-fill warn';
+        else barEl.className = 'bar-fill';
+    }
+
+    var elapsedEl = document.getElementById('elapsed');
+    if (elapsedEl) elapsedEl.innerHTML = calcElapsed(t);
+
+    var breakEl = document.getElementById('break-in');
+    if (breakEl) breakEl.innerHTML = calcBreakIn(t, ts);
+}
+
+// ============================================================
+// CARREGAR DADOS DO SUPABASE
+// ============================================================
+function carregar() {
+    httpPost('/rest/v1/rpc/tv_dados_torneios', {
+        p_clube_id: state.clubeId,
+        p_token: state.token
+    }, function(err, data) {
+        if (err) {
+            console.log('[TV LEGACY] erro:', err);
+            return;
+        }
+        if (!data || data.erro) {
+            renderError('Token inválido. Peça um link novo.');
+            return;
+        }
+        state.clube = data.clube;
+
+        var torneios = data.torneios || [];
+        var rodando = null;
+        var maxTs = 0;
+        for (var i = 0; i < torneios.length; i++) {
+            var t = torneios[i];
+            if (t.status === 'finished' || t.status === 'encerrado' || t.status === 'cancelado') continue;
+            if (t.status === 'running' || t.status === 'paused' || t.status === 'break' || t.rodando === true) {
+                var ts = t.iniciado_em ? new Date(t.iniciado_em).getTime() : 0;
+                if (ts >= maxTs) { rodando = t; maxTs = ts; }
+            }
+        }
+
+        if (!rodando) {
+            state.torneio = null;
+            renderEmpty(state.clube ? state.clube.nome : '');
+            return;
+        }
+
+        // Buscar pw_stats_visiveis direto da tabela (fallback)
+        httpGet('/rest/v1/torneios?id=eq.' + encodeURIComponent(rodando.id) + '&select=pw_stats_visiveis,last_chance_valor,last_chance_fichas', function(e2, extras) {
+            if (!e2 && extras && extras.length > 0) {
+                rodando.pw_stats_visiveis = extras[0].pw_stats_visiveis;
+                if (rodando.last_chance_valor === undefined) rodando.last_chance_valor = extras[0].last_chance_valor;
+                if (rodando.last_chance_fichas === undefined) rodando.last_chance_fichas = extras[0].last_chance_fichas;
+            }
+            state.torneio = rodando;
+            state.tempoRestante = calcTempoRestante(rodando);
+            renderTorneio(rodando);
+        });
+    });
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+function boot() {
+    state.slug = getSlug();
+    if (!state.slug) {
+        renderError('Link inválido. URL deve ser /tv-legacy/SEU_SLUG');
+        return;
+    }
+
+    httpPost('/rest/v1/rpc/resolver_tv_slug', { p_slug: state.slug }, function(err, data) {
+        if (err || !data || data.erro) {
+            renderError('Link inválido. Peça um link novo ao admin.');
+            return;
+        }
+        state.clubeId = data.clube_id;
+        state.token = data.tv_token;
+
+        carregar();
+        // Polling a cada 5s (mais agressivo que tv moderno porque não tem realtime)
+        state.pollInterval = setInterval(carregar, CONFIG.POLL_INTERVAL_MS);
+        // Timer local a cada 1s
+        state.timerInterval = setInterval(tickTimer, 1000);
+    });
+}
+
+// Inicia
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+} else {
+    boot();
+}
+</script>
+</body>
+</html>
