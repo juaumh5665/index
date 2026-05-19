@@ -1271,7 +1271,8 @@ function montarCarouselPremiacao(d) {
         if (!bs) return;
         if (!d.isBreak) { bs.classList.remove('show'); return; }
         bs.classList.add('show');
-        document.getElementById('break-timer').innerText = d.timer || '--:--';
+        // Timer: NÃO atualiza aqui — deixa o tickLocalTimer cuidar (anti-rollback)
+        // (break-timer está no array de timerEls do tickLocalTimer linha ~2056)
         // Clube name
         const cn = document.getElementById('bs-clube-nome');
         if (cn) cn.innerText = d.clubeNome || '';
@@ -1370,9 +1371,8 @@ function montarCarouselPremiacao(d) {
             // Level
             const pwLevel = document.getElementById('pw-level-num');
             if (pwLevel) pwLevel.innerText = d.nivel;
-            // Timer
-            const pwTimer = document.getElementById('pw-timer');
-            if (pwTimer) pwTimer.innerText = d.timer;
+            // Timer: NÃO atualiza aqui — deixa o tickLocalTimer cuidar (tem anti-rollback)
+            // (sem essa proteção, o postMessage sobrescrevia o timer com drift novo causando pulos)
             // Players
             const pwPlayers = document.getElementById('pw-players');
             const pwTotal = document.getElementById('pw-total');
@@ -1424,7 +1424,7 @@ function montarCarouselPremiacao(d) {
         document.getElementById('clube-nome').innerText=d.clubeNome||'';
         const tipoLabels={normal:'Torneio Normal',bounty:'💰 Bounty',pko:'🎯 Progressive KO',knockout:'⚡ Somente KO'};
         document.getElementById('tournament-type').innerText=tipoLabels[d.tipo]||'';
-        document.getElementById('timer').innerText=d.timer;
+        // Timer: NÃO atualiza aqui — deixa o tickLocalTimer cuidar (anti-rollback)
         document.getElementById('nivel').innerText=d.nivel;
         document.getElementById('nivel-total').innerText=' / '+d.totalNiveis;
         document.getElementById('blinds').innerText=d.blinds;
@@ -2005,35 +2005,36 @@ function montarCarouselPremiacao(d) {
     // Calcular tempo restante REAL usando tempo_alvo (sincronia perfeita)
     let ts = _calcularTempoRestante(t);
     
-    // 🛡️ ANTI-ROLLBACK: timer nunca pula pra trás dentro do mesmo nível.
-    // Se o drift se ajustou e calculou um valor MAIOR que o anterior (pulou pra frente no tempo restante),
-    // limita o salto a no máximo 1s pra frente (correção gradual de drift).
-    // Isso evita o efeito "05:01 → 05:09 → 05:02".
+    // 🛡️ ANTI-ROLLBACK SIMPLIFICADO: timer só anda pra trás ou fica igual.
+    // (não pode pular pra frente entre ticks consecutivos do mesmo nível)
+    //
+    // Caso especial: se ts pulou MUITO (>3s diff em qualquer direção), 
+    // provavelmente é mudança real (troca de nível, pause/resume, drift recalculado)
+    // → aceita o novo valor.
     const ultimoTs = pubState._ultimoTimerExibido;
     const ultimoNivelAlvo = pubState._ultimoNivelAlvo;
     const nivelAlvoAtual = t.tempo_alvo || t.nivel_atual;
     
     if (ultimoTs != null && ultimoNivelAlvo === nivelAlvoAtual) {
       // Mesmo nível/alvo do tick anterior
-      // Caso normal: ts deve ser igual ou 1s menor que ultimoTs
-      // Se ts > ultimoTs (drift se ajustou pra frente), aceita só +1s no máximo
-      if (ts > ultimoTs + 1) {
-        // Drift trouxe ts pra frente — corrige gradualmente (1s por tick)
+      const diff = ts - ultimoTs;  // positivo = pulou pra trás no tempo (regrediu)
+      
+      if (diff > 3) {
+        // Pulo grande pra "trás" no tempo (ts maior = mais tempo restante)
+        // = mudança real (volta de pause, drift recalculado significativamente)
+        // Aceita
         if (window._debugTimer) {
-          console.log('[TIMER] Anti-rollback: ' + ultimoTs + ' → ' + ts + ', limitando a ' + (ultimoTs + 1));
+          console.log('[TIMER] Aceitando salto grande: ' + ultimoTs + ' → ' + ts);
         }
-        ts = ultimoTs + 1;
-      } else if (ts < ultimoTs - 3) {
-        // Pulo absurdo pra trás (mais de 3s) — provavelmente troca de nível ou pause/resume
-        // Aceita o salto (não tem como prever esse caso)
-        if (window._debugTimer) {
-          console.log('[TIMER] Salto grande pra trás: ' + ultimoTs + ' → ' + ts + ' (provável mudança de nível)');
-        }
-      } else if (ts > ultimoTs && ts <= ultimoTs + 1) {
-        // Variação pequena pra frente (ajuste fino de drift) — mantém o anterior - 1
-        // pra continuar progredindo normalmente
+      } else if (diff > 0) {
+        // Pulo pequeno pra "trás" (1-3s) — provavelmente é variação de latência
+        // Mantém o anterior decrementando 1s pra continuar progredindo
         ts = Math.max(0, ultimoTs - 1);
+      } else if (diff < -3) {
+        // Pulo grande pra "frente" no tempo (ts muito menor) 
+        // = troca de nível ou frame perdido — aceita
       }
+      // Caso normal: diff entre -1 e 0 — aceita sem mexer
     }
     
     pubState._ultimoTimerExibido = ts;
