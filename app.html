@@ -4751,6 +4751,11 @@ document.addEventListener('DOMContentLoaded', function(){
                             <div><label class="inp-label">Fichas entregues</label><input id="t-last-chance-fichas" type="number" value="150000" class="inp" placeholder="Ex: 150000"></div>
                         </div>
                         <div style="margin-top:.6rem;">
+                            <label class="inp-label">Last Chance disponível até o nível</label>
+                            <input id="t-last-chance-ate" type="number" value="12" min="1" class="inp" placeholder="Ex: 12 (LC fica liberado até o fim do nível 12)">
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Geralmente 2-3 níveis depois do add-on (ex: add-on no nível 10 → LC até nível 12 ou 13)</div>
+                        </div>
+                        <div style="margin-top:.6rem;">
                             <label class="inp-label">Rake sobre Last Chance</label>
                             <select id="t-last-chance-paga-rake" class="inp">
                                 <option value="">Usar padrão do clube</option>
@@ -6732,6 +6737,7 @@ function _torneioToDb(t) {
         last_chance_ativo: !!t.last_chance_ativo,
         last_chance_valor: Number(t.last_chance_valor) || 0,
         last_chance_fichas: parseInt(t.last_chance_fichas) || 0,
+        last_chance_ate: t.last_chance_ate || t.lastChanceAte || null,  // nível humano máximo
         last_chance_paga_rake: (t.last_chance_paga_rake === null || t.last_chance_paga_rake === undefined) ? null : (t.last_chance_paga_rake ? 1 : 0),
         bounty_valor: t.bountyValor || 0,
         bounty_ko_split: t.bountyKoSplit || 50,
@@ -7536,6 +7542,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         last_chance_ativo: !!r.last_chance_ativo,
         last_chance_valor: parseFloat(r.last_chance_valor || 0),
         last_chance_fichas: parseInt(r.last_chance_fichas || 0),
+        last_chance_ate: r.last_chance_ate || null,
+        lastChanceAte: r.last_chance_ate || null,  // espelho compat
         last_chance_paga_rake: r.last_chance_paga_rake === null || r.last_chance_paga_rake === undefined ? null : Number(r.last_chance_paga_rake),
         bountyValor: parseFloat(r.bounty_valor || 0),
         bountyKoSplit: parseFloat(r.bounty_ko_split || 50),
@@ -15446,6 +15454,7 @@ function saveTournament() {
         last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
         last_chance_valor:  parseFloat(document.getElementById('t-last-chance-valor')?.value) || 0,
         last_chance_fichas: parseInt(document.getElementById('t-last-chance-fichas')?.value) || 0,
+        last_chance_ate:    parseInt(document.getElementById('t-last-chance-ate')?.value) || null,  // nível humano até onde LC fica disponível
         // Opt-in pra rake (NULL = usa padrão do clube)
         jackpot_paga_rake: (function() {
             const v = document.getElementById('t-jackpot-paga-rake')?.value;
@@ -16693,7 +16702,7 @@ function _tipoBloqueadoPorTrava(t, tipo) {
         }
     }
     
-    // Last Chance: só após o add-on terminar
+    // Last Chance: liberado após o nível de add-on, ATÉ o nível configurado em last_chance_ate
     if (tipo === 'last_chance') {
         if (!t.last_chance_ativo) {
             return { bloqueado: true, motivo: 'Last Chance não está ativo neste torneio' };
@@ -16705,10 +16714,33 @@ function _tipoBloqueadoPorTrava(t, tipo) {
                 motivo: `Last Chance só após o nível ${maxAddon} (atual: ${nivelAtual}) — período de add-on em andamento` 
             };
         }
+        // 🔥 NOVO: Last Chance tem nível MÁXIMO configurável (last_chance_ate)
+        // Geralmente 2-3 níveis depois do add-on (ex: addon nível 10 → LC até nível 12 ou 13)
+        const lcAte = _resolverNivelMaxLastChance(t);
+        if (lcAte != null && nivelAtual > lcAte) {
+            return {
+                bloqueado: true,
+                motivo: `Last Chance encerrado no nível ${lcAte} (atual: ${nivelAtual})`
+            };
+        }
     }
     
     return { bloqueado: false, motivo: '' };
 }
+
+// Resolve nível máximo onde Last Chance fica disponível (configurável por torneio ou padrão clube)
+function _resolverNivelMaxLastChance(t) {
+    if (!t) return null;
+    // 1) Configuração do torneio (mais específico)
+    if (t.last_chance_ate != null && Number(t.last_chance_ate) > 0) return Number(t.last_chance_ate);
+    if (t.lastChanceAte != null && Number(t.lastChanceAte) > 0) return Number(t.lastChanceAte);
+    // 2) Configuração padrão do clube (se existir)
+    const cfg = (typeof getClubeConfig === 'function') ? getClubeConfig() : null;
+    if (cfg && cfg.torneios && cfg.torneios.last_chance_ate != null) return Number(cfg.torneios.last_chance_ate);
+    // 3) Sem configuração: null = sem limite (regra antiga, mantém comportamento)
+    return null;
+}
+window._resolverNivelMaxLastChance = _resolverNivelMaxLastChance;
 
 // ============================================================
 // ENCERRAR / REABRIR COMPRAS — controle manual do operador
@@ -16914,11 +16946,13 @@ function onClickNovaEntrada() {
 window.onClickNovaEntrada = onClickNovaEntrada;
 
 // Wrapper que checa bloqueio antes de abrir compra de jackpot
+// Jackpot é compra normal (não é LC) — segue regra de compras encerradas direta
 function onClickComprarJackpot() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
     
-    if (_todasComprasEncerradas(t)) {
+    // Bloqueia se compras encerradas OU se todas travas dispararam
+    if ((t.compras_encerradas || t.comprasEncerradas) || _todasComprasEncerradas(t)) {
         return showToast('🔒 Compras encerradas. Jackpot não pode mais ser cadastrado.');
     }
     
@@ -16985,14 +17019,28 @@ function atualizarBotoesNovaEntrada() {
         btnEntrada.onmouseout = function() { this.style.background = 'rgba(245,158,11,.08)'; };
         
         if (btnJackpot) {
-            btnJackpot.style.background = 'rgba(245,158,11,.08)';
-            btnJackpot.style.borderColor = 'rgba(245,158,11,.2)';
-            btnJackpot.style.color = 'var(--gold)';
-            btnJackpot.style.cursor = 'pointer';
-            if (labelJackpot) labelJackpot.textContent = 'Comprar Jackpot';
-            btnJackpot.title = 'Cadastrar compra de Jackpot';
-            btnJackpot.onmouseover = function() { this.style.background = 'rgba(245,158,11,.18)'; };
-            btnJackpot.onmouseout = function() { this.style.background = 'rgba(245,158,11,.08)'; };
+            // 🔥 Jackpot: bloqueado se compras encerradas, mesmo que LC esteja ativo
+            // (jackpot é compra normal, segue regras de janela; LC é exceção pra entrar no torneio)
+            const jackpotBloq = (t.compras_encerradas || t.comprasEncerradas);
+            if (jackpotBloq) {
+                btnJackpot.style.background = 'rgba(63,63,70,.3)';
+                btnJackpot.style.borderColor = '#3f3f46';
+                btnJackpot.style.color = '#71717a';
+                btnJackpot.style.cursor = 'not-allowed';
+                if (labelJackpot) labelJackpot.innerHTML = `🔒 Jackpot (bloqueado)`;
+                btnJackpot.title = 'Compras encerradas. Jackpot bloqueado.';
+                btnJackpot.onmouseover = null;
+                btnJackpot.onmouseout = null;
+            } else {
+                btnJackpot.style.background = 'rgba(245,158,11,.08)';
+                btnJackpot.style.borderColor = 'rgba(245,158,11,.2)';
+                btnJackpot.style.color = 'var(--gold)';
+                btnJackpot.style.cursor = 'pointer';
+                if (labelJackpot) labelJackpot.textContent = 'Comprar Jackpot';
+                btnJackpot.title = 'Cadastrar compra de Jackpot';
+                btnJackpot.onmouseover = function() { this.style.background = 'rgba(245,158,11,.18)'; };
+                btnJackpot.onmouseout = function() { this.style.background = 'rgba(245,158,11,.08)'; };
+            }
         }
     }
 }
@@ -17000,6 +17048,18 @@ window.atualizarBotoesNovaEntrada = atualizarBotoesNovaEntrada;
 
 function openModalEntrada(idx) {
     const t = torneios[idx];
+    if (!t) return;
+    
+    // 🔒 PROTEÇÃO GLOBAL: se todas as compras estão encerradas (e LC também), bloqueia modal
+    // Cobre TODOS os caminhos que abrem o modal (botão, atalho N, F2, código interno)
+    if (typeof _todasComprasEncerradas === 'function' && _todasComprasEncerradas(t)) {
+        const motivo = (t.last_chance_ativo || t.lastChanceAtivo)
+            ? 'Compras e Last Chance encerrados. Não é possível cadastrar entradas.'
+            : 'Compras encerradas. Não é possível cadastrar entradas neste torneio.';
+        showToast(`🔒 ${motivo}`);
+        return;
+    }
+    
     const sel = document.getElementById('entrada-jogador');
     sel.innerHTML = '<option value="">Selecionar jogador...</option>';
 
@@ -24535,6 +24595,13 @@ function abrirRankingCompleto(rankId) {
 function abrirJackpot(idx) {
     const t = torneios[idx];
     if (!t || !t.jackpotValor || !t.jackpotFichas) return showToast('⚠️ Torneio sem jackpot configurado');
+    
+    // 🔒 PROTEÇÃO GLOBAL: jackpot é compra normal, bloqueia se janela encerrada
+    if ((t.compras_encerradas || t.comprasEncerradas) || (typeof _todasComprasEncerradas === 'function' && _todasComprasEncerradas(t))) {
+        showToast('🔒 Compras encerradas. Jackpot não pode mais ser cadastrado.');
+        return;
+    }
+    
     activeTorneioIdx = idx;
     document.getElementById('jackpot-info').innerHTML = `
         <div style="color:#71717a;font-size:.75rem;">Torneio: <strong style="color:#e4e4e7;">${t.nome}</strong></div>
