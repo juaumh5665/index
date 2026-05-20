@@ -5573,6 +5573,12 @@ let auditoria  = (function(){ try { return JSON.parse(localStorage.getItem('ps_a
 let funcionarios   = JSON.parse(localStorage.getItem('ps_funcionarios'))   || [];
 let torneioDealers = JSON.parse(localStorage.getItem('ps_torneio_dealers'))|| [];
 let torneioCapiles = JSON.parse(localStorage.getItem('ps_torneio_capiles'))|| [];
+
+// LOTE 6 — Tickets (vagas) + Vouchers (créditos)
+let tickets  = JSON.parse(localStorage.getItem('ps_tickets'))  || [];
+let vouchers = JSON.parse(localStorage.getItem('ps_vouchers')) || [];
+let voucherMovimentos = JSON.parse(localStorage.getItem('ps_voucher_movimentos')) || [];
+
 // Denominações de fichas padrão do clube (editável em Configurações)
 // Persistido em clubes.config.fichas_denominacoes (Supabase) + cache em localStorage
 const FICHAS_DEFAULT = [
@@ -7955,6 +7961,186 @@ async function deletarCapileLine(cId) {
     } catch(e) {
         console.error('[deletarCapileLine] erro:', e);
         showToast('⚠️ Erro ao remover: ' + (e.message || e));
+    }
+}
+
+// ============================================================
+// LOTE 6 — TICKETS (vagas) + VOUCHERS (créditos)
+// ============================================================
+
+// Constante de validade padrão (90 dias)
+const _TV_VALIDADE_MS = 90 * 24 * 60 * 60 * 1000;
+
+// ---------- TICKETS ----------
+function _ticketToDb(t) {
+    return {
+        id: t.id,
+        clube_id: sbClube ? sbClube.id : null,
+        jogador_id: t.jogadorId || null,
+        valor: Number(t.valor) || 0,
+        descricao: t.descricao || null,
+        torneio_destino_id: t.torneioDestinoId || null,
+        torneio_origem_id: t.torneioOrigemId || null,
+        posicao_origem: t.posicaoOrigem != null ? Number(t.posicaoOrigem) : null,
+        status: t.status || 'disponivel',
+        usado_torneio_id: t.usadoTorneioId || null,
+        usado_em: t.usadoEm ? new Date(t.usadoEm).toISOString() : null,
+        valor_usado: Number(t.valorUsado) || 0,
+        sobra_voucher_id: t.sobraVoucherId || null,
+        validade: t.validade ? new Date(t.validade).toISOString() : null,
+        observacoes: t.observacoes || null,
+    };
+}
+function _ticketFromDb(r) {
+    return {
+        id: r.id,
+        clubeId: r.clube_id,
+        jogadorId: r.jogador_id,
+        valor: parseFloat(r.valor || 0),
+        descricao: r.descricao || '',
+        torneioDestinoId: r.torneio_destino_id,
+        torneioOrigemId: r.torneio_origem_id,
+        posicaoOrigem: r.posicao_origem,
+        status: r.status || 'disponivel',
+        usadoTorneioId: r.usado_torneio_id,
+        usadoEm: r.usado_em ? new Date(r.usado_em).getTime() : null,
+        valorUsado: parseFloat(r.valor_usado || 0),
+        sobraVoucherId: r.sobra_voucher_id,
+        validade: r.validade ? new Date(r.validade).getTime() : null,
+        observacoes: r.observacoes || '',
+        criadoEm: r.criado_em ? new Date(r.criado_em).getTime() : Date.now(),
+    };
+}
+
+async function syncTicket(t) {
+    if (!sbClube?.id || !t) return;
+    try {
+        const row = _ticketToDb(t);
+        const { error } = await sb.from('tickets').upsert(row);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
+    } catch(e) { console.error('[TICKET sync]', e); throw e; }
+}
+
+async function deleteTicket(id) {
+    if (!sbClube?.id || !id) return;
+    try {
+        const { error } = await sb.from('tickets').delete().eq('id', id);
+        if (error) throw error;
+    } catch(e) { console.error('[TICKET delete]', e); throw e; }
+}
+
+// ---------- VOUCHERS ----------
+function _voucherToDb(v) {
+    return {
+        id: v.id,
+        clube_id: sbClube ? sbClube.id : null,
+        jogador_id: v.jogadorId || null,
+        valor_original: Number(v.valorOriginal) || 0,
+        saldo_atual: Number(v.saldoAtual) || 0,
+        descricao: v.descricao || null,
+        origem: v.origem || 'manual',
+        ticket_origem_id: v.ticketOrigemId || null,
+        status: v.status || 'ativo',
+        validade: v.validade ? new Date(v.validade).toISOString() : null,
+        observacoes: v.observacoes || null,
+    };
+}
+function _voucherFromDb(r) {
+    return {
+        id: r.id,
+        clubeId: r.clube_id,
+        jogadorId: r.jogador_id,
+        valorOriginal: parseFloat(r.valor_original || 0),
+        saldoAtual: parseFloat(r.saldo_atual || 0),
+        descricao: r.descricao || '',
+        origem: r.origem || 'manual',
+        ticketOrigemId: r.ticket_origem_id,
+        status: r.status || 'ativo',
+        validade: r.validade ? new Date(r.validade).getTime() : null,
+        observacoes: r.observacoes || '',
+        criadoEm: r.criado_em ? new Date(r.criado_em).getTime() : Date.now(),
+    };
+}
+
+async function syncVoucher(v) {
+    if (!sbClube?.id || !v) return;
+    try {
+        const row = _voucherToDb(v);
+        const { error } = await sb.from('vouchers').upsert(row);
+        if (error) throw error;
+        if (typeof _marcarIdRecente === 'function') _marcarIdRecente(v.id);
+    } catch(e) { console.error('[VOUCHER sync]', e); throw e; }
+}
+
+async function deleteVoucher(id) {
+    if (!sbClube?.id || !id) return;
+    try {
+        const { error } = await sb.from('vouchers').delete().eq('id', id);
+        if (error) throw error;
+    } catch(e) { console.error('[VOUCHER delete]', e); throw e; }
+}
+
+// ---------- HELPERS ----------
+// Calcula validade default (90 dias a partir de agora)
+function _ticketVoucherValidadeDefault() {
+    const dias = (sbClube?.cfg_ticket_validade_dias) || 90;
+    return Date.now() + (dias * 24 * 60 * 60 * 1000);
+}
+
+// Lista tickets/vouchers de um jogador (filtra por status disponível e validade)
+function getTicketsDisponiveis(jogadorId) {
+    const agora = Date.now();
+    return (tickets || []).filter(t =>
+        t.jogadorId === jogadorId &&
+        t.status === 'disponivel' &&
+        (!t.validade || t.validade > agora)
+    );
+}
+
+function getVouchersDisponiveis(jogadorId) {
+    const agora = Date.now();
+    return (vouchers || []).filter(v =>
+        v.jogadorId === jogadorId &&
+        v.status === 'ativo' &&
+        Number(v.saldoAtual) > 0 &&
+        (!v.validade || v.validade > agora)
+    );
+}
+
+// Verifica se torneio aceita ticket/voucher (com fallback global do clube)
+function _torneioAceitaTicket(t) {
+    if (!t) return false;
+    if (t.aceita_ticket === 1 || t.aceita_ticket === true) return true;
+    if (t.aceita_ticket === 0 || t.aceita_ticket === false) return false;
+    return !!(sbClube && sbClube.cfg_aceita_ticket);
+}
+function _torneioAceitaVoucher(t) {
+    if (!t) return false;
+    if (t.aceita_voucher === 1 || t.aceita_voucher === true) return true;
+    if (t.aceita_voucher === 0 || t.aceita_voucher === false) return false;
+    return !!(sbClube && sbClube.cfg_aceita_voucher);
+}
+
+// Atualiza status de expirados (chamar periodicamente)
+function _atualizarStatusValidade() {
+    const agora = Date.now();
+    let mudou = false;
+    tickets.forEach(t => {
+        if (t.status === 'disponivel' && t.validade && t.validade <= agora) {
+            t.status = 'expirado';
+            mudou = true;
+        }
+    });
+    vouchers.forEach(v => {
+        if (v.status === 'ativo' && v.validade && v.validade <= agora) {
+            v.status = 'expirado';
+            mudou = true;
+        }
+    });
+    if (mudou) {
+        localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
     }
 }
 
