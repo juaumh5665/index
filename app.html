@@ -40,8 +40,9 @@
             --border: #1e1e23;
             --text-dim: #52525b;
             
-            /* Fonte dos números (configurável pelo usuário) */
-            --font-mono: var(--font-mono);
+            /* Fonte dos números (configurável pelo usuário via aplicarFonte()) */
+            /* Default JetBrains Mono — sobrescrito em runtime pelo JS quando o usuário escolhe outra. */
+            --font-mono: 'JetBrains Mono', 'Space Mono', 'IBM Plex Mono', 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             --font-mono-features: 'tnum', 'zero';
             
             /* Variáveis de cor do tema (tema escuro = padrão) */
@@ -10757,7 +10758,11 @@ function diagTorneio(idx) {
 
     return { t, porTipo, unicosPorTipo, ativos, jogadoresUnicosNaoAddon, setBuyinReentry, chipCount, avg };
 }
-window.diagTorneio = diagTorneio;
+// Debug helpers — só ficam expostos quando localStorage.ps_debug === '1'.
+// Pra ativar no cliente: localStorage.setItem('ps_debug','1') + F5
+if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === '1') {
+    window.diagTorneio = diagTorneio;
+}
 
 // ============================================================
 // BACKUP AUTOMÁTICO
@@ -19492,8 +19497,11 @@ function repararTorneio(idx) {
     if (typeof updateTV === 'function')                updateTV();
     if (typeof renderTorneiosList === 'function')      renderTorneiosList();
 }
-window.diagnosticarTorneio = diagnosticarTorneio;
-window.repararTorneio = repararTorneio;
+// Debug helpers — só expostos com flag (ver explicação no topo do arquivo)
+if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === '1') {
+    window.diagnosticarTorneio = diagnosticarTorneio;
+    window.repararTorneio = repararTorneio;
+}
 
 // ============================================================
 // LOTE 3: Modelo financeiro correto — rake + staff em cascata
@@ -19708,6 +19716,24 @@ function formatTime(s) {
 
 function formatMoney(v) {
     return 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ============================================================
+// MONEY: arredondamento seguro para 2 casas (centavos)
+// ============================================================
+// Evita o problema clássico do JavaScript: 0.1 + 0.2 === 0.30000000000000004
+// Use SEMPRE que persistir valores monetários (banco, saldo, rake, prêmio).
+// Para exibição, formatMoney já formata corretamente.
+//
+// Exemplos:
+//   money(100 * 0.03)         === 3
+//   money(0.1 + 0.2)          === 0.3
+//   money(123.456)            === 123.46
+//   money(0.1 + 0.2 + 0.3)    === 0.6
+function money(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return 0;
+    return Math.round(n * 100) / 100;
 }
 
 // ============================================================
@@ -21670,7 +21696,7 @@ function confirmAddCashJogador() {
         }
     }
 
-    const rakeCobrado = valor * (m.rake / 100);
+    const rakeCobrado = money(valor * (m.rake / 100));
     const sessaoId = _genUuid();   // ID estável da sessão (pra UPDATE depois)
     const agora = Date.now();
 
@@ -21760,8 +21786,8 @@ function confirmRecompra() {
         }
     }
 
-    const rakeCobrado = valor * (m.rake / 100);
-    j.totalInvestido += valor;
+    const rakeCobrado = money(valor * (m.rake / 100));
+    j.totalInvestido = money(j.totalInvestido + valor);
     j.movimentos.push({ tipo: 'recompra', valor, fichas: fichasRecompra, rakeCobrado, ts: Date.now() });
 
     // Reset contagem
@@ -25439,7 +25465,7 @@ function renderRankingsList() {
             <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Top 3</div>
             <div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.75rem;">
                 ${top3.map((p, i) => {
-                    const premioJogador = (r.premiosPct && r.premiosPct[i]) ? (premioAcumulado * r.premiosPct[i] / 100) : 0;
+                    const premioJogador = (r.premiosPct && r.premiosPct[i]) ? money(premioAcumulado * r.premiosPct[i] / 100) : 0;
                     return `
                     <div style="display:grid;grid-template-columns:2rem 1fr auto auto;gap:.75rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.85rem;">
                         <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':'#92610a'};">${i===0?'🥇':i===1?'🥈':'🥉'}</span>
@@ -25517,10 +25543,10 @@ function abrirRankingCompleto(rankId) {
     if (!r) return;
     const pontuacoes = calcularPontuacoesRanking(r);
     const torneiosVinc = torneios.filter(t => t.rankingId == r.id);
-    const premio = torneiosVinc.reduce((s,t) => s + getRake(t) * (t.rankingRakePct||0) / 100, 0);
+    const premio = money(torneiosVinc.reduce((s,t) => s + getRake(t) * (t.rankingRakePct||0) / 100, 0));
 
     const lista = pontuacoes.map((p, i) => {
-        const prem = (r.premiosPct && r.premiosPct[i]) ? (premio * r.premiosPct[i] / 100) : 0;
+        const prem = (r.premiosPct && r.premiosPct[i]) ? money(premio * r.premiosPct[i] / 100) : 0;
         return `${i+1}º  ${p.nome.padEnd(25,' ')}  ${p.pontos.toFixed(0).padStart(5,' ')} pts  (${p.torneios} torn.)${prem>0?'  💰 '+formatMoney(prem):''}`;
     }).join('\n');
     alert(`RANKING: ${r.nome}\nPremiação acumulada: ${formatMoney(premio)}\n\n${lista}`);
@@ -26755,17 +26781,17 @@ function renderRelTorneios() {
             else if (e.tipo === 'last_chance') lastChance += v;
         });
         // Jackpot (vem de jackpotCompras, fora de entries)
-        jackpot += (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
+        jackpot = money(jackpot + (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0));
         // Taxa administrativa: cobrada só no buy-in × valor da taxa
         const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
-        taxaAdm += buyinsQtd * (Number(t.taxaAdm) || 0);
+        taxaAdm = money(taxaAdm + buyinsQtd * (Number(t.taxaAdm) || 0));
     });
     
     // === Totais financeiros (usando funções unificadas) ===
-    const bruto = torneiosPeriodo.reduce((s, t) => s + getBrutoTotal(t), 0);
-    const rake  = torneiosPeriodo.reduce((s, t) => s + getRake(t), 0);
-    const staff = torneiosPeriodo.reduce((s, t) => s + getStaff(t), 0);
-    const prize = torneiosPeriodo.reduce((s, t) => s + getPrize(t), 0);
+    const bruto = money(torneiosPeriodo.reduce((s, t) => s + getBrutoTotal(t), 0));
+    const rake  = money(torneiosPeriodo.reduce((s, t) => s + getRake(t), 0));
+    const staff = money(torneiosPeriodo.reduce((s, t) => s + getStaff(t), 0));
+    const prize = money(torneiosPeriodo.reduce((s, t) => s + getPrize(t), 0));
 
     // === Atualiza cards ===
     // Linha 1: Entradas
@@ -29553,8 +29579,9 @@ document.addEventListener('keydown', function(e) {
         return;
     }
 
-    // ? = Mostrar ajuda de atalhos (alternativa)
-    if (e.key === '?' && !e.shiftKey === false) {
+    // ? = Mostrar ajuda de atalhos (alternativa) — quando o usuário digita "?"
+    // o browser já entrega e.key === '?' (sem precisar checar shiftKey, que era inconsistente entre layouts)
+    if (e.key === '?') {
         e.preventDefault();
         abrirAjudaAtalhos();
         return;
@@ -29601,20 +29628,24 @@ window.onload = () => {
 };
 
 
-// Helper de debug: forçar sync manual e ver o que acontece
-window.debugSync = async function() {
-    console.log('=== DEBUG SYNC ===');
-    console.log('sbClube:', sbClube);
-    console.log('dbOnline:', dbOnline);
-    console.log('Torneios em memória:', torneios.length);
-    if (torneios.length) {
-        console.log('Primeiro torneio:', torneios[0]);
-        console.log('Tentando syncar TODOS os torneios...');
-        torneios.forEach(t => _markDirty('torneios', t.id));
-        await sincronizarEstado();
-        console.log('=== Sync forçado concluído ===');
-    }
-};
+// Helper de debug: forçar sync manual e ver o que acontece.
+// Só fica exposto quando localStorage.ps_debug === '1'.
+// Pra ativar: no console do cliente, rodar localStorage.setItem('ps_debug','1') e dar F5
+if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === '1') {
+    window.debugSync = async function() {
+        console.log('=== DEBUG SYNC ===');
+        console.log('sbClube:', sbClube);
+        console.log('dbOnline:', dbOnline);
+        console.log('Torneios em memória:', torneios.length);
+        if (torneios.length) {
+            console.log('Primeiro torneio:', torneios[0]);
+            console.log('Tentando syncar TODOS os torneios...');
+            torneios.forEach(t => _markDirty('torneios', t.id));
+            await sincronizarEstado();
+            console.log('=== Sync forçado concluído ===');
+        }
+    };
+}
 
 // ============================================================
 // BOOT: recupera sessão Supabase antes de mostrar a UI
