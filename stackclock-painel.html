@@ -243,9 +243,10 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 const CLOCK_BASE_URL = 'https://www.stackos.com.br/clock.html';
 const PAPEIS = ['admin','gerente','caixa','bar','operador'];
 const TIPOS = [
-  {id:'reentry', label:'🃏 Re-entry'},
-  {id:'floor',   label:'👮 Floor'},
-  {id:'bar',     label:'🍻 Bar'},
+  {id:'reentry',  label:'🃏 Re-entry'},
+  {id:'floor',    label:'👮 Floor'},
+  {id:'bar',      label:'🍻 Bar'},
+  {id:'position', label:'🪑 Posição vagou'},
 ];
 
 let CLUBE_ID = null;
@@ -364,11 +365,11 @@ async function carregarConfig(){
     som_ativo: true,
     vibrar_ativo: true,
     roteamento: {
-      admin:['reentry','floor','bar'],
-      gerente:['reentry','floor','bar'],
-      caixa:['reentry'],
-      bar:['bar'],
-      operador:['floor','bar']
+      admin:   ['reentry','floor','bar','position'],
+      gerente: ['reentry','floor','bar','position'],
+      caixa:   ['reentry','position'],
+      bar:     ['bar'],
+      operador:['floor','bar','position']
     }
   };
   $('cfgTempoAcao').value = CONFIG_LOCAL.tempo_acao_seg;

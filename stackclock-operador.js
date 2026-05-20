@@ -47,6 +47,7 @@
     .sc-alert-icon.reentry{background:rgba(245,158,11,.18);color:#f59e0b;}
     .sc-alert-icon.floor{background:rgba(59,130,246,.18);color:#3b82f6;}
     .sc-alert-icon.bar{background:rgba(249,115,22,.18);color:#f97316;}
+    .sc-alert-icon.position{background:rgba(168,85,247,.18);color:#a855f7;}
     .sc-alert-body{flex:1;min-width:0;}
     .sc-alert-title{font-size:14px;font-weight:700;margin-bottom:2px;color:#e4e4e7;}
     .sc-alert-meta{font-size:12px;color:#9ca3af;}
@@ -125,12 +126,12 @@
         .maybeSingle();
 
       roteamento = (cfg && cfg.roteamento) || {
-        admin:    ['reentry','floor','bar'],
-        gerente:  ['reentry','floor','bar'],
-        caixa:    ['reentry'],
+        admin:    ['reentry','floor','bar','position'],
+        gerente:  ['reentry','floor','bar','position'],
+        caixa:    ['reentry','position'],
         bar:      ['bar'],
-        operador: ['floor','bar'],
-        administrador: ['reentry','floor','bar']
+        operador: ['floor','bar','position'],
+        administrador: ['reentry','floor','bar','position']
       };
 
       const tipos = roteamento[papelUsuario] || [];
@@ -237,6 +238,8 @@
       icon = '👮'; titulo = 'Floor chamado';
     } else if (a.tipo === 'bar') {
       icon = '🍻'; titulo = 'Bar chamado';
+    } else if (a.tipo === 'position') {
+      icon = '🪑'; titulo = 'Posição ' + (a.posicao || '?') + ' vagou';
     }
     const meta = 'Mesa ' + a.mesa + (a.torneio_nome ? ' • ' + esc(a.torneio_nome) : '');
     const time = formatTime(a.criado_em);
@@ -308,6 +311,8 @@
       txt = '👮 Floor — Mesa ' + alerta.mesa;
     } else if (alerta.tipo === 'bar') {
       txt = '🍻 Bar — Mesa ' + alerta.mesa;
+    } else if (alerta.tipo === 'position') {
+      txt = '🪑 Mesa ' + alerta.mesa + ' — Posição ' + alerta.posicao + ' vagou';
     }
     if (alerta.torneio_nome) txt += ' (' + alerta.torneio_nome + ')';
 

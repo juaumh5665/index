@@ -308,7 +308,7 @@ html,body{
 
 /* === BOTÕES === */
 .buttons{
-  display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;
+  display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;
   gap:1.2vw;z-index:2;
   margin-top:1vh;
   height:14vh;
@@ -564,6 +564,10 @@ html,body{
       <svg viewBox="0 0 24 24"><path d="M21 5V3H3v2l8 9v5H6v2h12v-2h-5v-5l8-9z"/></svg>
       BAR
     </button>
+    <button class="btn" id="positionBtn">
+      <svg viewBox="0 0 24 24"><path d="M7 14h10v-3h2v8h-2v-3H7v3H5v-8h2v3zm0-9h10c1.1 0 2 .9 2 2v3h-2V8H7v2H5V7c0-1.1.9-2 2-2z"/></svg>
+      POSIÇÃO
+    </button>
   </div>
 
   <div class="footer">
@@ -617,6 +621,17 @@ html,body{
   </div>
 </div>
 
+<!-- MODAL: POSIÇÃO VAGOU -->
+<div class="modal" id="modalPosVagou">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Posição vagou — Qual?</h3>
+      <button class="modal-close" onclick="fechar('modalPosVagou')">×</button>
+    </div>
+    <div class="grid-pos" id="gridPosVagou"></div>
+  </div>
+</div>
+
 <!-- MODAL: CONFIGURAÇÕES -->
 <div class="modal" id="modalConfig">
   <div class="modal-content">
@@ -644,6 +659,13 @@ html,body{
       <label style="display:flex;justify-content:space-between;align-items:center;">
         <span>Vibração</span>
         <input type="checkbox" id="cfgVibrar" style="width:24px;height:24px;">
+      </label>
+      <label style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <span style="display:flex;flex-direction:column;">
+          <span>Modo acumular TimeBank</span>
+          <span style="font-size:11px;color:#71717a;font-weight:400;margin-top:2px;">Quando o tempo zerar, GANHA uma bolinha em vez de consumir</span>
+        </span>
+        <input type="checkbox" id="cfgModoAcumular" style="width:24px;height:24px;flex-shrink:0;margin-top:2px;">
       </label>
       <button onclick="salvarConfig()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;border:none;padding:14px;border-radius:12px;font-weight:700;font-size:16px;font-family:inherit;cursor:pointer;margin-top:8px;">
         Salvar
@@ -782,7 +804,8 @@ let CONFIG = {
   tempo_bank_seg: 30,
   bank_max: 3,
   som_ativo: true,
-  vibrar_ativo: true
+  vibrar_ativo: true,
+  modo_acumular: localStorage.getItem('stackclock_modo_acumular') === '1'
 };
 
 let timerVal = 30;
@@ -850,7 +873,8 @@ async function tentarLogin(tok) {
         tempo_bank_seg: data.config.tempo_bank_seg || 30,
         bank_max: data.config.bank_max || 3,
         som_ativo: data.config.som_ativo !== false,
-        vibrar_ativo: data.config.vibrar_ativo !== false
+        vibrar_ativo: data.config.vibrar_ativo !== false,
+        modo_acumular: localStorage.getItem('stackclock_modo_acumular') === '1'
       };
     }
     localStorage.setItem('stackclock_token', tok);
@@ -941,7 +965,24 @@ function startTimer() {
     }
 
     if (timerVal <= 0) {
-      // ZEROU — verifica se tem timebank disponível
+      // ZEROU — modo acumular: GANHA uma bolinha (em vez de consumir)
+      if (CONFIG.modo_acumular) {
+        CONFIG.bank_max++;
+        banksRestantes++;
+        renderTimebanks();
+        // reinicia o cronômetro de ação (não entra em modo bank)
+        inBank = false;
+        timerVal = CONFIG.tempo_acao_seg;
+        totalRef = CONFIG.tempo_acao_seg;
+        $('timer').textContent = fmtTime(timerVal);
+        $('timer').classList.remove('danger');
+        $('progressBar').style.width = '100%';
+        beep(900, 180);
+        vibrate(120);
+        showAlert('+1 TIME BANK ganho (' + banksRestantes + ' total)', 'success');
+        return;
+      }
+      // ZEROU — modo padrão: verifica se tem timebank disponível
       if (banksRestantes > 0) {
         // consome automaticamente 1 timebank e CONTINUA contando
         banksRestantes--;
@@ -1142,6 +1183,33 @@ $('barBtn').onclick = async () => {
   catch (e) { showAlert('Erro ao enviar', 'danger'); }
 };
 
+// ===== POSIÇÃO VAGOU =====
+$('positionBtn').onclick = () => {
+  if (!MESA) { abrirTrocarMesa(); return; }
+  const grid = $('gridPosVagou');
+  grid.innerHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    const b = document.createElement('button');
+    b.className = 'grid-cell';
+    b.textContent = i;
+    b.onclick = () => confirmarPosicaoVagou(i);
+    grid.appendChild(b);
+  }
+  abrir('modalPosVagou');
+};
+
+async function confirmarPosicaoVagou(posicao) {
+  fechar('modalPosVagou');
+  showAlert('Posição ' + posicao + ' vagou • Mesa ' + MESA, 'success');
+  vibrate(150);
+  try {
+    await sb.rpc('stackclock_registrar_alerta', {
+      p_token: TOKEN, p_mesa: MESA, p_tipo: 'position',
+      p_posicao: posicao
+    });
+  } catch (e) { console.error('Erro alerta posição:', e); showAlert('Erro ao enviar alerta', 'danger'); }
+}
+
 // ===== CONFIGURAÇÕES =====
 $('settingsBtn').onclick = () => abrirConfig();
 $('arrowLeft').onclick = () => abrirConfig();
@@ -1153,6 +1221,7 @@ function abrirConfig() {
   $('cfgBankMax').value = CONFIG.bank_max;
   $('cfgSom').checked = CONFIG.som_ativo;
   $('cfgVibrar').checked = CONFIG.vibrar_ativo;
+  $('cfgModoAcumular').checked = !!CONFIG.modo_acumular;
   abrir('modalConfig');
 }
 
@@ -1162,6 +1231,8 @@ function salvarConfig() {
   CONFIG.bank_max = parseInt($('cfgBankMax').value) || 3;
   CONFIG.som_ativo = $('cfgSom').checked;
   CONFIG.vibrar_ativo = $('cfgVibrar').checked;
+  CONFIG.modo_acumular = $('cfgModoAcumular').checked;
+  localStorage.setItem('stackclock_modo_acumular', CONFIG.modo_acumular ? '1' : '0');
   banksRestantes = CONFIG.bank_max;
   renderTimebanks();
   resetTimer();
