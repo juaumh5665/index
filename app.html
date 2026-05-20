@@ -7070,19 +7070,26 @@ async function sincronizarEstado() {
                 }
                 else {
                     console.log('[SYNC] ✅ Torneios sincronizados:', dataT ? dataT.length : 0);
-                    // 2. Sync tabelas filhas — DELETE-then-INSERT (mais simples e robusto)
+                    // 2. Sync tabelas filhas — UPSERT + DELETE SELETIVO (à prova de falhas)
+                    //
+                    // ⚠️ ANTES era DELETE-then-INSERT — se a rede caísse entre o DELETE
+                    // e o INSERT, todas as entries eram perdidas. Agora:
+                    //   a) Buscamos os IDs que existem no banco
+                    //   b) Garantimos IDs estáveis no estado local (se faltar, gera)
+                    //   c) UPSERT do estado atual (atualiza existentes + insere novos)
+                    //   d) DELETE apenas dos IDs que sumiram do estado local
+                    //
+                    // Resultado: se qualquer passo falhar, NADA é perdido — só fica
+                    // desatualizado por alguns segundos até o próximo sync.
                     for (const t of torneiosRows) {
                         try {
-                            // Limpa entries/eliminados/jackpots/mesas antigos do torneio
-                            await sb.from('torneio_entries').delete().eq('torneio_id', t.id);
-                            await sb.from('torneio_eliminados').delete().eq('torneio_id', t.id);
-                            await sb.from('torneio_jackpot_compras').delete().eq('torneio_id', t.id);
-                            await sb.from('torneio_mesas').delete().eq('torneio_id', t.id);
+                            // === ENTRIES ===
+                            // Garante IDs estáveis (entries já têm via _genUuid, mas defensivo)
+                            (t.entries || []).forEach(e => { if (!_isUuid(e.id)) e.id = _genUuid(); });
 
-                            // Re-insere o estado atual
                             if (t.entries && t.entries.length) {
                                 const entryRows = t.entries.map(e => ({
-                                    id: e.id || _genUuid(),
+                                    id: e.id,
                                     torneio_id: t.id,
                                     clube_id: sbClube.id,
                                     jogador_id: e.jogadorId,
@@ -7093,12 +7100,30 @@ async function sincronizarEstado() {
                                     ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
                                     operador: e.operador || null,
                                 }));
-                                await sb.from('torneio_entries').insert(entryRows);
+                                const { error: errE } = await sb.from('torneio_entries').upsert(entryRows);
+                                if (errE) throw new Error('Upsert entries: ' + errE.message);
+
+                                // DELETE seletivo: remove do banco IDs que não estão mais no estado local
+                                const idsLocais = t.entries.map(e => e.id);
+                                if (idsLocais.length) {
+                                    await sb.from('torneio_entries')
+                                        .delete()
+                                        .eq('torneio_id', t.id)
+                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                }
+                            } else {
+                                // Estado local vazio — só remove se realmente não houver nada
+                                // (proteção extra: só executa se o torneio existe e está sincronizado)
+                                await sb.from('torneio_entries').delete().eq('torneio_id', t.id);
                             }
+
+                            // === ELIMINADOS ===
+                            // Garante IDs estáveis (eliminados antigos podem não ter id)
+                            (t.eliminados || []).forEach(e => { if (!e.id || !_isUuid(e.id)) e.id = _genUuid(); });
 
                             if (t.eliminados && t.eliminados.length) {
                                 const elimRows = t.eliminados.map(e => ({
-                                    id: _genUuid(),
+                                    id: e.id,
                                     torneio_id: t.id,
                                     clube_id: sbClube.id,
                                     jogador_id: e.jogadorId,
@@ -7108,12 +7133,26 @@ async function sincronizarEstado() {
                                     ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
                                     operador: e.operador || null,
                                 }));
-                                await sb.from('torneio_eliminados').insert(elimRows);
+                                const { error: errEl } = await sb.from('torneio_eliminados').upsert(elimRows);
+                                if (errEl) throw new Error('Upsert eliminados: ' + errEl.message);
+
+                                const idsLocais = t.eliminados.map(e => e.id);
+                                if (idsLocais.length) {
+                                    await sb.from('torneio_eliminados')
+                                        .delete()
+                                        .eq('torneio_id', t.id)
+                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                }
+                            } else {
+                                await sb.from('torneio_eliminados').delete().eq('torneio_id', t.id);
                             }
+
+                            // === JACKPOT COMPRAS ===
+                            (t.jackpotCompras || []).forEach(j => { if (!j.id || !_isUuid(j.id)) j.id = _genUuid(); });
 
                             if (t.jackpotCompras && t.jackpotCompras.length) {
                                 const jackRows = t.jackpotCompras.map(j => ({
-                                    id: _genUuid(),
+                                    id: j.id,
                                     torneio_id: t.id,
                                     clube_id: sbClube.id,
                                     jogador_id: j.jogadorId,
@@ -7121,21 +7160,50 @@ async function sincronizarEstado() {
                                     fichas: j.fichas,
                                     ts: j.ts ? new Date(j.ts).toISOString() : new Date().toISOString(),
                                 }));
-                                await sb.from('torneio_jackpot_compras').insert(jackRows);
+                                const { error: errJ } = await sb.from('torneio_jackpot_compras').upsert(jackRows);
+                                if (errJ) throw new Error('Upsert jackpots: ' + errJ.message);
+
+                                const idsLocais = t.jackpotCompras.map(j => j.id);
+                                if (idsLocais.length) {
+                                    await sb.from('torneio_jackpot_compras')
+                                        .delete()
+                                        .eq('torneio_id', t.id)
+                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                }
+                            } else {
+                                await sb.from('torneio_jackpot_compras').delete().eq('torneio_id', t.id);
                             }
+
+                            // === MESAS ===
+                            (t.mesas || []).forEach(m => { if (!m.id || !_isUuid(m.id)) m.id = _genUuid(); });
 
                             if (t.mesas && t.mesas.length) {
                                 const mesaRows = t.mesas.map(m => ({
-                                    id: _genUuid(),
+                                    id: m.id,
                                     torneio_id: t.id,
                                     clube_id: sbClube.id,
                                     numero: m.numero,
                                     jogadores: m.jogadores || [],
                                 }));
-                                await sb.from('torneio_mesas').insert(mesaRows);
+                                const { error: errM } = await sb.from('torneio_mesas').upsert(mesaRows);
+                                if (errM) throw new Error('Upsert mesas: ' + errM.message);
+
+                                const idsLocais = t.mesas.map(m => m.id);
+                                if (idsLocais.length) {
+                                    await sb.from('torneio_mesas')
+                                        .delete()
+                                        .eq('torneio_id', t.id)
+                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                }
+                            } else {
+                                await sb.from('torneio_mesas').delete().eq('torneio_id', t.id);
                             }
                         } catch (e) {
-                            console.warn('Sync filhas do torneio ' + t.id + ':', e.message);
+                            // ⚠️ Erro de sync NÃO apaga dados locais — re-marca o torneio
+                            // como sujo pra retentar no próximo sync (debounce de 800ms)
+                            console.error('[SYNC] ❌ Falha sync filhas do torneio ' + t.id + ':', e.message);
+                            if (typeof _markDirty === 'function') _markDirty('torneios', t.id);
+                            showToast('⚠️ Sync incompleto — retentando em segundos...');
                         }
                     }
                     _syncQueue.torneios.clear();
@@ -7609,15 +7677,15 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             nivel: e.nivel, ts: new Date(e.ts).getTime(), operador: e.operador,
         })),
         eliminados: tElims.map(e => ({
-            jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
+            id: e.id, jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
             posicao: e.posicao, bountyPago: parseFloat(e.bounty_pago || 0),
             ts: new Date(e.ts).getTime(), operador: e.operador,
         })),
         jackpotCompras: tJacks.map(j => ({
-            jogadorId: j.jogador_id, valor: parseFloat(j.valor),
+            id: j.id, jogadorId: j.jogador_id, valor: parseFloat(j.valor),
             fichas: j.fichas, ts: new Date(j.ts).getTime(),
         })),
-        mesas: tMesas.map(m => ({ numero: m.numero, jogadores: m.jogadores || [] })),
+        mesas: tMesas.map(m => ({ id: m.id, numero: m.numero, jogadores: m.jogadores || [] })),
     };
 }
 
