@@ -1203,6 +1203,125 @@ html {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(245,213,114,.3);
 }
+
+/* ============================================================
+ * REFORÇO DO TEMA CLARO — v3 (classes CSS com cor hardcoded)
+ * Cobre os bugs visuais reportados:
+ *   - Tela Preferências → bloco Som & Alertas (Sons/Alerta de Nível invisíveis)
+ *   - Tela Relatórios → Clientes (nomes invisíveis)
+ *   - Tela Bar → Venda Rápida (nomes de produtos invisíveis)
+ * As regras antigas (v1/v2) só cobriam style inline. Estas cobrem classes.
+ * ============================================================ */
+
+/* Classes com background escuro hardcoded — força clara no tema claro */
+body.tema-claro .pref-toggle,
+body.tema-claro .pref-option,
+body.tema-claro .payout-item,
+body.tema-claro .mesa-card,
+body.tema-claro .ps-input,
+body.tema-claro .ps-list,
+body.tema-claro .busca-item,
+body.tema-claro .player-badge,
+body.tema-claro .timer-bar-bg,
+body.tema-claro .level-dot,
+body.tema-claro .jackpot-filter-btn,
+body.tema-claro .rp-btn,
+body.tema-claro .mobile-menu-btn {
+    background: var(--t-bg-3) !important;
+    border-color: var(--t-border) !important;
+    color: var(--t-text) !important;
+}
+
+/* Garante que textos DENTRO dessas classes fiquem legíveis (filhos diretos e indiretos) */
+body.tema-claro .pref-toggle *,
+body.tema-claro .pref-option *,
+body.tema-claro .payout-item *,
+body.tema-claro .mesa-card *,
+body.tema-claro .busca-item *,
+body.tema-claro .player-badge {
+    color: var(--t-text);
+}
+/* Mas preserva cores semanticamente importantes (verde/vermelho/dourado/azul) */
+body.tema-claro .pref-toggle [style*="color:#22c55e"],
+body.tema-claro .pref-toggle [style*="color:#ef4444"],
+body.tema-claro .pref-toggle [style*="color:#3b82f6"],
+body.tema-claro .pref-toggle [style*="color:var(--gold)"],
+body.tema-claro .payout-item [style*="color:#22c55e"],
+body.tema-claro .payout-item [style*="color:#ef4444"],
+body.tema-claro .payout-item [style*="color:var(--gold)"],
+body.tema-claro .mesa-card [style*="color:#22c55e"],
+body.tema-claro .mesa-card [style*="color:#ef4444"],
+body.tema-claro .busca-item [style*="color:#22c55e"],
+body.tema-claro .busca-item [style*="color:var(--gold)"] {
+    color: inherit !important; /* deixa a cor inline original prevalecer */
+}
+
+/* Linhas de tabela/lista clicáveis com bg escuro (tela Relatórios Clientes) */
+body.tema-claro [style*="background:#0a0a0c"],
+body.tema-claro [style*="background: #0a0a0c"],
+body.tema-claro [style*="background:#0a0a0d"],
+body.tema-claro [style*="background:#0a0a0e"] {
+    background: var(--t-bg-2) !important;
+}
+
+/* Cards de produto no bar (tela Venda Rápida) — fundo escuro fixo no CSS */
+body.tema-claro [style*="background:linear-gradient(135deg,#0a0a0"],
+body.tema-claro [style*="background: linear-gradient(135deg, #0a0a0"],
+body.tema-claro [style*="background:linear-gradient(135deg, #0a0a0"],
+body.tema-claro [style*="background:linear-gradient(180deg,#0a0a0"],
+body.tema-claro [style*="background:linear-gradient(180deg, #0a0a0"] {
+    background: var(--t-bg-3) !important;
+}
+
+/* Hover states em modo claro */
+body.tema-claro .pref-toggle:hover,
+body.tema-claro .pref-option:hover,
+body.tema-claro .mesa-card:hover,
+body.tema-claro .busca-item:hover,
+body.tema-claro .payout-item:hover {
+    background: var(--t-surface-hover) !important;
+}
+
+/* Textos claros descobertos (que somem em fundo claro) */
+body.tema-claro [style*="color:#fef3c7"],
+body.tema-claro [style*="color: #fef3c7"] {
+    color: #92400e !important; /* dourado mais escuro */
+}
+body.tema-claro [style*="color:#d4d4d8"],
+body.tema-claro [style*="color: #d4d4d8"],
+body.tema-claro [style*="color:#cbd5e1"],
+body.tema-claro [style*="color: #cbd5e1"] {
+    color: var(--t-text-2) !important;
+}
+
+/* Backgrounds escuros descobertos (#0c1223, #1a1a1f, #1a1a2e, #16161a) */
+body.tema-claro [style*="background:#0c1223"],
+body.tema-claro [style*="background: #0c1223"],
+body.tema-claro [style*="background:#1a1a1f"],
+body.tema-claro [style*="background: #1a1a1f"],
+body.tema-claro [style*="background:#1a1a2e"],
+body.tema-claro [style*="background: #1a1a2e"],
+body.tema-claro [style*="background:#16161a"],
+body.tema-claro [style*="background: #16161a"] {
+    background: var(--t-bg-2) !important;
+}
+
+/* Banners coloridos opacos (#7f1d1d, #1e3a8a, #14532d) — convertem pra versão clara */
+body.tema-claro [style*="background:#7f1d1d"],
+body.tema-claro [style*="background: #7f1d1d"] {
+    background: rgba(239,68,68,.1) !important;
+    color: #991b1b !important;
+}
+body.tema-claro [style*="background:#1e3a8a"],
+body.tema-claro [style*="background: #1e3a8a"] {
+    background: rgba(59,130,246,.1) !important;
+    color: #1e40af !important;
+}
+body.tema-claro [style*="background:#14532d"],
+body.tema-claro [style*="background: #14532d"] {
+    background: rgba(34,197,94,.1) !important;
+    color: #166534 !important;
+}
 </style>
 </head>
 <body class="overflow-hidden">
