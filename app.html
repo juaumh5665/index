@@ -1870,6 +1870,9 @@ document.addEventListener('DOMContentLoaded', function(){
             <div onclick="showPage('jackpot')" id="nav-jackpot" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-gem nav-ico" style="width:16px;color:#a855f7;"></i> Caixa do Jackpot
             </div>
+            <div onclick="showPage('ticketsvouchers')" id="nav-ticketsvouchers" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
+                <i class="fa-solid fa-ticket nav-ico" style="width:16px;color:#3b82f6;"></i> Tickets & Vouchers
+            </div>
             <div style="height:1px;background:#1a1a1e;margin:.5rem .5rem;" id="nav-divider-admin"></div>
             <div onclick="showPage('funcionarios')" id="nav-funcionarios" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-id-card-clip nav-ico" style="width:16px;color:#c084fc;"></i> Funcionários
@@ -3144,6 +3147,63 @@ document.addEventListener('DOMContentLoaded', function(){
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- TICKETS & VOUCHERS                                          -->
+            <!-- ============================================================ -->
+            <div id="page-ticketsvouchers" class="page-content fade-in" style="display:none;">
+                <div style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:.25rem;"><i class="fa-solid fa-ticket" style="color:#3b82f6;"></i> Tickets & Vouchers</h2>
+                        <div style="font-size:.8rem;color:#71717a;">Vagas (tickets) com valor declarado · Créditos (vouchers) com saldo flexível</div>
+                    </div>
+                    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                        <button onclick="abrirModalGerarTicket()" style="background:#3b82f6;color:#fff;border:none;font-size:.8rem;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;"><i class="fa-solid fa-ticket"></i> Gerar Ticket</button>
+                        <button onclick="abrirModalGerarVoucher()" style="background:#a855f7;color:#fff;border:none;font-size:.8rem;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;"><i class="fa-solid fa-gift"></i> Gerar Voucher</button>
+                    </div>
+                </div>
+
+                <!-- KPIs -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.5rem;">
+                    <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">🎫 Tickets disponíveis</div><div id="tv-tickets-qtd" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;color:#3b82f6;">0</div><div id="tv-tickets-valor" style="font-size:.7rem;color:#71717a;margin-top:.1rem;">R$ 0,00</div></div>
+                    <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">🎫 Tickets usados</div><div id="tv-tickets-usados" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;color:#52525b;">0</div></div>
+                    <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">🎟️ Vouchers ativos</div><div id="tv-vouchers-qtd" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;color:#a855f7;">0</div><div id="tv-vouchers-saldo" style="font-size:.7rem;color:#71717a;margin-top:.1rem;">R$ 0,00 em saldo</div></div>
+                    <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">⚠️ Expira em 7 dias</div><div id="tv-expirando" style="font-size:1.5rem;font-weight:800;margin-top:.4rem;color:#f59e0b;">0</div></div>
+                </div>
+
+                <!-- ABAS Tickets / Vouchers -->
+                <div style="display:flex;gap:.25rem;border-bottom:1px solid #1e1e23;margin-bottom:1rem;">
+                    <button class="tab-btn active" id="tvtab-btn-tickets" onclick="switchTVTab('tvtab-tickets', this)"><i class="fa-solid fa-ticket"></i> Tickets</button>
+                    <button class="tab-btn" id="tvtab-btn-vouchers" onclick="switchTVTab('tvtab-vouchers', this)"><i class="fa-solid fa-gift"></i> Vouchers</button>
+                </div>
+
+                <!-- FILTROS comuns (jogador + status) -->
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+                    <div style="position:relative;flex:1;min-width:200px;">
+                        <i class="fa-solid fa-search" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:#52525b;font-size:.8rem;"></i>
+                        <input type="text" id="tv-busca" placeholder="Buscar por jogador..." class="inp" style="padding-left:2.2rem;font-size:.85rem;" oninput="renderTicketsVouchers()">
+                    </div>
+                    <select id="tv-filtro-status" class="inp" style="font-size:.85rem;width:200px;" onchange="renderTicketsVouchers()">
+                        <option value="">Todos os status</option>
+                        <option value="disponivel">🟢 Disponível</option>
+                        <option value="ativo">🟢 Ativo</option>
+                        <option value="usado">⚪ Usado</option>
+                        <option value="zerado">⚪ Zerado</option>
+                        <option value="expirado">🔴 Expirado</option>
+                        <option value="cancelado">❌ Cancelado</option>
+                    </select>
+                </div>
+
+                <!-- TAB: TICKETS -->
+                <div id="tvtab-tickets" class="tvtab-content stat-card" style="padding:1rem;">
+                    <div id="tv-lista-tickets" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
+                </div>
+
+                <!-- TAB: VOUCHERS -->
+                <div id="tvtab-vouchers" class="tvtab-content stat-card" style="padding:1rem;display:none;">
+                    <div id="tv-lista-vouchers" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
                 </div>
             </div>
 
@@ -5461,6 +5521,121 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;">
                 <button onclick="closeModal('modal-capile')" class="btn-ghost" style="padding:.7rem 1.25rem;border-radius:.5rem;font-size:.85rem;">Cancelar</button>
                 <button onclick="salvarCapile()" class="btn-gold" style="padding:.7rem 1.5rem;border-radius:.5rem;font-weight:700;font-size:.85rem;">Registrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- LOTE 6 — MODAL: GERAR TICKET                                -->
+<!-- ============================================================ -->
+<div id="modal-gerar-ticket" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-ticket" style="color:#3b82f6;"></i> Gerar Ticket</h3>
+            <button onclick="closeModal('modal-gerar-ticket')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.85rem;">
+            <div style="padding:.7rem .85rem;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:.5rem;font-size:.7rem;color:#93c5fd;line-height:1.5;">
+                <i class="fa-solid fa-info-circle"></i> Ticket é uma "vaga" com valor declarado. Pode ser usado em qualquer compra do torneio (buy-in, re-entry, rebuy, addon). Sobra vira voucher, falta completa em dinheiro/voucher.
+            </div>
+            
+            <div>
+                <label class="inp-label">Jogador *</label>
+                <select id="tk-jogador" class="inp"></select>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
+                <div>
+                    <label class="inp-label">Valor (R$) *</label>
+                    <input type="number" id="tk-valor" class="inp" step="0.01" min="0.01" placeholder="Ex: 200">
+                </div>
+                <div>
+                    <label class="inp-label">Validade (dias)</label>
+                    <input type="number" id="tk-validade-dias" class="inp" value="90" min="1" max="365">
+                </div>
+            </div>
+            
+            <div>
+                <label class="inp-label">Descrição (opcional)</label>
+                <input type="text" id="tk-descricao" class="inp" placeholder="Ex: Vaga Mensalão Domingão" maxlength="80">
+            </div>
+            
+            <div>
+                <label class="inp-label">Torneio destino (opcional)</label>
+                <select id="tk-torneio-destino" class="inp">
+                    <option value="">Qualquer torneio (livre)</option>
+                </select>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.3rem;">Vazio = vale em qualquer torneio que aceitar ticket. Específico = só serve naquele torneio.</div>
+            </div>
+            
+            <div>
+                <label class="inp-label">Observações (opcional)</label>
+                <input type="text" id="tk-obs" class="inp" placeholder="Ex: Premiação 3º lugar Satélite #5">
+            </div>
+            
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;">
+                <button onclick="closeModal('modal-gerar-ticket')" class="btn-ghost" style="padding:.7rem 1.25rem;border-radius:.5rem;font-size:.85rem;">Cancelar</button>
+                <button onclick="salvarTicketManual()" style="background:#3b82f6;color:#fff;border:none;padding:.7rem 1.5rem;border-radius:.5rem;font-weight:700;font-size:.85rem;cursor:pointer;"><i class="fa-solid fa-ticket"></i> Gerar Ticket</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- LOTE 6 — MODAL: GERAR VOUCHER                               -->
+<!-- ============================================================ -->
+<div id="modal-gerar-voucher" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:520px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;"><i class="fa-solid fa-gift" style="color:#a855f7;"></i> Gerar Voucher</h3>
+            <button onclick="closeModal('modal-gerar-voucher')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.85rem;">
+            <div style="padding:.7rem .85rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;font-size:.7rem;color:#c4b5fd;line-height:1.5;">
+                <i class="fa-solid fa-info-circle"></i> Voucher é crédito em R$ que vai sendo descontado conforme jogador usa. Aceita uso parcial em vários torneios até zerar.
+            </div>
+            
+            <div>
+                <label class="inp-label">Jogador *</label>
+                <select id="vc-jogador" class="inp"></select>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
+                <div>
+                    <label class="inp-label">Valor (R$) *</label>
+                    <input type="number" id="vc-valor" class="inp" step="0.01" min="0.01" placeholder="Ex: 700">
+                </div>
+                <div>
+                    <label class="inp-label">Validade (dias)</label>
+                    <input type="number" id="vc-validade-dias" class="inp" value="90" min="1" max="365">
+                </div>
+            </div>
+            
+            <div>
+                <label class="inp-label">Descrição (opcional)</label>
+                <input type="text" id="vc-descricao" class="inp" placeholder="Ex: Promoção Satélite Domingão" maxlength="80">
+            </div>
+            
+            <div>
+                <label class="inp-label">Origem</label>
+                <select id="vc-origem" class="inp">
+                    <option value="manual">Manual (criado pelo admin)</option>
+                    <option value="promocao">Promoção / Marketing</option>
+                    <option value="premiacao">Premiação</option>
+                    <option value="outro">Outro</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="inp-label">Observações (opcional)</label>
+                <input type="text" id="vc-obs" class="inp" placeholder="Ex: Compensação por reagendamento">
+            </div>
+            
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.5rem;">
+                <button onclick="closeModal('modal-gerar-voucher')" class="btn-ghost" style="padding:.7rem 1.25rem;border-radius:.5rem;font-size:.85rem;">Cancelar</button>
+                <button onclick="salvarVoucherManual()" style="background:#a855f7;color:#fff;border:none;padding:.7rem 1.5rem;border-radius:.5rem;font-weight:700;font-size:.85rem;cursor:pointer;"><i class="fa-solid fa-gift"></i> Gerar Voucher</button>
             </div>
         </div>
     </div>
@@ -11112,6 +11287,459 @@ function inicializarFechamento() {
 
 let _jackpotFiltroAtivo = 'todos';
 
+
+// ============================================================
+// LOTE 6 — PÁGINA Tickets & Vouchers
+// ============================================================
+function switchTVTab(tabId, btn) {
+    document.querySelectorAll('.tvtab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('#page-ticketsvouchers .tab-btn').forEach(b => b.classList.remove('active'));
+    const tab = document.getElementById(tabId);
+    if (tab) tab.style.display = 'block';
+    if (btn) btn.classList.add('active');
+    // Ajusta filtro de status (cada aba tem opções diferentes mas o select é o mesmo)
+    renderTicketsVouchers();
+}
+
+// Renderiza a página inteira (KPIs + listas das 2 abas)
+async function renderTicketsVouchers() {
+    // 1) Garante que dados estão carregados do Supabase
+    await _carregarTicketsVouchers();
+    
+    // 2) Atualiza status de validade (expirados)
+    _atualizarStatusValidade();
+    
+    // 3) Renderiza KPIs do topo
+    _renderKPIsTicketsVouchers();
+    
+    // 4) Renderiza listas (Tickets e Vouchers — só uma aparece por vez)
+    _renderListaTickets();
+    _renderListaVouchers();
+}
+
+// Carrega do banco (se houver clube logado)
+async function _carregarTicketsVouchers() {
+    if (!sbClube?.id) return;
+    try {
+        const [tRes, vRes] = await Promise.all([
+            sb.from('tickets').select('*').eq('clube_id', sbClube.id).order('criado_em', { ascending: false }),
+            sb.from('vouchers').select('*').eq('clube_id', sbClube.id).order('criado_em', { ascending: false }),
+        ]);
+        if (tRes.data) {
+            tickets = tRes.data.map(_ticketFromDb);
+            localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        }
+        if (vRes.data) {
+            vouchers = vRes.data.map(_voucherFromDb);
+            localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        }
+    } catch(e) {
+        console.error('[Tickets/Vouchers] carregar:', e);
+    }
+}
+
+function _renderKPIsTicketsVouchers() {
+    const agora = Date.now();
+    const seteDias = agora + (7 * 24 * 60 * 60 * 1000);
+    
+    // Tickets disponíveis
+    const tDisp = tickets.filter(t => t.status === 'disponivel' && (!t.validade || t.validade > agora));
+    const tValorDisp = tDisp.reduce((s, t) => s + (Number(t.valor) || 0), 0);
+    const tUsados = tickets.filter(t => t.status === 'usado').length;
+    
+    // Vouchers ativos
+    const vAtivos = vouchers.filter(v => v.status === 'ativo' && Number(v.saldoAtual) > 0 && (!v.validade || v.validade > agora));
+    const vSaldoTotal = vAtivos.reduce((s, v) => s + (Number(v.saldoAtual) || 0), 0);
+    
+    // Expirando em 7 dias
+    const expirando = [
+        ...tickets.filter(t => t.status === 'disponivel' && t.validade && t.validade > agora && t.validade <= seteDias),
+        ...vouchers.filter(v => v.status === 'ativo' && Number(v.saldoAtual) > 0 && v.validade && v.validade > agora && v.validade <= seteDias),
+    ].length;
+    
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+    set('tv-tickets-qtd', tDisp.length);
+    set('tv-tickets-valor', formatMoney(tValorDisp));
+    set('tv-tickets-usados', tUsados);
+    set('tv-vouchers-qtd', vAtivos.length);
+    set('tv-vouchers-saldo', formatMoney(vSaldoTotal) + ' em saldo');
+    set('tv-expirando', expirando);
+}
+
+// Lista de tickets com filtros aplicados
+function _renderListaTickets() {
+    const container = document.getElementById('tv-lista-tickets');
+    if (!container) return;
+    
+    const busca = (document.getElementById('tv-busca')?.value || '').toLowerCase().trim();
+    const filtroStatus = document.getElementById('tv-filtro-status')?.value || '';
+    
+    let lista = [...tickets];
+    
+    // Filtro status
+    if (filtroStatus) {
+        lista = lista.filter(t => t.status === filtroStatus);
+    }
+    
+    // Filtro busca (nome jogador ou descrição)
+    if (busca) {
+        lista = lista.filter(t => {
+            const jog = getJogadorNome(t.jogadorId).toLowerCase();
+            const desc = (t.descricao || '').toLowerCase();
+            return jog.includes(busca) || desc.includes(busca);
+        });
+    }
+    
+    if (lista.length === 0) {
+        container.innerHTML = `
+            <div style="padding:3rem 1rem;text-align:center;color:#52525b;">
+                <i class="fa-solid fa-ticket" style="font-size:2.5rem;color:#27272a;margin-bottom:.75rem;"></i>
+                <div style="font-size:.95rem;font-weight:700;">Nenhum ticket encontrado</div>
+                <div style="font-size:.75rem;margin-top:.5rem;">Crie um ticket clicando em "Gerar Ticket" no topo</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Ordena: disponíveis primeiro, depois por data desc
+    lista.sort((a, b) => {
+        if (a.status === 'disponivel' && b.status !== 'disponivel') return -1;
+        if (b.status === 'disponivel' && a.status !== 'disponivel') return 1;
+        return (b.criadoEm || 0) - (a.criadoEm || 0);
+    });
+    
+    container.innerHTML = lista.map(t => _cardTicket(t)).join('');
+}
+
+function _cardTicket(t) {
+    const jogNome = getJogadorNome(t.jogadorId) || '(sem jogador)';
+    const torneioDestino = t.torneioDestinoId ? (torneios.find(tn => tn.id === t.torneioDestinoId) || null) : null;
+    const torneioOrigem = t.torneioOrigemId ? (torneios.find(tn => tn.id === t.torneioOrigemId) || null) : null;
+    
+    const statusBadge = {
+        'disponivel': { cor: '#22c55e', bg: 'rgba(34,197,94,.1)', label: '🟢 Disponível' },
+        'usado':      { cor: '#71717a', bg: 'rgba(113,113,122,.1)', label: '⚪ Usado' },
+        'expirado':   { cor: '#ef4444', bg: 'rgba(239,68,68,.1)', label: '🔴 Expirado' },
+        'cancelado':  { cor: '#ef4444', bg: 'rgba(239,68,68,.1)', label: '❌ Cancelado' },
+    }[t.status] || { cor: '#71717a', bg: 'rgba(113,113,122,.1)', label: t.status };
+    
+    const validadeTxt = t.validade
+        ? `Válido até ${new Date(t.validade).toLocaleDateString('pt-BR')}`
+        : 'Sem validade';
+    const venceLogo = t.validade && (t.validade - Date.now()) < (7 * 24 * 60 * 60 * 1000) && t.status === 'disponivel';
+    
+    return `
+        <div style="padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                    <span style="font-size:1.5rem;">🎫</span>
+                    <span style="font-weight:700;font-size:.95rem;">${escapeHtml(jogNome)}</span>
+                    <span style="font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:.3rem;background:${statusBadge.bg};color:${statusBadge.cor};">${statusBadge.label}</span>
+                </div>
+                <div style="font-size:.75rem;color:#a1a1aa;margin-top:.35rem;">
+                    ${t.descricao ? escapeHtml(t.descricao) + ' · ' : ''}
+                    ${torneioDestino ? `Destino: <strong style="color:#3b82f6;">${escapeHtml(torneioDestino.nome)}</strong>` : '<span style="color:#71717a;">Livre (qualquer torneio)</span>'}
+                </div>
+                <div style="font-size:.7rem;color:#52525b;margin-top:.2rem;">
+                    ${torneioOrigem ? '📍 Origem: ' + escapeHtml(torneioOrigem.nome) + (t.posicaoOrigem ? ` (${t.posicaoOrigem}º lugar)` : '') + ' · ' : ''}
+                    <span style="${venceLogo ? 'color:#f59e0b;font-weight:700;' : ''}">${validadeTxt}${venceLogo ? ' ⚠️' : ''}</span>
+                </div>
+            </div>
+            <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:.35rem;">
+                <div style="font-size:1.15rem;font-weight:800;color:#3b82f6;font-family:var(--font-mono);">${formatMoney(t.valor)}</div>
+                ${t.status === 'disponivel' ? `<button onclick="cancelarTicket('${t.id}')" style="background:none;border:1px solid #3f3f46;color:#71717a;font-size:.7rem;padding:.25rem .55rem;border-radius:.3rem;cursor:pointer;" title="Cancelar ticket"><i class="fa-solid fa-ban"></i> Cancelar</button>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Lista de vouchers
+function _renderListaVouchers() {
+    const container = document.getElementById('tv-lista-vouchers');
+    if (!container) return;
+    
+    const busca = (document.getElementById('tv-busca')?.value || '').toLowerCase().trim();
+    const filtroStatus = document.getElementById('tv-filtro-status')?.value || '';
+    
+    let lista = [...vouchers];
+    
+    if (filtroStatus) {
+        lista = lista.filter(v => v.status === filtroStatus);
+    }
+    
+    if (busca) {
+        lista = lista.filter(v => {
+            const jog = getJogadorNome(v.jogadorId).toLowerCase();
+            const desc = (v.descricao || '').toLowerCase();
+            return jog.includes(busca) || desc.includes(busca);
+        });
+    }
+    
+    if (lista.length === 0) {
+        container.innerHTML = `
+            <div style="padding:3rem 1rem;text-align:center;color:#52525b;">
+                <i class="fa-solid fa-gift" style="font-size:2.5rem;color:#27272a;margin-bottom:.75rem;"></i>
+                <div style="font-size:.95rem;font-weight:700;">Nenhum voucher encontrado</div>
+                <div style="font-size:.75rem;margin-top:.5rem;">Crie um voucher clicando em "Gerar Voucher" no topo</div>
+            </div>
+        `;
+        return;
+    }
+    
+    lista.sort((a, b) => {
+        if (a.status === 'ativo' && b.status !== 'ativo') return -1;
+        if (b.status === 'ativo' && a.status !== 'ativo') return 1;
+        return (b.criadoEm || 0) - (a.criadoEm || 0);
+    });
+    
+    container.innerHTML = lista.map(v => _cardVoucher(v)).join('');
+}
+
+function _cardVoucher(v) {
+    const jogNome = getJogadorNome(v.jogadorId) || '(sem jogador)';
+    
+    const statusBadge = {
+        'ativo':     { cor: '#22c55e', bg: 'rgba(34,197,94,.1)', label: '🟢 Ativo' },
+        'zerado':    { cor: '#71717a', bg: 'rgba(113,113,122,.1)', label: '⚪ Zerado' },
+        'expirado':  { cor: '#ef4444', bg: 'rgba(239,68,68,.1)', label: '🔴 Expirado' },
+        'cancelado': { cor: '#ef4444', bg: 'rgba(239,68,68,.1)', label: '❌ Cancelado' },
+    }[v.status] || { cor: '#71717a', bg: 'rgba(113,113,122,.1)', label: v.status };
+    
+    const validadeTxt = v.validade
+        ? `Válido até ${new Date(v.validade).toLocaleDateString('pt-BR')}`
+        : 'Sem validade';
+    const venceLogo = v.validade && (v.validade - Date.now()) < (7 * 24 * 60 * 60 * 1000) && v.status === 'ativo';
+    
+    const pctUsado = v.valorOriginal > 0 ? Math.round((1 - v.saldoAtual / v.valorOriginal) * 100) : 0;
+    
+    const origemLabel = {
+        'manual': 'Criado manualmente',
+        'ticket_sobra': 'Troco de ticket',
+        'premiacao': 'Premiação',
+        'outro': 'Outro',
+    }[v.origem] || v.origem;
+    
+    return `
+        <div style="padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                    <span style="font-size:1.5rem;">🎟️</span>
+                    <span style="font-weight:700;font-size:.95rem;">${escapeHtml(jogNome)}</span>
+                    <span style="font-size:.7rem;font-weight:700;padding:.15rem .5rem;border-radius:.3rem;background:${statusBadge.bg};color:${statusBadge.cor};">${statusBadge.label}</span>
+                </div>
+                <div style="font-size:.75rem;color:#a1a1aa;margin-top:.35rem;">
+                    ${v.descricao ? escapeHtml(v.descricao) : `<span style="color:#71717a;">${origemLabel}</span>`}
+                </div>
+                <div style="font-size:.7rem;color:#52525b;margin-top:.2rem;">
+                    ${origemLabel} · <span style="${venceLogo ? 'color:#f59e0b;font-weight:700;' : ''}">${validadeTxt}${venceLogo ? ' ⚠️' : ''}</span>
+                </div>
+                ${v.status === 'ativo' && pctUsado > 0 ? `
+                    <div style="margin-top:.4rem;height:4px;background:#1e1e23;border-radius:2px;overflow:hidden;">
+                        <div style="height:100%;background:#a855f7;width:${pctUsado}%;"></div>
+                    </div>
+                    <div style="font-size:.65rem;color:#52525b;margin-top:.2rem;">${pctUsado}% usado</div>
+                ` : ''}
+            </div>
+            <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:.35rem;">
+                <div style="font-size:1.15rem;font-weight:800;color:#a855f7;font-family:var(--font-mono);">${formatMoney(v.saldoAtual)}</div>
+                <div style="font-size:.65rem;color:#52525b;">de ${formatMoney(v.valorOriginal)}</div>
+                ${v.status === 'ativo' ? `<button onclick="cancelarVoucher('${v.id}')" style="background:none;border:1px solid #3f3f46;color:#71717a;font-size:.7rem;padding:.25rem .55rem;border-radius:.3rem;cursor:pointer;" title="Cancelar voucher"><i class="fa-solid fa-ban"></i> Cancelar</button>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// ---------- Cancelar (mantém histórico mas marca como cancelado) ----------
+async function cancelarTicket(id) {
+    const t = tickets.find(x => x.id === id);
+    if (!t) return showToast('⚠️ Ticket não encontrado');
+    if (t.status !== 'disponivel') return showToast('⚠️ Só tickets disponíveis podem ser cancelados');
+    if (!confirm(`Cancelar este ticket de ${formatMoney(t.valor)} para ${getJogadorNome(t.jogadorId)}?`)) return;
+    
+    try {
+        t.status = 'cancelado';
+        await syncTicket(t);
+        localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        if (typeof logAudit === 'function') {
+            logAudit('TICKET_CANCEL', `Ticket ${formatMoney(t.valor)} cancelado (${getJogadorNome(t.jogadorId)})`);
+        }
+        renderTicketsVouchers();
+        showToast('✓ Ticket cancelado');
+    } catch(e) {
+        t.status = 'disponivel'; // rollback local
+        showToast('⚠️ Erro: ' + (e.message || e));
+    }
+}
+
+async function cancelarVoucher(id) {
+    const v = vouchers.find(x => x.id === id);
+    if (!v) return showToast('⚠️ Voucher não encontrado');
+    if (v.status !== 'ativo') return showToast('⚠️ Só vouchers ativos podem ser cancelados');
+    if (!confirm(`Cancelar este voucher de ${formatMoney(v.saldoAtual)} para ${getJogadorNome(v.jogadorId)}?`)) return;
+    
+    try {
+        const saldoAntes = v.saldoAtual;
+        v.status = 'cancelado';
+        await syncVoucher(v);
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        if (typeof logAudit === 'function') {
+            logAudit('VOUCHER_CANCEL', `Voucher saldo ${formatMoney(saldoAntes)} cancelado (${getJogadorNome(v.jogadorId)})`);
+        }
+        renderTicketsVouchers();
+        showToast('✓ Voucher cancelado');
+    } catch(e) {
+        v.status = 'ativo';
+        showToast('⚠️ Erro: ' + (e.message || e));
+    }
+}
+
+// ---------- MODAIS DE GERAÇÃO MANUAL ----------
+
+// Preenche um <select> com jogadores ativos do clube (ordenado por nome)
+function _popularSelectJogadores(selectId, valorAtual = '') {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const ativos = (jogadores || []).filter(j => j.status !== 'inativo').sort((a, b) => a.nome.localeCompare(b.nome));
+    sel.innerHTML = '<option value="">Selecione um jogador...</option>' + 
+        ativos.map(j => `<option value="${j.id}" ${j.id===valorAtual?'selected':''}>${escapeHtml(j.nome)}</option>`).join('');
+}
+
+// Preenche select de torneios destino (só torneios não-finalizados que aceitam ticket)
+function _popularSelectTorneiosDestino(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const disponiveis = (torneios || [])
+        .filter(t => t.status !== 'finished')
+        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    sel.innerHTML = '<option value="">Qualquer torneio (livre)</option>' + 
+        disponiveis.map(t => `<option value="${t.id}">${escapeHtml(t.nome)} — ${formatMoney(t.buyin)}</option>`).join('');
+}
+
+function abrirModalGerarTicket() {
+    if (!sbClube?.id) return showToast('⚠️ Clube não carregado');
+    // Reseta campos
+    _popularSelectJogadores('tk-jogador');
+    _popularSelectTorneiosDestino('tk-torneio-destino');
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('tk-valor', '');
+    set('tk-descricao', '');
+    set('tk-validade-dias', (sbClube?.cfg_ticket_validade_dias) || 90);
+    set('tk-obs', '');
+    openModal('modal-gerar-ticket');
+}
+
+async function salvarTicketManual() {
+    const jogadorId = document.getElementById('tk-jogador').value;
+    const valor = parseFloat(document.getElementById('tk-valor').value) || 0;
+    const validadeDias = parseInt(document.getElementById('tk-validade-dias').value) || 90;
+    const descricao = document.getElementById('tk-descricao').value.trim();
+    const torneioDestinoId = document.getElementById('tk-torneio-destino').value || null;
+    const obs = document.getElementById('tk-obs').value.trim();
+    
+    // Validações
+    if (!jogadorId) return showToast('⚠️ Selecione um jogador');
+    if (valor <= 0) return showToast('⚠️ Valor deve ser maior que zero');
+    if (validadeDias < 1 || validadeDias > 365) return showToast('⚠️ Validade deve estar entre 1 e 365 dias');
+    
+    const novo = {
+        id: _genUuid(),
+        clubeId: sbClube.id,
+        jogadorId,
+        valor,
+        descricao: descricao || null,
+        torneioDestinoId,
+        torneioOrigemId: null,
+        posicaoOrigem: null,
+        status: 'disponivel',
+        usadoTorneioId: null,
+        usadoEm: null,
+        valorUsado: 0,
+        sobraVoucherId: null,
+        validade: Date.now() + (validadeDias * 24 * 60 * 60 * 1000),
+        observacoes: obs || null,
+        criadoEm: Date.now(),
+    };
+    
+    try {
+        tickets.push(novo);
+        localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        await syncTicket(novo);
+        if (typeof logAudit === 'function') {
+            logAudit('TICKET_NEW', `Ticket ${formatMoney(valor)} para ${getJogadorNome(jogadorId)}`);
+        }
+        closeModal('modal-gerar-ticket');
+        showToast(`✓ Ticket ${formatMoney(valor)} gerado pra ${getJogadorNome(jogadorId)}`);
+        renderTicketsVouchers();
+    } catch(e) {
+        // Rollback local em caso de erro no banco
+        tickets = tickets.filter(t => t.id !== novo.id);
+        localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        console.error('[salvarTicketManual] erro:', e);
+        showToast('⚠️ Erro ao salvar: ' + (e.message || e));
+    }
+}
+
+function abrirModalGerarVoucher() {
+    if (!sbClube?.id) return showToast('⚠️ Clube não carregado');
+    _popularSelectJogadores('vc-jogador');
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('vc-valor', '');
+    set('vc-descricao', '');
+    set('vc-validade-dias', (sbClube?.cfg_voucher_validade_dias) || 90);
+    set('vc-origem', 'manual');
+    set('vc-obs', '');
+    openModal('modal-gerar-voucher');
+}
+
+async function salvarVoucherManual() {
+    const jogadorId = document.getElementById('vc-jogador').value;
+    const valor = parseFloat(document.getElementById('vc-valor').value) || 0;
+    const validadeDias = parseInt(document.getElementById('vc-validade-dias').value) || 90;
+    const descricao = document.getElementById('vc-descricao').value.trim();
+    const origemUI = document.getElementById('vc-origem').value;
+    const obs = document.getElementById('vc-obs').value.trim();
+    
+    // Mapeia origem UI pro enum do banco
+    const origemMap = { 'manual': 'manual', 'promocao': 'manual', 'premiacao': 'premiacao', 'outro': 'outro' };
+    const origem = origemMap[origemUI] || 'manual';
+    
+    if (!jogadorId) return showToast('⚠️ Selecione um jogador');
+    if (valor <= 0) return showToast('⚠️ Valor deve ser maior que zero');
+    if (validadeDias < 1 || validadeDias > 365) return showToast('⚠️ Validade deve estar entre 1 e 365 dias');
+    
+    const novo = {
+        id: _genUuid(),
+        clubeId: sbClube.id,
+        jogadorId,
+        valorOriginal: valor,
+        saldoAtual: valor,
+        descricao: descricao || null,
+        origem,
+        ticketOrigemId: null,
+        status: 'ativo',
+        validade: Date.now() + (validadeDias * 24 * 60 * 60 * 1000),
+        observacoes: obs || null,
+        criadoEm: Date.now(),
+    };
+    
+    try {
+        vouchers.push(novo);
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        await syncVoucher(novo);
+        if (typeof logAudit === 'function') {
+            logAudit('VOUCHER_NEW', `Voucher ${formatMoney(valor)} para ${getJogadorNome(jogadorId)}`);
+        }
+        closeModal('modal-gerar-voucher');
+        showToast(`✓ Voucher ${formatMoney(valor)} gerado pra ${getJogadorNome(jogadorId)}`);
+        renderTicketsVouchers();
+    } catch(e) {
+        vouchers = vouchers.filter(v => v.id !== novo.id);
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        console.error('[salvarVoucherManual] erro:', e);
+        showToast('⚠️ Erro ao salvar: ' + (e.message || e));
+    }
+}
+
 // Carrega movimentações do Supabase e renderiza a página
 async function renderPaginaJackpot() {
     try {
@@ -15182,6 +15810,7 @@ function showPage(page) {
     if (page === 'config')    renderConfig();
     if (page === 'assinatura') renderAssinatura();
     if (page === 'caixa')     renderCaixa();
+    if (page === 'ticketsvouchers') renderTicketsVouchers();
     if (page === 'relatorios') {
         setReportPeriod(_reportPeriod.tipo || '30d');
     }
