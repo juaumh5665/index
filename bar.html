@@ -298,13 +298,13 @@
     padding: 0 4px;
   }
   .jogador-suggestions {
-    position: absolute; top: 100%; left: 0; right: 0;
+    position: absolute; bottom: 100%; left: 0; right: 0;
     background: #131a2e;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
-    margin-top: 4px;
+    margin-bottom: 4px;
     max-height: 240px; overflow-y: auto;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
     z-index: 20; display: none;
   }
   .jogador-suggestions.show { display: block; }
@@ -370,6 +370,23 @@
   }
   .total-row .label { font-size: 12px; color: #9ca3af; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
   .total-row .valor { font-size: 26px; font-weight: 800; color: #a855f7; }
+
+  .secao-label {
+    font-size: 10px; color: #9ca3af; text-transform: uppercase;
+    font-weight: 800; letter-spacing: 1px;
+    margin-bottom: 6px; margin-top: 4px;
+  }
+  .divisor-ou {
+    display: flex; align-items: center; gap: 10px;
+    margin: 10px 0 8px 0;
+    color: #52525b; font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .divisor-ou::before, .divisor-ou::after {
+    content: ''; flex: 1; height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .divisor-ou span { padding: 0 4px; }
   .pagamento-grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
     margin-bottom: 8px;
@@ -683,14 +700,21 @@
             <span class="label">Total</span>
             <span class="valor" id="totalVenda">R$ 0,00</span>
           </div>
+
+          <div class="secao-label">💰 À VISTA</div>
           <div class="pagamento-grid">
             <button class="pagto-btn" data-pagto="dinheiro">💵 Dinheiro</button>
             <button class="pagto-btn" data-pagto="pix">📱 PIX</button>
             <button class="pagto-btn" data-pagto="debito">💳 Débito</button>
             <button class="pagto-btn" data-pagto="credito">💳 Crédito</button>
           </div>
+
+          <div class="divisor-ou"><span>OU</span></div>
+
+          <div class="secao-label" style="color:#fbbf24;">📒 PAGAR DEPOIS</div>
           <button class="btn-comanda" id="btnComanda">📒 Lançar na Comanda</button>
-          <button class="btn-confirmar" id="btnConfirmar" disabled>✓ Confirmar Venda</button>
+
+          <button class="btn-confirmar" id="btnConfirmar" disabled>Selecione produtos e jogador</button>
         </div>
       </div>
     </div>
@@ -813,7 +837,6 @@ let MOSTRAR_TODOS  = false;       // se true, ignora filtro de top 4
 let CARRINHO       = [];          // [{produtoId, nome, valor, qtd, subtotal}]
 let JOGADOR_SEL    = null;        // {id, nome, apelido}
 let METODO_PAGTO   = null;        // 'dinheiro'|'pix'|'debito'|'credito'|null
-let MODO_COMANDA   = false;       // se true, vai para comanda; ignora METODO_PAGTO
 let HISTORICO      = [];          // vendas do operador no dia
 let GRUPOS         = new Map();   // grupo_id → grupo_nome
 let _searchTimer   = null;
@@ -1189,6 +1212,10 @@ $('inpJogador').addEventListener('input', () => {
   _searchTimer = setTimeout(() => buscarJogadores(q), 280);
 });
 $('inpJogador').addEventListener('focus', () => {
+  // No celular, garante que o input fica visível quando o teclado abre
+  setTimeout(() => {
+    $('inpJogador').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 300);
   if ($('inpJogador').value.trim()) {
     const q = $('inpJogador').value.trim();
     buscarJogadores(q);
@@ -1268,12 +1295,9 @@ function setupEventListeners() {
     renderProdutos();
   });
 
-  // Pagamento
+  // Pagamento à vista (toggle único)
   document.querySelectorAll('.pagto-btn').forEach(b => {
     b.addEventListener('click', () => {
-      // Se já estava no modo comanda, sai disso
-      MODO_COMANDA = false;
-      $('btnComanda').classList.remove('active');
       // Toggle
       if (METODO_PAGTO === b.dataset.pagto) {
         METODO_PAGTO = null;
@@ -1287,19 +1311,17 @@ function setupEventListeners() {
     });
   });
 
-  // Comanda
+  // Comanda — atalho direto: lança imediatamente (sem precisar clicar em Confirmar)
   $('btnComanda').addEventListener('click', () => {
-    MODO_COMANDA = !MODO_COMANDA;
-    $('btnComanda').classList.toggle('active', MODO_COMANDA);
-    if (MODO_COMANDA) {
-      METODO_PAGTO = null;
-      document.querySelectorAll('.pagto-btn').forEach(x => x.classList.remove('active'));
-    }
-    atualizarBotaoConfirmar();
+    if (CARRINHO.length === 0) return showToast('⚠️ Carrinho vazio', 'error');
+    if (!JOGADOR_SEL) return showToast('⚠️ Selecione um jogador antes', 'error');
+    // Confirma intenção
+    if (!confirm('Lançar na comanda de ' + JOGADOR_SEL.nome + '?\nTotal: ' + fmtMoney(CARRINHO.reduce((s,i)=>s+i.subtotal,0)))) return;
+    confirmarVenda(true); // true = é comanda
   });
 
-  // Confirmar
-  $('btnConfirmar').addEventListener('click', confirmarVenda);
+  // Confirmar (à vista) — usa o pagto selecionado
+  $('btnConfirmar').addEventListener('click', () => confirmarVenda(false));
 
   // Config modal
   $('btnConfig').addEventListener('click', () => $('modalConfig').classList.add('open'));
@@ -1324,25 +1346,41 @@ function setupEventListeners() {
 function atualizarBotaoConfirmar() {
   const temItens = CARRINHO.length > 0;
   const temJogador = !!JOGADOR_SEL;
-  const temPagto = MODO_COMANDA || !!METODO_PAGTO;
-  $('btnConfirmar').disabled = !(temItens && temJogador && temPagto);
+  const btn = $('btnConfirmar');
 
-  if (MODO_COMANDA) {
-    $('btnConfirmar').textContent = '📒 Lançar na Comanda';
-  } else {
-    $('btnConfirmar').textContent = '✓ Confirmar Venda';
+  if (!temItens) {
+    btn.disabled = true;
+    btn.textContent = 'Adicione produtos ao carrinho';
+    return;
   }
+  if (!temJogador) {
+    btn.disabled = true;
+    btn.textContent = 'Selecione um jogador';
+    return;
+  }
+  if (!METODO_PAGTO) {
+    btn.disabled = true;
+    btn.textContent = 'Selecione forma de pagamento';
+    return;
+  }
+  // Tudo ok pra venda à vista
+  const labelPagto = {
+    dinheiro: 'Dinheiro', pix: 'PIX', debito: 'Débito', credito: 'Crédito'
+  }[METODO_PAGTO] || METODO_PAGTO;
+  btn.disabled = false;
+  btn.textContent = '✓ Confirmar venda à vista (' + labelPagto + ')';
 }
 
 // ============================================================
 // CONFIRMAR VENDA
 // ============================================================
-async function confirmarVenda() {
+async function confirmarVenda(eVendaComanda) {
   if (CARRINHO.length === 0) return showToast('⚠️ Carrinho vazio', 'error');
   if (!JOGADOR_SEL) return showToast('⚠️ Selecione um jogador', 'error');
-  if (!MODO_COMANDA && !METODO_PAGTO) return showToast('⚠️ Selecione forma de pagamento', 'error');
+  if (!eVendaComanda && !METODO_PAGTO) return showToast('⚠️ Selecione forma de pagamento ou Lançar na Comanda', 'error');
 
   $('btnConfirmar').disabled = true;
+  $('btnComanda').disabled = true;
   setLoading(true);
 
   try {
@@ -1355,8 +1393,8 @@ async function confirmarVenda() {
       p_token: TOKEN,
       p_user_id: SESSAO.user_id,
       p_jogador_id: JOGADOR_SEL.id,
-      p_tipo: MODO_COMANDA ? 'comanda' : 'direta',
-      p_forma_pagto: MODO_COMANDA ? null : METODO_PAGTO,
+      p_tipo: eVendaComanda ? 'comanda' : 'direta',
+      p_forma_pagto: eVendaComanda ? null : METODO_PAGTO,
       p_itens: itensPayload
     });
 
@@ -1374,17 +1412,15 @@ async function confirmarVenda() {
       return showToast(mapa[data?.erro] || ('Erro: ' + (data?.erro || 'desconhecido')), 'error');
     }
 
-    // Sucesso!
-    const tipoTxt = MODO_COMANDA ? 'Lançado na comanda' : 'Venda registrada';
-    showToast(`✅ ${tipoTxt}: ${fmtMoney(data.total)}`, 'success');
+    // Sucesso
+    const tipoTxt = eVendaComanda ? '📒 Lançado na comanda' : '✅ Venda à vista registrada';
+    showToast(`${tipoTxt}: ${fmtMoney(data.total)}`, 'success');
 
-    // Reset
+    // Reset completo (limpa tudo, pronto pro próximo cliente)
     CARRINHO = [];
     JOGADOR_SEL = null;
     METODO_PAGTO = null;
-    MODO_COMANDA = false;
     document.querySelectorAll('.pagto-btn').forEach(x => x.classList.remove('active'));
-    $('btnComanda').classList.remove('active');
     $('jogadorSelected').classList.remove('show');
     $('inpJogador').style.display = '';
     $('inpJogador').value = '';
@@ -1397,6 +1433,7 @@ async function confirmarVenda() {
     showToast('❌ Erro ao registrar: ' + msg, 'error');
   } finally {
     setLoading(false);
+    $('btnComanda').disabled = false;
     atualizarBotaoConfirmar();
   }
 }
