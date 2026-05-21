@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StackBar — Painel</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0c1223;
+    color: #e4e4e7;
+    font-family: 'Manrope', 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  /* === HEADER === */
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding-top: 20px;
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    margin: 4px 0 0 0;
+    color: #71717a;
+    font-size: 14px;
+  }
+
+  /* === LOGIN === */
+  #screen-login {
+    max-width: 380px;
+    margin: 80px auto 0;
+  }
+  .login-card {
+    background: #131a2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+  .login-card label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #a1a1aa;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .login-card input {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .login-card input:focus {
+    border-color: #7c3aed;
+    outline: none;
+  }
+  .erro-login {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: center;
+    display: none;
+  }
+  .erro-login.show { display: block; }
+
+  /* === BOTÕES === */
+  .btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.12s, opacity 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
+  }
+  .btn-secondary {
+    background: rgba(124, 58, 237, 0.15);
+    color: #c4b5fd;
+    border: 1px solid rgba(124, 58, 237, 0.3);
+  }
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  .btn-success {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(22, 163, 74, 0.3);
+  }
+  .btn-large {
+    width: 100%;
+    padding: 14px;
+    font-size: 14px;
+    justify-content: center;
+  }
+
+  /* === CARDS === */
+  .card {
+    background: #131a2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .card-title {
+    margin: 0 0 14px 0;
+    color: #a855f7;
+    font-size: 15px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-desc {
+    color: #9ca3af;
+    font-size: 13px;
+    margin: -8px 0 16px 0;
+  }
+
+  /* === LINK BOX === */
+  .link-box {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    color: #93c5fd;
+    word-break: break-all;
+    margin-bottom: 14px;
+    user-select: all;
+  }
+  .link-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* === STATS === */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+  }
+  .stat-card {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-card .label {
+    font-size: 10px;
+    color: #71717a;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .stat-card .valor {
+    font-size: 26px;
+    font-weight: 800;
+    margin-top: 4px;
+    color: #a855f7;
+  }
+  .stat-card.verde .valor { color: #4ade80; }
+  .stat-card.amarelo .valor { color: #fbbf24; }
+
+  /* === CONFIG === */
+  .config-row {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .config-row:last-child { border-bottom: none; }
+  .config-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .config-info strong {
+    color: #e4e4e7;
+    font-size: 14px;
+    font-weight: 700;
+    display: block;
+  }
+  .config-info span {
+    color: #71717a;
+    font-size: 12px;
+    margin-top: 2px;
+    display: block;
+  }
+  .switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .switch.on { background: #7c3aed; }
+  .switch.on::after { transform: translateX(20px); }
+
+  .papeis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .papel-chip {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #d4d4d8;
+    transition: all 0.15s;
+  }
+  .papel-chip:hover {
+    border-color: rgba(124, 58, 237, 0.4);
+  }
+  .papel-chip.checked {
+    background: rgba(124, 58, 237, 0.15);
+    border-color: #7c3aed;
+    color: #c4b5fd;
+  }
+  .papel-chip input[type=checkbox] {
+    display: none;
+  }
+  .papel-chip .check-mark {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .papel-chip.checked .check-mark {
+    background: #7c3aed;
+    border-color: #7c3aed;
+  }
+  .papel-chip.checked .check-mark::after {
+    content: '✓';
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  /* === TOAST === */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #131a2e;
+    border: 1px solid rgba(124, 58, 237, 0.4);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 999;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: rgba(34, 197, 94, 0.5); }
+  #toast.error { border-color: rgba(239, 68, 68, 0.5); }
+
+  /* === EMPTY === */
+  .empty {
+    text-align: center;
+    padding: 30px 16px;
+    color: #71717a;
+    font-size: 13px;
+  }
+
+  /* === VENDA RECENTE === */
+  .venda-recente {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .venda-recente .info { flex: 1; min-width: 0; }
+  .venda-recente .nome { font-weight: 700; color: #e4e4e7; }
+  .venda-recente .meta { font-size: 11px; color: #71717a; margin-top: 2px; }
+  .venda-recente .valor {
+    font-weight: 800;
+    color: #a855f7;
+    flex-shrink: 0;
+  }
+  .badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge.direta { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+  .badge.comanda { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+  #loading {
+    position: fixed; inset: 0;
+    background: rgba(12, 18, 35, 0.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200;
+  }
+  #loading.show { display: flex; }
+  .spinner {
+    width: 42px; height: 42px;
+    border: 3px solid rgba(124, 58, 237, 0.2);
+    border-top-color: #a855f7;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- =========== LOGIN =========== -->
+<div id="screen-login">
+  <div class="header">
+    <h1>🍻 StackBar</h1>
+    <p>Painel de Configuração</p>
+  </div>
+
+  <div class="login-card">
+    <label>E-mail</label>
+    <input type="email" id="inpEmail" autocomplete="email" placeholder="seu@email.com">
+    <label>Senha</label>
+    <input type="password" id="inpSenha" autocomplete="current-password" placeholder="••••••••">
+    <button class="btn btn-primary btn-large" id="btnLogin">Entrar</button>
+    <div class="erro-login" id="erroLogin"></div>
+  </div>
+</div>
+
+<!-- =========== PAINEL =========== -->
+<div id="screen-painel" style="display:none;">
+  <div class="container">
+    <div class="header">
+      <h1>🍻 StackBar</h1>
+      <p>Painel de Configuração • <span id="clubeNome">—</span></p>
+    </div>
+
+    <!-- LINK DE ACESSO -->
+    <div class="card">
+      <h3 class="card-title">🔗 Link de acesso para os operadores</h3>
+      <p class="card-desc">Compartilhe este link com o pessoal do bar. Eles abrem 1 vez no celular/tablet e instalam como app na tela inicial.</p>
+      <div class="link-box" id="linkBox">Carregando…</div>
+      <div class="link-actions">
+        <button class="btn btn-primary" id="btnCopiarLink">📋 Copiar Link</button>
+        <button class="btn btn-secondary" id="btnCopiarToken">🔑 Copiar Token</button>
+        <button class="btn btn-danger" id="btnRevogar">↻ Revogar e gerar novo</button>
+      </div>
+      <div class="link-box" id="tokenBox" style="margin-top:10px;display:none;"></div>
+    </div>
+
+    <!-- ATIVIDADE -->
+    <div class="card">
+      <h3 class="card-title">📊 Atividade</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="label">Vendas hoje</div>
+          <div class="valor" id="stHoje">0</div>
+        </div>
+        <div class="stat-card verde">
+          <div class="label">Faturamento</div>
+          <div class="valor" id="stFaturamento">R$ 0,00</div>
+        </div>
+        <div class="stat-card amarelo">
+          <div class="label">Comandas abertas</div>
+          <div class="valor" id="stComandas">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Operadores hoje</div>
+          <div class="valor" id="stOperadores">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VENDAS RECENTES -->
+    <div class="card">
+      <h3 class="card-title">🕒 Últimas vendas (hoje)</h3>
+      <div id="vendasRecentes" class="empty">Nenhuma venda hoje ainda.</div>
+    </div>
+
+    <!-- CONFIGURAÇÕES -->
+    <div class="card">
+      <h3 class="card-title">⚙️ Configurações</h3>
+      <div class="config-row">
+        <div class="config-info">
+          <strong>Permitir venda com estoque zerado/negativo</strong>
+          <span>Útil quando o clube não controla estoque rigorosamente</span>
+        </div>
+        <div class="switch" id="swEstoque" data-cfg="permitir_estoque_negativo"></div>
+      </div>
+      <div class="config-row" style="flex-direction:column;align-items:stretch;">
+        <div class="config-info">
+          <strong>Papéis autorizados a usar o app</strong>
+          <span>Apenas usuários com esses papéis conseguirão fazer login no app PWA</span>
+        </div>
+        <div class="papeis-grid" id="papeisGrid">
+          <!-- chips renderizados via JS -->
+        </div>
+      </div>
+      <div style="margin-top:18px;">
+        <button class="btn btn-success btn-large" id="btnSalvar">💾 Salvar configurações</button>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:20px;">
+      <button class="btn btn-secondary" id="btnLogout">↩ Sair</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="loading"><div class="spinner"></div></div>
+
+<script>
+'use strict';
+
+// ============================================================
+// CONFIG GLOBAL
+// ============================================================
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+
+const PAPEIS_DISPONIVEIS = [
+  { id: 'admin',    label: '👑 Admin' },
+  { id: 'gerente',  label: '🎯 Gerente' },
+  { id: 'caixa',    label: '💰 Caixa' },
+  { id: 'recepcao', label: '📋 Recepção' },
+  { id: 'dealer',   label: '🃏 Dealer' },
+];
+
+let CLUBE_ID = null;
+let CLUBE_NOME = null;
+let TOKEN_ATUAL = null;
+let CONFIG = {
+  permitir_estoque_negativo: false,
+  papeis_permitidos: ['admin', 'caixa']
+};
+
+const $ = (id) => document.getElementById(id);
+
+// ============================================================
+// HELPERS
+// ============================================================
+function fmtMoney(v) {
+  return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ',');
+}
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c]);
+}
+function showToast(msg, kind = '') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = '';
+  if (kind) t.classList.add(kind);
+  void t.offsetWidth;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function setLoading(on) {
+  $('loading').classList.toggle('show', on);
+}
+function todayStartIso() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+// ============================================================
+// BOOTSTRAP
+// ============================================================
+(async function boot() {
+  // Tenta restaurar sessão
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    await entrarPainel(session.user);
+  }
+})();
+
+// ============================================================
+// LOGIN
+// ============================================================
+$('btnLogin').addEventListener('click', doLogin);
+$('inpSenha').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+$('inpEmail').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('inpSenha').focus(); });
+
+async function doLogin() {
+  const email = $('inpEmail').value.trim();
+  const senha = $('inpSenha').value;
+  if (!email || !senha) {
+    return mostraErroLogin('Preencha e-mail e senha');
+  }
+
+  $('btnLogin').disabled = true;
+  $('erroLogin').classList.remove('show');
+  setLoading(true);
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
+    if (error) throw error;
+    await entrarPainel(data.user);
+  } catch (err) {
+    console.error('Login error:', err);
+    mostraErroLogin('E-mail ou senha incorretos');
+  } finally {
+    setLoading(false);
+    $('btnLogin').disabled = false;
+  }
+}
+
+function mostraErroLogin(msg) {
+  const el = $('erroLogin');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+// ============================================================
+// PAINEL — entrada
+// ============================================================
+async function entrarPainel(user) {
+  // Busca dados do usuário (clube_id, papel)
+  const { data: userData, error: userErr } = await sb
+    .from('usuarios')
+    .select('id, nome, papel, clube_id')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (userErr || !userData) {
+    mostraErroLogin('Usuário não encontrado no sistema');
+    await sb.auth.signOut();
+    return;
+  }
+
+  // Só admin/gerente acessa o painel
+  if (!['admin', 'gerente'].includes(userData.papel)) {
+    mostraErroLogin('🔒 Acesso restrito a administradores e gerentes');
+    await sb.auth.signOut();
+    return;
+  }
+
+  CLUBE_ID = userData.clube_id;
+
+  // Busca nome do clube
+  const { data: clubeData } = await sb
+    .from('clubes')
+    .select('nome')
+    .eq('id', CLUBE_ID)
+    .maybeSingle();
+  CLUBE_NOME = clubeData?.nome || 'Clube';
+  $('clubeNome').textContent = CLUBE_NOME;
+
+  $('screen-login').style.display = 'none';
+  $('screen-painel').style.display = 'block';
+
+  await carregarTudo();
+  setupListeners();
+}
+
+// ============================================================
+// CARREGAR TUDO
+// ============================================================
+async function carregarTudo() {
+  setLoading(true);
+  try {
+    await Promise.all([
+      carregarToken(),
+      carregarConfig(),
+      carregarAtividade()
+    ]);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ============================================================
+// TOKEN
+// ============================================================
+async function carregarToken() {
+  // Busca o token ativo atual; se não existir, gera um automaticamente
+  const { data, error } = await sb
+    .from('stackbar_tokens')
+    .select('token')
+    .eq('clube_id', CLUBE_ID)
+    .eq('ativo', true)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Erro carregar token:', error);
+    $('linkBox').textContent = 'Erro ao carregar token';
+    return;
+  }
+
+  if (data?.token) {
+    TOKEN_ATUAL = data.token;
+  } else {
+    // gera novo
+    const { data: novoToken, error: errGen } = await sb.rpc('stackbar_gerar_token', { p_clube_id: CLUBE_ID });
+    if (errGen) {
+      console.error('Erro gerar token:', errGen);
+      $('linkBox').textContent = 'Erro ao gerar token';
+      return;
+    }
+    TOKEN_ATUAL = novoToken;
+  }
+  renderTokenBox();
+}
+
+function renderTokenBox() {
+  const url = `${location.origin}/bar.html?t=${TOKEN_ATUAL}`;
+  $('linkBox').textContent = url;
+  $('tokenBox').textContent = TOKEN_ATUAL;
+}
+
+async function revogarToken() {
+  if (!confirm('Revogar o token atual e gerar um novo?\n\n⚠️ Os operadores que estão logados terão que entrar com o link novo.')) return;
+  setLoading(true);
+  try {
+    const { data, error } = await sb.rpc('stackbar_gerar_token', { p_clube_id: CLUBE_ID });
+    if (error) throw error;
+    TOKEN_ATUAL = data;
+    renderTokenBox();
+    showToast('✅ Token novo gerado', 'success');
+  } catch (err) {
+    console.error('Revogar token error:', err);
+    showToast('❌ Erro ao revogar token', 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ============================================================
+// CONFIG
+// ============================================================
+async function carregarConfig() {
+  const { data, error } = await sb
+    .from('stackbar_config')
+    .select('*')
+    .eq('clube_id', CLUBE_ID)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Erro carregar config:', error);
+    return;
+  }
+
+  if (data) {
+    CONFIG.permitir_estoque_negativo = !!data.permitir_estoque_negativo;
+    CONFIG.papeis_permitidos = Array.isArray(data.papeis_permitidos)
+      ? data.papeis_permitidos
+      : ['admin', 'caixa'];
+  }
+  renderConfig();
+}
+
+function renderConfig() {
+  // Switch estoque
+  $('swEstoque').classList.toggle('on', CONFIG.permitir_estoque_negativo);
+
+  // Chips de papéis
+  const grid = $('papeisGrid');
+  grid.innerHTML = PAPEIS_DISPONIVEIS.map(p => {
+    const checked = CONFIG.papeis_permitidos.includes(p.id);
+    return `
+      <label class="papel-chip ${checked ? 'checked' : ''}" data-papel="${p.id}">
+        <span class="check-mark"></span>
+        <span>${p.label}</span>
+      </label>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('.papel-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const papel = chip.dataset.papel;
+      if (CONFIG.papeis_permitidos.includes(papel)) {
+        CONFIG.papeis_permitidos = CONFIG.papeis_permitidos.filter(p => p !== papel);
+      } else {
+        CONFIG.papeis_permitidos.push(papel);
+      }
+      chip.classList.toggle('checked');
+    });
+  });
+}
+
+async function salvarConfig() {
+  if (CONFIG.papeis_permitidos.length === 0) {
+    return showToast('⚠️ Selecione pelo menos 1 papel autorizado', 'error');
+  }
+
+  setLoading(true);
+  try {
+    const { data, error } = await sb.rpc('stackbar_salvar_config', {
+      p_clube_id: CLUBE_ID,
+      p_permitir_estoque_negativo: CONFIG.permitir_estoque_negativo,
+      p_papeis_permitidos: CONFIG.papeis_permitidos
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error('Falha ao salvar');
+    showToast('✅ Configurações salvas', 'success');
+  } catch (err) {
+    console.error('Salvar config error:', err);
+    showToast('❌ Erro ao salvar', 'error');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ============================================================
+// ATIVIDADE
+// ============================================================
+async function carregarAtividade() {
+  const desde = todayStartIso();
+
+  // Vendas hoje (via tabela stackbar_vendas — RLS já garante filtro por clube)
+  const { data: vendas, error } = await sb
+    .from('stackbar_vendas')
+    .select('id, jogador_nome, operador_nome, tipo, forma_pagto, total, criado_em')
+    .eq('clube_id', CLUBE_ID)
+    .gte('criado_em', desde)
+    .order('criado_em', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('Erro carregar vendas:', error);
+    return;
+  }
+
+  const lista = vendas || [];
+  const qtd = lista.length;
+  const total = lista.reduce((s, v) => s + Number(v.total || 0), 0);
+  const operadoresUnicos = new Set(lista.map(v => v.operador_nome).filter(Boolean)).size;
+
+  $('stHoje').textContent = qtd;
+  $('stFaturamento').textContent = fmtMoney(total);
+  $('stOperadores').textContent = operadoresUnicos;
+
+  // Comandas abertas (consulta direta na bar_comandas)
+  const { count } = await sb
+    .from('bar_comandas')
+    .select('id', { count: 'exact', head: true })
+    .eq('clube_id', CLUBE_ID)
+    .eq('status', 'aberta');
+  $('stComandas').textContent = count || 0;
+
+  // Vendas recentes
+  if (qtd === 0) {
+    $('vendasRecentes').className = 'empty';
+    $('vendasRecentes').innerHTML = 'Nenhuma venda hoje ainda.';
+  } else {
+    $('vendasRecentes').className = '';
+    $('vendasRecentes').innerHTML = lista.map(v => {
+      const hora = new Date(v.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const formaTxt = v.tipo === 'comanda' ? 'Comanda' : (v.forma_pagto || '').toUpperCase();
+      return `
+        <div class="venda-recente">
+          <div class="info">
+            <div class="nome">
+              ${esc(v.jogador_nome || '—')}
+              <span class="badge ${v.tipo}">${v.tipo === 'comanda' ? 'COMANDA' : 'À VISTA'}</span>
+            </div>
+            <div class="meta">${hora} • ${esc(v.operador_nome || '—')} • ${esc(formaTxt)}</div>
+          </div>
+          <div class="valor">${fmtMoney(v.total)}</div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+// ============================================================
+// EVENTOS UI
+// ============================================================
+function setupListeners() {
+  // Copiar link
+  $('btnCopiarLink').addEventListener('click', async () => {
+    const url = `${location.origin}/bar.html?t=${TOKEN_ATUAL}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('✅ Link copiado!', 'success');
+    } catch {
+      showToast('Copie manualmente do campo', 'error');
+    }
+  });
+
+  // Copiar token
+  $('btnCopiarToken').addEventListener('click', async () => {
+    $('tokenBox').style.display = 'block';
+    try {
+      await navigator.clipboard.writeText(TOKEN_ATUAL);
+      showToast('🔑 Token copiado!', 'success');
+    } catch {
+      showToast('Copie manualmente do campo', 'error');
+    }
+  });
+
+  // Revogar token
+  $('btnRevogar').addEventListener('click', revogarToken);
+
+  // Switch estoque
+  $('swEstoque').addEventListener('click', () => {
+    CONFIG.permitir_estoque_negativo = !CONFIG.permitir_estoque_negativo;
+    $('swEstoque').classList.toggle('on', CONFIG.permitir_estoque_negativo);
+  });
+
+  // Salvar config
+  $('btnSalvar').addEventListener('click', salvarConfig);
+
+  // Logout
+  $('btnLogout').addEventListener('click', async () => {
+    if (!confirm('Sair do painel?')) return;
+    await sb.auth.signOut();
+    location.reload();
+  });
+}
+
+</script>
+</body>
+</html>
