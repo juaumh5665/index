@@ -1322,6 +1322,102 @@ body.tema-claro [style*="background: #14532d"] {
     background: rgba(34,197,94,.1) !important;
     color: #166534 !important;
 }
+
+/* ============================================================
+ * LOGIN/SIGNUP/CONVITE: SEMPRE escuro (identidade do produto)
+ * ============================================================
+ * As telas de autenticação mantêm visual escuro/cinematográfico
+ * independente do tema escolhido no app. Resolve:
+ *  - Inputs escuros num fundo claro (parecia bug)
+ *  - Hero com imagem escura ao lado de card claro (quebrado)
+ *  - Letras pouco visíveis por contraste estranho
+ *
+ * IMPORTANTE: deve vir DEPOIS do v3 acima — isso anula o que o v3
+ * teria feito DENTRO dessas telas, mantendo-as escuras sempre.
+ * ============================================================ */
+body.tema-claro #login-screen,
+body.tema-claro #signup-screen,
+body.tema-claro #invite-screen,
+body.tema-claro #convite-screen {
+    background: #0a0a0b !important;
+    color: #e4e4e7 !important;
+}
+body.tema-claro #login-screen [style*="background:#0a0a0"],
+body.tema-claro #login-screen [style*="background: #0a0a0"],
+body.tema-claro #login-screen [style*="background:#000"],
+body.tema-claro #signup-screen [style*="background:#0a0a0"],
+body.tema-claro #invite-screen [style*="background:#0a0a0"],
+body.tema-claro #convite-screen [style*="background:#0a0a0"] {
+    background: #0a0a0b !important;
+}
+body.tema-claro #login-screen [style*="background:#0d0d0f"],
+body.tema-claro #signup-screen [style*="background:#0d0d0f"] {
+    background: #0d0d0f !important;
+}
+body.tema-claro #login-screen [style*="background:#0f0f12"],
+body.tema-claro #signup-screen [style*="background:#0f0f12"],
+body.tema-claro #invite-screen [style*="background:#0f0f12"],
+body.tema-claro #convite-screen [style*="background:#0f0f12"] {
+    background: #0f0f12 !important;
+}
+body.tema-claro #login-screen [style*="background:#111113"],
+body.tema-claro #signup-screen [style*="background:#111113"],
+body.tema-claro #invite-screen [style*="background:#111113"],
+body.tema-claro #convite-screen [style*="background:#111113"] {
+    background: #111113 !important;
+}
+body.tema-claro #login-screen [style*="background:#18181b"],
+body.tema-claro #signup-screen [style*="background:#18181b"],
+body.tema-claro #invite-screen [style*="background:#18181b"],
+body.tema-claro #convite-screen [style*="background:#18181b"] {
+    background: #18181b !important;
+}
+body.tema-claro #login-screen [style*="1px solid #1e1e23"],
+body.tema-claro #login-screen [style*="1px solid #27272a"],
+body.tema-claro #login-screen [style*="1px dashed #27272a"],
+body.tema-claro #signup-screen [style*="1px solid #1e1e23"],
+body.tema-claro #signup-screen [style*="1px solid #27272a"],
+body.tema-claro #signup-screen [style*="1px dashed #27272a"],
+body.tema-claro #invite-screen [style*="1px solid #1e1e23"],
+body.tema-claro #invite-screen [style*="1px solid #27272a"],
+body.tema-claro #convite-screen [style*="1px solid #1e1e23"] {
+    border-color: inherit !important;
+}
+body.tema-claro #login-screen [style*="color:#fff"],
+body.tema-claro #login-screen [style*="color: #fff"],
+body.tema-claro #login-screen [style*="color:#fafafa"],
+body.tema-claro #login-screen [style*="color:#e4e4e7"],
+body.tema-claro #signup-screen [style*="color:#fff"],
+body.tema-claro #signup-screen [style*="color:#e4e4e7"],
+body.tema-claro #invite-screen [style*="color:#fff"],
+body.tema-claro #convite-screen [style*="color:#fff"] {
+    color: #fafafa !important;
+}
+body.tema-claro #login-screen [style*="color:#a1a1aa"],
+body.tema-claro #login-screen [style*="color: #a1a1aa"],
+body.tema-claro #signup-screen [style*="color:#a1a1aa"],
+body.tema-claro #invite-screen [style*="color:#a1a1aa"],
+body.tema-claro #convite-screen [style*="color:#a1a1aa"] {
+    color: #a1a1aa !important;
+}
+body.tema-claro #login-screen [style*="color:#71717a"],
+body.tema-claro #login-screen [style*="color: #71717a"],
+body.tema-claro #signup-screen [style*="color:#71717a"],
+body.tema-claro #invite-screen [style*="color:#71717a"],
+body.tema-claro #convite-screen [style*="color:#71717a"] {
+    color: #71717a !important;
+}
+body.tema-claro #login-screen [style*="color:#52525b"],
+body.tema-claro #login-screen [style*="color: #52525b"],
+body.tema-claro #signup-screen [style*="color:#52525b"],
+body.tema-claro #invite-screen [style*="color:#52525b"],
+body.tema-claro #convite-screen [style*="color:#52525b"] {
+    color: #52525b !important;
+}
+body.tema-claro #login-screen [style*="color:#d4d4d8"],
+body.tema-claro #login-screen [style*="color: #d4d4d8"] {
+    color: #d4d4d8 !important;
+}
 </style>
 </head>
 <body class="overflow-hidden">
@@ -7601,10 +7697,21 @@ async function sincronizarEstado() {
                 const { error: errC } = await sb.from('bar_comandas').upsert(comandasUI.map(_comandaToDb));
                 if (errC) { console.warn('Sync bar_comandas:', errC); }
                 else {
-                    // Sync itens (delete-then-insert para cada comanda)
+                    // Sync itens — UPSERT + DELETE SELETIVO (à prova de falhas)
+                    //
+                    // ⚠️ ANTES era DELETE-then-INSERT — se a rede caísse entre o DELETE
+                    // e o INSERT, a comanda perdia TODOS os itens. Agora:
+                    //   a) Garante IDs estáveis nos itens (se faltar, gera)
+                    //   b) UPSERT do estado atual (atualiza existentes + insere novos)
+                    //   c) DELETE apenas dos IDs que sumiram do estado local
+                    //
+                    // Se qualquer passo falhar, NADA é perdido — só fica desatualizado
+                    // por alguns segundos até o próximo sync, e marca a comanda como suja.
                     for (const c of comandasUI) {
                         try {
-                            await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id);
+                            // Garante IDs estáveis nos itens (defensivo)
+                            (c.itens || []).forEach(it => { if (!it.id || !_isUuid(it.id)) it.id = _genUuid(); });
+
                             if (c.itens && c.itens.length) {
                                 const itensRows = c.itens.map(it => {
                                     const prod = barProdutos.find(p => p.id === it.produtoId);
@@ -7620,7 +7727,7 @@ async function sincronizarEstado() {
                                     }
                                     const qtd = Number(it.qtd || 1);
                                     return {
-                                        id: it.id || _genUuid(),
+                                        id: it.id,
                                         comanda_id: c.id,
                                         clube_id: sbClube.id,
                                         produto_id: it.produtoId || null,
@@ -7631,9 +7738,28 @@ async function sincronizarEstado() {
                                         ts: it.ts ? new Date(it.ts).toISOString() : new Date().toISOString(),
                                     };
                                 });
-                                await sb.from('bar_comanda_itens').insert(itensRows);
+                                const { error: errIt } = await sb.from('bar_comanda_itens').upsert(itensRows);
+                                if (errIt) throw new Error('Upsert itens: ' + errIt.message);
+
+                                // DELETE seletivo: remove só os IDs que sumiram do estado local
+                                const idsLocais = c.itens.map(it => it.id);
+                                if (idsLocais.length) {
+                                    await sb.from('bar_comanda_itens')
+                                        .delete()
+                                        .eq('comanda_id', c.id)
+                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                }
+                            } else {
+                                // Estado local vazio — só aqui é seguro apagar tudo
+                                await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id);
                             }
-                        } catch (e) { console.warn('Sync itens da comanda:', e.message); }
+                        } catch (e) {
+                            // ⚠️ Erro de sync NÃO apaga itens locais — re-marca a comanda
+                            // como suja pra retentar no próximo sync
+                            console.error('[SYNC] ❌ Falha sync itens comanda ' + c.id + ':', e.message);
+                            if (typeof _markDirty === 'function') _markDirty('barComandas', c.id);
+                            if (typeof showToast === 'function') showToast('⚠️ Sync de comanda incompleto — retentando...');
+                        }
                     }
                     _syncQueue.barComandas.clear();
                 }
@@ -18131,7 +18257,7 @@ function openModalEntrada(idx) {
         const jaElim = eliminadosIds.has(j.id);
         const jaEntrou = entriesIds.has(j.id);
         // Mostra todos, filtrando lógica no submit
-        sel.innerHTML += `<option value="${j.id}" ${jaElim?'':''}>${j.nome}${jaElim?' (elim.)': jaEntrou?' (inscrito)':''}</option>`;
+        sel.innerHTML += `<option value="${esc(j.id)}" ${jaElim?'':''}>${esc(j.nome)}${jaElim?' (elim.)': jaEntrou?' (inscrito)':''}</option>`;
     });
     
     // Monta opções iniciais (sem jogador selecionado ainda)
@@ -18443,7 +18569,7 @@ function openModalEliminar(idx) {
 
     ativos.forEach(id => {
         const j = jogadores.find(j => j.id === id);
-        sel.innerHTML += `<option value="${id}">${j ? j.nome : 'Desconhecido'}</option>`;
+        sel.innerHTML += `<option value="${esc(id)}">${esc(j ? j.nome : 'Desconhecido')}</option>`;
     });
 
     const posicao = ativos.length;
@@ -21778,7 +21904,7 @@ function abrirAddJogadorCash(mesaId) {
 
     if (!disponiveis.length) return showToast('⚠️ Todos os jogadores cadastrados já estão na mesa');
 
-    sel.innerHTML = disponiveis.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('');
+    sel.innerHTML = disponiveis.map(j => `<option value="${esc(j.id)}">${esc(j.nome)}${j.apelido?' ('+esc(j.apelido)+')':''}</option>`).join('');
     document.getElementById('acj-buyin-range').innerText = `Buy-in permitido: R$ ${m.bmin} – R$ ${m.bmax}`;
     document.getElementById('acj-valor').value = m.bmin;
 
@@ -24312,7 +24438,7 @@ function confirmarDepositoNoModal() {
 // ============================================================
 function openModalDepositoRapido() {
     const sel = document.getElementById('dep-jogador');
-    sel.innerHTML = jogadores.map(j => `<option value="${j.id}">${j.nome}${j.apelido?' ('+j.apelido+')':''}</option>`).join('') || '<option>Nenhum jogador</option>';
+    sel.innerHTML = jogadores.map(j => `<option value="${esc(j.id)}">${esc(j.nome)}${j.apelido?' ('+esc(j.apelido)+')':''}</option>`).join('') || '<option>Nenhum jogador</option>';
     document.getElementById('dep-valor').value = '';
     document.getElementById('dep-obs').value = '';
     renderMetodosPagamento('dep-metodos', 'quick', false);
