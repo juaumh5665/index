@@ -2102,6 +2102,9 @@ document.addEventListener('DOMContentLoaded', function(){
             <a href="stackclock-painel.html" id="nav-stackclock" target="_blank" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;text-decoration:none;">
                 <i class="fa-solid fa-stopwatch nav-ico" style="width:16px;color:#a855f7;"></i> StackClock
             </a>
+            <a href="stackbar-painel.html" id="nav-stackbar" target="_blank" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;text-decoration:none;">
+                <i class="fa-solid fa-beer-mug-empty nav-ico" style="width:16px;color:#a855f7;"></i> StackBar
+            </a>
             <div onclick="showPage('assinatura')" id="nav-assinatura" class="nav-item" style="display:none;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-credit-card nav-ico" style="width:16px;color:#facc15;"></i> Minha Assinatura
                 <span id="nav-assinatura-badge" style="display:none;margin-left:auto;background:#dc2626;color:white;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;"></span>
@@ -6038,10 +6041,10 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock'] },
-    dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash'] },
-    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot','ticketsvouchers'] },
-    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar'] },
+    dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash','stackbar'] },
+    caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot','ticketsvouchers','stackbar'] },
+    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa','stackbar'] },
 };
 
 // Seed admin padrão + limpeza de dados corrompidos
@@ -13753,6 +13756,7 @@ const FEATURE_REQUIREMENTS = {
     'fechamento':  'feature_fechamento_dia',
     'relatorios':  'feature_relatorios_avancados',
     'stackclock':  'feature_stackclock',
+    'stackbar':    'feature_stackbar',
 };
 
 // Retorna o objeto do plano atual do clube (ou null)
@@ -14262,6 +14266,7 @@ function _renderCardsPlanoNoModalExpirado() {
         if (p.feature_fechamento_dia) features.push('📊 Fechamento do dia');
         if (p.feature_relatorios_avancados) features.push('📈 Relatórios avançados');
         if (p.feature_stackclock) features.push('⏱ StackClock (Dealer App)');
+        if (p.feature_stackbar) features.push('🍻 StackBar (Bar App)');
         if (p.feature_multi_tv) features.push('📺 Multi-TV');
         if (p.feature_templates_torneio) features.push('📋 Templates de torneio');
         if (p.feature_suporte_prioritario) features.push('🛟 Suporte prioritário');
@@ -14434,6 +14439,7 @@ function renderPlanosGrid() {
         if (p.feature_api) features.push('✓ API');
         if (p.feature_white_label) features.push('✓ White-label');
         if (p.feature_stackclock) features.push('✓ StackClock (Dealer App)');
+        if (p.feature_stackbar) features.push('✓ StackBar (Bar App)');
         
         return `<div style="background:${isAtual ? cor + '22' : '#0d0d0f'};border:2px solid ${isAtual ? cor : '#27272a'};padding:1.5rem;border-radius:.75rem;position:relative;display:flex;flex-direction:column;min-height:480px;">
             ${isAtual ? `<div style="position:absolute;top:-10px;right:1rem;background:${cor};color:white;padding:.2rem .75rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;border-radius:.25rem;">PLANO ATUAL</div>` : ''}
@@ -15341,6 +15347,7 @@ async function adminCarregarPlanos() {
             if (p.feature_api) features.push('API');
             if (p.feature_white_label) features.push('White-label');
             if (p.feature_stackclock) features.push('StackClock');
+            if (p.feature_stackbar) features.push('StackBar');
             
             // Cor por id conhecido OU baseada na ordem (cores rotativas pra planos novos)
             const coresFixas = { basic: '#10b981', premium: '#f59e0b', pro: '#dc2626' };
@@ -15494,6 +15501,7 @@ function adminAbrirModalPlano(planoId) {
                     {key:'feature_api', label:'Acesso à API'},
                     {key:'feature_white_label', label:'White-label'},
                     {key:'feature_stackclock', label:'StackClock (Dealer App)'},
+                    {key:'feature_stackbar', label:'StackBar (Bar App)'},
                 ].map(f => `<label style="display:flex;align-items:center;gap:.5rem;background:#18181b;border:1px solid #27272a;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.85rem;">
                     <input type="checkbox" id="pl-${f.key}" ${plano?.[f.key] ? 'checked' : ''} style="cursor:pointer;width:16px;height:16px;">
                     <span>${f.label}</span>
@@ -15586,6 +15594,7 @@ async function adminSalvarPlano(novo) {
             feature_api: document.getElementById('pl-feature_api').checked,
             feature_white_label: document.getElementById('pl-feature_white_label').checked,
             feature_stackclock: document.getElementById('pl-feature_stackclock').checked,
+            feature_stackbar: document.getElementById('pl-feature_stackbar').checked,
             ativo: document.getElementById('pl-ativo').checked,
             updated_at: new Date().toISOString(),
         };
@@ -15909,6 +15918,7 @@ function applyPermissions() {
         'nav-usuarios':  'usuarios',
         'nav-config':    'config',
         'nav-stackclock':'stackclock',
+        'nav-stackbar':  'stackbar',
         'nav-assinatura':'assinatura',
         'nav-caixa':     'caixa',
         'nav-fechamento':'fechamento',
@@ -15955,6 +15965,7 @@ function _aplicarCadeadoSidebar(el, liberado, page) {
         'fechamento': 'Fechamento de Dia',
         'relatorios': 'Relatórios Avançados',
         'stackclock': 'StackClock',
+        'stackbar': 'StackBar',
     };
     
     if (liberado) {
@@ -15999,6 +16010,7 @@ function _renderSidebarLocks() {
         'nav-fechamento':  'fechamento',
         'nav-relatorios':  'relatorios',
         'nav-stackclock':  'stackclock',
+        'nav-stackbar':    'stackbar',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
         const el = document.getElementById(navId);
@@ -16025,6 +16037,7 @@ function showPage(page) {
             'fechamento': 'Fechamento de Dia',
             'relatorios': 'Relatórios Avançados',
             'stackclock': 'StackClock',
+            'stackbar': 'StackBar',
         };
         if (typeof mostrarModalUpgrade === 'function') {
             mostrarModalUpgrade(featureLabels[page] || page);

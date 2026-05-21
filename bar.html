@@ -525,6 +525,64 @@
     animation: spin 0.9s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* === PWA INSTALL BANNER === */
+  #pwa-banner {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+    padding: 14px 16px;
+    display: none; align-items: center; gap: 12px;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+    z-index: 998;
+    animation: slideUp 0.3s ease-out;
+  }
+  #pwa-banner.show { display: flex; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  #pwa-banner .pwa-icon {
+    width: 42px; height: 42px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #pwa-banner .pwa-icon svg { width: 22px; height: 22px; fill: #fff; }
+  #pwa-banner .pwa-text { flex: 1; min-width: 0; }
+  #pwa-banner .pwa-title { font-size: 14px; font-weight: 800; }
+  #pwa-banner .pwa-sub { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+  #pwa-banner button {
+    padding: 8px 14px; border-radius: 8px;
+    font-weight: 700; font-size: 13px;
+    flex-shrink: 0;
+  }
+  #pwa-banner .pwa-btn-install {
+    background: #fff; color: #6d28d9;
+  }
+  #pwa-banner .pwa-btn-dismiss {
+    background: rgba(255, 255, 255, 0.15); color: #fff;
+    padding: 8px 10px;
+  }
+
+  /* Modal de instruções iOS */
+  #ios-install-modal .modal-body {
+    font-size: 13px; line-height: 1.6;
+  }
+  #ios-install-modal .step {
+    background: rgba(0, 0, 0, 0.2); padding: 12px;
+    border-radius: 10px; margin-bottom: 8px;
+    display: flex; gap: 10px; align-items: center;
+  }
+  #ios-install-modal .step-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #7c3aed; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13px; flex-shrink: 0;
+  }
+  #ios-install-modal .ios-icon-share {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; vertical-align: middle;
+    background: rgba(124, 58, 237, 0.2); border-radius: 4px;
+    margin: 0 2px;
+  }
 </style>
 </head>
 <body>
@@ -670,6 +728,48 @@
 <div id="toast"></div>
 <div id="loading"><div class="spinner"></div></div>
 
+<!-- PWA INSTALL BANNER -->
+<div id="pwa-banner">
+  <div class="pwa-icon">
+    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+  </div>
+  <div class="pwa-text">
+    <div class="pwa-title">Instalar StackBar</div>
+    <div class="pwa-sub">Acesso rápido direto da sua tela inicial</div>
+  </div>
+  <button class="pwa-btn-install" id="btnPwaInstall">Instalar</button>
+  <button class="pwa-btn-dismiss" id="btnPwaDismiss">×</button>
+</div>
+
+<!-- MODAL: INSTRUÇÕES iOS -->
+<div class="modal" id="ios-install-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <strong>📱 Instalar no iPhone/iPad</strong>
+      <button class="modal-close" data-close="ios-install-modal">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span>Toque no botão <span class="ios-icon-share">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#a855f7"><path d="M12 2l-4 4h3v9h2V6h3l-4-4zm-7 17h14v-7h2v9H3v-9h2v7z"/></svg>
+        </span> <strong>Compartilhar</strong> no Safari (na barra inferior)</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span>Role pra baixo e toque em <strong>"Adicionar à Tela de Início"</strong></span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span>Toque em <strong>"Adicionar"</strong> no canto superior direito</span>
+      </div>
+      <div style="margin-top:14px;font-size:12px;color:#71717a;text-align:center;">
+        Pronto! O StackBar vai aparecer como app na tela inicial.
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -788,18 +888,29 @@ async function doLogin() {
   setLoading(true);
 
   try {
-    const { data, error } = await sb.rpc('stackbar_login_operador', {
-      p_token: TOKEN, p_email: email, p_senha: senha
+    // 1) Login nativo Supabase Auth (mesmo do StackOS)
+    const { data: authData, error: authErr } = await sb.auth.signInWithPassword({
+      email, password: senha
+    });
+    if (authErr || !authData?.user) {
+      return mostraErroLogin('❌ E-mail ou senha incorretos');
+    }
+
+    // 2) Valida que usuário pertence ao clube do token + papel autorizado
+    const { data, error } = await sb.rpc('stackbar_validar_acesso', {
+      p_token: TOKEN, p_user_id: authData.user.id
     });
     if (error) throw error;
 
     if (!data || !data.ok) {
       const mapa = {
-        token_invalido:        '⚠️ Token de acesso inválido',
-        credenciais_invalidas: '❌ E-mail ou senha incorretos',
-        usuario_outro_clube:   '🚫 Usuário não pertence a este clube',
-        papel_nao_autorizado:  '🔒 Seu papel (' + (data?.papel || '?') + ') não tem permissão pra usar o app'
+        token_invalido:        '⚠️ Token de acesso inválido — peça link novo',
+        usuario_nao_encontrado: '❌ Usuário não encontrado no sistema',
+        usuario_outro_clube:   '🚫 Você não pertence a este clube',
+        papel_nao_autorizado:  '🔒 Seu papel (' + (data?.papel || '?') + ') não tem permissão. Peça ao admin pra liberar no painel.'
       };
+      // Desfaz o login (auth nativo já criou sessão; desfazemos pra não confundir)
+      await sb.auth.signOut();
       return mostraErroLogin(mapa[data?.erro] || ('Erro: ' + (data?.erro || 'desconhecido')));
     }
 
@@ -1129,7 +1240,7 @@ function setupEventListeners() {
   $('btnLogout').addEventListener('click', () => {
     if (!confirm('Sair e voltar à tela de login?')) return;
     localStorage.removeItem('stackbar_sessao');
-    location.reload();
+    sb.auth.signOut().finally(() => location.reload());
   });
 
   // Sync
@@ -1284,6 +1395,73 @@ function renderHistorico() {
     `;
   }).join('');
 }
+
+// ============================================================
+// PWA INSTALL (Android via beforeinstallprompt, iOS via instruções)
+// ============================================================
+let _deferredPwaPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+}
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+function pwaWasDismissed() {
+  const v = localStorage.getItem('stackbar_pwa_dismissed');
+  if (!v) return false;
+  // re-mostra após 7 dias
+  const days = (Date.now() - parseInt(v)) / (1000 * 60 * 60 * 24);
+  return days < 7;
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredPwaPrompt = e;
+  if (!isStandalone() && !pwaWasDismissed()) {
+    setTimeout(() => $('pwa-banner').classList.add('show'), 1500);
+  }
+});
+
+// iOS não dispara beforeinstallprompt: mostra banner manualmente
+window.addEventListener('load', () => {
+  if (isIOS() && !isStandalone() && !pwaWasDismissed()) {
+    // adapta o banner pra iOS (instruções em vez de prompt nativo)
+    const banner = $('pwa-banner');
+    banner.querySelector('.pwa-title').textContent = 'Instalar StackBar no iPhone';
+    banner.querySelector('.pwa-sub').textContent = 'Toque pra ver como adicionar à tela inicial';
+    $('btnPwaInstall').textContent = 'Ver como';
+    setTimeout(() => banner.classList.add('show'), 1500);
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Botão "Instalar"
+  document.getElementById('btnPwaInstall')?.addEventListener('click', async () => {
+    if (isIOS()) {
+      $('pwa-banner').classList.remove('show');
+      $('ios-install-modal').classList.add('open');
+      return;
+    }
+    if (_deferredPwaPrompt) {
+      _deferredPwaPrompt.prompt();
+      try {
+        const choice = await _deferredPwaPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+          showToast('✅ App instalado!', 'success');
+        }
+      } catch(_){}
+      _deferredPwaPrompt = null;
+      $('pwa-banner').classList.remove('show');
+    }
+  });
+  // Botão "×" (dismiss)
+  document.getElementById('btnPwaDismiss')?.addEventListener('click', () => {
+    $('pwa-banner').classList.remove('show');
+    localStorage.setItem('stackbar_pwa_dismissed', String(Date.now()));
+  });
+});
 
 </script>
 </body>

@@ -730,6 +730,15 @@ async function carregarConfig() {
     CONFIG.papeis_permitidos = Array.isArray(data.papeis_permitidos)
       ? data.papeis_permitidos
       : ['admin', 'caixa'];
+  } else {
+    // Primeira vez: persiste o default para já permitir o admin entrar pelo bar.html
+    try {
+      await sb.rpc('stackbar_salvar_config', {
+        p_clube_id: CLUBE_ID,
+        p_permitir_estoque_negativo: false,
+        p_papeis_permitidos: ['admin', 'caixa']
+      });
+    } catch (e) { console.warn('Erro criar config default:', e); }
   }
   renderConfig();
 }
