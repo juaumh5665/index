@@ -9322,6 +9322,15 @@ async function carregarUsuarioEClube(authUser) {
     window.currentUser = currentUser;
     window.dispatchEvent(new CustomEvent('stackos:logged-in'));
 
+    // Verifica se é super admin global (via RPC) e expõe a flag pra hasFeature() liberar tudo.
+    // Pra um usuário comum do clube isso falha silenciosamente e a flag fica false.
+    try {
+        const { data: isAdmin } = await sb.rpc('is_super_admin');
+        window._isSuperAdmin = !!isAdmin;
+    } catch (e) {
+        window._isSuperAdmin = false;
+    }
+
     // 🎨 BRANDING: salva o último clube usado nesse dispositivo
     // pra próxima visita à tela de login mostrar logo + nome personalizados
     try {
@@ -9396,6 +9405,7 @@ sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
         sbSession = null; sbClube = null; currentUser = null;
         window.sbClube = null; window.currentUser = null; // [STACKCLOCK]
+        window._isSuperAdmin = false;
         sessionStorage.clear();
         if (typeof _limparEstadoClube === 'function') _limparEstadoClube();  // 🛡️ SEGURANÇA
         const ls = document.getElementById('login-screen');
@@ -13771,9 +13781,11 @@ window.hasFeature = function(name) {
     // Modo seguro: tudo liberado se a chave estiver desligada
     if (!FEATURES_BLOCK_ENABLED) return true;
     
-    // Super admin sempre tem tudo
-    if (currentUser && (currentUser.role === 'admin' || currentUser.papel === 'admin' || currentUser.papel === 'administrador')) {
-        // Mesmo admin precisa ser do clube; mas se tem a sessão admin global, libera
+    // Super admin GLOBAL (verificado via RPC is_super_admin no banco)
+    // tem acesso a tudo pra dar suporte. NÃO confunde com papel 'admin' do clube,
+    // que é apenas o dono/gestor de um clube específico (esse paga plano normal).
+    if (window._isSuperAdmin === true) {
+        return true;
     }
     
     // Em trial, libera tudo (cliente conhece o produto completo durante o trial)
