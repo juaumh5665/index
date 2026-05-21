@@ -8,8 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="StackBar">
-<link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIlN0YWNrQmFyIiwKICAic2hvcnRfbmFtZSI6ICJTdGFja0JhciIsCiAgInN0YXJ0X3VybCI6ICIuLyIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBjMTIyMyIsCiAgInRoZW1lX2NvbG9yIjogIiMwYzEyMjMiLAogICJpY29ucyI6IFsKICAgIHsKICAgICAgInNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBeU5DQXlOQ0lnWm1sc2JEMGlJMkU0TlRWbU55SSthRDRYTWlBekxqWWdNeTQyTGpoek5pNHpJREl1TmlBMkxqUWdOaTQwTGpReE9TQXhMakk1T1NBeU1TQXdJREVnTWlBemRqRjFNV0V5SURJZ01DQXdJREVnTWlBeWRtRXlJREVnTUNBd0lERWdNaUFsZE45MmJURXdJREYxTUNCMk0yMTJZak10WTJsaGRsTk5JREkzTGpRekxXSXVMV1Y2YlNBNExUTjJMVE5vTW1MM1VHRTBJREFnTUNBNExUVTBkRll4ZW0wd0xqTXVOaUJqTmkwekxqVWZWUTV2TVRRSWVUYzBeWmJ1eGVRWnRzMHk2REZqTm5oOExqMG0iCiAgICAgICJzaXplcyI6ICJhbnkiLAogICAgICAidHlwZSI6ICJpbWFnZS9zdmcreG1sIgogICAgfQogIF0KfQ==">
-
+<link rel="manifest" href="/bar-manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <title>StackBar — Bar do Clube</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -233,6 +233,26 @@
   }
   .produto-estoque.baixo { color: #f59e0b; }
   .produto-estoque.negativo { color: #ef4444; }
+
+  .btn-ver-todos {
+    width: 100%;
+    padding: 10px 14px;
+    margin-top: 10px;
+    background: rgba(124, 58, 237, 0.12);
+    border: 1px dashed rgba(124, 58, 237, 0.4);
+    color: #c4b5fd;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-ver-todos:active {
+    transform: scale(0.98);
+    background: rgba(124, 58, 237, 0.2);
+  }
 
   /* === CARRINHO === */
   .carrinho-panel {
@@ -641,6 +661,7 @@
           </select>
         </div>
         <div class="produtos-grid" id="produtosGrid"></div>
+        <button class="btn-ver-todos" id="btnVerTodos" style="display:none;">📋 Ver todos os produtos</button>
       </div>
 
       <div class="carrinho-panel">
@@ -786,7 +807,9 @@ const $ = (id) => document.getElementById(id);
 // Estado global do app
 let TOKEN          = null;        // token de acesso ao clube (na URL)
 let SESSAO         = null;        // dados retornados no login
-let PRODUTOS       = [];          // lista carregada via RPC
+let PRODUTOS       = [];          // lista completa carregada via RPC
+let TOP_PRODUTOS   = [];          // IDs dos mais vendidos (top 4)
+let MOSTRAR_TODOS  = false;       // se true, ignora filtro de top 4
 let CARRINHO       = [];          // [{produtoId, nome, valor, qtd, subtotal}]
 let JOGADOR_SEL    = null;        // {id, nome, apelido}
 let METODO_PAGTO   = null;        // 'dinheiro'|'pix'|'debito'|'credito'|null
@@ -927,7 +950,7 @@ async function doLogin() {
     await entrarApp();
   } catch (err) {
     console.error('Login error:', err);
-    mostraErroLogin('DEBUG: ' + (err.message || err.code || String(err)).substring(0, 150));
+    mostraErroLogin('Erro de conexão. Tente novamente.');
   } finally {
     setLoading(false);
     $('btnLogin').disabled = false;
@@ -956,8 +979,25 @@ async function entrarApp() {
     ? '✅ Permitido' : '❌ Bloqueado se zero';
 
   await carregarProdutos();
+  await carregarTopVendidos();
   await carregarHistorico();
   setupEventListeners();
+}
+
+// ============================================================
+// CARREGAR TOP MAIS VENDIDOS (últimos 30 dias)
+// ============================================================
+async function carregarTopVendidos() {
+  try {
+    const { data, error } = await sb.rpc('stackbar_top_produtos', { p_token: TOKEN });
+    if (error) { console.warn('top produtos error:', error); return; }
+    if (data?.ok && Array.isArray(data.top)) {
+      TOP_PRODUTOS = data.top;
+      renderProdutos();
+    }
+  } catch (e) {
+    console.warn('top produtos exception:', e);
+  }
 }
 
 // ============================================================
@@ -1002,12 +1042,22 @@ function renderProdutos() {
   const busca = ($('inpBusca').value || '').toLowerCase().trim();
   const grupoId = $('selGrupo').value;
   const podeNegativo = !!SESSAO.config?.permitir_estoque_negativo;
+  const haFiltro = !!busca || !!grupoId;
 
-  const filtrados = PRODUTOS.filter(p => {
+  let filtrados = PRODUTOS.filter(p => {
     if (grupoId && p.grupo_id !== grupoId) return false;
     if (busca && !p.nome.toLowerCase().includes(busca)) return false;
     return true;
   });
+
+  // Se NÃO tem filtro e NÃO está em modo "todos", mostra só os top 4 mais vendidos
+  if (!haFiltro && !MOSTRAR_TODOS && TOP_PRODUTOS.length > 0) {
+    const setTop = new Set(TOP_PRODUTOS);
+    const top = filtrados.filter(p => setTop.has(p.id));
+    // Ordena pela posição em TOP_PRODUTOS (mais vendido primeiro)
+    top.sort((a, b) => TOP_PRODUTOS.indexOf(a.id) - TOP_PRODUTOS.indexOf(b.id));
+    filtrados = top.slice(0, 4);
+  }
 
   if (filtrados.length === 0) {
     $('produtosGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:#71717a;font-size:13px;">Nenhum produto encontrado</div>';
@@ -1037,6 +1087,19 @@ function renderProdutos() {
       addCarrinho(b.dataset.pid);
     });
   });
+
+  // Toggle "Ver todos" / "Ver mais vendidos" (só faz sentido sem filtro)
+  const btnToggle = $('btnVerTodos');
+  if (btnToggle) {
+    if (haFiltro || TOP_PRODUTOS.length === 0 || PRODUTOS.length <= 4) {
+      btnToggle.style.display = 'none';
+    } else {
+      btnToggle.style.display = '';
+      btnToggle.textContent = MOSTRAR_TODOS
+        ? '🔝 Voltar aos mais vendidos'
+        : `📋 Ver todos os produtos (${PRODUTOS.length})`;
+    }
+  }
 }
 
 // ============================================================
@@ -1199,6 +1262,12 @@ function setupEventListeners() {
   $('inpBusca').addEventListener('input', renderProdutos);
   $('selGrupo').addEventListener('change', renderProdutos);
 
+  // Toggle Ver Todos / Top 4
+  $('btnVerTodos').addEventListener('click', () => {
+    MOSTRAR_TODOS = !MOSTRAR_TODOS;
+    renderProdutos();
+  });
+
   // Pagamento
   document.querySelectorAll('.pagto-btn').forEach(b => {
     b.addEventListener('click', () => {
@@ -1324,7 +1393,8 @@ async function confirmarVenda() {
     await carregarHistorico();
   } catch (err) {
     console.error('Confirmar venda error:', err);
-    showToast('❌ Erro de conexão ao registrar', 'error');
+    const msg = err?.message || err?.toString?.() || 'desconhecido';
+    showToast('❌ Erro ao registrar: ' + msg, 'error');
   } finally {
     setLoading(false);
     atualizarBotaoConfirmar();

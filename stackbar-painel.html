@@ -658,32 +658,15 @@ async function carregarTudo() {
 // TOKEN
 // ============================================================
 async function carregarToken() {
-  // Busca o token ativo atual; se não existir, gera um automaticamente
-  const { data, error } = await sb
-    .from('stackbar_tokens')
-    .select('token')
-    .eq('clube_id', CLUBE_ID)
-    .eq('ativo', true)
-    .maybeSingle();
-
+  // Usa RPC SECURITY DEFINER que valida auth + papel + clube e retorna
+  // o token ativo (criando um novo apenas se não existir nenhum)
+  const { data, error } = await sb.rpc('stackbar_obter_token_admin', { p_clube_id: CLUBE_ID });
   if (error) {
     console.error('Erro carregar token:', error);
-    $('linkBox').textContent = 'Erro ao carregar token';
+    $('linkBox').textContent = 'Erro ao carregar token: ' + (error.message || error);
     return;
   }
-
-  if (data?.token) {
-    TOKEN_ATUAL = data.token;
-  } else {
-    // gera novo
-    const { data: novoToken, error: errGen } = await sb.rpc('stackbar_gerar_token', { p_clube_id: CLUBE_ID });
-    if (errGen) {
-      console.error('Erro gerar token:', errGen);
-      $('linkBox').textContent = 'Erro ao gerar token';
-      return;
-    }
-    TOKEN_ATUAL = novoToken;
-  }
+  TOKEN_ATUAL = data;
   renderTokenBox();
 }
 
