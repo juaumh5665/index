@@ -486,6 +486,40 @@
   .hist-total { font-size: 14px; font-weight: 800; color: #a855f7; flex-shrink: 0; }
   .hist-empty { text-align: center; padding: 40px 16px; color: #52525b; font-size: 13px; }
 
+  /* Badges de status de estorno */
+  .hist-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .hist-badge.estornada { background: rgba(239, 68, 68, .2); color: #fca5a5; }
+  .hist-badge.pendente  { background: rgba(245, 158, 11, .2); color: #fcd34d; }
+  .hist-badge.negada    { background: rgba(113, 113, 122, .2); color: #a1a1aa; }
+
+  /* Botão solicitar estorno (compacto, discreto) */
+  .btn-estorno {
+    margin-top: 6px;
+    background: transparent;
+    border: 1px solid rgba(245, 158, 11, .35);
+    color: #fbbf24;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+  }
+  .btn-estorno:active {
+    transform: scale(.96);
+    background: rgba(245, 158, 11, .1);
+  }
+
   /* === CONFIG MODAL === */
   .modal {
     position: fixed; inset: 0;
@@ -1630,31 +1664,113 @@ async function carregarHistorico() {
 }
 
 function renderHistorico() {
-  const qtd = HISTORICO.length;
-  const total = HISTORICO.reduce((s, v) => s + Number(v.total || 0), 0);
+  // Total exclui estornados aprovados (não conta no faturamento do operador)
+  const validas = HISTORICO.filter(v => v.estorno_status !== 'aprovado');
+  const qtd = validas.length;
+  const total = validas.reduce((s, v) => s + Number(v.total || 0), 0);
   $('resumoQtd').textContent = qtd;
   $('resumoTotal').textContent = fmtMoney(total);
 
-  if (qtd === 0) {
+  if (HISTORICO.length === 0) {
     $('histList').innerHTML = '<div class="hist-empty">📊 Nenhuma venda registrada hoje</div>';
     return;
   }
 
   $('histList').innerHTML = HISTORICO.map(v => {
-    const hora = new Date(v.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    // tenta criado_em primeiro, fallback pra ts
+    const tsRaw = v.criado_em || v.ts;
+    const hora = tsRaw ? new Date(tsRaw).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
     const icon = v.tipo === 'comanda' ? '📒' : '💰';
     const formaTxt = v.tipo === 'comanda' ? 'Comanda' : (v.forma_pagto ? v.forma_pagto.toUpperCase() : '');
+
+    // Determina estado visual baseado em estorno_status
+    let badge = '';
+    let estiloItem = '';
+    let estiloTotal = '';
+    let botaoEstorno = '';
+
+    if (v.estorno_status === 'aprovado') {
+      // Venda estornada: riscada, opaca, sem ação
+      badge = '<span class="hist-badge estornada">❌ ESTORNADA</span>';
+      estiloItem = 'opacity:.55;';
+      estiloTotal = 'text-decoration:line-through;color:#71717a;';
+    } else if (v.estorno_status === 'solicitado') {
+      // Pendente: marcação laranja, sem botão (já solicitou)
+      badge = '<span class="hist-badge pendente">⏳ ESTORNO PENDENTE</span>';
+      estiloItem = 'border-left:3px solid #f59e0b;padding-left:8px;';
+    } else if (v.estorno_status === 'negado') {
+      // Negado: marcação cinza, pode pedir de novo
+      badge = '<span class="hist-badge negada">🚫 Estorno negado</span>';
+      botaoEstorno = `<button class="btn-estorno" data-vid="${v.id}">⚠️ Solicitar estorno</button>`;
+    } else {
+      // Normal: pode solicitar
+      botaoEstorno = `<button class="btn-estorno" data-vid="${v.id}">⚠️ Solicitar estorno</button>`;
+    }
+
     return `
-      <div class="hist-item">
+      <div class="hist-item" style="${estiloItem}">
         <div class="hist-icon ${v.tipo}">${icon}</div>
         <div class="hist-info">
-          <div class="hist-jogador">${esc(v.jogador_nome || '—')}</div>
+          <div class="hist-jogador">${esc(v.jogador_nome || '—')} ${badge}</div>
           <div class="hist-meta">${hora} • ${esc(formaTxt)}</div>
+          ${botaoEstorno}
         </div>
-        <div class="hist-total">${fmtMoney(v.total)}</div>
+        <div class="hist-total" style="${estiloTotal}">${fmtMoney(v.total)}</div>
       </div>
     `;
   }).join('');
+
+  // Bind botões de estorno
+  $('histList').querySelectorAll('.btn-estorno').forEach(b => {
+    b.addEventListener('click', () => solicitarEstorno(b.dataset.vid));
+  });
+}
+
+// ============================================================
+// ESTORNO (solicitar — admin aprova no painel)
+// ============================================================
+async function solicitarEstorno(vendaId) {
+  const venda = HISTORICO.find(v => v.id === vendaId);
+  if (!venda) return showToast('⚠️ Venda não encontrada', 'error');
+
+  const motivo = prompt(
+    '⚠️ SOLICITAR ESTORNO\n\n' +
+    `Jogador: ${venda.jogador_nome}\n` +
+    `Valor: ${fmtMoney(venda.total)}\n\n` +
+    'O estorno será revisado pelo administrador. Enquanto isso, a venda continua válida.\n\n' +
+    'Descreva o motivo (mínimo 10 caracteres):'
+  );
+  if (motivo === null) return;  // cancelou
+  if (motivo.trim().length < 10) return showToast('⚠️ Motivo muito curto (mínimo 10 caracteres)', 'error');
+
+  setLoading(true);
+  try {
+    const { data, error } = await sb.rpc('stackbar_solicitar_estorno', {
+      p_token:    TOKEN,
+      p_user_id:  SESSAO.user_id,
+      p_venda_id: vendaId,
+      p_motivo:   motivo.trim()
+    });
+    if (error) throw error;
+    if (!data || !data.ok) {
+      const mapa = {
+        token_invalido:        '⚠️ Sessão expirada — relogue',
+        operador_invalido:     '⚠️ Operador não autorizado',
+        motivo_curto:          '⚠️ Motivo muito curto (mínimo 10 caracteres)',
+        venda_invalida:        '⚠️ Venda não encontrada',
+        estorno_ja_solicitado: '⚠️ Já há um estorno pendente pra essa venda',
+        venda_ja_estornada:    '⚠️ Essa venda já foi estornada',
+      };
+      return showToast(mapa[data?.erro] || ('Erro: ' + (data?.erro || '?')), 'error');
+    }
+    showToast('✅ Estorno solicitado — aguarde aprovação do admin', 'success');
+    await carregarHistorico();
+  } catch (err) {
+    console.error('Solicitar estorno error:', err);
+    showToast('❌ Erro: ' + (err.message || 'conexão'), 'error');
+  } finally {
+    setLoading(false);
+  }
 }
 
 // ============================================================
