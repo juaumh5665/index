@@ -691,9 +691,41 @@ function setLoading(on) {
   $('loading').classList.toggle('show', on);
 }
 function todayStartIso() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  // "Dia operacional" — corta às 06:00 horário de Brasília.
+  // Vendas entre 06:00 BR de ontem e 06:00 BR de hoje pertencem ao mesmo dia.
+  // Ex.: torneio das 19h às 04h fica todo no mesmo dia operacional.
+  const TZ = 'America/Sao_Paulo';
+  const CORTE_HORA = 6;
+
+  // Pega a hora atual em BR usando o formatador nativo (sem libs)
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date()).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+  const ano = +parts.year, mes = +parts.month, dia = +parts.day, hora = +parts.hour;
+
+  // Calcula a data base do dia operacional (ontem se ainda antes do corte)
+  // Constrói uma Date em UTC representando "hoje BR às 06:00"
+  let baseDia = dia;
+  let baseMes = mes;
+  let baseAno = ano;
+  if (hora < CORTE_HORA) {
+    // Antes das 6h da manhã BR → dia operacional é "ontem"
+    const ontem = new Date(Date.UTC(ano, mes - 1, dia));
+    ontem.setUTCDate(ontem.getUTCDate() - 1);
+    baseAno = ontem.getUTCFullYear();
+    baseMes = ontem.getUTCMonth() + 1;
+    baseDia = ontem.getUTCDate();
+  }
+
+  // "06:00 BR" = "09:00 UTC" (BR é UTC-3 sem horário de verão atualmente)
+  // Construir corretamente independente de horário de verão:
+  // Sao Paulo offset = -03:00 fixo desde 2019
+  // Formato ISO com offset explícito
+  const pad = n => String(n).padStart(2, '0');
+  const isoBR = `${baseAno}-${pad(baseMes)}-${pad(baseDia)}T06:00:00-03:00`;
+  return new Date(isoBR).toISOString();
 }
 
 // ============================================================
