@@ -341,6 +341,94 @@
     font-size: 13px;
   }
 
+  /* === ESTORNOS PENDENTES === */
+  .badge-contador {
+    display: inline-block;
+    background: #ef4444;
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+    animation: pulse-badge 2s infinite;
+  }
+  @keyframes pulse-badge {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239,68,68,.5); }
+    50% { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+  }
+  .estorno-item {
+    background: rgba(245, 158, 11, .06);
+    border: 1px solid rgba(245, 158, 11, .25);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .estorno-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; margin-bottom: 10px;
+  }
+  .estorno-header .jogador {
+    font-weight: 800; font-size: 15px; color: #fafafa;
+  }
+  .estorno-header .meta {
+    font-size: 11px; color: #a1a1aa; margin-top: 2px;
+    line-height: 1.5;
+  }
+  .estorno-header .valor {
+    font-size: 18px; font-weight: 800; color: #fbbf24;
+    flex-shrink: 0;
+  }
+  .estorno-itens {
+    background: rgba(0, 0, 0, .25);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px; color: #d4d4d8;
+    margin-bottom: 10px;
+  }
+  .estorno-itens .item-linha {
+    display: flex; justify-content: space-between;
+    padding: 2px 0;
+  }
+  .estorno-motivo {
+    background: rgba(124, 58, 237, .08);
+    border-left: 3px solid #a855f7;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px; color: #d4d4d8;
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .estorno-motivo strong {
+    color: #c4b5fd; font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .5px;
+    display: block; margin-bottom: 4px;
+  }
+  .estorno-acoes {
+    display: flex; gap: 10px;
+  }
+  .btn-aprovar, .btn-negar {
+    flex: 1;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+  }
+  .btn-aprovar {
+    background: #16a34a; color: white;
+  }
+  .btn-aprovar:hover { background: #15803d; }
+  .btn-negar {
+    background: rgba(239, 68, 68, .15); color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, .35);
+  }
+  .btn-negar:hover { background: rgba(239, 68, 68, .25); }
+
   /* === VENDA RECENTE === */
   .venda-recente {
     display: flex;
@@ -476,6 +564,15 @@
           <div class="valor" id="stOperadores">0</div>
         </div>
       </div>
+    </div>
+
+    <!-- ESTORNOS PENDENTES (aparece destacado quando há) -->
+    <div class="card" id="cardEstornos" style="display:none;border:1px solid rgba(245, 158, 11, .4);background:linear-gradient(180deg, rgba(245,158,11,.06) 0%, rgba(15,23,42,1) 100%);">
+      <h3 class="card-title" style="color:#fbbf24;">
+        ⏳ Estornos pendentes <span id="badgeEstornos" class="badge-contador">0</span>
+      </h3>
+      <p class="card-desc">Solicitações de estorno aguardando sua aprovação. Aprovar reverte a venda (devolve estoque + cancela transações). Negar mantém a venda.</p>
+      <div id="estornosList"></div>
     </div>
 
     <!-- VENDAS RECENTES -->
@@ -674,12 +771,16 @@ async function carregarTudo() {
     await Promise.all([
       carregarToken(),
       carregarConfig(),
-      carregarAtividade()
+      carregarAtividade(),
+      carregarEstornos()
     ]);
   } finally {
     setLoading(false);
   }
 }
+
+// Atualiza estornos a cada 30s pra admin ver novos pedidos sem refresh manual
+setInterval(() => { carregarEstornos(); }, 30_000);
 
 // ============================================================
 // TOKEN
@@ -911,6 +1012,162 @@ function setupListeners() {
     await sb.auth.signOut();
     location.reload();
   });
+}
+
+// ============================================================
+// ESTORNOS PENDENTES (admin aprova ou nega)
+// ============================================================
+async function carregarEstornos() {
+  try {
+    const { data, error } = await sb.rpc('stackbar_listar_estornos_pendentes', {
+      p_clube_id: CLUBE_ID
+    });
+    if (error) { console.error('Estornos error:', error); return; }
+    if (!data?.ok) { console.error('Estornos resposta:', data); return; }
+
+    const lista = data.estornos || [];
+    renderEstornos(lista);
+  } catch (e) {
+    console.error('carregarEstornos exception:', e);
+  }
+}
+
+function renderEstornos(lista) {
+  const card    = $('cardEstornos');
+  const badge   = $('badgeEstornos');
+  const container = $('estornosList');
+
+  if (!lista || lista.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = '';
+  badge.textContent = lista.length;
+
+  container.innerHTML = lista.map(e => {
+    const dt = e.estorno_solicitado_em ? new Date(e.estorno_solicitado_em) : null;
+    const quando = dt ? dt.toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+    }) : '—';
+
+    const itens = Array.isArray(e.itens_json) ? e.itens_json : [];
+    const itensHtml = itens.length
+      ? itens.map(it => `
+          <div class="item-linha">
+            <span>${(it.qtd || 1)}x ${esc(it.nome || '?')}</span>
+            <span>${fmtMoney(it.subtotal || 0)}</span>
+          </div>
+        `).join('')
+      : '<div class="item-linha"><span>Detalhes não disponíveis</span></div>';
+
+    const tipoTxt = e.tipo === 'comanda'
+      ? '📒 Comanda'
+      : `💰 À vista (${(e.forma_pagto || '?').toUpperCase()})`;
+
+    return `
+      <div class="estorno-item" data-vid="${e.id}">
+        <div class="estorno-header">
+          <div>
+            <div class="jogador">${esc(e.jogador_nome || '—')}</div>
+            <div class="meta">
+              ${tipoTxt}<br>
+              Vendido por: <strong>${esc(e.operador_nome || '—')}</strong><br>
+              Estorno solicitado por: <strong>${esc(e.solicitado_por_nome || '—')}</strong> em ${quando}
+            </div>
+          </div>
+          <div class="valor">${fmtMoney(e.total || 0)}</div>
+        </div>
+
+        <div class="estorno-itens">${itensHtml}</div>
+
+        <div class="estorno-motivo">
+          <strong>Motivo do operador:</strong>
+          ${esc(e.estorno_motivo || '(sem motivo)')}
+        </div>
+
+        <div class="estorno-acoes">
+          <button class="btn-aprovar" data-acao="aprovar" data-vid="${e.id}">
+            ✅ Aprovar estorno
+          </button>
+          <button class="btn-negar" data-acao="negar" data-vid="${e.id}">
+            ❌ Negar
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Bind dos botões
+  container.querySelectorAll('.btn-aprovar, .btn-negar').forEach(btn => {
+    btn.addEventListener('click', () => resolverEstorno(btn.dataset.vid, btn.dataset.acao));
+  });
+}
+
+async function resolverEstorno(vendaId, acao) {
+  let obs = '';
+
+  if (acao === 'aprovar') {
+    const ok = confirm(
+      '⚠️ APROVAR ESTORNO?\n\n' +
+      'Isso irá:\n' +
+      '• Devolver os itens ao estoque\n' +
+      '• Reverter as transações (saldo do jogador volta)\n' +
+      '• Marcar venda como ESTORNADA\n' +
+      '• Se for comanda, remover os itens dela (ou cancelar se ficar vazia)\n\n' +
+      'Esta ação é irreversível. Continuar?'
+    );
+    if (!ok) return;
+  } else if (acao === 'negar') {
+    obs = prompt(
+      '❌ NEGAR ESTORNO\n\n' +
+      'A venda continuará válida. Explique o motivo da negação (mínimo 5 caracteres):\n\n' +
+      'Ex: "Pedido fora de política", "Cliente concordou com a venda", etc.'
+    );
+    if (obs === null) return;
+    if (obs.trim().length < 5) {
+      alert('⚠️ Observação muito curta (mínimo 5 caracteres)');
+      return;
+    }
+  } else {
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const { data, error } = await sb.rpc('stackbar_resolver_estorno', {
+      p_clube_id: CLUBE_ID,
+      p_venda_id: vendaId,
+      p_acao:     acao,
+      p_obs:      obs || null
+    });
+    if (error) throw error;
+    if (!data || !data.ok) {
+      const mapa = {
+        nao_autenticado:        'Sessão expirada — faça login',
+        acesso_negado:          'Sem acesso a esse clube',
+        papel_insuficiente:     'Apenas admin/gerente podem resolver estornos',
+        acao_invalida:          'Ação inválida',
+        observacao_obrigatoria: 'Observação obrigatória ao negar (mín. 5 chars)',
+        venda_invalida:         'Venda não encontrada',
+        nao_pendente:           'Esse estorno já foi resolvido',
+      };
+      throw new Error(mapa[data?.erro] || ('Erro: ' + (data?.erro || '?')));
+    }
+
+    alert(acao === 'aprovar'
+      ? '✅ Estorno aprovado. Estoque devolvido e transações revertidas.'
+      : '❌ Estorno negado. A venda continua válida.'
+    );
+
+    // Recarrega tudo (estornos + atividade pra refletir mudanças)
+    await Promise.all([carregarEstornos(), carregarAtividade()]);
+  } catch (e) {
+    console.error('resolverEstorno error:', e);
+    alert('❌ ' + (e.message || 'Erro ao processar'));
+  } finally {
+    setLoading(false);
+  }
 }
 
 </script>
