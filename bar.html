@@ -767,6 +767,28 @@
         <span class="label">Versão</span>
         <span class="valor">StackBar 1.0</span>
       </div>
+
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);">
+        <div style="font-size:11px;color:#a855f7;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">
+          🔔 Alertas do StackClock
+        </div>
+        <label style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13px;color:#d4d4d8;cursor:pointer;">
+          <span>🔊 Som ao receber alerta</span>
+          <input type="checkbox" id="cfgAlertSom" style="width:20px;height:20px;cursor:pointer;">
+        </label>
+        <label style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13px;color:#d4d4d8;cursor:pointer;">
+          <span>📳 Vibração</span>
+          <input type="checkbox" id="cfgAlertVibrar" style="width:20px;height:20px;cursor:pointer;">
+        </label>
+        <label style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13px;color:#d4d4d8;cursor:pointer;">
+          <span>💬 Toast na tela</span>
+          <input type="checkbox" id="cfgAlertToast" style="width:20px;height:20px;cursor:pointer;">
+        </label>
+        <div style="font-size:11px;color:#71717a;margin-top:6px;">
+          Quando o dealer chamar o bar pela mesa, você é avisado aqui.
+        </div>
+      </div>
+
       <button class="btn-danger" id="btnLogout">↩ Sair (logout)</button>
     </div>
   </div>
@@ -843,6 +865,15 @@ let METODO_PAGTO   = null;        // 'dinheiro'|'pix'|'debito'|'credito'|null
 let HISTORICO      = [];          // vendas do operador no dia
 let GRUPOS         = new Map();   // grupo_id → grupo_nome
 let _searchTimer   = null;
+let _scChannel     = null;        // canal realtime do stackclock_alertas
+let _audioCtx      = null;        // contexto de áudio (Web Audio API)
+
+// Config local de notificações (persistida no aparelho)
+let NOTIF_CFG = {
+  som:    localStorage.getItem('stackbar_alert_som')    !== '0',  // default true
+  vibrar: localStorage.getItem('stackbar_alert_vibrar') !== '0',  // default true
+  toast:  localStorage.getItem('stackbar_alert_toast')  !== '0',  // default true
+};
 
 // ============================================================
 // HELPERS
@@ -1007,7 +1038,67 @@ async function entrarApp() {
   await carregarProdutos();
   await carregarTopVendidos();
   await carregarHistorico();
+  assinarAlertasStackClock();
   setupEventListeners();
+}
+
+// ============================================================
+// ALERTAS DO STACKCLOCK (realtime — recebe quando dealer chama BAR)
+// ============================================================
+function assinarAlertasStackClock() {
+  if (_scChannel) {
+    try { sb.removeChannel(_scChannel); } catch(_) {}
+  }
+  _scChannel = sb
+    .channel('stackbar_alertas_' + SESSAO.clube_id)
+    .on('postgres_changes', {
+      event:  'INSERT',
+      schema: 'public',
+      table:  'stackclock_alertas',
+      filter: 'clube_id=eq.' + SESSAO.clube_id
+    }, (payload) => {
+      const novo = payload.new;
+      // Operador do bar só recebe alertas do tipo 'bar'
+      if (!novo || novo.tipo !== 'bar') return;
+      notificarAlertaBar(novo);
+    })
+    .subscribe((status) => {
+      console.log('[StackBar] realtime stackclock:', status);
+    });
+}
+
+function notificarAlertaBar(alerta) {
+  const mesaTxt = alerta.mesa ? 'Mesa ' + alerta.mesa : 'Mesa ?';
+  const torneioTxt = alerta.torneio_nome ? ' (' + alerta.torneio_nome + ')' : '';
+  const msg = '🍻 BAR chamado — ' + mesaTxt + torneioTxt;
+
+  // 1) Som
+  if (NOTIF_CFG.som) {
+    try {
+      if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = _audioCtx.createOscillator();
+      const gain = _audioCtx.createGain();
+      osc.frequency.setValueAtTime(880, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(660, _audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.3, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, _audioCtx.currentTime + 0.45);
+      osc.connect(gain); gain.connect(_audioCtx.destination);
+      osc.start(); osc.stop(_audioCtx.currentTime + 0.45);
+    } catch(_){}
+  }
+
+  // 2) Vibração
+  if (NOTIF_CFG.vibrar && navigator.vibrate) {
+    navigator.vibrate([120, 60, 120]);
+  }
+
+  // 3) Toast
+  if (NOTIF_CFG.toast) {
+    showToast(msg, 'success');
+  } else {
+    // Mesmo sem toast configurado, loga no console pra debugging
+    console.log('[StackBar] alerta recebido (toast off):', msg);
+  }
 }
 
 // ============================================================
@@ -1340,7 +1431,27 @@ function setupEventListeners() {
   $('btnConfirmar').addEventListener('click', () => confirmarVenda(false));
 
   // Config modal
-  $('btnConfig').addEventListener('click', () => $('modalConfig').classList.add('open'));
+  $('btnConfig').addEventListener('click', () => {
+    // Carrega estado atual dos toggles antes de abrir
+    $('cfgAlertSom').checked    = !!NOTIF_CFG.som;
+    $('cfgAlertVibrar').checked = !!NOTIF_CFG.vibrar;
+    $('cfgAlertToast').checked  = !!NOTIF_CFG.toast;
+    $('modalConfig').classList.add('open');
+  });
+
+  // Persistência dos toggles (salva imediatamente ao mudar)
+  $('cfgAlertSom').addEventListener('change', (e) => {
+    NOTIF_CFG.som = e.target.checked;
+    localStorage.setItem('stackbar_alert_som', NOTIF_CFG.som ? '1' : '0');
+  });
+  $('cfgAlertVibrar').addEventListener('change', (e) => {
+    NOTIF_CFG.vibrar = e.target.checked;
+    localStorage.setItem('stackbar_alert_vibrar', NOTIF_CFG.vibrar ? '1' : '0');
+  });
+  $('cfgAlertToast').addEventListener('change', (e) => {
+    NOTIF_CFG.toast = e.target.checked;
+    localStorage.setItem('stackbar_alert_toast', NOTIF_CFG.toast ? '1' : '0');
+  });
   document.querySelectorAll('[data-close]').forEach(b => {
     b.addEventListener('click', () => $(b.dataset.close).classList.remove('open'));
   });
@@ -1424,12 +1535,20 @@ async function confirmarVenda(eVendaComanda) {
         jogador_invalido:       '⚠️ Jogador inválido',
         produto_invalido:       '⚠️ Produto inválido no carrinho',
         estoque_insuficiente:   `⚠️ Estoque insuficiente: ${data.produto || ''} (${data.disponivel || 0} disponíveis)`,
+        caixa_fechado:          '🚫 Caixa do bar fechado. Abra o caixa no StackOS antes de vender.',
       };
       return showToast(mapa[data?.erro] || ('Erro: ' + (data?.erro || 'desconhecido')), 'error');
     }
 
     // Sucesso
-    const tipoTxt = eVendaComanda ? '📒 Lançado na comanda' : '✅ Venda à vista registrada';
+    let tipoTxt;
+    if (eVendaComanda) {
+      tipoTxt = data.reusou_comanda
+        ? '📒 Itens adicionados à comanda existente'
+        : '📒 Nova comanda aberta';
+    } else {
+      tipoTxt = '✅ Venda à vista registrada';
+    }
     showToast(`${tipoTxt}: ${fmtMoney(data.total)}`, 'success');
 
     // Reset completo (limpa tudo, pronto pro próximo cliente)
