@@ -912,8 +912,27 @@ function todayStartIso() {
 // ============================================================
 (async function boot() {
   TOKEN = getTokenFromUrl();
+
+  // Detecta se está rodando como PWA standalone (instalado na tela inicial)
+  const ehStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;  // iOS Safari
+
   if (!TOKEN) {
-    $('clubeLabel').innerHTML = '⚠️ <strong>Link inválido</strong> — peça um link novo ao admin.';
+    // No iOS, o PWA standalone tem localStorage separado do Safari normal.
+    // Se chegou aqui sem token, provavelmente é primeira abertura do PWA instalado.
+    if (ehStandalone) {
+      $('clubeLabel').innerHTML =
+        '⚠️ <strong>Primeiro acesso pelo app</strong><br>' +
+        '<span style="font-size:.85em;color:#a3a3a3;">' +
+        'Abra o link de convite no navegador uma vez,<br>' +
+        'faça login, e <em>depois</em> adicione à tela inicial.<br><br>' +
+        'Peça um link novo ao administrador do clube.' +
+        '</span>';
+    } else {
+      $('clubeLabel').innerHTML =
+        '⚠️ <strong>Link inválido</strong> — peça um link novo ao admin.';
+    }
     return;
   }
   localStorage.setItem('stackbar_token', TOKEN);
