@@ -13674,46 +13674,39 @@ async function aceitarConviteSubmit() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando…';
 
     try {
-        // 1) RPC atômica: cria user no auth + vincula ao clube + marca convite aceito
-        //    (substitui o antigo signUp+aceitar_convite que deixava users órfãos)
-        const { data: rpcData, error: rpcErr } = await sb.rpc('aceitar_convite_completo', {
-            p_token: _conviteAtual.token,
-            p_email: _conviteAtual.email,
-            p_senha: senha,
-            p_nome:  nome,
+        // 1) Cria usuário no Auth com o email do convite
+        const { data: signData, error: signErr } = await sb.auth.signUp({
+            email: _conviteAtual.email,
+            password: senha,
         });
 
-        if (rpcErr) {
-            console.error('RPC aceitar_convite_completo erro:', rpcErr);
-            throw new Error(rpcErr.message || 'Erro de conexão ao processar convite');
+        if (signErr) {
+            if (signErr.message.includes('already registered')) {
+                throw new Error('Este e-mail já está cadastrado em outro clube.');
+            }
+            throw signErr;
         }
+        if (!signData.user) throw new Error('Erro ao criar conta');
 
-        if (!rpcData || !rpcData.ok) {
-            const mapaErros = {
-                token_invalido:      'Convite inválido ou inexistente',
-                token_ja_usado:      'Este convite já foi aceito anteriormente',
-                token_expirado:      'Este convite expirou. Peça um novo ao administrador',
-                email_nao_confere:   'O e-mail não corresponde ao convite',
-                email_ja_cadastrado: 'Este e-mail já está cadastrado no sistema',
-                senha_curta:         'A senha deve ter pelo menos 6 caracteres',
-                nome_invalido:       'Informe um nome válido',
-                falha_interna:       'Erro interno: ' + (rpcData?.detalhe || 'tente novamente em instantes'),
-            };
-            throw new Error(mapaErros[rpcData?.erro] || ('Erro desconhecido: ' + (rpcData?.erro || '?')));
-        }
+        // 2) RPC pra aceitar convite
+        const { data: rpcData, error: rpcErr } = await sb.rpc('aceitar_convite', {
+            p_token: _conviteAtual.token,
+            p_user_id: signData.user.id,
+            p_nome: nome,
+        });
+        if (rpcErr) throw new Error(rpcErr.message || 'Erro ao aceitar convite');
 
         showToast('🎉 Convite aceito! Entrando…');
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1000));
 
-        // 2) Login automático (e-mail já vem confirmado, então signIn funciona direto)
+        // 3) Login automático
         const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({
             email: _conviteAtual.email,
             password: senha,
         });
         if (loginErr) {
-            console.error('Login pós-convite erro:', loginErr);
             mostrarTelaLogin();
-            showToast('Conta criada! Faça login com sua senha.');
+            showToast('✉️ Verifique seu e-mail para confirmar o cadastro');
             return;
         }
 
@@ -22341,39 +22334,238 @@ function formatDuration(ms) {
 // ============================================================
 // USUÁRIOS & PERMISSÕES
 // ============================================================
-function renderUsuarios() {
+async function renderUsuarios() {
     // Renderiza painel "Meu Clube" + convites
     renderMeuClubeCard();
 
     const tbody = document.getElementById('usuarios-tbody');
     if (!tbody) return;
-    tbody.innerHTML = usuarios.map(u => {
-        const role = ROLES[u.role];
-        const isMe = currentUser && u.id === currentUser.id;
-        return `
-        <tr style="border-bottom:1px solid #1a1a1e;">
-            <td style="padding:.9rem 1.5rem;">
-                <div style="display:flex;align-items:center;gap:.75rem;">
-                    <div style="width:32px;height:32px;background:${role.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:#000;">${u.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
-                    <div>
-                        <div style="font-weight:700;">${u.nome}${isMe?' <span style="font-size:.65rem;color:var(--gold);font-weight:800;">(você)</span>':''}</div>
+
+    // Busca operadores reais do banco (filtra pelo clube atual)
+    if (!sbClube || !sbClube.id) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:1.5rem;text-align:center;color:#71717a;font-size:.85rem;">Carregando…</td></tr>';
+        renderMatrizPermissoes();
+        return;
+    }
+
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:1.5rem;text-align:center;color:#71717a;font-size:.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando operadores…</td></tr>';
+
+    try {
+        const { data: operadores, error } = await sb
+            .from('usuarios')
+            .select('id, nome, email, papel, status, criado_em')
+            .eq('clube_id', sbClube.id)
+            .order('criado_em', { ascending: true });
+
+        if (error) throw error;
+
+        if (!operadores || operadores.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:1.5rem;text-align:center;color:#71717a;font-size:.85rem;">Nenhum operador cadastrado. Use "Convidar Operador" pra adicionar.</td></tr>';
+            renderMatrizPermissoes();
+            return;
+        }
+
+        tbody.innerHTML = operadores.map(u => {
+            const role = ROLES[u.papel] || { label: u.papel, color: '#71717a', icon: '👤' };
+            const isMe = currentUser && u.id === currentUser.id;
+            const isAtivo = (u.status || 'ativo') === 'ativo';
+            const sou_admin = currentUser && currentUser.papel === 'admin';
+
+            // Iniciais pro avatar
+            const iniciais = (u.nome || '?').split(' ').map(w => w[0] || '').slice(0, 2).join('').toUpperCase();
+
+            // Ações disponíveis (só pra admin, nunca pro próprio)
+            let acoes = '—';
+            if (sou_admin && !isMe) {
+                acoes = `
+                    <button onclick="abrirModalMudarPapel('${u.id}', ${JSON.stringify(u.nome).replace(/"/g,'&quot;')}, '${u.papel}')" class="btn-ghost" style="padding:.35rem .55rem;font-size:.75rem;margin-right:.3rem;" title="Mudar papel">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </button>
+                    ${isAtivo
+                        ? `<button onclick="desativarOperador('${u.id}', ${JSON.stringify(u.nome).replace(/"/g,'&quot;')})" class="btn-ghost" style="padding:.35rem .55rem;font-size:.75rem;margin-right:.3rem;color:#f59e0b;" title="Desativar"><i class="fa-solid fa-user-slash"></i></button>`
+                        : `<button onclick="reativarOperador('${u.id}', ${JSON.stringify(u.nome).replace(/"/g,'&quot;')})" class="btn-ghost" style="padding:.35rem .55rem;font-size:.75rem;margin-right:.3rem;color:#22c55e;" title="Reativar"><i class="fa-solid fa-user-check"></i></button>`
+                    }
+                    <button onclick="removerOperador('${u.id}', ${JSON.stringify(u.nome).replace(/"/g,'&quot;')})" class="btn-danger" style="padding:.35rem .55rem;font-size:.75rem;" title="Remover do clube">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+            } else if (isMe) {
+                acoes = '<span style="font-size:.7rem;color:#52525b;">(você)</span>';
+            }
+
+            return `
+            <tr style="border-bottom:1px solid #1a1a1e;${!isAtivo ? 'opacity:.55;' : ''}">
+                <td style="padding:.9rem 1.5rem;">
+                    <div style="display:flex;align-items:center;gap:.75rem;">
+                        <div style="width:32px;height:32px;background:${role.color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:#000;">${iniciais}</div>
+                        <div>
+                            <div style="font-weight:700;">${escapeHtml(u.nome || '')}${isMe ? ' <span style="font-size:.65rem;color:var(--gold);font-weight:800;">(você)</span>' : ''}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:var(--font-mono);">${escapeHtml(u.email || '')}</td>
+                <td style="padding:.9rem 1.5rem;"><span class="tag" style="background:${role.color}22;color:${role.color};">${role.icon} ${role.label}</span></td>
+                <td style="padding:.9rem 1.5rem;">
+                    <span class="tag ${isAtivo ? 'tag-running' : 'tag-waiting'}">${isAtivo ? '● Ativo' : '○ Inativo'}</span>
+                </td>
+                <td style="padding:.9rem 1.5rem;text-align:right;white-space:nowrap;">
+                    ${acoes}
+                </td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        console.error('Erro carregar operadores:', e);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:1.5rem;text-align:center;color:#ef4444;font-size:.85rem;">Erro ao carregar operadores: ' + (e.message || 'desconhecido') + '</td></tr>';
+    }
+
+    // Matriz de permissões (didática, abaixo)
+    renderMatrizPermissoes();
+}
+
+// ============================================================
+// GERENCIAMENTO DE OPERADORES (admin do clube)
+// ============================================================
+
+function abrirModalMudarPapel(userId, nomeUser, papelAtual) {
+    const papeis = [
+        { key: 'admin',    label: '👑 Administrador', desc: 'Acesso total + gerencia outros usuários' },
+        { key: 'gerente',  label: '🎯 Gerente',       desc: 'Acesso quase total, exceto gerenciar usuários' },
+        { key: 'dealer',   label: '🃏 Dealer',        desc: 'Torneios + cash game' },
+        { key: 'caixa',    label: '💰 Caixa',         desc: 'Bar, caixa, fechamento, jackpot' },
+        { key: 'recepcao', label: '📋 Recepção',      desc: 'Jogadores, torneios, caixa' },
+    ];
+
+    const html = `
+        <div id="modal-mudar-papel" class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);z-index:9999;padding:1rem;">
+            <div style="background:#0a0a14;border:1px solid #27272a;border-radius:.85rem;max-width:480px;width:100%;max-height:90vh;overflow:auto;">
+                <div style="padding:1.1rem 1.25rem;border-bottom:1px solid #1a1a1e;display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="margin:0;font-size:1.05rem;font-weight:800;color:#a855f7;"><i class="fa-solid fa-user-shield"></i> Mudar papel</h3>
+                    <button onclick="document.getElementById('modal-mudar-papel').remove()" style="background:rgba(255,255,255,.08);border:none;color:#fff;width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1;">×</button>
+                </div>
+                <div style="padding:1.25rem;">
+                    <div style="font-size:.85rem;color:#9ca3af;margin-bottom:1rem;">Operador: <strong style="color:#e4e4e7;">${escapeHtml(nomeUser)}</strong></div>
+                    <div style="display:flex;flex-direction:column;gap:.55rem;">
+                    ${papeis.map(p => `
+                        <button onclick="confirmarMudarPapel('${userId}', '${p.key}', ${JSON.stringify(nomeUser).replace(/"/g,'&quot;')})"
+                                ${p.key === papelAtual ? 'disabled' : ''}
+                                style="
+                                    text-align:left;padding:.85rem 1rem;
+                                    background:${p.key === papelAtual ? 'rgba(124,58,237,.25)' : 'rgba(255,255,255,.04)'};
+                                    border:1px solid ${p.key === papelAtual ? '#7c3aed' : 'rgba(255,255,255,.08)'};
+                                    color:#e4e4e7;border-radius:.6rem;cursor:${p.key === papelAtual ? 'default' : 'pointer'};
+                                    font-family:inherit;transition:all .15s;
+                                    ${p.key === papelAtual ? 'opacity:1;' : ''}
+                                ">
+                            <div style="font-weight:700;font-size:.9rem;">${p.label}${p.key === papelAtual ? ' <span style="color:#a855f7;font-size:.7rem;">(atual)</span>' : ''}</div>
+                            <div style="font-size:.72rem;color:#71717a;margin-top:.2rem;">${p.desc}</div>
+                        </button>
+                    `).join('')}
                     </div>
                 </div>
-            </td>
-            <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:var(--font-mono);">${u.email}</td>
-            <td style="padding:.9rem 1.5rem;"><span class="tag" style="background:${role.color}22;color:${role.color};">${role.icon} ${role.label}</span></td>
-            <td style="padding:.9rem 1.5rem;">
-                <span class="tag ${u.status==='ativo'?'tag-running':'tag-waiting'}">${u.status==='ativo'?'● Ativo':'○ Inativo'}</span>
-            </td>
-            <td style="padding:.9rem 1.5rem;text-align:right;">
-                <button onclick="editarUsuario(${u.id})" class="btn-ghost" style="padding:.35rem .65rem;font-size:.75rem;margin-right:.3rem;"><i class="fa-solid fa-pen"></i></button>
-                <button onclick="removerUsuario(${u.id})" class="btn-danger" ${isMe?'disabled style="opacity:.3;cursor:not-allowed;"':''}><i class="fa-solid fa-trash"></i></button>
-            </td>
-        </tr>`;
-    }).join('');
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
 
-    // Matriz de permissões
-    renderMatrizPermissoes();
+async function confirmarMudarPapel(userId, novoPapel, nomeUser) {
+    if (!confirm(`Mudar papel de ${nomeUser} para ${novoPapel.toUpperCase()}?`)) return;
+    try {
+        const { data, error } = await sb.rpc('mudar_papel_usuario', {
+            p_alvo_user_id: userId,
+            p_novo_papel: novoPapel,
+        });
+        if (error) throw error;
+        if (!data || !data.ok) {
+            const mapa = {
+                nao_pode_mudar_proprio_papel: 'Você não pode mudar seu próprio papel',
+                papel_invalido: 'Papel inválido',
+                apenas_admin: 'Apenas administradores podem mudar papéis',
+                usuario_outro_clube: 'Usuário pertence a outro clube',
+                usuario_nao_encontrado: 'Usuário não encontrado',
+            };
+            throw new Error(mapa[data?.erro] || ('Erro: ' + (data?.erro || '?')));
+        }
+        document.getElementById('modal-mudar-papel')?.remove();
+        showToast(`✅ Papel de ${nomeUser} atualizado para ${novoPapel}`);
+        logAudit && logAudit('USUARIO_PAPEL_MUDADO', `${nomeUser} → ${novoPapel}`);
+        await renderUsuarios();
+    } catch (e) {
+        console.error('Erro mudar papel:', e);
+        alert('❌ ' + (e.message || 'Erro ao mudar papel'));
+    }
+}
+
+async function desativarOperador(userId, nomeUser) {
+    if (!confirm(`Desativar ${nomeUser}?\n\nO usuário não conseguirá mais fazer login, mas o histórico é preservado. Você pode reativar a qualquer momento.`)) return;
+    try {
+        const { data, error } = await sb.rpc('desativar_usuario', { p_alvo_user_id: userId });
+        if (error) throw error;
+        if (!data || !data.ok) {
+            const mapa = {
+                nao_pode_desativar_proprio: 'Você não pode se desativar',
+                apenas_admin: 'Apenas administradores podem desativar usuários',
+                usuario_outro_clube: 'Usuário pertence a outro clube',
+            };
+            throw new Error(mapa[data?.erro] || ('Erro: ' + (data?.erro || '?')));
+        }
+        showToast(`🚫 ${nomeUser} desativado`);
+        logAudit && logAudit('USUARIO_DESATIVADO', nomeUser);
+        await renderUsuarios();
+    } catch (e) {
+        console.error('Erro desativar:', e);
+        alert('❌ ' + (e.message || 'Erro ao desativar'));
+    }
+}
+
+async function reativarOperador(userId, nomeUser) {
+    if (!confirm(`Reativar ${nomeUser}? O usuário voltará a poder fazer login.`)) return;
+    try {
+        const { data, error } = await sb.rpc('reativar_usuario', { p_alvo_user_id: userId });
+        if (error) throw error;
+        if (!data || !data.ok) {
+            throw new Error('Erro: ' + (data?.erro || '?'));
+        }
+        showToast(`✅ ${nomeUser} reativado`);
+        logAudit && logAudit('USUARIO_REATIVADO', nomeUser);
+        await renderUsuarios();
+    } catch (e) {
+        console.error('Erro reativar:', e);
+        alert('❌ ' + (e.message || 'Erro ao reativar'));
+    }
+}
+
+async function removerOperador(userId, nomeUser) {
+    const confirma = prompt(
+        `⚠️ REMOVER PERMANENTEMENTE ${nomeUser}?\n\n` +
+        `Esta ação é IRREVERSÍVEL:\n` +
+        `• A conta será excluída\n` +
+        `• O e-mail ficará livre para ser convidado em outro clube\n` +
+        `• O histórico das ações dele permanece\n\n` +
+        `Digite REMOVER pra confirmar:`
+    );
+    if (confirma !== 'REMOVER') {
+        if (confirma !== null) showToast('Remoção cancelada');
+        return;
+    }
+    try {
+        const { data, error } = await sb.rpc('remover_usuario', { p_alvo_user_id: userId });
+        if (error) throw error;
+        if (!data || !data.ok) {
+            const mapa = {
+                nao_pode_remover_proprio: 'Você não pode se remover',
+                apenas_admin: 'Apenas administradores podem remover usuários',
+                usuario_outro_clube: 'Usuário pertence a outro clube',
+            };
+            throw new Error(mapa[data?.erro] || ('Erro: ' + (data?.erro || '?')));
+        }
+        showToast(`🗑️ ${nomeUser} removido do clube`);
+        logAudit && logAudit('USUARIO_REMOVIDO', nomeUser);
+        await renderUsuarios();
+    } catch (e) {
+        console.error('Erro remover:', e);
+        alert('❌ ' + (e.message || 'Erro ao remover'));
+    }
 }
 
 function renderMatrizPermissoes() {
