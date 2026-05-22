@@ -459,6 +459,19 @@
     color: #a855f7;
     flex-shrink: 0;
   }
+  .venda-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .venda-badge.estornada { background: rgba(239, 68, 68, .2); color: #fca5a5; }
+  .venda-badge.pendente  { background: rgba(245, 158, 11, .2); color: #fcd34d; }
+  .venda-badge.negada    { background: rgba(113, 113, 122, .2); color: #a1a1aa; }
   .badge {
     font-size: 9px;
     padding: 2px 6px;
@@ -785,13 +798,51 @@ async function carregarTudo() {
       carregarAtividade(),
       carregarEstornos()
     ]);
+    assinarRealtime();
   } finally {
     setLoading(false);
   }
 }
 
-// Atualiza estornos a cada 30s pra admin ver novos pedidos sem refresh manual
-setInterval(() => { carregarEstornos(); }, 30_000);
+// ============================================================
+// REALTIME: atualiza painel quando há mudanças no clube
+// ============================================================
+let _painelChannel = null;
+
+function assinarRealtime() {
+  if (_painelChannel) {
+    try { sb.removeChannel(_painelChannel); } catch(_) {}
+  }
+  _painelChannel = sb
+    .channel('stackbar_painel_' + CLUBE_ID)
+    // Mudanças em vendas (nova venda, estorno solicitado/aprovado/negado)
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'stackbar_vendas',
+      filter: 'clube_id=eq.' + CLUBE_ID
+    }, () => {
+      // qualquer mudança em vendas: recarrega atividade + estornos
+      carregarAtividade();
+      carregarEstornos();
+    })
+    // Mudanças em comandas (abrir/fechar/cancelar)
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'bar_comandas',
+      filter: 'clube_id=eq.' + CLUBE_ID
+    }, () => {
+      carregarAtividade();
+    })
+    // Itens de comanda (acumular item, remover)
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'bar_comanda_itens',
+      filter: 'clube_id=eq.' + CLUBE_ID
+    }, () => {
+      // Não precisa recarregar atividade aqui — só importa pra contagem global
+      // mas o total da comanda já mudou via bar_comandas
+    })
+    .subscribe((status) => {
+      console.log('[Painel] realtime:', status);
+    });
+}
 
 // ============================================================
 // TOKEN
@@ -923,10 +974,10 @@ async function salvarConfig() {
 async function carregarAtividade() {
   const desde = todayStartIso();
 
-  // Vendas hoje (via tabela stackbar_vendas — RLS já garante filtro por clube)
+  // Vendas hoje (inclui estorno_status pra descontar e marcar visualmente)
   const { data: vendas, error } = await sb
     .from('stackbar_vendas')
-    .select('id, jogador_nome, operador_nome, tipo, forma_pagto, total, criado_em')
+    .select('id, jogador_nome, operador_nome, tipo, forma_pagto, total, criado_em, estorno_status')
     .eq('clube_id', CLUBE_ID)
     .gte('criado_em', desde)
     .order('criado_em', { ascending: false })
@@ -938,9 +989,12 @@ async function carregarAtividade() {
   }
 
   const lista = vendas || [];
-  const qtd = lista.length;
-  const total = lista.reduce((s, v) => s + Number(v.total || 0), 0);
-  const operadoresUnicos = new Set(lista.map(v => v.operador_nome).filter(Boolean)).size;
+
+  // Faturamento real desconta estornos APROVADOS (vendas pendentes ainda contam)
+  const validas = lista.filter(v => v.estorno_status !== 'aprovado');
+  const qtd = validas.length;
+  const total = validas.reduce((s, v) => s + Number(v.total || 0), 0);
+  const operadoresUnicos = new Set(validas.map(v => v.operador_nome).filter(Boolean)).size;
 
   $('stHoje').textContent = qtd;
   $('stFaturamento').textContent = fmtMoney(total);
@@ -954,8 +1008,8 @@ async function carregarAtividade() {
     .eq('status', 'aberta');
   $('stComandas').textContent = count || 0;
 
-  // Vendas recentes
-  if (qtd === 0) {
+  // Vendas recentes (mostra TODAS, incluindo estornadas com badge)
+  if (lista.length === 0) {
     $('vendasRecentes').className = 'empty';
     $('vendasRecentes').innerHTML = 'Nenhuma venda hoje ainda.';
   } else {
@@ -963,16 +1017,32 @@ async function carregarAtividade() {
     $('vendasRecentes').innerHTML = lista.map(v => {
       const hora = new Date(v.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const formaTxt = v.tipo === 'comanda' ? 'Comanda' : (v.forma_pagto || '').toUpperCase();
+
+      // Status de estorno: estilos visuais distintos
+      let badge = '';
+      let estiloItem = '';
+      let estiloValor = '';
+      if (v.estorno_status === 'aprovado') {
+        badge = '<span class="venda-badge estornada">❌ ESTORNADA</span>';
+        estiloItem = 'opacity:.55;';
+        estiloValor = 'text-decoration:line-through;color:#71717a;';
+      } else if (v.estorno_status === 'solicitado') {
+        badge = '<span class="venda-badge pendente">⏳ ESTORNO PENDENTE</span>';
+        estiloItem = 'border-left:3px solid #f59e0b;padding-left:8px;';
+      } else if (v.estorno_status === 'negado') {
+        badge = '<span class="venda-badge negada">🚫 Estorno negado</span>';
+      }
+
       return `
-        <div class="venda-recente">
+        <div class="venda-recente" style="${estiloItem}">
           <div class="info">
             <div class="nome">
-              ${esc(v.jogador_nome || '—')}
+              ${esc(v.jogador_nome || '—')} ${badge}
               <span class="badge ${v.tipo}">${v.tipo === 'comanda' ? 'COMANDA' : 'À VISTA'}</span>
             </div>
             <div class="meta">${hora} • ${esc(v.operador_nome || '—')} • ${esc(formaTxt)}</div>
           </div>
-          <div class="valor">${fmtMoney(v.total)}</div>
+          <div class="valor" style="${estiloValor}">${fmtMoney(v.total)}</div>
         </div>
       `;
     }).join('');

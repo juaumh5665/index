@@ -900,6 +900,7 @@ let HISTORICO      = [];          // vendas do operador no dia
 let GRUPOS         = new Map();   // grupo_id → grupo_nome
 let _searchTimer   = null;
 let _scChannel     = null;        // canal realtime do stackclock_alertas
+let _vendasChannel = null;        // canal realtime de stackbar_vendas (mudanças de estorno)
 let _audioCtx      = null;        // contexto de áudio (Web Audio API)
 
 // Config local de notificações (persistida no aparelho)
@@ -1092,7 +1093,47 @@ async function entrarApp() {
   await carregarTopVendidos();
   await carregarHistorico();
   assinarAlertasStackClock();
+  assinarMudancasVendas();
   setupEventListeners();
+}
+
+// ============================================================
+// REALTIME: mudanças em stackbar_vendas (estorno aprovado/negado)
+// Recarrega o histórico do operador quando o admin resolve estorno
+// ============================================================
+function assinarMudancasVendas() {
+  if (_vendasChannel) {
+    try { sb.removeChannel(_vendasChannel); } catch(_) {}
+  }
+  _vendasChannel = sb
+    .channel('stackbar_vendas_' + SESSAO.clube_id)
+    .on('postgres_changes', {
+      event:  'UPDATE',
+      schema: 'public',
+      table:  'stackbar_vendas',
+      filter: 'clube_id=eq.' + SESSAO.clube_id
+    }, (payload) => {
+      // Só interessa se a venda mudou de status de estorno
+      const novo = payload.new;
+      const velho = payload.old;
+      if (!novo || !velho) return;
+      if (novo.estorno_status === velho.estorno_status) return;
+
+      // Se a venda atualizada é do operador logado, atualiza tela
+      if (novo.operador_id === SESSAO.user_id) {
+        // Toast informativo
+        if (novo.estorno_status === 'aprovado') {
+          showToast('✅ Estorno aprovado pelo admin: ' + (novo.jogador_nome || ''), 'success');
+        } else if (novo.estorno_status === 'negado') {
+          showToast('🚫 Estorno NEGADO pelo admin: ' + (novo.jogador_nome || ''), 'error');
+        }
+        // Recarrega histórico só se a aba estiver visível
+        carregarHistorico();
+      }
+    })
+    .subscribe((status) => {
+      console.log('[StackBar] realtime stackbar_vendas:', status);
+    });
 }
 
 // ============================================================
