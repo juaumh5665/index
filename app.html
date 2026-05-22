@@ -13674,66 +13674,46 @@ async function aceitarConviteSubmit() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando…';
 
     try {
-        // 1) Cria usuário no Auth com o email do convite
-        const { data: signData, error: signErr } = await sb.auth.signUp({
-            email: _conviteAtual.email,
-            password: senha,
-        });
-
-        if (signErr) {
-            // Erro explícito do Supabase
-            console.error('[CONVITE] signUp erro:', signErr);
-            if (signErr.message?.includes('already registered') || signErr.message?.includes('User already registered')) {
-                throw new Error('Este e-mail já tem cadastro. Faça login com sua senha existente — você já é membro do clube.');
-            }
-            if (signErr.message?.toLowerCase().includes('weak password') || signErr.message?.toLowerCase().includes('password')) {
-                throw new Error('Senha muito fraca. Use ao menos 6 caracteres com letras e números.');
-            }
-            if (signErr.message?.toLowerCase().includes('rate')) {
-                throw new Error('Muitas tentativas seguidas. Aguarde 1 minuto e tente novamente.');
-            }
-            throw new Error('Erro ao criar conta: ' + signErr.message);
-        }
-
-        // Detecção de "fake success" do Supabase: email já cadastrado mas retornou sucesso silencioso.
-        // Sinais: user é null, ou user.identities está vazio (proteção contra user enumeration).
-        if (!signData?.user || (Array.isArray(signData.user.identities) && signData.user.identities.length === 0)) {
-            console.error('[CONVITE] signUp retornou user inválido (provável e-mail duplicado):', signData);
-            throw new Error(
-                'Este e-mail já está cadastrado. Se você já tem conta, faça login. ' +
-                'Se acredita que isso é um erro, entre em contato com o suporte.'
-            );
-        }
-
-        // 2) RPC pra aceitar convite (vincula user → clube)
-        const { data: rpcData, error: rpcErr } = await sb.rpc('aceitar_convite', {
+        // 1) RPC atômica: cria user no auth + vincula ao clube + marca convite aceito
+        //    (substitui o antigo signUp+aceitar_convite que deixava users órfãos)
+        const { data: rpcData, error: rpcErr } = await sb.rpc('aceitar_convite_completo', {
             p_token: _conviteAtual.token,
-            p_user_id: signData.user.id,
-            p_nome: nome,
+            p_email: _conviteAtual.email,
+            p_senha: senha,
+            p_nome:  nome,
         });
+
         if (rpcErr) {
-            // ⚠️ AQUI é o ponto crítico: o user JÁ foi criado no Auth, mas a vinculação falhou.
-            // Sem essa mensagem, o usuário acha que pode tentar de novo — mas como o e-mail já
-            // existe, vai dar "fake success" eternamente.
-            console.error('[CONVITE] RPC aceitar_convite falhou:', rpcErr);
-            throw new Error(
-                'Sua conta foi criada mas o convite não pôde ser vinculado. ' +
-                'Entre em contato com o suporte para liberar seu acesso ' +
-                '(detalhe técnico: ' + (rpcErr.message || rpcErr.code || 'desconhecido') + ').'
-            );
+            console.error('RPC aceitar_convite_completo erro:', rpcErr);
+            throw new Error(rpcErr.message || 'Erro de conexão ao processar convite');
+        }
+
+        if (!rpcData || !rpcData.ok) {
+            const mapaErros = {
+                token_invalido:      'Convite inválido ou inexistente',
+                token_ja_usado:      'Este convite já foi aceito anteriormente',
+                token_expirado:      'Este convite expirou. Peça um novo ao administrador',
+                email_nao_confere:   'O e-mail não corresponde ao convite',
+                email_ja_cadastrado: 'Este e-mail já está cadastrado no sistema',
+                senha_curta:         'A senha deve ter pelo menos 6 caracteres',
+                nome_invalido:       'Informe um nome válido',
+                falha_interna:       'Erro interno: ' + (rpcData?.detalhe || 'tente novamente em instantes'),
+            };
+            throw new Error(mapaErros[rpcData?.erro] || ('Erro desconhecido: ' + (rpcData?.erro || '?')));
         }
 
         showToast('🎉 Convite aceito! Entrando…');
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 800));
 
-        // 3) Login automático
+        // 2) Login automático (e-mail já vem confirmado, então signIn funciona direto)
         const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({
             email: _conviteAtual.email,
             password: senha,
         });
         if (loginErr) {
+            console.error('Login pós-convite erro:', loginErr);
             mostrarTelaLogin();
-            showToast('✉️ Verifique seu e-mail para confirmar o cadastro');
+            showToast('Conta criada! Faça login com sua senha.');
             return;
         }
 
