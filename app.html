@@ -21151,7 +21151,10 @@ function renderHistorico() {
     ` : '';
 
     // Inclui comandas fechadas E canceladas (estornadas) — canceladas com badge
-    const fechadas = [...barComandas].filter(c => c.status === 'fechada' || c.status === 'cancelada').reverse();
+    // Ordenação: mais recente primeiro (por fechadoEm DESC)
+    const fechadas = [...barComandas]
+        .filter(c => c.status === 'fechada' || c.status === 'cancelada')
+        .sort((a, b) => (b.fechadoEm || 0) - (a.fechadoEm || 0));
     if (!fechadas.length) {
         el.innerHTML = turnosHtml + '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma venda registrada</div>';
         return;
