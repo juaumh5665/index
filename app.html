@@ -6989,18 +6989,20 @@ async function _processarMudancaRealtime(tipo, payload) {
         
         if (tipo === 'comanda' || tipo === 'comanda_item' || tipo === 'produto') {
             if (paginaAtual === 'bar') {
-                // Chama todas as renderizações relevantes da página Bar & Vendas
-                safeRender(window.renderComandas, 'renderComandas');           // lista de comandas abertas
-                safeRender(window.renderHistorico, 'renderHistorico');         // aba histórico (vendas fechadas + canceladas)
-                safeRender(window.renderRelBar, 'renderRelBar');               // aba relatório (KPIs)
-                safeRender(window.renderBarProdutos, 'renderBarProdutos');     // aba produtos (estoque)
-                safeRender(window.renderBarCaixaBanner, 'renderBarCaixaBanner'); // banner topo (caixa aberto/fechado)
-                // Se há comanda ativa selecionada, atualiza o painel de detalhe
-                if (activeComandaId && typeof window.renderDetalheComanda === 'function') {
-                    safeRender(window.renderDetalheComanda, 'renderDetalheComanda');
+                // Chama as renderizações da página Bar & Vendas
+                // (sem usar window.* porque funções declaradas com `function` não viram global)
+                safeRender(() => typeof renderComandas       === 'function' && renderComandas(),       'renderComandas');
+                safeRender(() => typeof renderHistorico      === 'function' && renderHistorico(),      'renderHistorico');
+                safeRender(() => typeof renderRelBar         === 'function' && renderRelBar(),         'renderRelBar');
+                safeRender(() => typeof renderBarProdutos    === 'function' && renderBarProdutos(),    'renderBarProdutos');
+                safeRender(() => typeof renderBarCaixaBanner === 'function' && renderBarCaixaBanner(), 'renderBarCaixaBanner');
+                if (activeComandaId) {
+                    safeRender(() => typeof renderDetalheComanda === 'function' && renderDetalheComanda(), 'renderDetalheComanda');
                 }
             }
-            if (paginaAtual === 'caixa') safeRender(window.renderCaixa, 'renderCaixa');
+            if (paginaAtual === 'caixa') {
+                safeRender(() => typeof renderCaixa === 'function' && renderCaixa(), 'renderCaixa');
+            }
         }
         
         if (tipo === 'cash_mesa') {
