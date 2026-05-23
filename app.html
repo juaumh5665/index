@@ -6974,7 +6974,18 @@ async function _processarMudancaRealtime(tipo, payload) {
         }
         
         // Re-renderizar páginas afetadas — cada uma em try/catch isolado pra não derrubar tudo
-        const paginaAtual = window._paginaAtual || 'dashboard';
+        // Tenta primeiro a variável global, senão detecta pela página visível no DOM
+        let paginaAtual = window._paginaAtual;
+        if (!paginaAtual) {
+            // Fallback: olha qual div .page-content está visível
+            const visivel = document.querySelector('.page-content[style*="block"]:not([style*="none"])');
+            if (visivel && visivel.id && visivel.id.startsWith('page-')) {
+                paginaAtual = visivel.id.replace('page-', '');
+            } else {
+                paginaAtual = 'dashboard';
+            }
+        }
+        console.log('[REALTIME] página atual detectada:', paginaAtual);
         
         const safeRender = (fn, nome) => {
             try { if (typeof fn === 'function') fn(); }
@@ -16046,6 +16057,9 @@ function _renderSidebarLocks() {
 }
 
 function showPage(page) {
+    // Rastreia página atual pra outros sistemas (ex: realtime decide o que re-renderizar)
+    window._paginaAtual = page;
+
     if (page === 'fechamento') setTimeout(inicializarFechamento, 50);
     if (page === 'jackpot')    setTimeout(() => renderPaginaJackpot(), 50);
 
