@@ -6988,7 +6988,18 @@ async function _processarMudancaRealtime(tipo, payload) {
         }
         
         if (tipo === 'comanda' || tipo === 'comanda_item' || tipo === 'produto') {
-            if (paginaAtual === 'bar') safeRender(window.renderBar, 'renderBar');
+            if (paginaAtual === 'bar') {
+                // Chama todas as renderizações relevantes da página Bar & Vendas
+                safeRender(window.renderComandas, 'renderComandas');           // lista de comandas abertas
+                safeRender(window.renderHistorico, 'renderHistorico');         // aba histórico (vendas fechadas + canceladas)
+                safeRender(window.renderRelBar, 'renderRelBar');               // aba relatório (KPIs)
+                safeRender(window.renderBarProdutos, 'renderBarProdutos');     // aba produtos (estoque)
+                safeRender(window.renderBarCaixaBanner, 'renderBarCaixaBanner'); // banner topo (caixa aberto/fechado)
+                // Se há comanda ativa selecionada, atualiza o painel de detalhe
+                if (activeComandaId && typeof window.renderDetalheComanda === 'function') {
+                    safeRender(window.renderDetalheComanda, 'renderDetalheComanda');
+                }
+            }
             if (paginaAtual === 'caixa') safeRender(window.renderCaixa, 'renderCaixa');
         }
         
