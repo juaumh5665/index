@@ -21129,6 +21129,8 @@ function abrirComanda() {
 
 
 // --- HISTÓRICO ---
+let _historicoFiltroOperador = localStorage.getItem('ps_hist_op_filtro') || '';
+
 function renderHistorico() {
     const el = document.getElementById('bar-historico-list');
     if (!el) return;
@@ -21152,18 +21154,54 @@ function renderHistorico() {
 
     // Inclui comandas fechadas E canceladas (estornadas) — canceladas com badge
     // Ordenação: mais recente primeiro (por fechadoEm DESC)
-    const fechadas = [...barComandas]
+    const todasFechadas = [...barComandas]
         .filter(c => c.status === 'fechada' || c.status === 'cancelada')
         .sort((a, b) => (b.fechadoEm || 0) - (a.fechadoEm || 0));
+
+    // Conta vendas por operador (pra mostrar no dropdown)
+    const operadoresCount = {};
+    todasFechadas.forEach(c => {
+        const op = c.operador || '— Sem operador';
+        operadoresCount[op] = (operadoresCount[op] || 0) + 1;
+    });
+    const operadoresOrdenados = Object.entries(operadoresCount).sort((a, b) => b[1] - a[1]);
+
+    // Aplica filtro (se houver operador selecionado)
+    const fechadas = _historicoFiltroOperador
+        ? todasFechadas.filter(c => (c.operador || '— Sem operador') === _historicoFiltroOperador)
+        : todasFechadas;
+
+    // Dropdown de filtro (só aparece se tem mais de 1 operador)
+    let filtroHtml = '';
+    if (operadoresOrdenados.length > 1) {
+        const opts = ['<option value="">Todos os operadores (' + todasFechadas.length + ')</option>']
+            .concat(operadoresOrdenados.map(([op, qtd]) =>
+                `<option value="${op.replace(/"/g, '&quot;')}" ${op === _historicoFiltroOperador ? 'selected' : ''}>${op} (${qtd})</option>`
+            ));
+        filtroHtml = `
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+                <i class="fa-solid fa-filter" style="color:#52525b;font-size:.85rem;"></i>
+                <label for="bar-hist-op-filtro" style="font-size:.75rem;color:#a1a1aa;font-weight:600;">Filtrar por operador:</label>
+                <select id="bar-hist-op-filtro" onchange="_setHistoricoFiltroOperador(this.value)" class="inp" style="flex:1;padding:.35rem .55rem;font-size:.8rem;background:#0a0a0b;border:1px solid #1e1e23;color:#fafafa;border-radius:.35rem;cursor:pointer;">
+                    ${opts.join('')}
+                </select>
+                ${_historicoFiltroOperador ? `<button onclick="_setHistoricoFiltroOperador('')" style="background:transparent;border:1px solid #3f3f46;color:#a1a1aa;font-size:.7rem;padding:.3rem .6rem;border-radius:.35rem;cursor:pointer;" title="Limpar filtro"><i class="fa-solid fa-times"></i> Limpar</button>` : ''}
+            </div>
+        `;
+    }
+
     if (!fechadas.length) {
-        el.innerHTML = turnosHtml + '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma venda registrada</div>';
+        const msg = _historicoFiltroOperador
+            ? `Nenhuma venda registrada para "${esc(_historicoFiltroOperador)}"`
+            : 'Nenhuma venda registrada';
+        el.innerHTML = turnosHtml + filtroHtml + `<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">${msg}</div>`;
         return;
     }
 
     // wrap fechadas in title
     const vendasTitle = '<div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-receipt"></i> Vendas</div>';
     const pgtoIcon = { dinheiro:'fa-money-bill-wave', pix:'fa-brands fa-pix', cartao:'fa-credit-card', debito:'fa-credit-card', credito:'fa-credit-card', cheque:'fa-money-check', credito_sistema:'fa-wallet' };
-    el.innerHTML = turnosHtml + vendasTitle + fechadas.map(c => {
+    el.innerHTML = turnosHtml + filtroHtml + vendasTitle + fechadas.map(c => {
         const j = jogadores.find(j => j.id === c.jogadorId);
         const mLbl = (PAYMENT_METHODS[c.pagamento] && PAYMENT_METHODS[c.pagamento].label) || c.pagamento;
 
@@ -21176,12 +21214,17 @@ function renderHistorico() {
             ? '<span class="tag" style="background:rgba(239,68,68,.18);color:#fca5a5;font-size:.65rem;margin-left:.4rem;letter-spacing:.5px;">❌ ESTORNADA</span>'
             : '';
 
+        // Operador inline na metadata (estilo A escolhido)
+        const operadorHtml = c.operador
+            ? ` &bull; <i class="fa-solid fa-user" style="font-size:.7rem;color:#71717a;"></i> <span style="color:#a1a1aa;">${esc(c.operador)}</span>`
+            : '';
+
         return `
         <div onclick="abrirExtratoComanda('${c.id}')" style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;cursor:pointer;transition:all .15s;${estiloItem}" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'" title="Clique pra ver extrato detalhado">
             <div>
                 <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}${badgeEstornada}</div>
                 <div style="font-size:.75rem;color:#52525b;">
-                    ${c.itens.length} item(s) &bull; ${new Date(c.fechadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                    ${c.itens.length} item(s) &bull; ${new Date(c.fechadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${operadorHtml}
                     ${c.incluiuPendencias ? `<span style="color:var(--gold);"> &bull; incluiu ${formatMoney(c.pendenciasValor)} pendente</span>` : ''}
                 </div>
             </div>
@@ -21191,6 +21234,17 @@ function renderHistorico() {
             <i class="fa-solid fa-receipt" style="color:var(--gold);font-size:.85rem;"></i>
         </div>`;
     }).join('');
+}
+
+// Handler do dropdown (salva preferência + re-renderiza)
+function _setHistoricoFiltroOperador(valor) {
+    _historicoFiltroOperador = valor || '';
+    if (valor) {
+        localStorage.setItem('ps_hist_op_filtro', valor);
+    } else {
+        localStorage.removeItem('ps_hist_op_filtro');
+    }
+    renderHistorico();
 }
 
 // --- RELATÓRIO ---
