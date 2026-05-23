@@ -21123,7 +21123,8 @@ function renderHistorico() {
         </div>
     ` : '';
 
-    const fechadas = [...barComandas].filter(c => c.status === 'fechada').reverse();
+    // Inclui comandas fechadas E canceladas (estornadas) — canceladas com badge
+    const fechadas = [...barComandas].filter(c => c.status === 'fechada' || c.status === 'cancelada').reverse();
     if (!fechadas.length) {
         el.innerHTML = turnosHtml + '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma venda registrada</div>';
         return;
@@ -21135,18 +21136,28 @@ function renderHistorico() {
     el.innerHTML = turnosHtml + vendasTitle + fechadas.map(c => {
         const j = jogadores.find(j => j.id === c.jogadorId);
         const mLbl = (PAYMENT_METHODS[c.pagamento] && PAYMENT_METHODS[c.pagamento].label) || c.pagamento;
+
+        // Comanda cancelada (estorno aprovado): aparece riscada + opaca + badge
+        const isEstornada = c.status === 'cancelada';
+        const estiloItem = isEstornada ? 'opacity:.55;' : '';
+        const corValor = isEstornada ? '#71717a' : '#22c55e';
+        const decoracao = isEstornada ? 'text-decoration:line-through;' : '';
+        const badgeEstornada = isEstornada
+            ? '<span class="tag" style="background:rgba(239,68,68,.18);color:#fca5a5;font-size:.65rem;margin-left:.4rem;letter-spacing:.5px;">❌ ESTORNADA</span>'
+            : '';
+
         return `
-        <div onclick="abrirExtratoComanda('${c.id}')" style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'" title="Clique pra ver extrato detalhado">
+        <div onclick="abrirExtratoComanda('${c.id}')" style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:1rem;align-items:center;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;cursor:pointer;transition:all .15s;${estiloItem}" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='#1e1e23'" title="Clique pra ver extrato detalhado">
             <div>
-                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}</div>
+                <div style="font-weight:700;font-size:.9rem;">${j ? j.nome : '?'}${badgeEstornada}</div>
                 <div style="font-size:.75rem;color:#52525b;">
                     ${c.itens.length} item(s) &bull; ${new Date(c.fechadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
                     ${c.incluiuPendencias ? `<span style="color:var(--gold);"> &bull; incluiu ${formatMoney(c.pendenciasValor)} pendente</span>` : ''}
                 </div>
             </div>
             <span class="tag" style="background:#18181b;color:#71717a;font-size:.65rem;"><i class="fa-solid ${pgtoIcon[c.pagamento]||'fa-circle'}"></i> ${mLbl}</span>
-            <span style="font-family:var(--font-mono);font-size:.75rem;color:#71717a;">Pago: ${formatMoney(c.valorPago||c.total)}</span>
-            <span style="font-family:var(--font-mono);font-weight:700;color:#22c55e;font-size:.9rem;">${formatMoney(c.total)}</span>
+            <span style="font-family:var(--font-mono);font-size:.75rem;color:#71717a;${decoracao}">Pago: ${formatMoney(c.valorPago||c.total)}</span>
+            <span style="font-family:var(--font-mono);font-weight:700;color:${corValor};font-size:.9rem;${decoracao}">${formatMoney(c.total)}</span>
             <i class="fa-solid fa-receipt" style="color:var(--gold);font-size:.85rem;"></i>
         </div>`;
     }).join('');
@@ -27129,7 +27140,10 @@ function renderRelatorios() {
 function getDadosPeriodo() {
     const torneiosPeriodo = torneios.filter(t => inPeriod(_getTorneioTimestamp(t)));
     const cashPeriodo = cashMesas.filter(m => inPeriod(m.fechadoEm || m.abertoEm));
-    const comandasPeriodo = barComandas.filter(c => c.status === 'fechada' && inPeriod(c.fechadoEm));
+    // Comandas: inclui fechadas E canceladas (estornadas) — canceladas marcadas com badge
+    const comandasPeriodo = barComandas.filter(c =>
+        (c.status === 'fechada' || c.status === 'cancelada') && inPeriod(c.fechadoEm)
+    );
     const transacoesPeriodo = transacoes.filter(t => inPeriod(t.ts));
 
     return { torneiosPeriodo, cashPeriodo, comandasPeriodo, transacoesPeriodo };
@@ -27361,11 +27375,15 @@ function renderRelBar() {
     if (!el || el.style.display === 'none') return;
     const { comandasPeriodo } = getDadosPeriodo();
 
-    const fat = comandasPeriodo.reduce((s,c) => s + c.total, 0);
-    const ticket = comandasPeriodo.length ? fat / comandasPeriodo.length : 0;
-    const itens = comandasPeriodo.reduce((s,c) => s + c.itens.reduce((ss,it) => ss + it.qtd, 0), 0);
+    // Comandas válidas (não-canceladas) e canceladas (estornadas)
+    const validas = comandasPeriodo.filter(c => c.status !== 'cancelada');
+    const canceladas = comandasPeriodo.filter(c => c.status === 'cancelada');
 
-    document.getElementById('rb-qtd').innerText = comandasPeriodo.length;
+    const fat = validas.reduce((s,c) => s + c.total, 0);
+    const ticket = validas.length ? fat / validas.length : 0;
+    const itens = validas.reduce((s,c) => s + c.itens.reduce((ss,it) => ss + it.qtd, 0), 0);
+
+    document.getElementById('rb-qtd').innerText = validas.length;
     document.getElementById('rb-fat').innerText = formatMoney(fat);
     document.getElementById('rb-ticket').innerText = formatMoney(ticket);
     document.getElementById('rb-itens').innerText = itens;
@@ -27376,7 +27394,7 @@ function renderRelBar() {
     let cmvTotal = 0;       // custo das mercadorias vendidas
     let qtdComCusto = 0;    // quantidade de itens vendidos que têm custo cadastrado
     let qtdSemCusto = 0;    // quantidade de itens vendidos sem custo cadastrado
-    comandasPeriodo.forEach(c => {
+    validas.forEach(c => {
         c.itens.forEach(it => {
             const p = barProdutos.find(x => x.id === it.produtoId);
             if (!p) return;
