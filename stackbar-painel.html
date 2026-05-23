@@ -472,6 +472,54 @@
   .venda-badge.estornada { background: rgba(239, 68, 68, .2); color: #fca5a5; }
   .venda-badge.pendente  { background: rgba(245, 158, 11, .2); color: #fcd34d; }
   .venda-badge.negada    { background: rgba(113, 113, 122, .2); color: #a1a1aa; }
+
+  /* === TOP VENDEDORES === */
+  .ranking-item {
+    display: grid;
+    grid-template-columns: 38px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    background: rgba(15, 23, 42, .35);
+    border: 1px solid rgba(255, 255, 255, .04);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    transition: all .15s;
+  }
+  .ranking-item:hover { border-color: rgba(168, 85, 247, .25); }
+  .ranking-item:last-child { margin-bottom: 0; }
+  .ranking-medalha {
+    font-size: 22px;
+    text-align: center;
+    line-height: 1;
+  }
+  .ranking-pos1 { background: linear-gradient(180deg, rgba(245, 158, 11, .08), transparent); border-color: rgba(245, 158, 11, .25); }
+  .ranking-pos2 { background: linear-gradient(180deg, rgba(168, 168, 168, .06), transparent); border-color: rgba(168, 168, 168, .2); }
+  .ranking-pos3 { background: linear-gradient(180deg, rgba(180, 83, 9, .06), transparent); border-color: rgba(180, 83, 9, .2); }
+  .ranking-info .nome {
+    font-weight: 700;
+    font-size: 14px;
+    color: #fafafa;
+  }
+  .ranking-info .meta {
+    font-size: 11px;
+    color: #71717a;
+    margin-top: 3px;
+  }
+  .ranking-valor {
+    text-align: right;
+  }
+  .ranking-valor .num {
+    font-weight: 800;
+    font-size: 17px;
+    color: #4ade80;
+    font-family: var(--font-mono, monospace);
+  }
+  .ranking-valor .qtd {
+    font-size: 11px;
+    color: #71717a;
+    margin-top: 2px;
+  }
   .badge {
     font-size: 9px;
     padding: 2px 6px;
@@ -597,6 +645,13 @@
       </h3>
       <p class="card-desc">Solicitações de estorno aguardando sua aprovação. Aprovar reverte a venda (devolve estoque + cancela transações). Negar mantém a venda.</p>
       <div id="estornosList"></div>
+    </div>
+
+    <!-- TOP VENDEDORES (hoje) -->
+    <div class="card" id="cardTopVendedores" style="display:none;">
+      <h3 class="card-title">🏆 Top vendedores (hoje)</h3>
+      <p class="card-desc">Ranking dos operadores por faturamento no dia operacional atual. Já desconta estornos aprovados.</p>
+      <div id="topVendedoresList"></div>
     </div>
 
     <!-- VENDAS RECENTES -->
@@ -1007,13 +1062,14 @@ async function carregarAtividade() {
   const desde = todayStartIso();
 
   // Vendas hoje (inclui estorno_status pra descontar e marcar visualmente)
+  // Limit alto pra cobrir o dia operacional inteiro (KPIs + ranking dependem disso)
   const { data: vendas, error } = await sb
     .from('stackbar_vendas')
-    .select('id, jogador_nome, operador_nome, tipo, forma_pagto, total, criado_em, estorno_status')
+    .select('id, jogador_nome, operador_nome, operador_id, tipo, forma_pagto, total, criado_em, estorno_status')
     .eq('clube_id', CLUBE_ID)
     .gte('criado_em', desde)
     .order('criado_em', { ascending: false })
-    .limit(20);
+    .limit(500);
 
   if (error) {
     console.error('Erro carregar vendas:', error);
@@ -1040,13 +1096,17 @@ async function carregarAtividade() {
     .eq('status', 'aberta');
   $('stComandas').textContent = count || 0;
 
-  // Vendas recentes (mostra TODAS, incluindo estornadas com badge)
-  if (lista.length === 0) {
+  // 🏆 TOP 3 VENDEDORES (calculado das vendas válidas)
+  renderTopVendedores(validas);
+
+  // Vendas recentes (mostra apenas as 20 mais recentes — TODAS, incluindo estornadas)
+  const vendasRecentes = lista.slice(0, 20);
+  if (vendasRecentes.length === 0) {
     $('vendasRecentes').className = 'empty';
     $('vendasRecentes').innerHTML = 'Nenhuma venda hoje ainda.';
   } else {
     $('vendasRecentes').className = '';
-    $('vendasRecentes').innerHTML = lista.map(v => {
+    $('vendasRecentes').innerHTML = vendasRecentes.map(v => {
       const hora = new Date(v.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const formaTxt = v.tipo === 'comanda' ? 'Comanda' : (v.forma_pagto || '').toUpperCase();
 
@@ -1079,6 +1139,63 @@ async function carregarAtividade() {
       `;
     }).join('');
   }
+}
+
+// ============================================================
+// TOP VENDEDORES (top 3 por faturamento no dia operacional)
+// ============================================================
+function renderTopVendedores(vendasValidas) {
+  const card = $('cardTopVendedores');
+  const lista = $('topVendedoresList');
+
+  if (!vendasValidas || vendasValidas.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  // Agrupa por operador_id (ou nome como fallback)
+  const agrupado = {};
+  vendasValidas.forEach(v => {
+    const key = v.operador_id || v.operador_nome || 'desconhecido';
+    if (!agrupado[key]) {
+      agrupado[key] = {
+        nome: v.operador_nome || '—',
+        faturamento: 0,
+        qtdVendas: 0
+      };
+    }
+    agrupado[key].faturamento += Number(v.total || 0);
+    agrupado[key].qtdVendas += 1;
+  });
+
+  // Ordena por faturamento DESC, pega top 3
+  const ranking = Object.values(agrupado)
+    .sort((a, b) => b.faturamento - a.faturamento)
+    .slice(0, 3);
+
+  if (ranking.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = '';
+  const medalhas = ['🥇', '🥈', '🥉'];
+  const posClasses = ['ranking-pos1', 'ranking-pos2', 'ranking-pos3'];
+  const ticketTxt = (f, q) => q > 0 ? `Ticket médio ${fmtMoney(f / q)}` : '';
+
+  lista.innerHTML = ranking.map((r, i) => `
+    <div class="ranking-item ${posClasses[i]}">
+      <div class="ranking-medalha">${medalhas[i]}</div>
+      <div class="ranking-info">
+        <div class="nome">${esc(r.nome)}</div>
+        <div class="meta">${ticketTxt(r.faturamento, r.qtdVendas)}</div>
+      </div>
+      <div class="ranking-valor">
+        <div class="num">${fmtMoney(r.faturamento)}</div>
+        <div class="qtd">${r.qtdVendas} venda${r.qtdVendas !== 1 ? 's' : ''}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
 // ============================================================
