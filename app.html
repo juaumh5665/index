@@ -2644,10 +2644,11 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div class="stat-card"><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">Valor em Estoque</div><div id="rb-estoque-valor" style="font-size:1.4rem;font-weight:800;margin-top:.4rem;color:#06b6d4;">R$ 0</div><div id="rb-estoque-info" style="font-size:.65rem;color:#52525b;margin-top:.25rem;"></div></div>
                     </div>
 
-                    <!-- Sub-tabs internas: Vendas / Estoque & Custos -->
+                    <!-- Sub-tabs internas: Vendas / Estoque & Custos / Performance -->
                     <div style="display:flex;gap:.25rem;margin-bottom:1rem;border-bottom:1px solid #1e1e23;padding-bottom:.5rem;flex-wrap:wrap;">
                         <button class="tab-btn active" id="rb-subtab-vendas-btn" onclick="switchBarSubtab('vendas', this)" style="font-size:.75rem;padding:.4rem .85rem;"><i class="fa-solid fa-chart-line"></i> Vendas</button>
                         <button class="tab-btn" id="rb-subtab-estoque-btn" onclick="switchBarSubtab('estoque', this)" style="font-size:.75rem;padding:.4rem .85rem;"><i class="fa-solid fa-box-archive"></i> Estoque & Custos</button>
+                        <button class="tab-btn" id="rb-subtab-performance-btn" onclick="switchBarSubtab('performance', this)" style="font-size:.75rem;padding:.4rem .85rem;"><i class="fa-solid fa-medal"></i> Performance</button>
                         <div style="margin-left:auto;display:flex;gap:.5rem;">
                             <button onclick="exportRelBarCSV()" class="btn-ghost" style="font-size:.7rem;padding:.4rem .75rem;"><i class="fa-solid fa-file-csv"></i> CSV</button>
                         </div>
@@ -2675,6 +2676,23 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div style="font-size:.7rem;color:#71717a;">📋 Mostra preço, custo, margem e situação do estoque</div>
                             </div>
                             <div id="rb-estoque-tabela"></div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-aba: Performance por operador -->
+                    <div id="rb-sub-performance" class="rb-subtab" style="display:none;">
+                        <div class="stat-card" style="padding:1.25rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem;gap:.75rem;flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">🏆 Performance por Operador</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Ranking de operadores no período + comissão calculada (% configurada no painel StackBar)</div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:.5rem;background:#0a0a0b;border:1px solid #1e1e23;padding:.4rem .75rem;border-radius:.4rem;">
+                                    <span style="font-size:.7rem;color:#71717a;font-weight:600;">Comissão:</span>
+                                    <span id="rb-perf-comissao-pct" style="font-size:.85rem;font-weight:800;color:var(--gold);">10%</span>
+                                </div>
+                            </div>
+                            <div id="rb-performance-tabela"></div>
                         </div>
                     </div>
                 </div>
@@ -27563,6 +27581,145 @@ function renderRelBar() {
 
     // Tabela detalhada de estoque (foto atual)
     renderRelBarEstoque();
+
+    // Performance por operador (com cálculo de comissão)
+    renderRelBarPerformance();
+}
+
+// ============================================================
+// PERFORMANCE POR OPERADOR (com comissão configurada)
+// ============================================================
+let _comissaoPadraoCache = null;
+let _comissaoPadraoCacheTs = 0;
+
+async function _carregarComissaoPadrao() {
+    // Cache de 5 minutos pra evitar query repetida
+    const agora = Date.now();
+    if (_comissaoPadraoCache !== null && (agora - _comissaoPadraoCacheTs) < 5 * 60 * 1000) {
+        return _comissaoPadraoCache;
+    }
+    try {
+        if (!sbClube?.id) return 10.0;
+        const { data, error } = await sb
+            .from('stackbar_config')
+            .select('comissao_padrao_pct')
+            .eq('clube_id', sbClube.id)
+            .maybeSingle();
+        if (error || !data) {
+            _comissaoPadraoCache = 10.0;
+        } else {
+            _comissaoPadraoCache = data.comissao_padrao_pct != null ? Number(data.comissao_padrao_pct) : 10.0;
+        }
+        _comissaoPadraoCacheTs = agora;
+    } catch (e) {
+        console.warn('Erro carregar comissão:', e);
+        _comissaoPadraoCache = 10.0;
+    }
+    return _comissaoPadraoCache;
+}
+
+async function renderRelBarPerformance() {
+    const tab = document.getElementById('rb-performance-tabela');
+    if (!tab) return;
+    const labelComissao = document.getElementById('rb-perf-comissao-pct');
+
+    // Carrega comissão configurada
+    const comissaoPct = await _carregarComissaoPadrao();
+    if (labelComissao) labelComissao.innerText = comissaoPct.toFixed(comissaoPct % 1 === 0 ? 0 : 1) + '%';
+
+    // Pega comandas do período (mesma lógica do renderRelBar)
+    const { comandasPeriodo } = getDadosPeriodo();
+    const validas = comandasPeriodo.filter(c => c.status !== 'cancelada');
+    const canceladas = comandasPeriodo.filter(c => c.status === 'cancelada');
+
+    if (!comandasPeriodo.length) {
+        tab.innerHTML = '<div style="color:#3f3f46;font-size:.85rem;padding:2rem;text-align:center;">Nenhuma venda no período selecionado</div>';
+        return;
+    }
+
+    // Agrupa por operador
+    const porOp = {};
+    const inicializar = (nome) => {
+        if (!porOp[nome]) porOp[nome] = {
+            nome,
+            qtdVendas: 0,
+            qtdItens: 0,
+            faturamento: 0,
+            qtdEstornadas: 0,
+            valorEstornado: 0,
+        };
+    };
+    validas.forEach(c => {
+        const nome = c.operador || '— Sem operador';
+        inicializar(nome);
+        porOp[nome].qtdVendas += 1;
+        porOp[nome].faturamento += Number(c.total || 0);
+        porOp[nome].qtdItens += c.itens.reduce((s, it) => s + Number(it.qtd || 0), 0);
+    });
+    canceladas.forEach(c => {
+        const nome = c.operador || '— Sem operador';
+        inicializar(nome);
+        porOp[nome].qtdEstornadas += 1;
+        porOp[nome].valorEstornado += Number(c.total || 0);
+    });
+
+    // Ordena por faturamento DESC
+    const ranking = Object.values(porOp).sort((a, b) => b.faturamento - a.faturamento);
+
+    // Totais gerais
+    const totFat = ranking.reduce((s, r) => s + r.faturamento, 0);
+    const totComissao = totFat * (comissaoPct / 100);
+
+    // Render tabela
+    const medalhas = ['🥇', '🥈', '🥉'];
+    tab.innerHTML = `
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+                <thead>
+                    <tr style="background:#161618;">
+                        <th style="text-align:left;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;width:36px;">#</th>
+                        <th style="text-align:left;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Operador</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Vendas</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Itens</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Ticket Médio</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Faturamento</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Comissão</th>
+                        <th style="text-align:right;padding:.5rem .75rem;font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Estornos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ranking.map((r, i) => {
+                        const ticket = r.qtdVendas > 0 ? r.faturamento / r.qtdVendas : 0;
+                        const comissao = r.faturamento * (comissaoPct / 100);
+                        const pos = i < 3 ? medalhas[i] : (i + 1);
+                        const corBorda = i === 0 ? 'rgba(245,158,11,.35)' : i === 1 ? 'rgba(180,180,180,.25)' : i === 2 ? 'rgba(180,83,9,.25)' : '#1e1e23';
+                        return `
+                        <tr style="border-bottom:1px solid #1e1e23;${i < 3 ? 'background:linear-gradient(90deg,'+corBorda.replace(',.35','').replace(',.25','').slice(0,-1)+',.05) 0%, transparent 50%);' : ''}">
+                            <td style="padding:.65rem .75rem;font-size:1.05rem;font-weight:800;text-align:left;">${pos}</td>
+                            <td style="padding:.65rem .75rem;font-weight:700;color:#fafafa;">${r.nome}</td>
+                            <td style="padding:.65rem .75rem;text-align:right;font-family:var(--font-mono);color:#a1a1aa;">${r.qtdVendas}</td>
+                            <td style="padding:.65rem .75rem;text-align:right;font-family:var(--font-mono);color:#a1a1aa;">${r.qtdItens}</td>
+                            <td style="padding:.65rem .75rem;text-align:right;font-family:var(--font-mono);color:var(--gold);">${formatMoney(ticket)}</td>
+                            <td style="padding:.65rem .75rem;text-align:right;font-family:var(--font-mono);color:#22c55e;font-weight:800;">${formatMoney(r.faturamento)}</td>
+                            <td style="padding:.65rem .75rem;text-align:right;font-family:var(--font-mono);color:var(--gold);font-weight:800;">${formatMoney(comissao)}</td>
+                            <td style="padding:.65rem .75rem;text-align:right;font-family:var(--font-mono);color:${r.qtdEstornadas > 0 ? '#ef4444' : '#52525b'};">${r.qtdEstornadas > 0 ? r.qtdEstornadas + ' (' + formatMoney(r.valorEstornado) + ')' : '—'}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+                <tfoot>
+                    <tr style="background:#0a0a0b;border-top:2px solid var(--gold);">
+                        <td colspan="5" style="padding:.85rem .75rem;font-size:.7rem;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;font-weight:800;text-align:right;">TOTAL GERAL:</td>
+                        <td style="padding:.85rem .75rem;text-align:right;font-family:var(--font-mono);color:#22c55e;font-weight:800;font-size:.95rem;">${formatMoney(totFat)}</td>
+                        <td style="padding:.85rem .75rem;text-align:right;font-family:var(--font-mono);color:var(--gold);font-weight:800;font-size:.95rem;">${formatMoney(totComissao)}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div style="margin-top:.85rem;padding:.65rem .85rem;background:rgba(245,158,11,.05);border-left:3px solid var(--gold);border-radius:.3rem;font-size:.72rem;color:#a1a1aa;line-height:1.5;">
+            <strong style="color:var(--gold);">💡 Como funciona:</strong> A comissão é calculada multiplicando o faturamento do operador pela <strong>% configurada no painel StackBar</strong> (atualmente ${comissaoPct.toFixed(comissaoPct % 1 === 0 ? 0 : 1)}%). Vendas estornadas não entram no faturamento e portanto não geram comissão.
+        </div>
+    `;
 }
 
 function renderRelBarEstoque() {

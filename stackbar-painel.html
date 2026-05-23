@@ -679,6 +679,25 @@
           <!-- chips renderizados via JS -->
         </div>
       </div>
+      <div class="config-row" style="flex-direction:column;align-items:stretch;">
+        <div class="config-info">
+          <strong>💰 Comissão padrão dos operadores (%)</strong>
+          <span>Aplicada no Relatório de Performance do StackOS pra calcular quanto pagar de comissão. Ex: 10% sobre R$ 100 = R$ 10,00.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
+          <input
+            type="number"
+            id="inpComissao"
+            min="0"
+            max="100"
+            step="0.5"
+            placeholder="10"
+            style="width:120px;padding:10px 14px;background:#0a0a0b;border:1px solid #1e1e23;border-radius:8px;color:#fafafa;font-size:15px;font-weight:700;text-align:center;font-family:var(--font-mono,monospace);"
+          >
+          <span style="color:#a1a1aa;font-size:14px;font-weight:600;">%</span>
+          <span style="color:#52525b;font-size:12px;">(0 a 100)</span>
+        </div>
+      </div>
       <div style="margin-top:18px;">
         <button class="btn btn-success btn-large" id="btnSalvar">💾 Salvar configurações</button>
       </div>
@@ -718,7 +737,8 @@ let CLUBE_NOME = null;
 let TOKEN_ATUAL = null;
 let CONFIG = {
   permitir_estoque_negativo: false,
-  papeis_permitidos: ['admin', 'caixa']
+  papeis_permitidos: ['admin', 'caixa'],
+  comissao_padrao_pct: 10.0
 };
 
 const $ = (id) => document.getElementById(id);
@@ -990,13 +1010,17 @@ async function carregarConfig() {
     CONFIG.papeis_permitidos = Array.isArray(data.papeis_permitidos)
       ? data.papeis_permitidos
       : ['admin', 'caixa'];
+    CONFIG.comissao_padrao_pct = data.comissao_padrao_pct != null
+      ? Number(data.comissao_padrao_pct)
+      : 10.0;
   } else {
     // Primeira vez: persiste o default para já permitir o admin entrar pelo bar.html
     try {
       await sb.rpc('stackbar_salvar_config', {
         p_clube_id: CLUBE_ID,
         p_permitir_estoque_negativo: false,
-        p_papeis_permitidos: ['admin', 'caixa']
+        p_papeis_permitidos: ['admin', 'caixa'],
+        p_comissao_padrao_pct: 10.0
       });
     } catch (e) { console.warn('Erro criar config default:', e); }
   }
@@ -1006,6 +1030,11 @@ async function carregarConfig() {
 function renderConfig() {
   // Switch estoque
   $('swEstoque').classList.toggle('on', CONFIG.permitir_estoque_negativo);
+
+  // Campo comissão
+  if ($('inpComissao')) {
+    $('inpComissao').value = CONFIG.comissao_padrao_pct;
+  }
 
   // Chips de papéis
   const grid = $('papeisGrid');
@@ -1037,12 +1066,23 @@ async function salvarConfig() {
     return showToast('⚠️ Selecione pelo menos 1 papel autorizado', 'error');
   }
 
+  // Lê comissão do input + valida
+  const inpCom = $('inpComissao');
+  if (inpCom) {
+    const valor = parseFloat(inpCom.value);
+    if (isNaN(valor) || valor < 0 || valor > 100) {
+      return showToast('⚠️ Comissão deve ser entre 0 e 100%', 'error');
+    }
+    CONFIG.comissao_padrao_pct = valor;
+  }
+
   setLoading(true);
   try {
     const { data, error } = await sb.rpc('stackbar_salvar_config', {
       p_clube_id: CLUBE_ID,
       p_permitir_estoque_negativo: CONFIG.permitir_estoque_negativo,
-      p_papeis_permitidos: CONFIG.papeis_permitidos
+      p_papeis_permitidos: CONFIG.papeis_permitidos,
+      p_comissao_padrao_pct: CONFIG.comissao_padrao_pct
     });
     if (error) throw error;
     if (!data?.ok) throw new Error('Falha ao salvar');
