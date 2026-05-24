@@ -5202,15 +5202,9 @@ document.addEventListener('DOMContentLoaded', function(){
                         <span style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-passport"></i> Passaporte (opcional)</span>
                     </label>
                     <div id="t-passaporte-painel" style="display:none;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem;">
-                            <div>
-                                <label class="inp-label">Valor (R$)</label>
-                                <input id="t-passaporte-valor" type="number" step="0.5" min="0" value="10" class="inp">
-                            </div>
-                            <div>
-                                <label class="inp-label">Fichas — avulso (sem ação)</label>
-                                <input id="t-passaporte-fichas-avulso" type="number" min="0" value="5000" class="inp">
-                            </div>
+                        <div style="margin-bottom:.65rem;">
+                            <label class="inp-label">Valor (R$)</label>
+                            <input id="t-passaporte-valor" type="number" step="0.5" min="0" value="10" class="inp">
                         </div>
                         <div style="font-size:.7rem;color:#71717a;margin-bottom:.4rem;">Fichas extras por tipo de ação:</div>
                         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;">
@@ -5234,6 +5228,10 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <label class="inp-label" style="font-size:.65rem;">Add-on</label>
                                 <input id="t-passaporte-fichas-addon" type="number" min="0" value="15000" class="inp">
                             </div>
+                        </div>
+                        <div style="margin-top:.75rem;padding-top:.65rem;border-top:1px dashed #27272a;">
+                            <label class="inp-label" style="font-size:.65rem;">Avulso (sem ação) <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">— usado só em torneio Buy-in FREE</span></label>
+                            <input id="t-passaporte-fichas-avulso" type="number" min="0" value="5000" class="inp">
                         </div>
                         <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
                             <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
@@ -11224,7 +11222,8 @@ function diagTorneio(idx) {
         else                                  totalFichas += t.stack;
     });
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
-    const chipCount = totalFichas + jackpotFichas;
+    const passaporteFichas = (typeof _getFichasExtrasPassaporte === 'function') ? _getFichasExtrasPassaporte(t) : 0;
+    const chipCount = totalFichas + jackpotFichas + passaporteFichas;
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
 
     console.log('%c🔬 DIAGNÓSTICO TORNEIO: ' + t.nome, 'color:#06b6d4;font-weight:bold;font-size:14px;');
@@ -19198,7 +19197,8 @@ function updateTV(idx) {
     }, 0);
     // Adiciona jackpot chips e last chance chips (somados a parte se vierem por lastChanceCompras antigo)
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
-    const chipCount = totalFichas + jackpotFichas;
+    const passaporteFichas = _getFichasExtrasPassaporte(t);
+    const chipCount = totalFichas + jackpotFichas + passaporteFichas;
 
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
 
@@ -19472,7 +19472,8 @@ function _computarDadosMiniTV(t) {
         return s + t.stack;
     }, 0);
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
-    const chipCount = totalFichas + jackpotFichas;
+    const passaporteFichas = _getFichasExtrasPassaporte(t);
+    const chipCount = totalFichas + jackpotFichas + passaporteFichas;
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
     const buyinsQtd  = (t.entries || []).filter(e => e.tipo === 'buyin').length;
     const reentriesQtd = (t.entries || []).filter(e => e.tipo === 'reentry').length;
@@ -20278,6 +20279,15 @@ function _getPassaporteFichas(t, tipoAcao) {
     if (!t || !t.passaporteAtivo) return 0;
     const mapa = t.passaporteFichas || {};
     return Number(mapa[tipoAcao]) || 0;
+}
+
+// Soma TODAS as fichas extras de passaporte já vendidas (pra chipcount/média)
+// Cada entry guarda e.passaporte.fichas no momento da compra (snapshot histórico)
+function _getFichasExtrasPassaporte(t) {
+    if (!t) return 0;
+    return (t.entries || []).reduce((s, e) => {
+        return s + (e.passaporte && e.passaporte.cobrado ? (Number(e.passaporte.fichas) || 0) : 0);
+    }, 0);
 }
 
 function getPrize(t) {
