@@ -1418,6 +1418,53 @@ body.tema-claro #login-screen [style*="color:#d4d4d8"],
 body.tema-claro #login-screen [style*="color: #d4d4d8"] {
     color: #d4d4d8 !important;
 }
+
+/* ============================================================
+   BLUR DE VALORES SENSÍVEIS (Rake, Staff)
+   Camufla valores financeiros que não devem vazar pra jogadores
+   que olhem a tela do operador. Click pra revelar, auto-oculta em 10s.
+   ============================================================ */
+.sensitive-card {
+    cursor: pointer;
+    position: relative;
+    transition: background-color .15s ease;
+}
+.sensitive-card:hover {
+    background-color: rgba(255,255,255,.02);
+}
+.sensitive-value {
+    filter: blur(10px);
+    transition: filter .25s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.sensitive-card[data-revealed="true"] .sensitive-value {
+    filter: blur(0);
+    user-select: auto;
+    -webkit-user-select: auto;
+}
+.sensitive-lock {
+    font-size: .7rem;
+    color: #52525b;
+    margin-left: .35rem;
+    transition: color .2s ease;
+}
+.sensitive-card[data-revealed="true"] .sensitive-lock {
+    color: #22c55e;
+}
+.sensitive-timer {
+    font-size: .6rem;
+    color: #22c55e;
+    font-variant-numeric: tabular-nums;
+    margin-left: .25rem;
+    display: none;
+}
+.sensitive-card[data-revealed="true"] .sensitive-timer {
+    display: inline;
+}
+.sensitive-timer.warning {
+    color: #ef4444;
+}
 </style>
 </head>
 <body class="overflow-hidden">
@@ -5313,19 +5360,30 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Prize Pool</div>
                                 <div id="mt-prize" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:#22c55e;">R$ 0</div>
                             </div>
-                            <div class="stat-card" style="padding:1rem;">
-                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake</div>
-                                <div id="mt-rake-val" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:var(--gold);">R$ 0</div>
+                            <div class="stat-card sensitive-card" data-revealed="false" data-sensitive-id="mt-rake" style="padding:1rem;">
+                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;justify-content:space-between;">
+                                    <span>Rake</span>
+                                    <span>
+                                        <span class="sensitive-timer">10s</span>
+                                        <i class="fa-solid fa-lock sensitive-lock"></i>
+                                    </span>
+                                </div>
+                                <div id="mt-rake-val" class="sensitive-value" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:var(--gold);">R$ 0</div>
                             </div>
                         </div>
                         <!-- Card Staff (só aparece se staffPct > 0) -->
-                        <div id="mt-staff-card" class="stat-card" style="padding:.85rem 1rem;display:none;background:rgba(56,189,248,.05);border-color:rgba(56,189,248,.2);">
+                        <div id="mt-staff-card" class="stat-card sensitive-card" data-revealed="false" data-sensitive-id="mt-staff" style="padding:.85rem 1rem;display:none;background:rgba(56,189,248,.05);border-color:rgba(56,189,248,.2);">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <div>
-                                    <div style="font-size:.6rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff (Dealers + Floor)</div>
+                                    <div style="font-size:.6rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:.35rem;">
+                                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                                        <span>Staff (Dealers + Floor)</span>
+                                        <span class="sensitive-timer">10s</span>
+                                        <i class="fa-solid fa-lock sensitive-lock"></i>
+                                    </div>
                                     <div id="mt-staff-desc" style="font-size:.7rem;color:#71717a;margin-top:.2rem;">0% sobre o líquido pós-rake</div>
                                 </div>
-                                <div id="mt-staff-val" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#38bdf8;">R$ 0</div>
+                                <div id="mt-staff-val" class="sensitive-value" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#38bdf8;">R$ 0</div>
                             </div>
                         </div>
                         <!-- 🔥 JANELA DE BREAK ESPECIAL — combo Re-entry + Rebuy + Add-on -->
@@ -30443,6 +30501,94 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 
 <!-- [STACKCLOCK] alertas em tempo real do app dealer -->
 <script src="stackclock-operador.js" defer></script>
+
+<!-- ============================================================
+     CONTROLE DE BLUR EM VALORES SENSÍVEIS (Rake, Staff)
+     - Click pra revelar
+     - Auto-oculta após 10s
+     - Contador regressivo visível, vira vermelho nos últimos 3s
+     - ESC oculta todos os cards revelados de uma vez
+     ============================================================ -->
+<script>
+(function() {
+    var AUTO_HIDE_SECONDS = 10;
+    var WARNING_THRESHOLD = 3;
+    var timers = {}; // map: data-sensitive-id → { timeout, interval }
+
+    function clearTimers(id) {
+        if (timers[id]) {
+            if (timers[id].timeout) clearTimeout(timers[id].timeout);
+            if (timers[id].interval) clearInterval(timers[id].interval);
+            delete timers[id];
+        }
+    }
+
+    function hideCard(card) {
+        var id = card.dataset.sensitiveId;
+        card.dataset.revealed = 'false';
+        var lock = card.querySelector('.sensitive-lock');
+        if (lock) {
+            lock.classList.remove('fa-lock-open');
+            lock.classList.add('fa-lock');
+        }
+        var timerEl = card.querySelector('.sensitive-timer');
+        if (timerEl) {
+            timerEl.textContent = AUTO_HIDE_SECONDS + 's';
+            timerEl.classList.remove('warning');
+        }
+        clearTimers(id);
+    }
+
+    function revealCard(card) {
+        var id = card.dataset.sensitiveId;
+        card.dataset.revealed = 'true';
+        var lock = card.querySelector('.sensitive-lock');
+        if (lock) {
+            lock.classList.remove('fa-lock');
+            lock.classList.add('fa-lock-open');
+        }
+        var timerEl = card.querySelector('.sensitive-timer');
+        clearTimers(id);
+
+        var remaining = AUTO_HIDE_SECONDS;
+        if (timerEl) {
+            timerEl.textContent = remaining + 's';
+            timerEl.classList.remove('warning');
+        }
+
+        var interval = setInterval(function() {
+            remaining--;
+            if (remaining > 0 && timerEl) {
+                timerEl.textContent = remaining + 's';
+                if (remaining <= WARNING_THRESHOLD) {
+                    timerEl.classList.add('warning');
+                }
+            }
+        }, 1000);
+
+        var timeout = setTimeout(function() { hideCard(card); }, AUTO_HIDE_SECONDS * 1000);
+        timers[id] = { timeout: timeout, interval: interval };
+    }
+
+    // Delegação de evento — funciona mesmo se cards forem re-renderizados dinamicamente
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('.sensitive-card');
+        if (!card) return;
+        if (card.dataset.revealed === 'true') {
+            hideCard(card);
+        } else {
+            revealCard(card);
+        }
+    });
+
+    // ESC pra ocultar todos os revelados (útil quando alguém se aproxima)
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.sensitive-card[data-revealed="true"]').forEach(hideCard);
+        }
+    });
+})();
+</script>
 
 </body>
 </html>
