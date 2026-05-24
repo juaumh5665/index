@@ -5160,21 +5160,15 @@ document.addEventListener('DOMContentLoaded', function(){
                 <!-- Bloco Buy-in FREE: só aparece se buy-in = 0 -->
                 <div id="t-buyin-free-bloco" style="display:none;padding:.85rem 1rem;background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.25);border-radius:.6rem;">
                     <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-gift"></i> Buy-in FREE</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
-                        <div>
-                            <label class="inp-label">Buy-in FREE até nível <span style="color:#ef4444;">*</span></label>
-                            <input id="t-buyin-free-ate-nivel" type="number" min="1" value="" placeholder="Obrigatório" class="inp">
-                            <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;">Após este nível, buy-in não está mais disponível</div>
-                        </div>
-                        <div>
-                            <label class="inp-label">Re-entry R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(valor pago no re-entry)</span></label>
-                            <input id="t-reentry-valor" type="number" min="0" step="0.01" value="0" class="inp" placeholder="0 = re-entry também grátis">
-                            <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;">Em buy-in FREE, re-entry pode ter outro valor</div>
-                        </div>
+                    <div>
+                        <label class="inp-label">Buy-in FREE até nível <span style="color:#ef4444;">*</span></label>
+                        <input id="t-buyin-free-ate-nivel" type="number" min="1" value="" placeholder="Obrigatório" class="inp">
+                        <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;">Após este nível, buy-in não está mais disponível</div>
                     </div>
                     <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
                         <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
                         Buy-in gratuito. Taxa adm e passaporte continuam funcionando se configurados. Stack base entregue normalmente.
+                        Re-entry também é grátis enquanto a janela de re-entry estiver aberta. Use Rebuy Simples/Duplo se quiser cobrar pelo retorno.
                     </div>
                 </div>
 
@@ -7403,7 +7397,6 @@ function _torneioToDb(t) {
         passaporte_valor: t.passaporteValor || 0,
         passaporte_fichas: t.passaporteFichas || null,
         buyin_free_ate_nivel: t.buyinFreeAteNivel || null,
-        reentry_valor: (t.reentryValor != null) ? t.reentryValor : null,
         rebuy_valor: t.rebuyValor || t.rebuySimples || 0,
         rebuy_fichas: t.rebuyFichas || t.rebuySimplesFichas || 0,
         rebuy_duplo_valor: t.rebuyDuploValor || t.rebuyDuplo || 0,
@@ -8310,7 +8303,6 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         passaporteValor: parseFloat(r.passaporte_valor || 0),
         passaporteFichas: r.passaporte_fichas || null,
         buyinFreeAteNivel: r.buyin_free_ate_nivel || null,
-        reentryValor: (r.reentry_valor != null) ? parseFloat(r.reentry_valor) : null,
         capileModo: r.capile_modo || 'pote',
         rebuyValor: parseFloat(r.rebuy_valor || 0),
         rebuySimples: parseFloat(r.rebuy_valor || 0),  // espelho compat
@@ -16927,10 +16919,6 @@ function saveTournament() {
         buyinFreeAteNivel: (function() {
             const v = parseInt(document.getElementById('t-buyin-free-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
-        })(),
-        reentryValor: (function() {
-            const v = parseFloat(document.getElementById('t-reentry-valor')?.value);
-            return (isNaN(v) || v < 0) ? null : v; // null = usa t.buyin como fallback
         })(),
         tempoNivel,
         stack:        parseInt(document.getElementById('t-stack').value)    || 20000,
