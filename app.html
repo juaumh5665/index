@@ -1418,6 +1418,53 @@ body.tema-claro #login-screen [style*="color:#d4d4d8"],
 body.tema-claro #login-screen [style*="color: #d4d4d8"] {
     color: #d4d4d8 !important;
 }
+
+/* ============================================================
+   BLUR DE VALORES SENSÍVEIS (Rake, Staff, Passaporte)
+   Camufla valores financeiros que não devem vazar pra jogadores
+   que olhem a tela do operador. Click pra revelar, auto-oculta em 10s.
+   ============================================================ */
+.sensitive-card {
+    cursor: pointer;
+    position: relative;
+    transition: background-color .15s ease;
+}
+.sensitive-card:hover {
+    background-color: rgba(255,255,255,.02);
+}
+.sensitive-value {
+    filter: blur(10px);
+    transition: filter .25s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.sensitive-card[data-revealed="true"] .sensitive-value {
+    filter: blur(0);
+    user-select: auto;
+    -webkit-user-select: auto;
+}
+.sensitive-lock {
+    font-size: .7rem;
+    color: #52525b;
+    margin-left: .35rem;
+    transition: color .2s ease;
+}
+.sensitive-card[data-revealed="true"] .sensitive-lock {
+    color: #22c55e;
+}
+.sensitive-timer {
+    font-size: .6rem;
+    color: #22c55e;
+    font-variant-numeric: tabular-nums;
+    margin-left: .25rem;
+    display: none;
+}
+.sensitive-card[data-revealed="true"] .sensitive-timer {
+    display: inline;
+}
+.sensitive-timer.warning {
+    color: #ef4444;
+}
 </style>
 </head>
 <body class="overflow-hidden">
@@ -5148,6 +5195,54 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
                 </div>
 
+                <!-- Passaporte (produto opcional vendido junto com ações) -->
+                <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+                    <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;margin-bottom:.65rem;">
+                        <input type="checkbox" id="t-passaporte-ativo" onchange="atualizarPassaporteUI()" style="width:18px;height:18px;cursor:pointer;accent-color:#a78bfa;">
+                        <span style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-passport"></i> Passaporte (opcional)</span>
+                    </label>
+                    <div id="t-passaporte-painel" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem;">
+                            <div>
+                                <label class="inp-label">Valor (R$)</label>
+                                <input id="t-passaporte-valor" type="number" step="0.5" min="0" value="10" class="inp">
+                            </div>
+                            <div>
+                                <label class="inp-label">Fichas — avulso (sem ação)</label>
+                                <input id="t-passaporte-fichas-avulso" type="number" min="0" value="5000" class="inp">
+                            </div>
+                        </div>
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.4rem;">Fichas extras por tipo de ação:</div>
+                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;">
+                            <div>
+                                <label class="inp-label" style="font-size:.65rem;">Buy-in</label>
+                                <input id="t-passaporte-fichas-buyin" type="number" min="0" value="5000" class="inp">
+                            </div>
+                            <div>
+                                <label class="inp-label" style="font-size:.65rem;">Rebuy simples</label>
+                                <input id="t-passaporte-fichas-rebuy-simples" type="number" min="0" value="5000" class="inp">
+                            </div>
+                            <div>
+                                <label class="inp-label" style="font-size:.65rem;">Rebuy duplo</label>
+                                <input id="t-passaporte-fichas-rebuy-duplo" type="number" min="0" value="10000" class="inp">
+                            </div>
+                            <div>
+                                <label class="inp-label" style="font-size:.65rem;">Re-entry</label>
+                                <input id="t-passaporte-fichas-reentry" type="number" min="0" value="5000" class="inp">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label class="inp-label" style="font-size:.65rem;">Add-on</label>
+                                <input id="t-passaporte-fichas-addon" type="number" min="0" value="15000" class="inp">
+                            </div>
+                        </div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
+                            <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
+                            Receita 100% do clube. <strong>Não entra no cálculo de rake nem de staff.</strong>
+                            Adiciona fichas extras ao stack do jogador no momento da ação.
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Staff / Taxa de serviço — 3 modos: nenhum | percentual (cascata) | fixo (por ação) -->
                 <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
                     <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.65rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff (Dealers + Floor)</div>
@@ -5366,19 +5461,45 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Prize Pool</div>
                                 <div id="mt-prize" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:#22c55e;">R$ 0</div>
                             </div>
-                            <div class="stat-card" style="padding:1rem;">
-                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake</div>
-                                <div id="mt-rake-val" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:var(--gold);">R$ 0</div>
+                            <div class="stat-card sensitive-card" data-revealed="false" data-sensitive-id="mt-rake" style="padding:1rem;">
+                                <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;justify-content:space-between;">
+                                    <span>Rake</span>
+                                    <span>
+                                        <span class="sensitive-timer">10s</span>
+                                        <i class="fa-solid fa-lock sensitive-lock"></i>
+                                    </span>
+                                </div>
+                                <div id="mt-rake-val" class="sensitive-value" style="font-size:1.2rem;font-weight:800;margin-top:.25rem;color:var(--gold);">R$ 0</div>
                             </div>
                         </div>
-                        <!-- Card Staff (só aparece se staffPct > 0) -->
-                        <div id="mt-staff-card" class="stat-card" style="padding:.85rem 1rem;display:none;background:rgba(56,189,248,.05);border-color:rgba(56,189,248,.2);">
+                        <!-- Card Staff (só aparece se staffPct > 0 ou staffModo='fixo') -->
+                        <div id="mt-staff-card" class="stat-card sensitive-card" data-revealed="false" data-sensitive-id="mt-staff" style="padding:.85rem 1rem;display:none;background:rgba(56,189,248,.05);border-color:rgba(56,189,248,.2);">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <div>
-                                    <div style="font-size:.6rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff (Dealers + Floor)</div>
+                                    <div style="font-size:.6rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:.35rem;">
+                                        <i class="fa-solid fa-hand-holding-dollar"></i>
+                                        <span>Staff (Dealers + Floor)</span>
+                                        <span class="sensitive-timer">10s</span>
+                                        <i class="fa-solid fa-lock sensitive-lock"></i>
+                                    </div>
                                     <div id="mt-staff-desc" style="font-size:.7rem;color:#71717a;margin-top:.2rem;">0% sobre o líquido pós-rake</div>
                                 </div>
-                                <div id="mt-staff-val" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#38bdf8;">R$ 0</div>
+                                <div id="mt-staff-val" class="sensitive-value" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#38bdf8;">R$ 0</div>
+                            </div>
+                        </div>
+                        <!-- Card Passaporte (só aparece se passaporteAtivo e algum foi vendido) -->
+                        <div id="mt-passaporte-card" class="stat-card sensitive-card" data-revealed="false" data-sensitive-id="mt-passaporte" style="padding:.85rem 1rem;display:none;background:rgba(167,139,250,.05);border-color:rgba(167,139,250,.2);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div style="font-size:.6rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:.35rem;">
+                                        <i class="fa-solid fa-passport"></i>
+                                        <span>Passaporte (receita do clube)</span>
+                                        <span class="sensitive-timer">10s</span>
+                                        <i class="fa-solid fa-lock sensitive-lock"></i>
+                                    </div>
+                                    <div id="mt-passaporte-desc" style="font-size:.7rem;color:#71717a;margin-top:.2rem;">0 vendidos — fora do rake</div>
+                                </div>
+                                <div id="mt-passaporte-val" class="sensitive-value" style="font-family:var(--font-mono);font-size:1.1rem;font-weight:800;color:#a78bfa;">R$ 0</div>
                             </div>
                         </div>
                         <!-- 🔥 JANELA DE BREAK ESPECIAL — combo Re-entry + Rebuy + Add-on -->
@@ -5723,6 +5844,16 @@ document.addEventListener('DOMContentLoaded', function(){
                     <span><strong>Cobrar staff</strong> <span id="entrada-staff-valor-label" style="color:var(--gold);">R$ 0,00</span></span>
                 </label>
                 <div style="font-size:.7rem;color:#71717a;margin-top:.4rem;margin-left:1.65rem;">Desmarque caso o jogador esteja isento desta taxa</div>
+            </div>
+            <!-- Passaporte (opcional, só aparece se torneio tem passaporte ativo) -->
+            <div id="entrada-passaporte-wrap" style="display:none;padding:.75rem 1rem;background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.2);border-radius:.5rem;">
+                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.85rem;">
+                    <input type="checkbox" id="entrada-passaporte-comprar" onchange="atualizarResumoEntrada()" style="width:18px;height:18px;cursor:pointer;accent-color:#a78bfa;">
+                    <span><strong style="color:#a78bfa;"><i class="fa-solid fa-passport"></i> Comprar passaporte</strong> <span id="entrada-passaporte-valor-label" style="color:#a78bfa;">R$ 0,00</span></span>
+                </label>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.4rem;margin-left:1.65rem;">
+                    Opcional. <span id="entrada-passaporte-fichas-label">+0 fichas extras</span>
+                </div>
             </div>
             <!-- Resumo do total -->
             <div id="entrada-resumo" style="padding:.85rem 1rem;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;display:flex;justify-content:space-between;align-items:center;">
@@ -7249,6 +7380,9 @@ function _torneioToDb(t) {
         staff_modo: t.staffModo || null,
         staff_fixo_valor: t.staffFixoValor || 0,
         staff_fixo_acoes: t.staffFixoAcoes || null,
+        passaporte_ativo: !!t.passaporteAtivo,
+        passaporte_valor: t.passaporteValor || 0,
+        passaporte_fichas: t.passaporteFichas || null,
         rebuy_valor: t.rebuyValor || t.rebuySimples || 0,
         rebuy_fichas: t.rebuyFichas || t.rebuySimplesFichas || 0,
         rebuy_duplo_valor: t.rebuyDuploValor || t.rebuyDuplo || 0,
@@ -8151,6 +8285,9 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         staffModo: r.staff_modo || null,
         staffFixoValor: parseFloat(r.staff_fixo_valor || 0),
         staffFixoAcoes: r.staff_fixo_acoes || null,
+        passaporteAtivo: !!r.passaporte_ativo,
+        passaporteValor: parseFloat(r.passaporte_valor || 0),
+        passaporteFichas: r.passaporte_fichas || null,
         capileModo: r.capile_modo || 'pote',
         rebuyValor: parseFloat(r.rebuy_valor || 0),
         rebuySimples: parseFloat(r.rebuy_valor || 0),  // espelho compat
@@ -16765,6 +16902,16 @@ function saveTournament() {
             addon:       document.getElementById('t-staff-fixo-addon')?.checked ?? true,
             last_chance: document.getElementById('t-staff-fixo-last-chance')?.checked ?? false
         },
+        passaporteAtivo:  document.getElementById('t-passaporte-ativo')?.checked || false,
+        passaporteValor:  parseFloat(document.getElementById('t-passaporte-valor')?.value) || 0,
+        passaporteFichas: {
+            avulso:        parseInt(document.getElementById('t-passaporte-fichas-avulso')?.value)        || 0,
+            buyin:         parseInt(document.getElementById('t-passaporte-fichas-buyin')?.value)         || 0,
+            rebuy_simples: parseInt(document.getElementById('t-passaporte-fichas-rebuy-simples')?.value) || 0,
+            rebuy_duplo:   parseInt(document.getElementById('t-passaporte-fichas-rebuy-duplo')?.value)   || 0,
+            reentry:       parseInt(document.getElementById('t-passaporte-fichas-reentry')?.value)       || 0,
+            addon:         parseInt(document.getElementById('t-passaporte-fichas-addon')?.value)         || 0
+        },
         // Rebuy structure
         // BUG FIX: salva em AMBOS os nomes (rebuyFichas é o nome do banco, rebuySimplesFichas é o nome histórico do form)
         // Pra evitar dessincronização entre criação local e leitura do banco
@@ -17047,6 +17194,24 @@ function updateModalTorneio() {
             }
         } else {
             staffCard.style.display = 'none';
+        }
+    }
+
+    // Card Passaporte (só visível se passaporteAtivo e pelo menos 1 vendido)
+    const passCard = document.getElementById('mt-passaporte-card');
+    if (passCard) {
+        const passTotal = getPassaporteTotal(t);
+        const passQtd = getPassaporteCount(t);
+        if (t.passaporteAtivo && passQtd > 0) {
+            passCard.style.display = 'block';
+            document.getElementById('mt-passaporte-val').innerText = formatMoney(passTotal);
+            const passDesc = document.getElementById('mt-passaporte-desc');
+            if (passDesc) {
+                const v = Number(t.passaporteValor) || 0;
+                passDesc.innerText = `${passQtd} ${passQtd === 1 ? 'vendido' : 'vendidos'} × ${formatMoney(v)} — fora do rake`;
+            }
+        } else {
+            passCard.style.display = 'none';
         }
     }
 
@@ -18544,13 +18709,35 @@ function atualizarResumoEntrada() {
     if (tipo === 'buyin' && Number(t.taxaAdm) > 0) {
         taxaAdm = Number(t.taxaAdm);
     }
+
+    // PASSAPORTE (opcional): mostra wrap se torneio ativou, calcula valor se marcado
+    const passWrap = document.getElementById('entrada-passaporte-wrap');
+    const cbPass = document.getElementById('entrada-passaporte-comprar');
+    const lblPassValor = document.getElementById('entrada-passaporte-valor-label');
+    const lblPassFichas = document.getElementById('entrada-passaporte-fichas-label');
+    let passaporte = 0;
+    if (t.passaporteAtivo && passWrap) {
+        passWrap.style.display = '';
+        const valorPass = Number(t.passaporteValor) || 0;
+        const fichasPass = _getPassaporteFichas(t, tipo);
+        if (lblPassValor) lblPassValor.innerText = 'R$ ' + valorPass.toFixed(2).replace('.', ',');
+        if (lblPassFichas) lblPassFichas.innerText = '+' + fichasPass.toLocaleString('pt-BR') + ' fichas extras';
+        if (cbPass && cbPass.checked) passaporte = valorPass;
+    } else if (passWrap) {
+        passWrap.style.display = 'none';
+        if (cbPass) cbPass.checked = false;
+    }
     
-    const total = valorBase + staff + taxaAdm;
+    const total = valorBase + staff + taxaAdm + passaporte;
     if (resumoVal) {
-        // Se tem taxa adm, mostra detalhado
-        if (taxaAdm > 0) {
-            resumoVal.innerHTML = 'R$ ' + total.toFixed(2).replace('.', ',') + 
-                ' <span style="font-size:.65rem;color:#71717a;font-weight:400;font-family:Manrope,sans-serif;">(R$ ' + valorBase.toFixed(2).replace('.', ',') + ' + R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa)</span>';
+        // Se tem extras (taxa adm ou passaporte), mostra detalhado
+        const partes = [];
+        if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ','));
+        if (taxaAdm > 0)   partes.push('R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa');
+        if (passaporte > 0) partes.push('R$ ' + passaporte.toFixed(2).replace('.', ',') + ' passaporte');
+        if (partes.length > 1) {
+            resumoVal.innerHTML = 'R$ ' + total.toFixed(2).replace('.', ',') +
+                ' <span style="font-size:.65rem;color:#71717a;font-weight:400;font-family:Manrope,sans-serif;">(' + partes.join(' + ') + ')</span>';
         } else {
             resumoVal.innerText = 'R$ ' + total.toFixed(2).replace('.', ',');
         }
@@ -18624,9 +18811,23 @@ function _registrarEntradaImpl() {
     // Mantém variáveis pra compat mas sempre zero.
     let staffCobrado = 0;
     const valorRS = valorBase; // mantém variável legada pra compat
-    const valorTotal = valorBase + staffCobrado + taxaAdmCobrada;
+    
+    // PASSAPORTE (opcional): se torneio ativou e jogador marcou, registra na entry
+    let passaporteCobrado = 0;
+    let passaporteFichas = 0;
+    const cbPass = document.getElementById('entrada-passaporte-comprar');
+    if (t.passaporteAtivo && cbPass && cbPass.checked) {
+        passaporteCobrado = Number(t.passaporteValor) || 0;
+        passaporteFichas = _getPassaporteFichas(t, tipo);
+    }
+    
+    const valorTotal = valorBase + staffCobrado + taxaAdmCobrada + passaporteCobrado;
 
-    t.entries.push({ id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado, taxaAdm: taxaAdmCobrada });
+    const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado, taxaAdm: taxaAdmCobrada };
+    if (passaporteCobrado > 0) {
+        novaEntry.passaporte = { cobrado: true, valor: passaporteCobrado, fichas: passaporteFichas };
+    }
+    t.entries.push(novaEntry);
     alocarJogadorMesa(t, jid);
 
     // Para torneios KO: cada entrada paga também bounty (exceto add-on)
@@ -18678,6 +18879,18 @@ function _registrarEntradaImpl() {
         });
     }
 
+    // PASSAPORTE: transação separada (receita do clube, fora do rake/staff/prize)
+    if (passaporteCobrado > 0) {
+        registrarTransacao({
+            jogadorId: jid,
+            tipo: 'passaporte',
+            valor: -passaporteCobrado,
+            descricao: `Passaporte · ${t.nome} · ${getJogadorNome(jid)}`,
+            origem: 'torneio',
+            refId: t.id,
+        });
+    }
+
     saveData();
     closeModal('modal-entrada');
     updateModalTorneio();
@@ -18687,7 +18900,7 @@ function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0);
+    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0);
     const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
@@ -20041,6 +20254,30 @@ function getStaff(t) {
     const brutoComRake = _getBrutoParaRake(t);
     const sobra = brutoComRake - getRake(t);
     return sobra * ((Number(t.staffPct) || 0) / 100);
+}
+
+// === PASSAPORTE (produto opcional vendido junto com ações) ===
+// Receita 100% do clube. Não entra no rake, não entra no staff.
+// Cada entry pode ter um sub-objeto e.passaporte = { cobrado:true, valor:N, fichas:N }
+function getPassaporteTotal(t) {
+    if (!t || !t.passaporteAtivo) return 0;
+    return (t.entries || []).reduce((s, e) => {
+        return s + (e.passaporte && e.passaporte.cobrado ? (Number(e.passaporte.valor) || 0) : 0);
+    }, 0);
+}
+
+function getPassaporteCount(t) {
+    if (!t || !t.passaporteAtivo) return 0;
+    return (t.entries || []).reduce((s, e) => {
+        return s + (e.passaporte && e.passaporte.cobrado ? 1 : 0);
+    }, 0);
+}
+
+// Quantas fichas extras o passaporte entrega pra uma ação de tipo `tipoAcao`
+function _getPassaporteFichas(t, tipoAcao) {
+    if (!t || !t.passaporteAtivo) return 0;
+    const mapa = t.passaporteFichas || {};
+    return Number(mapa[tipoAcao]) || 0;
 }
 
 function getPrize(t) {
@@ -26445,6 +26682,8 @@ function abrirModalEstorno(kind, refId) {
             tipo: entry.tipo,
             valor: Number(entry.valor) || 0,
             fichas: _calcularFichasReverter(t, entry),
+            passaporteValor: (entry.passaporte && entry.passaporte.cobrado) ? (Number(entry.passaporte.valor) || 0) : 0,
+            passaporteFichas: (entry.passaporte && entry.passaporte.cobrado) ? (Number(entry.passaporte.fichas) || 0) : 0,
         };
     }
 
@@ -26471,13 +26710,16 @@ function abrirModalEstorno(kind, refId) {
 
     const info = document.getElementById('mod-estorno-info');
     if (info) {
+        const temPassaporte = dados.passaporteValor > 0;
         info.innerHTML = `
             <div style="font-size:.78rem;margin-bottom:.35rem;">Jogador: <strong style="color:#fff;">${escapeHtml(dados.jogadorNome)}</strong></div>
             <div style="font-size:.78rem;margin-bottom:.35rem;">Tipo: <strong style="color:${meta.color};">${meta.label}</strong> · <span class="mono">${formatMoney(dados.valor)}</span></div>
+            ${temPassaporte ? `<div style="font-size:.78rem;margin-bottom:.35rem;color:#a78bfa;"><i class="fa-solid fa-passport"></i> + Passaporte: <span class="mono">${formatMoney(dados.passaporteValor)}</span> (${dados.passaporteFichas.toLocaleString('pt-BR')} fichas)</div>` : ''}
             ${dados.fichas > 0 ? `<div style="font-size:.7rem;color:#71717a;margin-bottom:.35rem;">Fichas que serão revertidas: <strong>${dados.fichas.toLocaleString('pt-BR')}</strong></div>` : ''}
             <div style="font-size:.7rem;color:#a1a1aa;margin-top:.45rem;padding-top:.45rem;border-top:1px dashed #27272a;">
                 <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
-                O valor de ${formatMoney(dados.valor)} será devolvido ao saldo do jogador e descontado do caixa do torneio.
+                O valor de ${formatMoney(dados.valor + (dados.passaporteValor || 0))} será devolvido ao saldo do jogador e descontado do caixa do torneio.
+                ${temPassaporte ? '<br>O passaporte será estornado junto com a entrada.' : ''}
                 ${dados.tipo === 'jackpot' ? '<br>O valor também será estornado da <strong style="color:#a855f7;">Caixa do Jackpot</strong> do clube.' : ''}
             </div>
             ${warningExtra}
@@ -26542,6 +26784,18 @@ async function confirmarEstorno() {
                 tipo: 'estorno',
                 valor: +dados.valor,
                 descricao: `Estorno de ${_getEstornoTipoLabel(dados.tipo).label} · ${t.nome} · ${motivo}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
+
+        // 2b. Estorna passaporte (se a entry tinha um)
+        if (dados.passaporteValor > 0) {
+            registrarTransacao({
+                jogadorId: dados.jogadorId,
+                tipo: 'estorno',
+                valor: +dados.passaporteValor,
+                descricao: `Estorno de Passaporte · ${t.nome} · ${motivo}`,
                 origem: 'torneio',
                 refId: t.id,
             });
@@ -30566,6 +30820,93 @@ function atualizarStaffModoUI() {
     if (painelPct)  painelPct.style.display  = (modo === 'percentual') ? '' : 'none';
     if (painelFixo) painelFixo.style.display = (modo === 'fixo') ? '' : 'none';
 }
+
+function atualizarPassaporteUI() {
+    var cb = document.getElementById('t-passaporte-ativo');
+    var painel = document.getElementById('t-passaporte-painel');
+    if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
+}
+</script>
+
+<!-- ============================================================
+     CONTROLE DE BLUR EM VALORES SENSÍVEIS (Rake, Staff, Passaporte)
+     - Click pra revelar
+     - Auto-oculta após 10s
+     - Contador regressivo visível, vira vermelho nos últimos 3s
+     - ESC oculta todos os cards revelados de uma vez
+     ============================================================ -->
+<script>
+(function() {
+    var AUTO_HIDE_SECONDS = 10;
+    var WARNING_THRESHOLD = 3;
+    var timers = {};
+
+    function clearTimers(id) {
+        if (timers[id]) {
+            if (timers[id].timeout) clearTimeout(timers[id].timeout);
+            if (timers[id].interval) clearInterval(timers[id].interval);
+            delete timers[id];
+        }
+    }
+
+    function hideCard(card) {
+        var id = card.dataset.sensitiveId;
+        card.dataset.revealed = 'false';
+        var lock = card.querySelector('.sensitive-lock');
+        if (lock) {
+            lock.classList.remove('fa-lock-open');
+            lock.classList.add('fa-lock');
+        }
+        var timerEl = card.querySelector('.sensitive-timer');
+        if (timerEl) {
+            timerEl.textContent = AUTO_HIDE_SECONDS + 's';
+            timerEl.classList.remove('warning');
+        }
+        clearTimers(id);
+    }
+
+    function revealCard(card) {
+        var id = card.dataset.sensitiveId;
+        card.dataset.revealed = 'true';
+        var lock = card.querySelector('.sensitive-lock');
+        if (lock) {
+            lock.classList.remove('fa-lock');
+            lock.classList.add('fa-lock-open');
+        }
+        var timerEl = card.querySelector('.sensitive-timer');
+        clearTimers(id);
+
+        var remaining = AUTO_HIDE_SECONDS;
+        if (timerEl) {
+            timerEl.textContent = remaining + 's';
+            timerEl.classList.remove('warning');
+        }
+
+        var interval = setInterval(function() {
+            remaining--;
+            if (remaining > 0 && timerEl) {
+                timerEl.textContent = remaining + 's';
+                if (remaining <= WARNING_THRESHOLD) timerEl.classList.add('warning');
+            }
+        }, 1000);
+
+        var timeout = setTimeout(function() { hideCard(card); }, AUTO_HIDE_SECONDS * 1000);
+        timers[id] = { timeout: timeout, interval: interval };
+    }
+
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest('.sensitive-card');
+        if (!card) return;
+        if (card.dataset.revealed === 'true') hideCard(card);
+        else revealCard(card);
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.sensitive-card[data-revealed="true"]').forEach(hideCard);
+        }
+    });
+})();
 </script>
 
 </body>
