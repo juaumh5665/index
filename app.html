@@ -2971,6 +2971,44 @@ document.addEventListener('DOMContentLoaded', function(){
                             </ul>
                         </div>
                     </div>
+
+                    <!-- Impressão Térmica do Clube -->
+                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
+                        <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-print"></i> Impressão Térmica</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1.25rem;">Configura como os comprovantes de compra/jackpot são impressos. Estas configs valem pra todos os torneios do clube.</div>
+
+                        <div style="margin-bottom:1rem;">
+                            <label class="inp-label">Largura do papel</label>
+                            <div style="display:flex;gap:.65rem;margin-top:.35rem;">
+                                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;padding:.5rem .8rem;border:1px solid #27272a;border-radius:.4rem;flex:1;background:rgba(255,255,255,.02);">
+                                    <input type="radio" name="cfg-impressao-largura" value="80mm" id="cfg-impressao-largura-80" checked style="accent-color:#06b6d4;">
+                                    <span><strong>80mm</strong> <span style="font-size:.7rem;color:#71717a;">(32 colunas — padrão)</span></span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;padding:.5rem .8rem;border:1px solid #27272a;border-radius:.4rem;flex:1;background:rgba(255,255,255,.02);">
+                                    <input type="radio" name="cfg-impressao-largura" value="58mm" id="cfg-impressao-largura-58" style="accent-color:#06b6d4;">
+                                    <span><strong>58mm</strong> <span style="font-size:.7rem;color:#71717a;">(24 colunas)</span></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.5rem;margin-top:1rem;">Dados do cabeçalho:</div>
+                        <div style="display:flex;flex-direction:column;gap:.4rem;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
+                                <input type="checkbox" id="cfg-impressao-cnpj" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
+                                <span>Imprimir <strong>CNPJ</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
+                                <input type="checkbox" id="cfg-impressao-endereco" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
+                                <span>Imprimir <strong>endereço</strong></span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
+                                <input type="checkbox" id="cfg-impressao-telefone" style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
+                                <span>Imprimir <strong>telefone</strong></span>
+                            </label>
+                        </div>
+
+                        <button onclick="salvarConfigImpressao()" class="btn-gold" style="padding:.7rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Configurações de Impressão</button>
+                    </div>
                 </div>
 
                 <!-- ABA: CASH GAME (padrões) -->
@@ -5319,6 +5357,45 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
                 </div>
             </div>
+
+            <!-- Comprovante de impressão (térmico) -->
+            <div style="display:flex;flex-direction:column;gap:.65rem;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
+                <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comprovante de impressão</div>
+
+                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.85rem;">
+                    <input type="checkbox" id="t-imprimir-compra" onchange="atualizarComprovanteUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
+                    <span><strong>Comprovante de compra</strong> <span style="font-size:.7rem;color:#71717a;">(buy-in, rebuy, add-on, passaporte, etc.)</span></span>
+                </label>
+
+                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.85rem;">
+                    <input type="checkbox" id="t-imprimir-jackpot" onchange="atualizarComprovanteUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#a855f7;">
+                    <span><strong>Comprovante de jackpot</strong> <span style="font-size:.7rem;color:#71717a;">(compra avulsa de jackpot)</span></span>
+                </label>
+
+                <div id="t-comprovante-opcoes" style="display:none;padding:.65rem .85rem;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:.4rem;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.5rem;">
+                        <div>
+                            <label class="inp-label">Vias</label>
+                            <select id="t-comprovante-vias" class="inp">
+                                <option value="1">1 via (jogador)</option>
+                                <option value="2">2 vias (jogador + clube)</option>
+                                <option value="3">3 vias</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:center;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;margin-top:1.2rem;">
+                                <input type="checkbox" id="t-comprovante-assinatura" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
+                                <span>Incluir linha de <strong>assinatura</strong></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;">
+                        <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
+                        Largura do papel é definida nas configurações do clube (80mm ou 58mm).
+                    </div>
+                </div>
+            </div>
+
             <!-- Blinds -->
             <div style="display:flex;flex-direction:column;gap:.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
@@ -7397,6 +7474,10 @@ function _torneioToDb(t) {
         passaporte_valor: t.passaporteValor || 0,
         passaporte_fichas: t.passaporteFichas || null,
         buyin_free_ate_nivel: t.buyinFreeAteNivel || null,
+        imprimir_comprovante_compra: !!t.imprimirComprovanteCompra,
+        imprimir_comprovante_jackpot: !!t.imprimirComprovanteJackpot,
+        comprovante_vias: t.comprovanteVias || 1,
+        comprovante_assinatura: t.comprovanteAssinatura !== false,
         rebuy_valor: t.rebuyValor || t.rebuySimples || 0,
         rebuy_fichas: t.rebuyFichas || t.rebuySimplesFichas || 0,
         rebuy_duplo_valor: t.rebuyDuploValor || t.rebuyDuplo || 0,
@@ -8303,6 +8384,10 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         passaporteValor: parseFloat(r.passaporte_valor || 0),
         passaporteFichas: r.passaporte_fichas || null,
         buyinFreeAteNivel: r.buyin_free_ate_nivel || null,
+        imprimirComprovanteCompra:  !!r.imprimir_comprovante_compra,
+        imprimirComprovanteJackpot: !!r.imprimir_comprovante_jackpot,
+        comprovanteVias:            r.comprovante_vias || 1,
+        comprovanteAssinatura:      r.comprovante_assinatura !== false,
         capileModo: r.capile_modo || 'pote',
         rebuyValor: parseFloat(r.rebuy_valor || 0),
         rebuySimples: parseFloat(r.rebuy_valor || 0),  // espelho compat
@@ -11592,6 +11677,31 @@ function _printHeader() {
     h += _printLine('=', 32) + '\n';
     return h;
 }
+
+// FASE E: Largura da coluna conforme config do clube (80mm=32, 58mm=24)
+function _printColWidth() {
+    if (typeof sbClube !== 'undefined' && sbClube && sbClube.impressao_largura === '58mm') return 24;
+    return 32;
+}
+
+// FASE E: Header térmico configurável por clube (flags impressao_cnpj/endereco/telefone)
+function _printHeaderCfg() {
+    const col = _printColWidth();
+    const c = (typeof sbClube !== 'undefined' && sbClube) ? sbClube : (config.clube || {});
+    // Defaults: cnpj e endereco = true; telefone = false (mesmas regras do render)
+    const inclCnpj = c.impressao_cnpj !== false;
+    const inclEnd  = c.impressao_endereco !== false;
+    const inclTel  = !!c.impressao_telefone;
+
+    let h = '';
+    if (c.nome) h += _printCenter(c.nome.toUpperCase(), col) + '\n';
+    if (inclCnpj && c.cnpj) h += _printCenter('CNPJ: ' + c.cnpj, col) + '\n';
+    if (inclEnd && c.endereco) h += _printCenter(c.endereco, col) + '\n';
+    if (inclEnd && (c.cidade || c.uf)) h += _printCenter([c.cidade, c.uf].filter(Boolean).join('/'), col) + '\n';
+    if (inclTel && (c.fone || c.telefone)) h += _printCenter('Tel: ' + (c.fone || c.telefone), col) + '\n';
+    h += _printLine('=', col) + '\n';
+    return h;
+}
 function _printFooter() {
     const dt = new Date();
     let f = _printLine('=', 32) + '\n';
@@ -11599,6 +11709,364 @@ function _printFooter() {
     f += _printCenter(dt.toLocaleString('pt-BR'), 32) + '\n';
     if (currentUser) f += _printCenter('Operador: ' + currentUser.nome, 32) + '\n';
     return f;
+}
+
+// ============================================================
+// FASE E — COMPROVANTE DE COMPRA (térmico)
+// Mostra: ação cobrada + extras (passaporte/staff fixo/taxa adm)
+// + fichas entregues. Configurável por torneio (vias/assinatura).
+// ============================================================
+
+// Mapeia tipo de entry pra label legível no comprovante
+function _labelTipoEntry(tipo) {
+    const map = {
+        'buyin': 'Buy-in',
+        'reentry': 'Re-entry',
+        'rebuy_simples': 'Rebuy Simples',
+        'rebuy_duplo': 'Rebuy Duplo',
+        'addon': 'Add-on',
+        'last_chance': 'Last Chance'
+    };
+    return map[tipo] || tipo;
+}
+
+// Calcula fichas do stack base entregue pra cada tipo
+function _fichasStackPorTipo(t, tipo) {
+    if (tipo === 'rebuy_simples') return Number(t.rebuyFichas || t.rebuySimplesFichas || t.stack) || 0;
+    if (tipo === 'rebuy_duplo')   return Number(t.rebuyDuploFichas || t.stack * 2) || 0;
+    if (tipo === 'addon')         return Number(t.addonFichas) || 0;
+    if (tipo === 'last_chance')   return Number(t.last_chance_fichas) || 0;
+    return Number(t.stack) || 0; // buyin / reentry
+}
+
+// Gera o TEXTO do comprovante de UMA entrada específica
+// dados = { entry, jogadorNome, viaLabel? }
+function gerarComprovanteCompra(t, dados) {
+    if (!t || !dados || !dados.entry) return '';
+    const e = dados.entry;
+    const col = _printColWidth();
+    const tipoLabel = _labelTipoEntry(e.tipo);
+    const valorAcao = Number(e.valor) || 0;
+    const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+    const taxaAdm = Number(e.taxaAdm) || 0;
+    const temPassaporte = e.passaporte && e.passaporte.cobrado;
+    const valorPassaporte = temPassaporte ? (Number(e.passaporte.valor) || 0) : 0;
+    const fichasPassaporte = temPassaporte ? (Number(e.passaporte.fichas) || 0) : 0;
+
+    // Staff fixo "incluso" — exibido como informação, sem somar no total
+    const staffFixo = (_resolverStaffModo(t) === 'fixo' && _isTipoStaffFixoElegivel(t, e.tipo))
+        ? (Number(t.staffFixoValor) || 0)
+        : 0;
+
+    let txt = _printHeaderCfg();
+    txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
+    if (dados.viaLabel) txt += _printCenter(dados.viaLabel, col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
+    const dt = new Date(e.ts || Date.now());
+    txt += 'Data: ' + dt.toLocaleString('pt-BR') + '\n';
+    // Nível atual (humano) — informativo
+    if (t.iniciadoEm) {
+        try {
+            const niv = _nivelHumano(t);
+            txt += 'Nivel: ' + niv + '\n';
+        } catch(_) {}
+    }
+    txt += 'Jogador: ' + (dados.jogadorNome || '—').substring(0, col - 9) + '\n';
+    if (currentUser && currentUser.nome) {
+        txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
+    }
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'ITENS COMPRADOS' + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    // Ação principal (sempre — mesmo R$0 em buy-in free, pra deixar claro)
+    if (valorAcao > 0) {
+        txt += _printPad(tipoLabel, formatMoney(valorAcao), col) + '\n';
+    } else {
+        txt += _printPad(tipoLabel, 'GRATIS', col) + '\n';
+    }
+    if (fichasAcao > 0) {
+        txt += '   + ' + fichasAcao.toLocaleString('pt-BR') + ' fichas\n';
+    }
+
+    // Staff fixo incluso (informação)
+    if (staffFixo > 0) {
+        txt += _printPad('  Staff (incluso)', formatMoney(staffFixo), col) + '\n';
+        txt += '   na acao acima\n';
+    }
+
+    // Taxa adm
+    if (taxaAdm > 0) {
+        txt += _printPad('Taxa Adm.', formatMoney(taxaAdm), col) + '\n';
+    }
+
+    // Passaporte
+    if (temPassaporte) {
+        txt += _printPad('Passaporte', formatMoney(valorPassaporte), col) + '\n';
+        if (fichasPassaporte > 0) {
+            txt += '   + ' + fichasPassaporte.toLocaleString('pt-BR') + ' fichas\n';
+        }
+    }
+
+    txt += _printLine('-', col) + '\n';
+    const total = valorAcao + taxaAdm + valorPassaporte;
+    const fichasTotal = fichasAcao + fichasPassaporte;
+    txt += _printPad('TOTAL', formatMoney(total), col) + '\n';
+    if (fichasTotal > 0) {
+        txt += _printPad('Fichas entregues', fichasTotal.toLocaleString('pt-BR'), col) + '\n';
+    }
+
+    // Linha de assinatura (configurável)
+    if (t.comprovanteAssinatura !== false) {
+        txt += '\n\n';
+        txt += _printCenter('_'.repeat(Math.min(col - 4, 26)), col) + '\n';
+        txt += _printCenter('Assinatura do jogador', col) + '\n';
+    }
+
+    txt += '\n' + _printFooter();
+    return txt;
+}
+
+// Verifica se um tipo de entry é elegível pro staff fixo (helper interno)
+function _isTipoStaffFixoElegivel(t, tipo) {
+    if (!t || _resolverStaffModo(t) !== 'fixo') return false;
+    const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
+    if (tipo === 'last_chance') return !!acoes.last_chance;
+    const key = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
+    return !!acoes[key];
+}
+
+// Imprime o comprovante (gera + abre preview). Respeita N de vias.
+function imprimirComprovanteCompra(t, dados) {
+    if (!t || !dados || !dados.entry) return;
+    const vias = Math.max(1, Math.min(3, Number(t.comprovanteVias) || 1));
+    const labels = vias === 1 ? [null] : (vias === 2 ? ['VIA DO JOGADOR', 'VIA DO CLUBE'] : ['VIA DO JOGADOR', 'VIA DO CLUBE', '3a VIA']);
+    let txt = '';
+    for (let i = 0; i < vias; i++) {
+        if (i > 0) txt += '\n\n' + _printLine('=', _printColWidth()) + '\n\n';
+        txt += gerarComprovanteCompra(t, { ...dados, viaLabel: labels[i] });
+    }
+    abrirPreviewImpressao('Comprovante de Compra', txt);
+    logAudit && logAudit('IMPRESSAO', `Comprovante de compra impresso · ${dados.jogadorNome || '—'} · ${_labelTipoEntry(dados.entry.tipo)}`);
+}
+
+// ============================================================
+// FASE E — COMPROVANTE DE JACKPOT (térmico, layout separado)
+// ============================================================
+
+function gerarComprovanteJackpot(t, dados) {
+    if (!t || !dados) return '';
+    const col = _printColWidth();
+    let txt = _printHeaderCfg();
+    txt += _printCenter('COMPROVANTE DE JACKPOT', col) + '\n';
+    if (dados.viaLabel) txt += _printCenter(dados.viaLabel, col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
+    const dt = new Date(dados.ts || Date.now());
+    txt += 'Data: ' + dt.toLocaleString('pt-BR') + '\n';
+    txt += 'Jogador: ' + (dados.jogadorNome || '—').substring(0, col - 9) + '\n';
+    if (currentUser && currentUser.nome) {
+        txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
+    }
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'COMPRA DE JACKPOT' + '\n';
+    txt += _printLine('-', col) + '\n';
+    const qtd = Math.max(1, Number(dados.qtd) || 1);
+    const valorUnit = Number(t.jackpotValor) || 0;
+    const fichasUnit = Number(t.jackpotFichas) || 0;
+    txt += _printPad(qtd + 'x Jackpot', formatMoney(qtd * valorUnit), col) + '\n';
+    if (qtd > 1) {
+        txt += '   ' + formatMoney(valorUnit) + ' cada\n';
+    }
+    if (fichasUnit > 0) {
+        txt += '   + ' + (qtd * fichasUnit).toLocaleString('pt-BR') + ' fichas\n';
+    }
+
+    txt += _printLine('-', col) + '\n';
+    txt += _printPad('TOTAL', formatMoney(Number(dados.valor) || (qtd * valorUnit)), col) + '\n';
+    if (dados.fichas) {
+        txt += _printPad('Fichas entregues', Number(dados.fichas).toLocaleString('pt-BR'), col) + '\n';
+    }
+
+    if (t.comprovanteAssinatura !== false) {
+        txt += '\n\n';
+        txt += _printCenter('_'.repeat(Math.min(col - 4, 26)), col) + '\n';
+        txt += _printCenter('Assinatura do jogador', col) + '\n';
+    }
+
+    txt += '\n' + _printFooter();
+    return txt;
+}
+
+function imprimirComprovanteJackpot(t, dados) {
+    if (!t || !dados) return;
+    const vias = Math.max(1, Math.min(3, Number(t.comprovanteVias) || 1));
+    const labels = vias === 1 ? [null] : (vias === 2 ? ['VIA DO JOGADOR', 'VIA DO CLUBE'] : ['VIA DO JOGADOR', 'VIA DO CLUBE', '3a VIA']);
+    let txt = '';
+    for (let i = 0; i < vias; i++) {
+        if (i > 0) txt += '\n\n' + _printLine('=', _printColWidth()) + '\n\n';
+        txt += gerarComprovanteJackpot(t, { ...dados, viaLabel: labels[i] });
+    }
+    abrirPreviewImpressao('Comprovante de Jackpot', txt);
+    logAudit && logAudit('IMPRESSAO', `Comprovante de jackpot impresso · ${dados.jogadorNome || '—'}`);
+}
+
+// ============================================================
+// FASE E — EXTRATO COMPLETO DO JOGADOR NO TORNEIO
+// Imprime TODAS as compras (entries + jackpots) de um jogador.
+// ============================================================
+function gerarExtratoJogadorTorneio(t, jogadorId) {
+    if (!t || !jogadorId) return '';
+    const col = _printColWidth();
+    const jogador = (typeof jogadores !== 'undefined' && Array.isArray(jogadores))
+        ? jogadores.find(j => j.id === jogadorId)
+        : null;
+    const nome = jogador ? jogador.nome : '—';
+
+    let txt = _printHeaderCfg();
+    txt += _printCenter('EXTRATO DO JOGADOR', col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
+    txt += 'Jogador: ' + nome.substring(0, col - 9) + '\n';
+    txt += 'Emitido: ' + new Date().toLocaleString('pt-BR') + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    // Entries do jogador
+    const entries = (t.entries || []).filter(e => e.jogadorId === jogadorId);
+    let totalGeral = 0;
+    let fichasTotal = 0;
+    let qtd = 0;
+
+    if (entries.length > 0) {
+        txt += 'COMPRAS DE TORNEIO' + '\n';
+        txt += _printLine('-', col) + '\n';
+        entries.forEach(e => {
+            qtd++;
+            const dt = new Date(e.ts || Date.now());
+            const dtFmt = dt.toLocaleString('pt-BR').substring(0, 17);
+            txt += dtFmt + ' #' + qtd + '\n';
+            const valorAcao = Number(e.valor) || 0;
+            const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+            if (valorAcao > 0) {
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo), formatMoney(valorAcao), col) + '\n';
+            } else {
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo), 'GRATIS', col) + '\n';
+            }
+            totalGeral += valorAcao;
+            fichasTotal += fichasAcao;
+
+            if (Number(e.taxaAdm) > 0) {
+                txt += _printPad('  Taxa Adm.', formatMoney(e.taxaAdm), col) + '\n';
+                totalGeral += Number(e.taxaAdm);
+            }
+            if (e.passaporte && e.passaporte.cobrado) {
+                txt += _printPad('  Passaporte', formatMoney(e.passaporte.valor || 0), col) + '\n';
+                totalGeral += Number(e.passaporte.valor) || 0;
+                fichasTotal += Number(e.passaporte.fichas) || 0;
+            }
+            txt += '\n';
+        });
+    }
+
+    // Jackpots do jogador
+    const jackpots = (t.jackpotCompras || []).filter(j => j.jogadorId === jogadorId);
+    if (jackpots.length > 0) {
+        txt += 'COMPRAS DE JACKPOT' + '\n';
+        txt += _printLine('-', col) + '\n';
+        jackpots.forEach(j => {
+            const dt = new Date(j.ts || Date.now());
+            const qtdJ = Math.max(1, Number(j.qtd) || 1);
+            txt += dt.toLocaleString('pt-BR').substring(0, 17) + '\n';
+            txt += _printPad('  ' + qtdJ + 'x Jackpot', formatMoney(j.valor || 0), col) + '\n';
+            totalGeral += Number(j.valor) || 0;
+            fichasTotal += Number(j.fichas) || 0;
+        });
+        txt += '\n';
+    }
+
+    if (entries.length === 0 && jackpots.length === 0) {
+        txt += '(Sem compras registradas)\n';
+    } else {
+        txt += _printLine('-', col) + '\n';
+        txt += _printPad('TOTAL GERAL', formatMoney(totalGeral), col) + '\n';
+        if (fichasTotal > 0) {
+            txt += _printPad('Fichas totais', fichasTotal.toLocaleString('pt-BR'), col) + '\n';
+        }
+    }
+
+    txt += '\n' + _printFooter();
+    return txt;
+}
+
+function imprimirExtratoJogadorTorneio(t, jogadorId) {
+    if (!t || !jogadorId) return;
+    const txt = gerarExtratoJogadorTorneio(t, jogadorId);
+    abrirPreviewImpressao('Extrato do Jogador', txt);
+    const jogador = (typeof jogadores !== 'undefined' && Array.isArray(jogadores))
+        ? jogadores.find(j => j.id === jogadorId)
+        : null;
+    logAudit && logAudit('IMPRESSAO', `Extrato impresso · ${jogador ? jogador.nome : jogadorId}`);
+}
+
+// FASE E: dispatcher de reimpressão a partir do histórico
+// kind='entry' usa o ID da entry; kind='jackpot' usa o jogadorId (busca compra mais recente)
+function _reimprimirLancamento(kind, refId) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return showToast('⚠️ Torneio não encontrado');
+
+    if (kind === 'jackpot') {
+        // Pega TODAS as compras de jackpot do jogador e imprime a mais recente
+        const compras = (t.jackpotCompras || []).filter(j => j.jogadorId === refId);
+        if (!compras.length) return showToast('⚠️ Compra de jackpot não encontrada');
+        const compra = compras[compras.length - 1];
+        imprimirComprovanteJackpot(t, {
+            jogadorNome: getJogadorNome(compra.jogadorId),
+            qtd: compra.qtd, valor: compra.valor, fichas: compra.fichas, ts: compra.ts
+        });
+    } else {
+        // Entry — busca pelo id
+        const entry = (t.entries || []).find(e => e.id === refId);
+        if (!entry) return showToast('⚠️ Lançamento não encontrado');
+        imprimirComprovanteCompra(t, { entry, jogadorNome: getJogadorNome(entry.jogadorId) });
+    }
+}
+
+// FASE E: modal pequeno perguntando se quer imprimir comprovante
+// opcoes = { titulo, descricao, onConfirm, onCancel? }
+function _abrirModalPromptImpressao(opcoes) {
+    const existing = document.getElementById('modal-prompt-impressao');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'modal-prompt-impressao';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(4px);animation:fadein .15s ease;';
+    overlay.innerHTML = `
+        <div style="background:#0f0f12;border:1px solid rgba(6,182,212,.3);border-radius:.75rem;padding:1.5rem;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+            <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.85rem;">
+                <i class="fa-solid fa-print" style="font-size:1.4rem;color:#06b6d4;"></i>
+                <div style="font-size:1.05rem;font-weight:600;color:#fff;">${(opcoes.titulo || 'Imprimir comprovante?')}</div>
+            </div>
+            ${opcoes.descricao ? `<div style="font-size:.85rem;color:#a1a1aa;margin-bottom:1.25rem;">${opcoes.descricao}</div>` : ''}
+            <div style="display:flex;gap:.55rem;">
+                <button id="prompt-print-cancel" class="btn-ghost" style="flex:1;padding:.65rem;border-radius:.5rem;">Não, obrigado</button>
+                <button id="prompt-print-ok" class="btn-gold" style="flex:1;padding:.65rem;border-radius:.5rem;background:#06b6d4;border-color:#06b6d4;color:#000;font-weight:600;">
+                    <i class="fa-solid fa-print"></i> Imprimir
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => { try { overlay.remove(); } catch(_){} };
+    document.getElementById('prompt-print-cancel').onclick = () => { close(); if (opcoes.onCancel) opcoes.onCancel(); };
+    document.getElementById('prompt-print-ok').onclick = () => { close(); if (opcoes.onConfirm) opcoes.onConfirm(); };
+    overlay.onclick = (ev) => { if (ev.target === overlay) close(); };
 }
 
 // === RECIBO DE PAGAMENTO ===
@@ -16920,6 +17388,10 @@ function saveTournament() {
             const v = parseInt(document.getElementById('t-buyin-free-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
         })(),
+        imprimirComprovanteCompra:  document.getElementById('t-imprimir-compra')?.checked || false,
+        imprimirComprovanteJackpot: document.getElementById('t-imprimir-jackpot')?.checked || false,
+        comprovanteVias:            parseInt(document.getElementById('t-comprovante-vias')?.value) || 1,
+        comprovanteAssinatura:      document.getElementById('t-comprovante-assinatura')?.checked ?? true,
         tempoNivel,
         stack:        parseInt(document.getElementById('t-stack').value)    || 20000,
         reentryAte:   parseInt(document.getElementById('t-reentry').value)  || 0,
@@ -17551,6 +18023,13 @@ function renderTabLancamentosDetalhados() {
             ? `<button onclick="abrirModalEstorno('${l.kind}', '${l.kind === 'jackpot' ? l.jogadorId : l.id}')" title="Estornar" style="background:transparent;border:1px solid #3f3f46;color:#71717a;padding:.25rem .5rem;border-radius:.3rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444';this.style.borderColor='#ef4444';" onmouseout="this.style.color='#71717a';this.style.borderColor='#3f3f46';"><i class="fa-solid fa-trash-can"></i></button>`
             : `<span style="font-size:.65rem;color:#3f3f46;">—</span>`;
 
+        // FASE E: botão de reimpressão (se torneio tem comprovante ativado)
+        const tAtual = torneios[activeTorneioIdx];
+        const canReprint = tAtual && ((l.kind === 'jackpot' && tAtual.imprimirComprovanteJackpot) || (l.kind !== 'jackpot' && tAtual.imprimirComprovanteCompra));
+        const btnReprint = canReprint
+            ? `<button onclick="_reimprimirLancamento('${l.kind}', '${l.id || l.jogadorId}')" title="Reimprimir comprovante" style="background:transparent;border:1px solid #3f3f46;color:#71717a;padding:.25rem .5rem;border-radius:.3rem;cursor:pointer;font-size:.75rem;margin-right:.25rem;" onmouseover="this.style.color='#06b6d4';this.style.borderColor='#06b6d4';" onmouseout="this.style.color='#71717a';this.style.borderColor='#3f3f46';"><i class="fa-solid fa-print"></i></button>`
+            : '';
+
         return `<tr style="border-top:1px solid #1e1e23;">
             <td style="padding:.55rem 1rem;font-size:.72rem;color:#71717a;white-space:nowrap;">${dataStr}</td>
             <td style="padding:.55rem 1rem;font-size:.8rem;color:#e4e4e7;">${escapeHtml(jogadorNome)}</td>
@@ -17560,7 +18039,7 @@ function renderTabLancamentosDetalhados() {
                 </span>
             </td>
             <td style="padding:.55rem 1rem;text-align:right;font-weight:700;color:#e4e4e7;white-space:nowrap;" class="mono">${formatMoney(l.valor)}</td>
-            <td style="padding:.55rem 1rem;text-align:center;">${btnEstornar}</td>
+            <td style="padding:.55rem 1rem;text-align:center;">${btnReprint}${btnEstornar}</td>
         </tr>`;
     }).join('');
 }
@@ -18970,6 +19449,20 @@ function _registrarEntradaImpl() {
 
     const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
     showToast(`💰 ${tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in'} registrado!${totalLabel}`);
+
+    // FASE E: oferecer impressão de comprovante (se torneio configurado pra isso)
+    if (t.imprimirComprovanteCompra) {
+        const novaEntryRef = t.entries[t.entries.length - 1];
+        if (novaEntryRef) {
+            setTimeout(() => {
+                _abrirModalPromptImpressao({
+                    titulo: 'Imprimir comprovante de compra?',
+                    descricao: `${_labelTipoEntry(novaEntryRef.tipo)} de ${getJogadorNome(jid)}`,
+                    onConfirm: () => imprimirComprovanteCompra(t, { entry: novaEntryRef, jogadorNome: getJogadorNome(jid) })
+                });
+            }, 300);
+        }
+    }
 }
 
 function openModalEliminar(idx) {
@@ -23480,6 +23973,52 @@ function renderConfigTorneios() {
     const cbLC = document.getElementById('cfg-last-chance-paga-rake');
     if (cbJack) cbJack.checked = !!sbClube.cfg_jackpot_paga_rake;
     if (cbLC)   cbLC.checked   = !!sbClube.cfg_last_chance_paga_rake;
+
+    // FASE E: Configurações de impressão térmica
+    const larg = sbClube.impressao_largura || '80mm';
+    const rb80 = document.getElementById('cfg-impressao-largura-80');
+    const rb58 = document.getElementById('cfg-impressao-largura-58');
+    if (rb80) rb80.checked = (larg === '80mm');
+    if (rb58) rb58.checked = (larg === '58mm');
+    const cbCnpj = document.getElementById('cfg-impressao-cnpj');
+    const cbEnd  = document.getElementById('cfg-impressao-endereco');
+    const cbTel  = document.getElementById('cfg-impressao-telefone');
+    if (cbCnpj) cbCnpj.checked = sbClube.impressao_cnpj !== false; // default true
+    if (cbEnd)  cbEnd.checked  = sbClube.impressao_endereco !== false; // default true
+    if (cbTel)  cbTel.checked  = !!sbClube.impressao_telefone; // default false
+}
+
+// FASE E: Salva configurações de impressão térmica do clube
+async function salvarConfigImpressao() {
+    if (!sbClube || !sbClube.id) return showToast('⚠️ Clube não carregado');
+
+    const largura = document.querySelector('input[name="cfg-impressao-largura"]:checked')?.value || '80mm';
+    const imprimirCnpj = document.getElementById('cfg-impressao-cnpj')?.checked ?? true;
+    const imprimirEnd  = document.getElementById('cfg-impressao-endereco')?.checked ?? true;
+    const imprimirTel  = document.getElementById('cfg-impressao-telefone')?.checked ?? false;
+
+    try {
+        const { error } = await sb.from('clubes').update({
+            impressao_largura: largura,
+            impressao_cnpj: imprimirCnpj,
+            impressao_endereco: imprimirEnd,
+            impressao_telefone: imprimirTel,
+            atualizado_em: new Date().toISOString(),
+        }).eq('id', sbClube.id);
+
+        if (error) throw error;
+
+        sbClube.impressao_largura  = largura;
+        sbClube.impressao_cnpj     = imprimirCnpj;
+        sbClube.impressao_endereco = imprimirEnd;
+        sbClube.impressao_telefone = imprimirTel;
+        window.sbClube = sbClube;
+
+        showToast('✓ Configurações de impressão salvas');
+    } catch(e) {
+        console.error('[CONFIG-IMPRESSAO] erro:', e);
+        showToast('⚠️ Erro ao salvar: ' + (e.message || e));
+    }
 }
 
 async function salvarTravasPadrao() {
@@ -26696,6 +27235,20 @@ function confirmarJackpot() {
     closeModal('modal-jackpot');
     updateModalTorneio();
     showToast(`💎 ${qtd}x Jackpot comprado por ${getJogadorNome(jid)}  ·  +R$ ${total} na Caixa do Clube`);
+
+    // FASE E: oferecer impressão de comprovante de jackpot
+    if (t.imprimirComprovanteJackpot) {
+        setTimeout(() => {
+            _abrirModalPromptImpressao({
+                titulo: 'Imprimir comprovante de jackpot?',
+                descricao: `${qtd}x Jackpot de ${getJogadorNome(jid)} · ${formatMoney(total)}`,
+                onConfirm: () => imprimirComprovanteJackpot(t, {
+                    jogadorNome: getJogadorNome(jid),
+                    qtd, valor: total, fichas: totalFichas, ts: Date.now()
+                })
+            });
+        }, 300);
+    }
 }
 
 // ============================================================
@@ -30924,6 +31477,15 @@ function atualizarBuyinFreeUI() {
     var v = parseFloat(inp.value);
     var isFree = !isNaN(v) && v === 0;
     bloco.style.display = isFree ? '' : 'none';
+}
+
+function atualizarComprovanteUI() {
+    var cbCompra = document.getElementById('t-imprimir-compra');
+    var cbJackpot = document.getElementById('t-imprimir-jackpot');
+    var opcoes = document.getElementById('t-comprovante-opcoes');
+    if (!opcoes) return;
+    var show = (cbCompra && cbCompra.checked) || (cbJackpot && cbJackpot.checked);
+    opcoes.style.display = show ? '' : 'none';
 }
 </script>
 
