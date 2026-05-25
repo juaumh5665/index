@@ -5327,6 +5327,32 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div id="t-staff-painel-fixo" style="display:none;">
                         <label class="inp-label">Valor fixo em R$ por ação</label>
                         <input id="t-staff-fixo-valor" type="number" step="0.5" min="0" value="10" class="inp" placeholder="Ex: 10,00">
+
+                        <!-- FASE G: Modo do staff fixo -->
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.85rem;margin-bottom:.4rem;">Como cobrar o staff?</div>
+                        <div style="display:flex;flex-direction:column;gap:.35rem;">
+                            <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.75rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
+                                <input type="radio" name="t-staff-fixo-modo" value="embutido" id="t-staff-fixo-modo-embutido" checked style="accent-color:#38bdf8;margin-top:.15rem;">
+                                <div style="flex:1;">
+                                    <div><strong>Embutido</strong> no preço (recomendado)</div>
+                                    <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60 (do flyer). Internamente, R$ 50 vai pro rake e R$ 10 é staff. Não aparece no comprovante.</div>
+                                </div>
+                            </label>
+                            <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.75rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
+                                <input type="radio" name="t-staff-fixo-modo" value="adicional" id="t-staff-fixo-modo-adicional" style="accent-color:#38bdf8;margin-top:.15rem;">
+                                <div style="flex:1;">
+                                    <div><strong>Adicional</strong> (transparente)</div>
+                                    <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60 + R$ 10 staff = R$ 70. Staff aparece como linha separada no comprovante.</div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- FASE G: Cobrar staff também no Buy-in FREE -->
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;margin-top:.65rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);">
+                            <input type="checkbox" id="t-staff-fixo-cobrar-free" style="accent-color:var(--gold);">
+                            <span>Cobrar staff fixo também no <strong>Buy-in FREE</strong> (R$ 0 + R$ 10 staff = R$ 10)</span>
+                        </label>
+
                         <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;margin-bottom:.4rem;">Aplicar staff fixo em quais ações?</div>
                         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.35rem;">
                             <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.75rem;padding:.3rem .5rem;border-radius:.35rem;background:rgba(56,189,248,.05);">
@@ -5352,7 +5378,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                         <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
                             <strong>Como funciona:</strong> O valor fixo é descontado de cada ação <strong>antes</strong> do cálculo de rake.<br>
-                            <strong>Exemplo:</strong> Buy-in R$ 60 com staff fixo R$ 10 e rake 20% → Staff: R$ 10 · Base do rake: R$ 50 · Rake: R$ 10 · Prize: R$ 40
+                            <strong>Exemplo (embutido):</strong> Rebuy R$ 60 com staff fixo R$ 10 e rake 23% → Cliente paga R$ 60 · Base rake R$ 50 · Rake R$ 11,50 · Staff R$ 10 · Prize R$ 38,50
                         </div>
                     </div>
                 </div>
@@ -7477,6 +7503,8 @@ function _torneioToDb(t) {
         staff_modo: t.staffModo || null,
         staff_fixo_valor: t.staffFixoValor || 0,
         staff_fixo_acoes: t.staffFixoAcoes || null,
+        staff_fixo_modo: t.staffFixoModo || 'embutido',
+        staff_fixo_cobrar_free: !!t.staffFixoCobrarFree,
         passaporte_ativo: !!t.passaporteAtivo,
         passaporte_valor: t.passaporteValor || 0,
         passaporte_fichas: t.passaporteFichas || null,
@@ -8392,6 +8420,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         staffModo: r.staff_modo || null,
         staffFixoValor: parseFloat(r.staff_fixo_valor || 0),
         staffFixoAcoes: r.staff_fixo_acoes || null,
+        staffFixoModo: r.staff_fixo_modo || 'embutido',
+        staffFixoCobrarFree: !!r.staff_fixo_cobrar_free,
         passaporteAtivo: !!r.passaporte_ativo,
         passaporteValor: parseFloat(r.passaporte_valor || 0),
         passaporteFichas: r.passaporte_fichas || null,
@@ -11770,10 +11800,12 @@ function gerarComprovanteCompra(t, dados) {
     const valorPassaporte = temPassaporte ? (Number(e.passaporte.valor) || 0) : 0;
     const fichasPassaporte = temPassaporte ? (Number(e.passaporte.fichas) || 0) : 0;
 
-    // Staff fixo "incluso" — exibido como informação, sem somar no total
-    const staffFixo = (_resolverStaffModo(t) === 'fixo' && _isTipoStaffFixoElegivel(t, e.tipo))
-        ? (Number(t.staffFixoValor) || 0)
-        : 0;
+    // FASE G: Staff fixo — exibição depende do MODO
+    // - 'embutido' (default): NÃO mostra no comprovante (já está dentro do preço)
+    // - 'adicional': mostra como linha separada e SOMA no total
+    const eligivelStaff = (_resolverStaffModo(t) === 'fixo' && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0));
+    const fixoModo = t.staffFixoModo || 'embutido';
+    const staffFixoMostrar = eligivelStaff && fixoModo === 'adicional' ? (Number(t.staffFixoValor) || 0) : 0;
 
     let txt = _printHeaderCfg();
     txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
@@ -11813,9 +11845,9 @@ function gerarComprovanteCompra(t, dados) {
         txt += '   + ' + fichasAcao.toLocaleString('pt-BR') + ' fichas\n';
     }
 
-    // Staff fixo incluso (informação)
-    if (staffFixo > 0) {
-        txt += _printPad('  Staff (incluso)', formatMoney(staffFixo), col) + '\n';
+    // Staff fixo (só aparece em modo adicional)
+    if (staffFixoMostrar > 0) {
+        txt += _printPad('Staff Fixo', formatMoney(staffFixoMostrar), col) + '\n';
     }
 
     // Taxa adm
@@ -11832,7 +11864,7 @@ function gerarComprovanteCompra(t, dados) {
     }
 
     txt += _printLine('-', col) + '\n';
-    const total = valorAcao + taxaAdm + valorPassaporte;
+    const total = valorAcao + staffFixoMostrar + taxaAdm + valorPassaporte;
     const fichasTotal = fichasAcao + fichasPassaporte;
     txt += _printPad('TOTAL', formatMoney(total), col) + '\n';
     if (fichasTotal > 0) {
@@ -11851,12 +11883,19 @@ function gerarComprovanteCompra(t, dados) {
 }
 
 // Verifica se um tipo de entry é elegível pro staff fixo (helper interno)
-function _isTipoStaffFixoElegivel(t, tipo) {
+// Verifica se um tipo de entry é elegível pro staff fixo.
+// Parâmetro `valorEntry` (opcional): se for 0 e for buy-in, respeita t.staffFixoCobrarFree
+function _isTipoStaffFixoElegivel(t, tipo, valorEntry) {
     if (!t || _resolverStaffModo(t) !== 'fixo') return false;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
     if (tipo === 'last_chance') return !!acoes.last_chance;
     const key = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
-    return !!acoes[key];
+    if (!acoes[key]) return false;
+    // FASE G: buy-in free só conta se cobrarFree=true
+    if (tipo === 'buyin' && valorEntry !== undefined && Number(valorEntry) === 0 && !t.staffFixoCobrarFree) {
+        return false;
+    }
+    return true;
 }
 
 // Imprime o comprovante (gera + abre preview). Respeita N de vias.
@@ -11933,7 +11972,8 @@ function gerarComprovanteCombo(t, dados) {
         }
 
         // Staff fixo incluso (acumula pra mostrar 1 vez no final)
-        if (_isTipoStaffFixoElegivel(t, e.tipo)) {
+        // FASE G: Staff fixo só conta se MODO adicional (em embutido já está dentro do preço)
+        if (_isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) {
             staffFixoTotal += (Number(t.staffFixoValor) || 0);
         }
 
@@ -11949,9 +11989,11 @@ function gerarComprovanteCombo(t, dados) {
         }
     });
 
-    // Mostrar staff fixo total (agrupado)
-    if (staffFixoTotal > 0) {
-        txt += _printPad('  Staff (incluso)', formatMoney(staffFixoTotal), col) + '\n';
+    // FASE G: Staff fixo aparece apenas em modo "adicional"
+    const fixoModo = t.staffFixoModo || 'embutido';
+    if (staffFixoTotal > 0 && fixoModo === 'adicional') {
+        txt += _printPad('Staff Fixo', formatMoney(staffFixoTotal), col) + '\n';
+        totalGeral += staffFixoTotal;
     }
 
     // Taxa adm
@@ -12188,6 +12230,22 @@ function _reimprimirLancamento(kind, refId) {
         // Entry — busca pelo id
         const entry = (t.entries || []).find(e => e.id === refId);
         if (!entry) return showToast('⚠️ Lançamento não encontrado');
+
+        // FASE F.3: se a entry faz parte de um combo (tem comboId), reimprime o combo INTEIRO
+        // (caso contrário, o jogador receberia só o Rebuy Duplo sem o Buy-in FREE original)
+        if (entry.comboId) {
+            const entriesDoCombo = (t.entries || [])
+                .filter(e => e.comboId === entry.comboId)
+                .sort((a, b) => (a.ts || 0) - (b.ts || 0)); // ordem cronológica
+            if (entriesDoCombo.length > 1) {
+                return imprimirComprovanteCombo(t, {
+                    entries: entriesDoCombo,
+                    jogadorNome: getJogadorNome(entry.jogadorId)
+                });
+            }
+        }
+
+        // Não tem combo (ou é a única entry do combo) → comprovante individual
         imprimirComprovanteCompra(t, { entry, jogadorNome: getJogadorNome(entry.jogadorId) });
     }
 }
@@ -17557,6 +17615,8 @@ function saveTournament() {
         staffPct:     parseFloat(document.getElementById('t-staff-pct').value) || 0,
         staffModo:    (document.querySelector('input[name="t-staff-modo"]:checked')?.value) || 'percentual',
         staffFixoValor: parseFloat(document.getElementById('t-staff-fixo-valor')?.value) || 0,
+        staffFixoModo: (document.querySelector('input[name="t-staff-fixo-modo"]:checked')?.value) || 'embutido',
+        staffFixoCobrarFree: document.getElementById('t-staff-fixo-cobrar-free')?.checked || false,
         staffFixoAcoes: {
             buyin:       document.getElementById('t-staff-fixo-buyin')?.checked ?? true,
             rebuy:       document.getElementById('t-staff-fixo-rebuy')?.checked ?? true,
@@ -18139,8 +18199,9 @@ function renderTabLancamentosDetalhados() {
     // Junta entries + jackpot compras em uma única lista ordenada por ts desc
     const lancamentos = [];
     (t.entries || []).forEach(e => {
-        // Total efetivamente pago nesta entry: valor base + taxa adm + passaporte
+        // Total efetivamente pago nesta entry: valor base + staff (modo adicional) + taxa adm + passaporte
         const valorTotal = (Number(e.valor) || 0)
+            + (Number(e.staff) || 0)
             + (Number(e.taxaAdm) || 0)
             + (e.passaporte && e.passaporte.cobrado ? (Number(e.passaporte.valor) || 0) : 0);
         lancamentos.push({
@@ -18150,7 +18211,7 @@ function renderTabLancamentosDetalhados() {
             tipo: e.tipo,
             valor: valorTotal,
             valorBase: Number(e.valor) || 0,
-            temExtras: (Number(e.taxaAdm) || 0) > 0 || !!(e.passaporte && e.passaporte.cobrado),
+            temExtras: (Number(e.staff) || 0) > 0 || (Number(e.taxaAdm) || 0) > 0 || !!(e.passaporte && e.passaporte.cobrado),
             ts: e.ts || 0,
         });
     });
@@ -19574,14 +19635,46 @@ function atualizarResumoEntrada() {
     // Soma valor base de cada ação selecionada
     let valorBase = 0;
     acoes.forEach(tipo => {
-        if (tipo === 'buyin')              valorBase += Number(t.buyin) || 0;
-        else if (tipo === 'reentry')       valorBase += (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.buyin) || 0);
-        else if (tipo === 'rebuy_simples') valorBase += Number(t.rebuyValor || t.rebuySimples) || 0;
-        else if (tipo === 'rebuy_duplo')   valorBase += Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
-        else if (tipo === 'addon')         valorBase += Number(t.addonValor) || 0;
+        let v = 0;
+        if (tipo === 'buyin')              v = Number(t.buyin) || 0;
+        else if (tipo === 'reentry')       v = (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.buyin) || 0);
+        else if (tipo === 'rebuy_simples') v = Number(t.rebuyValor || t.rebuySimples) || 0;
+        else if (tipo === 'rebuy_duplo')   v = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+        else if (tipo === 'addon')         v = Number(t.addonValor) || 0;
+        // FASE G: Em embutido + cobrarFree, buy-in free vira valor do staff (R$ 10)
+        if (tipo === 'buyin' && v === 0
+            && _resolverStaffModo(t) === 'fixo'
+            && (t.staffFixoModo || 'embutido') === 'embutido'
+            && t.staffFixoCobrarFree) {
+            v = Number(t.staffFixoValor) || 0;
+        }
+        valorBase += v;
     });
 
-    let staff = 0; // staff zerado sempre (agora é dedução do prize)
+    let staff = 0;
+    // FASE G: Staff fixo no modo ADICIONAL é somado ao total cobrado.
+    // No modo EMBUTIDO, já está dentro do valorBase (não soma novamente).
+    if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
+        const valorStaff = Number(t.staffFixoValor) || 0;
+        acoes.forEach(tp => {
+            // Buy-in free: respeita config cobrarFree
+            if (tp === 'buyin' && valorBase === 0 && !t.staffFixoCobrarFree) {
+                // Não soma staff em buy-in free se config não cobra
+                // (precisa ser uma checagem por ação, mas em combo se já tem rebuy junto, é melhor checar valor por ação)
+            }
+            // Verifica se essa ação específica é elegível
+            // Em combo, cada ação tem seu próprio valor — pra simplicidade aqui, assumimos preço de tabela
+            let valorAcao = 0;
+            if (tp === 'buyin') valorAcao = Number(t.buyin) || 0;
+            else if (tp === 'reentry') valorAcao = (typeof _getReentryValor === 'function') ? _getReentryValor(t) : 0;
+            else if (tp === 'rebuy_simples') valorAcao = Number(t.rebuyValor || t.rebuySimples) || 0;
+            else if (tp === 'rebuy_duplo')   valorAcao = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+            else if (tp === 'addon')         valorAcao = Number(t.addonValor) || 0;
+            if (_isTipoStaffFixoElegivel(t, tp, valorAcao)) {
+                staff += valorStaff;
+            }
+        });
+    }
 
     // LOTE 5: Taxa administrativa — cobrada apenas no buy-in
     let taxaAdm = 0;
@@ -19613,6 +19706,7 @@ function atualizarResumoEntrada() {
         const partes = [];
         const acoesLabel = acoes.length > 1 ? ` (${acoes.length} ações)` : '';
         if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ',') + acoesLabel);
+        if (staff > 0)     partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
         if (taxaAdm > 0)   partes.push('R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa');
         if (passaporte > 0) partes.push('R$ ' + passaporte.toFixed(2).replace('.', ',') + ' passaporte');
         if (partes.length > 1) {
@@ -19683,6 +19777,14 @@ function _registrarEntradasCombo(t, jid, acoes) {
         else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
         else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
 
+        // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
+        if (tipo === 'buyin' && valorBase === 0
+            && _resolverStaffModo(t) === 'fixo'
+            && (t.staffFixoModo || 'embutido') === 'embutido'
+            && t.staffFixoCobrarFree) {
+            valorBase = Number(t.staffFixoValor) || 0;
+        }
+
         // Taxa adm: só no buy-in
         const taxaAdm = (tipo === 'buyin' && Number(t.taxaAdm) > 0) ? Number(t.taxaAdm) : 0;
 
@@ -19691,6 +19793,14 @@ function _registrarEntradasCombo(t, jid, acoes) {
         const isPrimeira = (i === 0);
         const passNessaEntry = isPrimeira && passAtivo;
 
+        // FASE G: Staff fixo no modo "adicional" — cobra por ação
+        let staffNessaEntry = 0;
+        if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
+            if (_isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+                staffNessaEntry = Number(t.staffFixoValor) || 0;
+            }
+        }
+
         // Cria a entry
         const novaEntry = {
             id: _genUuid(),
@@ -19698,7 +19808,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
             tipo,
             ts: ts + i, // timestamps consecutivos pra manter ordem
             valor: valorBase,
-            staff: 0,
+            staff: staffNessaEntry,
             taxaAdm
         };
         if (passNessaEntry) {
@@ -19745,6 +19855,17 @@ function _registrarEntradasCombo(t, jid, acoes) {
                 refId: t.id,
             });
         }
+        // FASE G: Transação separada de staff fixo (modo adicional)
+        if (staffNessaEntry > 0) {
+            registrarTransacao({
+                jogadorId: jid,
+                tipo: 'staff',
+                valor: -staffNessaEntry,
+                descricao: `Staff · ${t.nome} · ${getJogadorNome(jid)}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
         if (passNessaEntry && passValor > 0) {
             registrarTransacao({
                 jogadorId: jid,
@@ -19780,6 +19901,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
     let totalGeral = 0;
     entriesCriadas.forEach(e => {
         totalGeral += Number(e.valor) || 0;
+        totalGeral += Number(e.staff) || 0;   // FASE G: staff adicional soma ao total cobrado
         totalGeral += Number(e.taxaAdm) || 0;
         if (e.passaporte && e.passaporte.cobrado) totalGeral += Number(e.passaporte.valor) || 0;
     });
@@ -19861,6 +19983,15 @@ function _registrarEntradaImpl() {
     if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
     if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
+
+    // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
+    // (cliente paga R$ 10 que já tem staff embutido — não cobra staff extra por fora)
+    if (tipo === 'buyin' && valorBase === 0
+        && _resolverStaffModo(t) === 'fixo'
+        && (t.staffFixoModo || 'embutido') === 'embutido'
+        && t.staffFixoCobrarFree) {
+        valorBase = Number(t.staffFixoValor) || 0;
+    }
     
     // LOTE 5: Taxa Administrativa — cobrada APENAS no buy-in (1ª entrada)
     // Não entra no rake, mas vai pro caixa do clube (separada contabilmente).
@@ -19870,8 +20001,13 @@ function _registrarEntradaImpl() {
     }
     
     // LOTE 3: Staff não é mais cobrado a parte. Agora é % do prize pool em cascata.
-    // Mantém variáveis pra compat mas sempre zero.
+    // FASE G: EXCETO no modo fixo "adicional", onde staff vem somado ao total cobrado.
     let staffCobrado = 0;
+    if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
+        if (_isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+            staffCobrado = Number(t.staffFixoValor) || 0;
+        }
+    }
     const valorRS = valorBase; // mantém variável legada pra compat
     
     // PASSAPORTE (opcional): se torneio ativou e jogador marcou, registra na entry
@@ -21289,11 +21425,23 @@ function _getBrutoSemRake(t) {
 
 function getRake(t) {
     // Rake incide só sobre o que está marcado pra pagar rake
-    // No modo staff fixo, o staff é descontado ANTES do cálculo do rake
     const bruto = _getBrutoParaRake(t);
-    const staffFixo = _getStaffFixoTotal(t);
-    const base = Math.max(0, bruto - staffFixo);
-    return base * ((Number(t.rake) || 0) / 100);
+    // FASE G: modo do staff fixo afeta como o rake é calculado
+    // - 'embutido' (default): preço de tabela JÁ inclui staff. Desconta staff ANTES do rake.
+    // - 'adicional': staff vem somado por fora. Bruto não inclui staff. Rake direto sobre o bruto.
+    const modo = _resolverStaffModo(t);
+    if (modo === 'fixo') {
+        const fixoModo = t.staffFixoModo || 'embutido';
+        if (fixoModo === 'embutido') {
+            const staffFixo = _getStaffFixoTotal(t);
+            const base = Math.max(0, bruto - staffFixo);
+            return base * ((Number(t.rake) || 0) / 100);
+        }
+        // 'adicional': staff é por fora, bruto não inclui staff → rake sobre bruto cheio
+        return bruto * ((Number(t.rake) || 0) / 100);
+    }
+    // Modos antigos (nenhum/percentual): comportamento original (sem dedução)
+    return bruto * ((Number(t.rake) || 0) / 100);
 }
 
 // Resolve o modo de staff de forma backward-compatible:
@@ -21336,12 +21484,18 @@ function _getStaffFixoTotal(t) {
     if (valor <= 0) return 0;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
     const lcPaga = _lastChancePagaRake(t);
+    // FASE G: se cobrarFree=false, buy-in com valor 0 NÃO conta como ação elegível pra staff
+    const cobrarFree = !!t.staffFixoCobrarFree;
     let qtd = 0;
     (t.entries || []).forEach(e => {
         const tipo = e.tipo;
+        // Mapa: rebuy_simples e rebuy_duplo apontam pra acoes.rebuy
+        const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
         if (tipo === 'last_chance') {
             if (acoes.last_chance && lcPaga) qtd++;
-        } else if (acoes[tipo]) {
+        } else if (acoes[keyAcao]) {
+            // FASE G: skipa buy-in free se config não cobra staff em free
+            if (tipo === 'buyin' && (Number(e.valor) || 0) === 0 && !cobrarFree) return;
             qtd++;
         }
     });
