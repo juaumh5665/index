@@ -5921,11 +5921,14 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <div>
                 <label class="inp-label">Tipo</label>
-                <select id="entrada-tipo" class="inp" onchange="atualizarResumoEntrada()">
+                <!-- Modo SELECT (jogador já inscrito) -->
+                <select id="entrada-tipo" class="inp" onchange="atualizarResumoEntrada()" style="display:none;">
                     <option value="buyin">Buy-in (entrada normal)</option>
                     <option value="reentry">Re-entry</option>
                     <option value="addon">Add-on</option>
                 </select>
+                <!-- Modo MULTI (jogador novo — permite combos: Buy-in + Rebuy Duplo etc.) -->
+                <div id="entrada-acoes-multi" style="display:flex;flex-direction:column;gap:.4rem;"></div>
             </div>
             <!-- Staff (só aparece se buyin e torneio tem staff configurado) -->
             <div id="entrada-staff-wrap" style="display:none;padding:.75rem 1rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
@@ -11854,6 +11857,133 @@ function imprimirComprovanteCompra(t, dados) {
     }
     abrirPreviewImpressao('Comprovante de Compra', txt);
     logAudit && logAudit('IMPRESSAO', `Comprovante de compra impresso · ${dados.jogadorNome || '—'} · ${_labelTipoEntry(dados.entry.tipo)}`);
+}
+
+// FASE F: Comprovante consolidado pra COMBO de ações (Buy-in + Rebuy Duplo + ...)
+// dados = { entries: [entry1, entry2, ...], jogadorNome, viaLabel? }
+function gerarComprovanteCombo(t, dados) {
+    if (!t || !dados || !dados.entries || !dados.entries.length) return '';
+    const col = _printColWidth();
+    const entries = dados.entries;
+    const ts = entries[0].ts || Date.now();
+
+    let txt = _printHeaderCfg();
+    txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
+    if (dados.viaLabel) txt += _printCenter(dados.viaLabel, col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
+    const dt = new Date(ts);
+    txt += 'Data: ' + dt.toLocaleString('pt-BR') + '\n';
+    if (t.iniciadoEm) {
+        try {
+            const niv = _nivelHumano(t);
+            txt += 'Nivel: ' + niv + '\n';
+        } catch(_) {}
+    }
+    if (currentUser && currentUser.nome) {
+        txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
+    }
+    // Nome do jogador em destaque
+    const nomeJog = (dados.jogadorNome || '—').toUpperCase().substring(0, col);
+    txt += _printLine('-', col) + '\n';
+    txt += _printCenter('JOGADOR', col) + '\n';
+    txt += _printCenter(nomeJog, col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'ITENS COMPRADOS' + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    let totalGeral = 0;
+    let fichasTotal = 0;
+    let staffFixoTotal = 0;
+    let taxaAdmTotal = 0;
+    let passaporteValor = 0;
+    let passaporteFichas = 0;
+
+    // Listar cada ação
+    entries.forEach(e => {
+        const tipoLabel = _labelTipoEntry(e.tipo);
+        const valorAcao = Number(e.valor) || 0;
+        const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+        totalGeral += valorAcao;
+        fichasTotal += fichasAcao;
+
+        if (valorAcao > 0) {
+            txt += _printPad(tipoLabel, formatMoney(valorAcao), col) + '\n';
+        } else {
+            txt += _printPad(tipoLabel, 'GRATIS', col) + '\n';
+        }
+        if (fichasAcao > 0) {
+            txt += '   + ' + fichasAcao.toLocaleString('pt-BR') + ' fichas\n';
+        }
+
+        // Staff fixo incluso (acumula pra mostrar 1 vez no final)
+        if (_isTipoStaffFixoElegivel(t, e.tipo)) {
+            staffFixoTotal += (Number(t.staffFixoValor) || 0);
+        }
+
+        // Taxa adm
+        if (Number(e.taxaAdm) > 0) {
+            taxaAdmTotal += Number(e.taxaAdm);
+        }
+
+        // Passaporte (vem agregado na primeira entry do combo)
+        if (e.passaporte && e.passaporte.cobrado) {
+            passaporteValor = Number(e.passaporte.valor) || 0;
+            passaporteFichas = Number(e.passaporte.fichas) || 0;
+        }
+    });
+
+    // Mostrar staff fixo total (agrupado)
+    if (staffFixoTotal > 0) {
+        txt += _printPad('  Staff (incluso)', formatMoney(staffFixoTotal), col) + '\n';
+    }
+
+    // Taxa adm
+    if (taxaAdmTotal > 0) {
+        txt += _printPad('Taxa Adm.', formatMoney(taxaAdmTotal), col) + '\n';
+        totalGeral += taxaAdmTotal;
+    }
+
+    // Passaporte (consolidado pro combo)
+    if (passaporteValor > 0) {
+        txt += _printPad('Passaporte', formatMoney(passaporteValor), col) + '\n';
+        if (passaporteFichas > 0) {
+            txt += '   + ' + passaporteFichas.toLocaleString('pt-BR') + ' fichas\n';
+        }
+        totalGeral += passaporteValor;
+        fichasTotal += passaporteFichas;
+    }
+
+    txt += _printLine('-', col) + '\n';
+    txt += _printPad('TOTAL', formatMoney(totalGeral), col) + '\n';
+    if (fichasTotal > 0) {
+        txt += _printPad('Fichas entregues', fichasTotal.toLocaleString('pt-BR'), col) + '\n';
+    }
+
+    // Linha de assinatura
+    if (t.comprovanteAssinatura !== false) {
+        txt += '\n\n';
+        txt += _printCenter('_'.repeat(Math.min(col - 4, 26)), col) + '\n';
+        txt += _printCenter('Assinatura do jogador', col) + '\n';
+    }
+
+    txt += '\n' + _printFooter();
+    return txt;
+}
+
+function imprimirComprovanteCombo(t, dados) {
+    if (!t || !dados || !dados.entries || !dados.entries.length) return;
+    const vias = Math.max(1, Math.min(3, Number(t.comprovanteVias) || 1));
+    const labels = vias === 1 ? [null] : (vias === 2 ? ['VIA DO JOGADOR', 'VIA DO CLUBE'] : ['VIA DO JOGADOR', 'VIA DO CLUBE', '3a VIA']);
+    let txt = '';
+    for (let i = 0; i < vias; i++) {
+        if (i > 0) txt += '\n\n' + _printLine('=', _printColWidth()) + '\n\n';
+        txt += gerarComprovanteCombo(t, { ...dados, viaLabel: labels[i] });
+    }
+    abrirPreviewImpressao('Comprovante de Compra (Combo)', txt);
+    logAudit && logAudit('IMPRESSAO', `Comprovante combo impresso · ${dados.jogadorNome || '—'} · ${dados.entries.length} ações`);
 }
 
 // ============================================================
@@ -19215,13 +19345,150 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
     
     tipoSel.innerHTML = opts.join('');
     
-    // Auto-selecionar primeiro tipo NÃO bloqueado
-    const primeiraOpcaoValida = Array.from(tipoSel.options).find(o => !o.disabled);
-    if (primeiraOpcaoValida) {
-        tipoSel.value = primeiraOpcaoValida.value;
+    // === MODO DE EXIBIÇÃO ===
+    // - Jogador já inscrito: usa <select> single (1 ação por vez)
+    // - Jogador novo (sem entrada ainda): usa checkboxes multi (permite combos como Buy-in + Rebuy Duplo)
+    // Add-on/Re-entry ainda exigem inscrição prévia, então sempre vão ficar em modo single.
+    const containerMulti = document.getElementById('entrada-acoes-multi');
+    const podeMulti = !jogadorJaInscrito && jid && !jogadorFoiEliminado;
+
+    if (podeMulti && containerMulti) {
+        // MODO MULTI — esconde select, renderiza checkboxes
+        tipoSel.style.display = 'none';
+        containerMulti.style.display = '';
+        _renderCheckboxesEntrada(t, jid, opts);
+    } else {
+        // MODO SINGLE (jogador inscrito ou sem jogador selecionado)
+        tipoSel.style.display = '';
+        if (containerMulti) {
+            containerMulti.style.display = 'none';
+            containerMulti.innerHTML = '';
+        }
+        // Auto-selecionar primeiro tipo NÃO bloqueado
+        const primeiraOpcaoValida = Array.from(tipoSel.options).find(o => !o.disabled);
+        if (primeiraOpcaoValida) tipoSel.value = primeiraOpcaoValida.value;
     }
     
     atualizarResumoEntrada();
+}
+
+// === FASE F: Checkboxes pra combos de compras (Buy-in + Rebuy Duplo + Add-on etc.)
+// Só renderiza pra jogadores NÃO inscritos. Buy-in vem marcado por padrão e é o tipo "âncora".
+function _renderCheckboxesEntrada(t, jid, optsLegado) {
+    const container = document.getElementById('entrada-acoes-multi');
+    if (!container) return;
+
+    // Lista de tipos disponíveis pra COMBO em entrada nova (sem reentry/addon/lc, que dependem de inscrição prévia)
+    const tiposDisponiveis = [];
+
+    // BUY-IN (sempre disponível pra jogador novo — é a âncora do combo)
+    const trBuyin = _tipoBloqueadoPorTrava(t, 'buyin');
+    tiposDisponiveis.push({
+        tipo: 'buyin',
+        label: 'Buy-in (entrada normal)',
+        valor: Number(t.buyin) || 0,
+        valorLabel: _isBuyinFree(t) ? 'GRÁTIS' : 'R$ ' + (Number(t.buyin) || 0).toFixed(2).replace('.', ','),
+        fichas: Number(t.stack) || 0,
+        bloqueado: trBuyin.bloqueado,
+        motivo: trBuyin.motivo,
+        ancora: true // Buy-in sempre marcado e travado
+    });
+
+    // REBUY SIMPLES
+    const rebuySimpVal = Number(t.rebuyValor || t.rebuySimples || 0);
+    const rebuySimpFichas = Number(t.rebuyFichas || t.rebuySimplesFichas || 0);
+    if (rebuySimpVal > 0) {
+        const tr = _tipoBloqueadoPorTrava(t, 'rebuy_simples');
+        tiposDisponiveis.push({
+            tipo: 'rebuy_simples',
+            label: 'Rebuy Simples',
+            valor: rebuySimpVal,
+            valorLabel: 'R$ ' + rebuySimpVal.toFixed(2).replace('.', ','),
+            fichas: rebuySimpFichas,
+            bloqueado: tr.bloqueado,
+            motivo: tr.motivo
+        });
+    }
+
+    // REBUY DUPLO
+    const rebuyDupVal = Number(t.rebuyDuploValor || t.rebuyDuplo || 0);
+    const rebuyDupFichas = Number(t.rebuyDuploFichas || 0);
+    if (rebuyDupVal > 0) {
+        const tr = _tipoBloqueadoPorTrava(t, 'rebuy_duplo');
+        tiposDisponiveis.push({
+            tipo: 'rebuy_duplo',
+            label: 'Rebuy Duplo',
+            valor: rebuyDupVal,
+            valorLabel: 'R$ ' + rebuyDupVal.toFixed(2).replace('.', ','),
+            fichas: rebuyDupFichas,
+            bloqueado: tr.bloqueado,
+            motivo: tr.motivo
+        });
+    }
+
+    // ADD-ON (jogador novo PODE comprar add-on junto com buy-in se a janela permitir)
+    if (t.addonFichas > 0) {
+        const tr = _tipoBloqueadoPorTrava(t, 'addon');
+        const aVal = Number(t.addonValor) || 0;
+        tiposDisponiveis.push({
+            tipo: 'addon',
+            label: 'Add-on',
+            valor: aVal,
+            valorLabel: aVal > 0 ? 'R$ ' + aVal.toFixed(2).replace('.', ',') : 'Cortesia',
+            fichas: Number(t.addonFichas) || 0,
+            bloqueado: tr.bloqueado,
+            motivo: tr.motivo
+        });
+    }
+
+    // Renderiza
+    container.innerHTML = tiposDisponiveis.map((opt, idx) => {
+        const id = `entrada-acao-${opt.tipo}`;
+        const disabled = opt.bloqueado;
+        const ancora = opt.ancora;
+        const checked = ancora ? 'checked' : '';
+        const lockedAttrs = ancora ? 'data-anchor="1"' : '';
+        // Buy-in âncora: marcado e desabilitado pra interação, mas com aparência de marcado
+        const inputAttrs = disabled ? 'disabled' : (ancora ? 'data-anchor="1"' : '');
+        const lockIcon = disabled ? '<i class="fa-solid fa-lock" style="font-size:.65rem;color:#71717a;margin-left:.4rem;"></i>' : '';
+        const motivoHtml = (disabled && opt.motivo) ? `<div style="font-size:.65rem;color:#ef4444;margin-top:.2rem;margin-left:1.65rem;">${opt.motivo}</div>` : '';
+        const bgColor = ancora ? 'rgba(245,158,11,.08)' : 'rgba(255,255,255,.02)';
+        const borderColor = ancora ? 'rgba(245,158,11,.3)' : '#27272a';
+
+        return `
+            <label style="display:flex;align-items:flex-start;gap:.55rem;cursor:${disabled ? 'not-allowed' : 'pointer'};padding:.55rem .75rem;border:1px solid ${borderColor};border-radius:.4rem;background:${bgColor};opacity:${disabled ? '.5' : '1'};">
+                <input type="checkbox" id="${id}" data-tipo="${opt.tipo}" ${checked} ${inputAttrs} onchange="atualizarResumoEntrada()" style="width:16px;height:16px;cursor:${disabled ? 'not-allowed' : 'pointer'};accent-color:${ancora ? 'var(--gold)' : '#06b6d4'};margin-top:.15rem;">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.85rem;">
+                        <span><strong>${opt.label}</strong>${ancora ? ' <span style="font-size:.6rem;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;">obrigatório</span>' : ''}${lockIcon}</span>
+                        <span style="font-weight:700;color:${opt.valor === 0 ? '#22c55e' : 'var(--gold)'};white-space:nowrap;">${opt.valorLabel}</span>
+                    </div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">+ ${opt.fichas.toLocaleString('pt-BR')} fichas</div>
+                    ${motivoHtml}
+                </div>
+            </label>
+        `;
+    }).join('');
+}
+
+// FASE F: lê quais ações foram marcadas no modo multi (ordem fixa: buyin → rebuy_simples → rebuy_duplo → addon)
+// Retorna array de tipos (string[]). Em modo SINGLE retorna [tipoSelecionado].
+function _getAcoesEntradaSelecionadas() {
+    const container = document.getElementById('entrada-acoes-multi');
+    // Multi mode?
+    if (container && container.style.display !== 'none' && container.children.length > 0) {
+        const ordem = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+        const acoes = [];
+        ordem.forEach(tipo => {
+            const cb = document.getElementById(`entrada-acao-${tipo}`);
+            if (cb && cb.checked && !cb.disabled) acoes.push(tipo);
+        });
+        return acoes;
+    }
+    // Single mode (jogador já inscrito)
+    const sel = document.getElementById('entrada-tipo');
+    if (sel && sel.value) return [sel.value];
+    return [];
 }
 window._renderOpcoesEntrada = _renderOpcoesEntrada;
 
@@ -19229,32 +19496,37 @@ window._renderOpcoesEntrada = _renderOpcoesEntrada;
 function atualizarResumoEntrada() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    
-    const tipo = document.getElementById('entrada-tipo')?.value || 'buyin';
+
+    // FASE F: detecta modo (single vs combo) — pega lista de ações marcadas
+    const acoes = (typeof _getAcoesEntradaSelecionadas === 'function')
+        ? _getAcoesEntradaSelecionadas()
+        : [document.getElementById('entrada-tipo')?.value || 'buyin'];
+
     const staffWrap = document.getElementById('entrada-staff-wrap');
-    const cbStaff = document.getElementById('entrada-staff-cobrar');
     const resumoVal = document.getElementById('entrada-resumo-valor');
-    
+
     // LOTE 3: Staff sempre escondido — agora vira % do prize pool
     if (staffWrap) staffWrap.style.display = 'none';
-    
-    // Calcular total
+
+    // Soma valor base de cada ação selecionada
     let valorBase = 0;
-    if (tipo === 'buyin')          valorBase = Number(t.buyin) || 0;
-    else if (tipo === 'reentry')   valorBase = (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.buyin) || 0);
-    else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
-    else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
-    else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
-    
+    acoes.forEach(tipo => {
+        if (tipo === 'buyin')              valorBase += Number(t.buyin) || 0;
+        else if (tipo === 'reentry')       valorBase += (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.buyin) || 0);
+        else if (tipo === 'rebuy_simples') valorBase += Number(t.rebuyValor || t.rebuySimples) || 0;
+        else if (tipo === 'rebuy_duplo')   valorBase += Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+        else if (tipo === 'addon')         valorBase += Number(t.addonValor) || 0;
+    });
+
     let staff = 0; // staff zerado sempre (agora é dedução do prize)
-    
+
     // LOTE 5: Taxa administrativa — cobrada apenas no buy-in
     let taxaAdm = 0;
-    if (tipo === 'buyin' && Number(t.taxaAdm) > 0) {
+    if (acoes.includes('buyin') && Number(t.taxaAdm) > 0) {
         taxaAdm = Number(t.taxaAdm);
     }
 
-    // PASSAPORTE (opcional): mostra wrap se torneio ativou, calcula valor se marcado
+    // PASSAPORTE: 1 só pro combo. Fichas extras = soma das fichas por ação marcada
     const passWrap = document.getElementById('entrada-passaporte-wrap');
     const cbPass = document.getElementById('entrada-passaporte-comprar');
     const lblPassValor = document.getElementById('entrada-passaporte-valor-label');
@@ -19263,20 +19535,21 @@ function atualizarResumoEntrada() {
     if (t.passaporteAtivo && passWrap) {
         passWrap.style.display = '';
         const valorPass = Number(t.passaporteValor) || 0;
-        const fichasPass = _getPassaporteFichas(t, tipo);
+        let fichasPassTotal = 0;
+        acoes.forEach(tp => { fichasPassTotal += _getPassaporteFichas(t, tp); });
         if (lblPassValor) lblPassValor.innerText = 'R$ ' + valorPass.toFixed(2).replace('.', ',');
-        if (lblPassFichas) lblPassFichas.innerText = '+' + fichasPass.toLocaleString('pt-BR') + ' fichas extras';
+        if (lblPassFichas) lblPassFichas.innerText = '+' + fichasPassTotal.toLocaleString('pt-BR') + ' fichas extras';
         if (cbPass && cbPass.checked) passaporte = valorPass;
     } else if (passWrap) {
         passWrap.style.display = 'none';
         if (cbPass) cbPass.checked = false;
     }
-    
+
     const total = valorBase + staff + taxaAdm + passaporte;
     if (resumoVal) {
-        // Se tem extras (taxa adm ou passaporte), mostra detalhado
         const partes = [];
-        if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ','));
+        const acoesLabel = acoes.length > 1 ? ` (${acoes.length} ações)` : '';
+        if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ',') + acoesLabel);
         if (taxaAdm > 0)   partes.push('R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa');
         if (passaporte > 0) partes.push('R$ ' + passaporte.toFixed(2).replace('.', ',') + ' passaporte');
         if (partes.length > 1) {
@@ -19294,10 +19567,176 @@ function registrarEntrada() {
     }, '⏳ Processando entrada, aguarde...');
 }
 
+// FASE F: Handler de COMBO de ações (Buy-in + Rebuy Duplo, etc.)
+// Cria uma entry por ação, registra transações separadas, e gera UM comprovante consolidado.
+// Reutiliza a infraestrutura existente (_registrarUmaEntryDireta) pra evitar duplicar lógica.
+function _registrarEntradasCombo(t, jid, acoes) {
+    // Validações comuns aplicadas pelo handler single ficam centralizadas aqui pra todas as ações
+    const eliminado = t.eliminados.some(e => String(e.jogadorId) === String(jid));
+    if (eliminado) return showToast('⚠️ Jogador eliminado — use Re-entry');
+
+    // Cada ação precisa estar destravada por nível
+    for (const tipo of acoes) {
+        const trava = _tipoBloqueadoPorTrava(t, tipo);
+        if (trava.bloqueado) return showToast('🔒 ' + trava.motivo + ' (' + _labelTipoEntry(tipo) + ')');
+    }
+
+    // Buy-in obrigatório no combo (regra: combo só pra jogador novo entrando)
+    if (!acoes.includes('buyin')) {
+        return showToast('⚠️ Combo precisa incluir Buy-in');
+    }
+
+    // Passaporte: 1 só, mas com fichas somadas conforme cada ação marcada
+    const cbPass = document.getElementById('entrada-passaporte-comprar');
+    const passAtivo = t.passaporteAtivo && cbPass && cbPass.checked;
+    const passValor = passAtivo ? (Number(t.passaporteValor) || 0) : 0;
+    let passFichasTotal = 0;
+    if (passAtivo) {
+        acoes.forEach(tp => { passFichasTotal += _getPassaporteFichas(t, tp); });
+    }
+
+    // Suspende realtime durante toda a operação
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(10000);
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
+
+    // Snapshot pra undo
+    const snapshot = JSON.stringify(t);
+    const tornIdx = torneios.indexOf(t);
+    const txsBefore = transacoes.length;
+    const entriesCriadas = [];
+    const ts = Date.now();
+
+    // === Loop de criação das entries ===
+    // Buy-in entra primeiro (sempre), depois rebuys, depois add-on (segue ordem natural).
+    const ordemFixa = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+    const acoesOrdenadas = ordemFixa.filter(tp => acoes.includes(tp));
+
+    let i = 0;
+    for (const tipo of acoesOrdenadas) {
+        // Calcula valor base por tipo (mesma lógica do _registrarEntradaImpl single)
+        let valorBase = 0;
+        if (tipo === 'buyin')          valorBase = Number(t.buyin) || 0;
+        else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
+        else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+        else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
+
+        // Taxa adm: só no buy-in
+        const taxaAdm = (tipo === 'buyin' && Number(t.taxaAdm) > 0) ? Number(t.taxaAdm) : 0;
+
+        // Passaporte: anexar SÓ na primeira entry (buy-in geralmente) pra evitar duplicação
+        // mas com TODAS as fichas extras somadas (do combo inteiro)
+        const isPrimeira = (i === 0);
+        const passNessaEntry = isPrimeira && passAtivo;
+
+        // Cria a entry
+        const novaEntry = {
+            id: _genUuid(),
+            jogadorId: jid,
+            tipo,
+            ts: ts + i, // timestamps consecutivos pra manter ordem
+            valor: valorBase,
+            staff: 0,
+            taxaAdm
+        };
+        if (passNessaEntry) {
+            novaEntry.passaporte = { cobrado: true, valor: passValor, fichas: passFichasTotal };
+        }
+        // Flag pra agrupar no comprovante
+        novaEntry.comboId = ts;
+
+        t.entries.push(novaEntry);
+        entriesCriadas.push(novaEntry);
+
+        // Aloca jogador na mesa só na primeira ação (buy-in)
+        if (isPrimeira) alocarJogadorMesa(t, jid);
+
+        // Bounty (PKO/Knockout) — só uma vez no buy-in
+        if (tipo === 'buyin' && ['bounty','pko','knockout'].includes(t.tipo)) {
+            if (t.tipo === 'pko' || t.tipo === 'knockout') {
+                const bountyInicial = _isBuyinFree(t) ? 0 : (t.tipo === 'knockout' ? t.buyin * (1 - t.rake/100) : t.buyin * (t.pkoSplit/100));
+                t.bounties[jid] = (t.bounties[jid] || 0) + bountyInicial;
+            } else if (t.tipo === 'bounty') {
+                t.bounties[jid] = t.bountyValor;
+            }
+        }
+
+        // Transação do valor base
+        const descMap = { buyin:'Buy-in', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on' };
+        if (valorBase > 0) {
+            registrarTransacao({
+                jogadorId: jid,
+                tipo: tipo === 'buyin' ? 'buyin' : (tipo === 'addon' ? 'addon' : 'reentry'),
+                valor: -valorBase,
+                descricao: `${descMap[tipo]} · ${t.nome}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
+        if (taxaAdm > 0) {
+            registrarTransacao({
+                jogadorId: jid,
+                tipo: 'taxa_adm',
+                valor: -taxaAdm,
+                descricao: `Taxa Adm. · ${t.nome} · ${getJogadorNome(jid)}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
+        if (passNessaEntry && passValor > 0) {
+            registrarTransacao({
+                jogadorId: jid,
+                tipo: 'passaporte',
+                valor: -passValor,
+                descricao: `Passaporte · ${t.nome} · ${getJogadorNome(jid)}`,
+                origem: 'torneio',
+                refId: t.id,
+            });
+        }
+
+        i++;
+    }
+
+    saveData();
+    closeModal('modal-entrada');
+    updateModalTorneio();
+    renderTorneiosList();
+    renderDashboard();
+
+    // UNDO
+    const nomeJog = getJogadorNome(jid);
+    registrarUndo(`💰 Combo (${acoesOrdenadas.length} ações) de ${nomeJog}`, () => {
+        torneios[tornIdx] = JSON.parse(snapshot);
+        if (transacoes.length > txsBefore) transacoes = transacoes.slice(0, txsBefore);
+        saveData();
+        updateModalTorneio();
+        renderTorneiosList();
+        renderDashboard();
+    });
+
+    // Total geral
+    let totalGeral = 0;
+    entriesCriadas.forEach(e => {
+        totalGeral += Number(e.valor) || 0;
+        totalGeral += Number(e.taxaAdm) || 0;
+        if (e.passaporte && e.passaporte.cobrado) totalGeral += Number(e.passaporte.valor) || 0;
+    });
+    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}`);
+
+    // Comprovante consolidado (uma única impressão pro combo)
+    if (t.imprimirComprovanteCompra) {
+        setTimeout(() => {
+            _abrirModalPromptImpressao({
+                titulo: 'Imprimir comprovante de compra?',
+                descricao: `${acoesOrdenadas.length} ações de ${nomeJog} · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}`,
+                onConfirm: () => imprimirComprovanteCombo(t, { entries: entriesCriadas, jogadorNome: nomeJog })
+            });
+        }, 300);
+    }
+}
+
 function _registrarEntradaImpl() {
     const t   = torneios[activeTorneioIdx];
     const jid = document.getElementById('entrada-jogador').value;
-    const tipo = document.getElementById('entrada-tipo').value;
 
     // REGRA: bloquear entrada se o caixa do torneio estiver fechado
     const caixa = getCaixaTorneio(t);
@@ -19306,6 +19745,21 @@ function _registrarEntradaImpl() {
     }
 
     if (!jid) return showToast('⚠️ Selecione um jogador');
+
+    // FASE F: detectar se é combo (múltiplas ações marcadas no modo multi)
+    const acoesSelecionadas = (typeof _getAcoesEntradaSelecionadas === 'function')
+        ? _getAcoesEntradaSelecionadas()
+        : null;
+
+    if (acoesSelecionadas && acoesSelecionadas.length > 1) {
+        // COMBO: redireciona pro handler de múltiplas ações
+        return _registrarEntradasCombo(t, jid, acoesSelecionadas);
+    }
+
+    // Modo single (1 ação): determina tipo do select OU da primeira ação marcada
+    const tipo = (acoesSelecionadas && acoesSelecionadas.length === 1)
+        ? acoesSelecionadas[0]
+        : document.getElementById('entrada-tipo').value;
 
     // LOTE 1+2: Validar trava de compras/add-on
     const trava = _tipoBloqueadoPorTrava(t, tipo);
