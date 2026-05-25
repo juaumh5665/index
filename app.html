@@ -11773,14 +11773,10 @@ function gerarComprovanteCompra(t, dados) {
             txt += 'Nivel: ' + niv + '\n';
         } catch(_) {}
     }
+    txt += 'Jogador: ' + (dados.jogadorNome || '—').substring(0, col - 9) + '\n';
     if (currentUser && currentUser.nome) {
         txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
     }
-    // Nome do jogador em destaque: linha própria, centralizado, em CAIXA ALTA
-    const nomeJog = (dados.jogadorNome || '—').toUpperCase().substring(0, col);
-    txt += _printLine('-', col) + '\n';
-    txt += _printCenter('JOGADOR', col) + '\n';
-    txt += _printCenter(nomeJog, col) + '\n';
     txt += _printLine('-', col) + '\n';
 
     txt += 'ITENS COMPRADOS' + '\n';
@@ -11799,6 +11795,7 @@ function gerarComprovanteCompra(t, dados) {
     // Staff fixo incluso (informação)
     if (staffFixo > 0) {
         txt += _printPad('  Staff (incluso)', formatMoney(staffFixo), col) + '\n';
+        txt += '   na acao acima\n';
     }
 
     // Taxa adm
@@ -11871,14 +11868,10 @@ function gerarComprovanteJackpot(t, dados) {
     txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
     const dt = new Date(dados.ts || Date.now());
     txt += 'Data: ' + dt.toLocaleString('pt-BR') + '\n';
+    txt += 'Jogador: ' + (dados.jogadorNome || '—').substring(0, col - 9) + '\n';
     if (currentUser && currentUser.nome) {
         txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
     }
-    // Nome do jogador em destaque
-    const nomeJog = (dados.jogadorNome || '—').toUpperCase().substring(0, col);
-    txt += _printLine('-', col) + '\n';
-    txt += _printCenter('JOGADOR', col) + '\n';
-    txt += _printCenter(nomeJog, col) + '\n';
     txt += _printLine('-', col) + '\n';
 
     txt += 'COMPRA DE JACKPOT' + '\n';
@@ -11940,12 +11933,8 @@ function gerarExtratoJogadorTorneio(t, jogadorId) {
     txt += _printLine('-', col) + '\n';
 
     txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
+    txt += 'Jogador: ' + nome.substring(0, col - 9) + '\n';
     txt += 'Emitido: ' + new Date().toLocaleString('pt-BR') + '\n';
-    // Nome do jogador em destaque
-    const nomeUp = nome.toUpperCase().substring(0, col);
-    txt += _printLine('-', col) + '\n';
-    txt += _printCenter('JOGADOR', col) + '\n';
-    txt += _printCenter(nomeUp, col) + '\n';
     txt += _printLine('-', col) + '\n';
 
     // Entries do jogador
