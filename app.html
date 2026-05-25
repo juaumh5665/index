@@ -18830,6 +18830,14 @@ function _nivelHumano(t) {
 
 // Verifica se um tipo de entrada está bloqueado por trava no torneio atual
 // Retorna { bloqueado: bool, motivo: string }
+// FASE F.2: Detecta se o torneio tem ALGUM intervalo marcado como "break de compras"
+// Se sim, a regra do add-on muda: SÓ durante esse intervalo (não mais "até nível X").
+// Se não, mantém regra legada (até nível X) — backward compatibility.
+function _torneioTemBreakDeCompras(t) {
+    if (!t || !Array.isArray(t.blinds)) return false;
+    return t.blinds.some(b => b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true));
+}
+
 function _tipoBloqueadoPorTrava(t, tipo) {
     if (!t) return { bloqueado: false, motivo: '' };
     
@@ -18888,6 +18896,34 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     
     // Add-on
     if (tipo === 'addon') {
+        // FASE F.2: Nova regra estrita — se o torneio TEM intervalo marcado como "compras",
+        // add-on SÓ é liberado DURANTE esse intervalo (não mais "até nível X").
+        // OBS: o caminho `_emJanelaBreakEspecial` lá em cima já libera quando estamos NO intervalo.
+        // Aqui só bloqueamos se chegou nesse ponto significa que NÃO está no intervalo.
+        if (_torneioTemBreakDeCompras(t)) {
+            // Encontra o número do nível JOGÁVEL imediatamente antes do break de compras
+            // (pra mensagem amigável: "Add-on só no intervalo após o nível X")
+            const blinds = t.blinds || [];
+            let nivelAntesDoBreak = null;
+            let jogadosAteAqui = 0;
+            for (let i = 0; i < blinds.length; i++) {
+                const b = blinds[i];
+                if (!b) continue;
+                if (b.isBreak && (b.breakDeCompras || b.break_de_compras)) {
+                    nivelAntesDoBreak = jogadosAteAqui;
+                    break;
+                }
+                if (!b.isBreak) jogadosAteAqui++;
+            }
+            return {
+                bloqueado: true,
+                motivo: nivelAntesDoBreak != null
+                    ? `Add-on só durante o intervalo de compras (após o nível ${nivelAntesDoBreak})`
+                    : 'Add-on só durante o intervalo de compras configurado'
+            };
+        }
+
+        // Fallback (torneios sem intervalo marcado): regra antiga (até nível X)
         const max = _resolverNivelMaxAddon(t);
         if (max != null && nivelAtual > max) {
             return { 
