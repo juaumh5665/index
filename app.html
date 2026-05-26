@@ -13925,10 +13925,10 @@ function _capturarConfigTorneio() {
         tempoNivel:     parseInt((document.getElementById('t-tempo') || {}).value) || 15,
         reentryAte:     parseInt((document.getElementById('t-reentry') || {}).value) || 0,
         addonValor:     parseFloat((document.getElementById('t-addon-valor') || {}).value) || 0,
-        addonFichas:    parseInt((document.getElementById('t-addon-fichas') || {}).value) || 0,
-        rebuyValor:     parseFloat((document.getElementById('t-rebuy-valor') || {}).value) || 0,
-        rebuyFichas:    parseInt((document.getElementById('t-rebuy-fichas') || {}).value) || 0,
-        rebuyDuploValor: parseFloat((document.getElementById('t-rebuy-duplo-valor') || {}).value) || 0,
+        addonFichas:    parseInt((document.getElementById('t-addon') || {}).value) || 0,
+        rebuyValor:     parseFloat((document.getElementById('t-rebuy-simples') || {}).value) || 0,
+        rebuyFichas:    parseInt((document.getElementById('t-rebuy-simples-fichas') || {}).value) || 0,
+        rebuyDuploValor: parseFloat((document.getElementById('t-rebuy-duplo') || {}).value) || 0,
         rebuyDuploFichas: parseInt((document.getElementById('t-rebuy-duplo-fichas') || {}).value) || 0,
         jackpotValor:   parseFloat((document.getElementById('t-jackpot-valor') || {}).value) || 0,
         jackpotFichas:  parseInt((document.getElementById('t-jackpot-fichas') || {}).value) || 0,
@@ -13947,7 +13947,7 @@ function _capturarConfigTorneio() {
             return Number(v);
         })(),
         bountyValor:    parseFloat((document.getElementById('t-bounty-valor') || {}).value) || 0,
-        bountyKoSplit:  parseFloat((document.getElementById('t-bounty-ko-split') || {}).value) || 50,
+        bountyKoSplit:  parseFloat((document.getElementById('t-pko-split') || {}).value) || 50,
         rankingRakePct: parseFloat((document.getElementById('t-ranking-rake-pct') || {}).value) || 0,
         // estrutura de blinds (snapshot)
         blinds: typeof blindStructure !== 'undefined' ? JSON.parse(JSON.stringify(blindStructure)) : [],
@@ -13968,10 +13968,10 @@ function _aplicarConfigTorneio(cfg) {
     set('t-tempo', cfg.tempoNivel);
     set('t-reentry', cfg.reentryAte);
     set('t-addon-valor', cfg.addonValor);
-    set('t-addon-fichas', cfg.addonFichas);
-    set('t-rebuy-valor', cfg.rebuyValor);
-    set('t-rebuy-fichas', cfg.rebuyFichas);
-    set('t-rebuy-duplo-valor', cfg.rebuyDuploValor);
+    set('t-addon', cfg.addonFichas);
+    set('t-rebuy-simples', cfg.rebuyValor);
+    set('t-rebuy-simples-fichas', cfg.rebuyFichas);
+    set('t-rebuy-duplo', cfg.rebuyDuploValor);
     set('t-rebuy-duplo-fichas', cfg.rebuyDuploFichas);
     set('t-jackpot-valor', cfg.jackpotValor);
     set('t-jackpot-fichas', cfg.jackpotFichas);
@@ -13994,7 +13994,7 @@ function _aplicarConfigTorneio(cfg) {
         selLR.value = (cfg.last_chance_paga_rake === null || cfg.last_chance_paga_rake === undefined) ? '' : String(cfg.last_chance_paga_rake);
     }
     set('t-bounty-valor', cfg.bountyValor);
-    set('t-bounty-ko-split', cfg.bountyKoSplit);
+    set('t-pko-split', cfg.bountyKoSplit);
     set('t-ranking-rake-pct', cfg.rankingRakePct);
 
     // Aplica blinds
@@ -32561,34 +32561,7 @@ function atualizarComprovanteUI() {
 (function () {
   'use strict';
 
-  // Lista de IDs compartilhados entre v1 e v2 (preciso fazer swap)
-  const SHARED_IDS = [
-    'blinds-setup','faixas-resumo','resumo-intervalos','resumo-niveis',
-    'resumo-stack','resumo-tempo','t-addon','t-addon-nivel','t-addon-valor',
-    't-bounty-hint','t-bounty-valor','t-bounty-wrap','t-buyin',
-    't-buyin-free-ate-nivel','t-buyin-free-bloco','t-comprovante-assinatura',
-    't-comprovante-opcoes','t-comprovante-vias','t-dia-label','t-dia1-wrap',
-    't-dia2-wrap','t-formato','t-imprimir-compra','t-imprimir-jackpot',
-    't-jackpot-fichas','t-jackpot-paga-rake','t-jackpot-valor',
-    't-last-chance-ate','t-last-chance-ativo','t-last-chance-campos',
-    't-last-chance-fichas','t-last-chance-paga-rake','t-last-chance-valor',
-    't-nome','t-passaporte-ativo','t-passaporte-fichas-addon',
-    't-passaporte-fichas-avulso','t-passaporte-fichas-buyin',
-    't-passaporte-fichas-rebuy-duplo','t-passaporte-fichas-rebuy-simples',
-    't-passaporte-fichas-reentry','t-passaporte-painel','t-passaporte-valor',
-    't-pko-split','t-pko-split-wrap','t-rake','t-ranking-id',
-    't-ranking-rake-pct','t-rebuy-duplo','t-rebuy-duplo-fichas',
-    't-rebuy-simples','t-rebuy-simples-fichas','t-reentry','t-series-id',
-    't-series-nome','t-stack','t-staff-fixo-addon','t-staff-fixo-buyin',
-    't-staff-fixo-cobrar-free','t-staff-fixo-last-chance',
-    't-staff-fixo-modo-adicional','t-staff-fixo-modo-embutido',
-    't-staff-fixo-rebuy','t-staff-fixo-reentry','t-staff-fixo-valor',
-    't-staff-modo-fixo','t-staff-modo-nenhum','t-staff-modo-percentual',
-    't-staff-painel-fixo','t-staff-painel-percentual','t-staff-pct',
-    't-taxa-adm','t-tempo','t-tipo','torneio-resumo'
-  ];
-
-  // ─── (removido: ativarV2 e desativarV2 — V1 não existe mais) ──
+  // ─── (removido: SHARED_IDS, ativarV2, desativarV2 — V1 não existe mais) ──
 
   // ─── Toggle de seções colapsáveis ──────────────────────────────
   window.t2ToggleSection = function (sectionKey) {
