@@ -5178,6 +5178,30 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
                 </div>
 
+                <!-- FASE H: Bônus de fichas no registro antecipado -->
+                <div style="padding:.85rem 1rem;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.15);border-radius:.6rem;">
+                    <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;margin-bottom:.65rem;">
+                        <input type="checkbox" id="t-bonus-registro-ativo" onchange="atualizarBonusRegistroUI()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;">
+                        <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-gift"></i> Bônus de fichas no registro antecipado</div>
+                    </label>
+                    <div id="t-bonus-registro-campos" style="display:none;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                            <div>
+                                <label class="inp-label">Fichas extras</label>
+                                <input id="t-bonus-registro-fichas" type="number" min="0" value="5000" class="inp" placeholder="Ex: 5000">
+                            </div>
+                            <div>
+                                <label class="inp-label">Até fim do nível</label>
+                                <input id="t-bonus-registro-ate-nivel" type="number" min="1" value="2" class="inp" placeholder="Ex: 2">
+                            </div>
+                        </div>
+                        <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.5;">
+                            <i class="fa-solid fa-circle-info" style="color:#22c55e;"></i>
+                            Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível recebem <strong>+X fichas extras</strong> no stack. Entra no chipcount e média. Não afeta rake/staff/prize.
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Configuração KO (só aparece conforme o tipo) -->
                 <div id="t-bounty-wrap" style="display:none;padding:.85rem 1rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.6rem;">
                     <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-crosshairs"></i> Configuração KO</div>
@@ -7193,6 +7217,8 @@ async function _processarMudancaRealtime(tipo, payload) {
                             taxaAdm: parseFloat(e.taxa_adm || 0),
                             passaporte: e.passaporte || null,
                             comboId: e.combo_id || null,
+                            // FASE H: bônus de fichas no registro antecipado
+                            bonusFichas: parseInt(e.bonus_fichas || 0),
                         }));
                         t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
                             jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
@@ -7509,6 +7535,10 @@ function _torneioToDb(t) {
         passaporte_valor: t.passaporteValor || 0,
         passaporte_fichas: t.passaporteFichas || null,
         buyin_free_ate_nivel: t.buyinFreeAteNivel || null,
+        // FASE H: bônus de fichas no registro antecipado
+        bonus_registro_ativo: !!t.bonusRegistroAtivo,
+        bonus_registro_fichas: t.bonusRegistroFichas || 0,
+        bonus_registro_ate_nivel: t.bonusRegistroAteNivel || null,
         imprimir_comprovante_compra: !!t.imprimirComprovanteCompra,
         imprimir_comprovante_jackpot: !!t.imprimirComprovanteJackpot,
         comprovante_vias: t.comprovanteVias || 1,
@@ -7860,6 +7890,7 @@ async function sincronizarEstado() {
                                     taxa_adm: e.taxaAdm || 0,
                                     passaporte: (e.passaporte && e.passaporte.cobrado) ? e.passaporte : null,
                                     combo_id: e.comboId || null,
+                                    bonus_fichas: Number(e.bonusFichas) || 0,
                                 }));
                                 const { error: errE } = await sb.from('torneio_entries').upsert(entryRows);
                                 if (errE) throw new Error('Upsert entries: ' + errE.message);
@@ -8426,6 +8457,10 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         passaporteValor: parseFloat(r.passaporte_valor || 0),
         passaporteFichas: r.passaporte_fichas || null,
         buyinFreeAteNivel: r.buyin_free_ate_nivel || null,
+        // FASE H: bônus de fichas no registro antecipado
+        bonusRegistroAtivo: !!r.bonus_registro_ativo,
+        bonusRegistroFichas: parseInt(r.bonus_registro_fichas) || 0,
+        bonusRegistroAteNivel: r.bonus_registro_ate_nivel || null,
         imprimirComprovanteCompra:  !!r.imprimir_comprovante_compra,
         imprimirComprovanteJackpot: !!r.imprimir_comprovante_jackpot,
         comprovanteVias:            r.comprovante_vias || 1,
@@ -8484,6 +8519,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             taxaAdm: parseFloat(e.taxa_adm || 0),
             passaporte: e.passaporte || null,
             comboId: e.combo_id || null,
+            // FASE H: bônus de fichas no registro antecipado
+            bonusFichas: parseInt(e.bonus_fichas || 0),
         })),
         eliminados: tElims.map(e => ({
             id: e.id, jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
@@ -11372,7 +11409,8 @@ function diagTorneio(idx) {
     });
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
     const passaporteFichas = (typeof _getFichasExtrasPassaporte === 'function') ? _getFichasExtrasPassaporte(t) : 0;
-    const chipCount = totalFichas + jackpotFichas + passaporteFichas;
+    const bonusFichas = (typeof _getFichasExtrasBonus === 'function') ? _getFichasExtrasBonus(t) : 0;
+    const chipCount = totalFichas + jackpotFichas + passaporteFichas + bonusFichas;
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
 
     console.log('%c🔬 DIAGNÓSTICO TORNEIO: ' + t.nome, 'color:#06b6d4;font-weight:bold;font-size:14px;');
@@ -11845,6 +11883,12 @@ function gerarComprovanteCompra(t, dados) {
         txt += '   + ' + fichasAcao.toLocaleString('pt-BR') + ' fichas\n';
     }
 
+    // FASE H: Bônus de registro antecipado
+    const bonusFichasEntry = Number(e.bonusFichas) || 0;
+    if (bonusFichasEntry > 0) {
+        txt += '   + ' + bonusFichasEntry.toLocaleString('pt-BR') + ' fichas (bonus de registro)\n';
+    }
+
     // Staff fixo (só aparece em modo adicional)
     if (staffFixoMostrar > 0) {
         txt += _printPad('Staff Fixo', formatMoney(staffFixoMostrar), col) + '\n';
@@ -11865,7 +11909,7 @@ function gerarComprovanteCompra(t, dados) {
 
     txt += _printLine('-', col) + '\n';
     const total = valorAcao + staffFixoMostrar + taxaAdm + valorPassaporte;
-    const fichasTotal = fichasAcao + fichasPassaporte;
+    const fichasTotal = fichasAcao + fichasPassaporte + bonusFichasEntry;
     txt += _printPad('TOTAL', formatMoney(total), col) + '\n';
     if (fichasTotal > 0) {
         txt += _printPad('Fichas entregues', fichasTotal.toLocaleString('pt-BR'), col) + '\n';
@@ -11969,6 +12013,13 @@ function gerarComprovanteCombo(t, dados) {
         }
         if (fichasAcao > 0) {
             txt += '   + ' + fichasAcao.toLocaleString('pt-BR') + ' fichas\n';
+        }
+
+        // FASE H: Bônus de registro antecipado (entry tem bonusFichas se for elegível)
+        const bonusFichasEntry = Number(e.bonusFichas) || 0;
+        if (bonusFichasEntry > 0) {
+            txt += '   + ' + bonusFichasEntry.toLocaleString('pt-BR') + ' fichas (bonus de registro)\n';
+            fichasTotal += bonusFichasEntry;
         }
 
         // Staff fixo incluso (acumula pra mostrar 1 vez no final)
@@ -17601,6 +17652,16 @@ function saveTournament() {
             const v = parseInt(document.getElementById('t-buyin-free-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
         })(),
+        // FASE H: Bônus de fichas no registro antecipado
+        bonusRegistroAtivo: document.getElementById('t-bonus-registro-ativo')?.checked || false,
+        bonusRegistroFichas: (function() {
+            const v = parseInt(document.getElementById('t-bonus-registro-fichas')?.value);
+            return (isNaN(v) || v < 0) ? 0 : v;
+        })(),
+        bonusRegistroAteNivel: (function() {
+            const v = parseInt(document.getElementById('t-bonus-registro-ate-nivel')?.value);
+            return (isNaN(v) || v <= 0) ? null : v;
+        })(),
         imprimirComprovanteCompra:  document.getElementById('t-imprimir-compra')?.checked || false,
         imprimirComprovanteJackpot: document.getElementById('t-imprimir-jackpot')?.checked || false,
         comprovanteVias:            parseInt(document.getElementById('t-comprovante-vias')?.value) || 1,
@@ -19814,6 +19875,11 @@ function _registrarEntradasCombo(t, jid, acoes) {
         if (passNessaEntry) {
             novaEntry.passaporte = { cobrado: true, valor: passValor, fichas: passFichasTotal };
         }
+        // FASE H: Anexa fichas de bônus se for buy-in e estiver dentro do limite de nível
+        const bonusFichasNessaEntry = _calcBonusFichasParaEntry(t, tipo);
+        if (bonusFichasNessaEntry > 0) {
+            novaEntry.bonusFichas = bonusFichasNessaEntry;
+        }
         // Flag pra agrupar no comprovante
         novaEntry.comboId = ts;
 
@@ -20024,6 +20090,11 @@ function _registrarEntradaImpl() {
     const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado, taxaAdm: taxaAdmCobrada };
     if (passaporteCobrado > 0) {
         novaEntry.passaporte = { cobrado: true, valor: passaporteCobrado, fichas: passaporteFichas };
+    }
+    // FASE H: Anexa fichas de bônus se for buy-in e estiver dentro do limite de nível
+    const bonusFichas = _calcBonusFichasParaEntry(t, tipo);
+    if (bonusFichas > 0) {
+        novaEntry.bonusFichas = bonusFichas;
     }
     t.entries.push(novaEntry);
     alocarJogadorMesa(t, jid);
@@ -20412,7 +20483,8 @@ function updateTV(idx) {
     // Adiciona jackpot chips e last chance chips (somados a parte se vierem por lastChanceCompras antigo)
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
     const passaporteFichas = _getFichasExtrasPassaporte(t);
-    const chipCount = totalFichas + jackpotFichas + passaporteFichas;
+    const bonusFichas = _getFichasExtrasBonus(t);
+    const chipCount = totalFichas + jackpotFichas + passaporteFichas + bonusFichas;
 
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
 
@@ -20687,7 +20759,8 @@ function _computarDadosMiniTV(t) {
     }, 0);
     const jackpotFichas = (t.jackpotCompras || []).reduce((s, j) => s + (j.fichas || 0), 0);
     const passaporteFichas = _getFichasExtrasPassaporte(t);
-    const chipCount = totalFichas + jackpotFichas + passaporteFichas;
+    const bonusFichas = _getFichasExtrasBonus(t);
+    const chipCount = totalFichas + jackpotFichas + passaporteFichas + bonusFichas;
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
     const buyinsQtd  = (t.entries || []).filter(e => e.tipo === 'buyin').length;
     const reentriesQtd = (t.entries || []).filter(e => e.tipo === 'reentry').length;
@@ -21543,6 +21616,30 @@ function _getFichasExtrasPassaporte(t) {
     return (t.entries || []).reduce((s, e) => {
         return s + (e.passaporte && e.passaporte.cobrado ? (Number(e.passaporte.fichas) || 0) : 0);
     }, 0);
+}
+
+// FASE H: Soma das fichas extras do bônus de registro antecipado (entries com bonusFichas > 0)
+function _getFichasExtrasBonus(t) {
+    if (!t) return 0;
+    return (t.entries || []).reduce((s, e) => {
+        return s + (Number(e.bonusFichas) || 0);
+    }, 0);
+}
+
+// FASE H: Retorna o valor de fichas extras do bônus pra um BUY-IN feito AGORA, ou 0 se não elegível.
+// Regras: bônus ativo + tipo = buyin + nível atual <= bonusRegistroAteNivel
+function _calcBonusFichasParaEntry(t, tipo) {
+    if (!t || !t.bonusRegistroAtivo) return 0;
+    if (tipo !== 'buyin') return 0; // só buy-in (decisão do usuário)
+    const fichasBonus = Number(t.bonusRegistroFichas) || 0;
+    if (fichasBonus <= 0) return 0;
+    const ateNivel = Number(t.bonusRegistroAteNivel) || 0;
+    if (ateNivel <= 0) return 0;
+    // Se torneio nem começou, considera "antes do nível 1" — vale o bônus
+    if (!t.iniciadoEm) return fichasBonus;
+    // Compara nível atual humano com o limite (inclusivo: durante o nível X, ainda vale)
+    const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
+    return (nivelAtual <= ateNivel) ? fichasBonus : 0;
 }
 
 function getPrize(t) {
@@ -32163,6 +32260,13 @@ function atualizarStaffModoUI() {
 function atualizarPassaporteUI() {
     var cb = document.getElementById('t-passaporte-ativo');
     var painel = document.getElementById('t-passaporte-painel');
+    if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
+}
+
+// FASE H: Bônus de fichas no registro antecipado
+function atualizarBonusRegistroUI() {
+    var cb = document.getElementById('t-bonus-registro-ativo');
+    var painel = document.getElementById('t-bonus-registro-campos');
     if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
 }
 
