@@ -5068,436 +5068,617 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
 </div>
 
-<!-- MODAL: NOVO TORNEIO -->
-<div id="modal-novo-torneio" class="modal-overlay">
-    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:860px;max-height:90vh;overflow-y:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-            <h3 style="font-weight:800;font-size:1.2rem;">Novo Torneio</h3>
-            <button onclick="closeModal('modal-novo-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     MODAL NOVO TORNEIO v2 — Layout progressive disclosure
+     ════════════════════════════════════════════════════════════════════
+     Mantém TODOS os 78 IDs do modal antigo (zero perda de funcionalidade).
+     Estrutura nova: Básico sempre visível + Blinds sempre visível +
+     8 seções colapsáveis com status inline.
+     ════════════════════════════════════════════════════════════════════ -->
+<div id="modal-novo-torneio" class="modal-overlay" style="display:none;">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:0;width:100%;max-width:920px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;">
+
+        <!-- ═══════════════ HEADER ═══════════════ -->
+        <div style="padding:1.5rem 1.75rem 1rem;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,.04);">
+            <div>
+                <h3 style="font-weight:700;font-size:1.15rem;color:#fff;margin-bottom:.2rem;">Novo torneio</h3>
+                <div style="color:#8b8f93;font-size:.78rem;">Preencha o nome — o resto tem padrões prontos.</div>
+            </div>
+            <button onclick="closeModal('modal-novo-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;padding:.25rem;">&times;</button>
         </div>
-        <!-- TEMPLATES de configuração rápida -->
-        <div id="template-bar" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;padding:.6rem .85rem;background:rgba(245,158,11,.05);border:1px dashed rgba(245,158,11,.2);border-radius:.5rem;margin-bottom:1.25rem;">
-            <span style="font-size:.7rem;color:var(--gold);font-weight:800;text-transform:uppercase;letter-spacing:.08em;flex-shrink:0;"><i class="fa-solid fa-bookmark"></i> Templates:</span>
-            <div id="template-list" style="display:flex;gap:.4rem;flex-wrap:wrap;flex:1;"></div>
-            <button onclick="abrirSalvarTemplate()" class="btn-ghost" style="font-size:.7rem;padding:.35rem .7rem;color:#22c55e;flex-shrink:0;" title="Salvar configurações atuais como template"><i class="fa-solid fa-floppy-disk"></i> Salvar como template</button>
+
+        <!-- Templates bar (mesma estrutura do original) -->
+        <div id="template-bar-v2" style="margin:1rem 1.75rem 0;padding:.7rem .95rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:.55rem;">
+            <div style="font-size:.65rem;color:#c084fc;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.55rem;">
+                <i class="fa-solid fa-bookmark"></i> Use um template pronto
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;">
+                <div id="template-list-v2" style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1;"></div>
+                <button onclick="abrirSalvarTemplate()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .6rem;color:#22c55e;flex-shrink:0;" title="Salvar configurações atuais como template">
+                    <i class="fa-solid fa-floppy-disk"></i> Salvar template
+                </button>
+            </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
-            <!-- Configs -->
-            <div style="display:flex;flex-direction:column;gap:1rem;">
-                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Configurações</div>
-                <div><label class="inp-label">Nome do Torneio</label><input id="t-nome" class="inp" placeholder="Ex: Sunday Major"></div>
+        <!-- ═══════════════ CORPO (scroll) ═══════════════ -->
+        <div style="flex:1;overflow-y:auto;padding:1.25rem 1.75rem;">
 
-                <div>
-                    <label class="inp-label">Tipo de Torneio</label>
-                    <select id="t-tipo" class="inp" onchange="onTipoTorneioChange()">
-                        <option value="normal">🏆 Normal (Freezeout / Re-entry)</option>
-                        <option value="bounty">💰 Bounty Fixo (valor fixo por eliminação)</option>
-                        <option value="pko">🎯 Progressive KO (bounty cresce a cada KO)</option>
-                        <option value="knockout">⚡ Somente KO (100% em bounties, sem premiação final)</option>
-                    </select>
-                </div>
+            <!-- Grid 2 colunas: Básico | Blinds -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
 
-                <!-- FORMATO (multi-dias) -->
-                <div>
-                    <label class="inp-label">Formato / Estrutura</label>
-                    <select id="t-formato" class="inp" onchange="onFormatoChange()">
-                        <option value="unico">Único dia</option>
-                        <option value="dia1">Dia 1 de série (ex: 1A, 1B, 1C)</option>
-                        <option value="dia2">Dia 2 / Final (continuação de série)</option>
-                    </select>
-                </div>
+                <!-- ═══════════════ COLUNA ESQUERDA: BÁSICO ═══════════════ -->
+                <div style="display:flex;flex-direction:column;gap:.85rem;">
 
-                <div id="t-dia1-wrap" style="display:none;padding:.85rem 1rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);border-radius:.6rem;">
-                    <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-calendar-days"></i> Série / Dia</div>
-                    <div style="display:grid;grid-template-columns:1fr 2fr;gap:.5rem;">
-                        <div><label class="inp-label">Rótulo</label><input id="t-dia-label" class="inp" placeholder="1A"></div>
-                        <div><label class="inp-label">Série (nome)</label><input id="t-series-nome" class="inp" placeholder="Ex: Sunday Challenge Mai/26"></div>
+                    <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Configuração básica</div>
+
+                    <!-- Nome -->
+                    <div>
+                        <label class="inp-label">Nome do torneio</label>
+                        <input id="t-nome" class="inp" placeholder="Ex: Sunday Major">
                     </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">O primeiro Dia 1 cria a série; os demais podem ser vinculados pelo mesmo nome.</div>
-                </div>
 
-                <div id="t-dia2-wrap" style="display:none;padding:.85rem 1rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:.6rem;">
-                    <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-trophy"></i> Continuação de Série</div>
-                    <div><label class="inp-label">Série de origem</label>
-                        <select id="t-series-id" class="inp">
-                            <option value="">Selecione a série...</option>
-                        </select>
+                    <!-- Tipo + Formato -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
+                        <div>
+                            <label class="inp-label">Tipo</label>
+                            <select id="t-tipo" class="inp" onchange="onTipoTorneioChange()">
+                                <option value="normal">🏆 Normal (Freezeout / Re-entry)</option>
+                                <option value="bounty">💰 Bounty Fixo</option>
+                                <option value="pko">🎯 Progressive KO</option>
+                                <option value="knockout">⚡ Somente KO</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="inp-label">Formato</label>
+                            <select id="t-formato" class="inp" onchange="onFormatoChange()">
+                                <option value="unico">Único dia</option>
+                                <option value="dia1">Dia 1 de série</option>
+                                <option value="dia2">Dia 2 / Final</option>
+                            </select>
+                        </div>
                     </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Ao criar, os stacks finais dos Dia 1s serão importados automaticamente (melhor stack de cada jogador).</div>
-                </div>
 
-                <!-- LAST CHANCE -->
-                <div style="padding:.85rem 1rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.6rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
-                        <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-star"></i> Last Chance (3ª compra após add-on)</div>
-                        <label class="switch" title="Ativar Last Chance neste torneio"><input type="checkbox" id="t-last-chance-ativo" onchange="_toggleLastChanceForm(this.checked)"><span class="slider"></span></label>
+                    <!-- Bloco Dia 1 (condicional) -->
+                    <div id="t-dia1-wrap" style="display:none;padding:.75rem .9rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;">
+                            <i class="fa-solid fa-calendar-days"></i> Série / Dia
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 2fr;gap:.5rem;">
+                            <div><label class="inp-label">Rótulo</label><input id="t-dia-label" class="inp" placeholder="1A"></div>
+                            <div><label class="inp-label">Série (nome)</label><input id="t-series-nome" class="inp" placeholder="Ex: Sunday Challenge Mai/26"></div>
+                        </div>
+                        <div style="font-size:.68rem;color:#71717a;margin-top:.4rem;">O primeiro Dia 1 cria a série; demais podem ser vinculados pelo nome.</div>
                     </div>
-                    <div id="t-last-chance-campos" style="display:none;">
+
+                    <!-- Bloco Dia 2 (condicional) -->
+                    <div id="t-dia2-wrap" style="display:none;padding:.75rem .9rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;">
+                            <i class="fa-solid fa-trophy"></i> Continuação de série
+                        </div>
+                        <div>
+                            <label class="inp-label">Série de origem</label>
+                            <select id="t-series-id" class="inp">
+                                <option value="">Selecione a série...</option>
+                            </select>
+                        </div>
+                        <div style="font-size:.68rem;color:#71717a;margin-top:.4rem;">Stacks finais dos Dia 1s serão importados automaticamente.</div>
+                    </div>
+
+                    <!-- Buy-in / Taxa / Rake / Stack / Tempo -->
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;">
+                        <div>
+                            <label class="inp-label">Buy-in R$ <span style="color:#a78bfa;font-weight:400;text-transform:none;font-size:.62rem;">(0=FREE)</span></label>
+                            <input id="t-buyin" type="number" min="0" value="100" class="inp" oninput="atualizarBuyinFreeUI()">
+                        </div>
+                        <div>
+                            <label class="inp-label">Taxa adm R$</label>
+                            <input id="t-taxa-adm" type="number" step="0.01" value="0" class="inp" placeholder="0" title="Cobrada apenas na 1ª entrada. NÃO entra no rake.">
+                        </div>
+                        <div>
+                            <label class="inp-label">Rake %</label>
+                            <input id="t-rake" type="number" value="20" class="inp">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;">
+                        <div>
+                            <label class="inp-label">Stack inicial</label>
+                            <input id="t-stack" type="number" value="20000" class="inp">
+                        </div>
+                        <div>
+                            <label class="inp-label">Nível (min)</label>
+                            <input id="t-tempo" type="number" value="15" class="inp">
+                        </div>
+                    </div>
+
+                    <!-- Bloco Buy-in FREE (condicional, aparece se buy-in=0) -->
+                    <div id="t-buyin-free-bloco" style="display:none;padding:.75rem .9rem;background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.25);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;">
+                            <i class="fa-solid fa-gift"></i> Buy-in FREE
+                        </div>
+                        <label class="inp-label">Até nível <span style="color:#ef4444;">*</span></label>
+                        <input id="t-buyin-free-ate-nivel" type="number" min="1" value="" placeholder="Obrigatório" class="inp">
+                        <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;line-height:1.4;">Buy-in gratuito. Taxa adm e passaporte continuam funcionando. Re-entry também é grátis enquanto a janela estiver aberta.</div>
+                    </div>
+
+                    <!-- FASE H: Bônus de fichas no registro antecipado -->
+                    <div style="padding:.75rem .9rem;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.18);border-radius:.5rem;">
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.5rem;">
+                            <input type="checkbox" id="t-bonus-registro-ativo" onchange="atualizarBonusRegistroUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#22c55e;">
+                            <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-gift"></i> Bônus de fichas no registro antecipado</div>
+                        </label>
+                        <div id="t-bonus-registro-campos" style="display:none;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                                <div>
+                                    <label class="inp-label">Fichas extras</label>
+                                    <input id="t-bonus-registro-fichas" type="number" min="0" value="5000" class="inp" placeholder="Ex: 5000">
+                                </div>
+                                <div>
+                                    <label class="inp-label">Até fim do nível</label>
+                                    <input id="t-bonus-registro-ate-nivel" type="number" min="1" value="2" class="inp" placeholder="Ex: 2">
+                                </div>
+                            </div>
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;line-height:1.4;">
+                                <i class="fa-solid fa-circle-info" style="color:#22c55e;"></i>
+                                Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível recebem <strong>+X fichas extras</strong>. Entra no chipcount e média.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bloco KO (condicional, aparece conforme tipo) -->
+                    <div id="t-bounty-wrap" style="display:none;padding:.75rem .9rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;">
+                            <i class="fa-solid fa-crosshairs"></i> Configuração KO
+                        </div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                            <div><label class="inp-label">Valor R$</label><input id="t-last-chance-valor" type="number" value="200" class="inp" placeholder="Ex: 200"></div>
-                            <div><label class="inp-label">Fichas entregues</label><input id="t-last-chance-fichas" type="number" value="150000" class="inp" placeholder="Ex: 150000"></div>
+                            <div><label class="inp-label">Valor Bounty R$</label><input id="t-bounty-valor" type="number" value="20" class="inp"></div>
+                            <div id="t-pko-split-wrap" style="display:none;"><label class="inp-label">% p/ cabeça</label><input id="t-pko-split" type="number" value="50" min="0" max="100" class="inp"></div>
                         </div>
-                        <div style="margin-top:.6rem;">
-                            <label class="inp-label">Last Chance disponível até o nível</label>
-                            <input id="t-last-chance-ate" type="number" value="12" min="1" class="inp" placeholder="Ex: 12 (LC fica liberado até o fim do nível 12)">
-                            <div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Geralmente 2-3 níveis depois do add-on (ex: add-on no nível 10 → LC até nível 12 ou 13)</div>
+                        <div id="t-bounty-hint" style="font-size:.68rem;color:#71717a;margin-top:.4rem;"></div>
+                    </div>
+
+                </div>
+
+                <!-- ═══════════════ COLUNA DIREITA: BLINDS ═══════════════ -->
+                <div style="display:flex;flex-direction:column;gap:.65rem;">
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.4rem;">
+                        <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de blinds</div>
+                        <div style="display:flex;gap:.3rem;">
+                            <button onclick="abrirModalFaixas()" class="btn-ghost" style="font-size:.68rem;padding:.28rem .6rem;color:#a855f7;border-color:rgba(168,85,247,.3);" title="Definir tempos por faixa de níveis">
+                                <i class="fa-solid fa-layer-group"></i> Faixas
+                            </button>
+                            <button onclick="addBlindRow()" class="btn-ghost" style="font-size:.68rem;padding:.28rem .6rem;">+ Nível</button>
+                            <button onclick="addIntervaloRow()" class="btn-ghost" style="font-size:.68rem;padding:.28rem .6rem;color:#06b6d4;border-color:rgba(6,182,212,.3);">
+                                <i class="fa-solid fa-pause"></i> + Intervalo
+                            </button>
                         </div>
-                        <div style="margin-top:.6rem;">
-                            <label class="inp-label">Rake sobre Last Chance</label>
-                            <select id="t-last-chance-paga-rake" class="inp">
+                    </div>
+
+                    <!-- Resumo de faixas ativas -->
+                    <div id="faixas-resumo" style="display:none;padding:.45rem .7rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(124,58,237,.05));border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.68rem;color:#a855f7;"></div>
+
+                    <!-- Cabeçalho da tabela de blinds -->
+                    <div style="display:grid;grid-template-columns:1.25rem 2rem 1fr 1fr 1fr 3rem 2rem;gap:.3rem;padding:0 .5rem;">
+                        <span></span>
+                        <span></span>
+                        <span style="font-size:.58rem;color:#52525b;text-align:center;">SB</span>
+                        <span style="font-size:.58rem;color:#52525b;text-align:center;">BB</span>
+                        <span style="font-size:.58rem;color:#52525b;text-align:center;">Ante</span>
+                        <span style="font-size:.58rem;color:#52525b;text-align:center;">Min</span>
+                        <span></span>
+                    </div>
+
+                    <!-- Container dos níveis (populado via JS) -->
+                    <div id="blinds-setup" style="display:flex;flex-direction:column;gap:.25rem;max-height:280px;overflow-y:auto;padding-right:.25rem;"></div>
+
+                    <!-- Resumo do torneio -->
+                    <div id="torneio-resumo" style="margin-top:.4rem;padding:.75rem .9rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(99,102,241,.05));border:1px solid rgba(255,255,255,.06);border-radius:.55rem;">
+                        <div style="font-size:.58rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.55rem;">📊 Resumo do torneio</div>
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;">
+                            <div>
+                                <div style="font-size:.58rem;color:#9ca3af;margin-bottom:.15rem;">⏱ Tempo total</div>
+                                <div id="resumo-tempo" style="font-size:.85rem;color:#fff;font-weight:700;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size:.58rem;color:#9ca3af;margin-bottom:.15rem;">📊 Níveis</div>
+                                <div id="resumo-niveis" style="font-size:.85rem;color:#fff;font-weight:700;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size:.58rem;color:#9ca3af;margin-bottom:.15rem;">⏸ Intervalos</div>
+                                <div id="resumo-intervalos" style="font-size:.85rem;color:#fff;font-weight:700;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size:.58rem;color:#9ca3af;margin-bottom:.15rem;">💰 Stack</div>
+                                <div id="resumo-stack" style="font-size:.85rem;color:#fff;font-weight:700;">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Dica verde explicando que tá tudo pronto -->
+            <div style="margin-top:1.25rem;padding:.7rem .9rem;background:rgba(34,197,94,.04);border-left:2px solid #22c55e;border-radius:0 .4rem .4rem 0;">
+                <div style="color:#22c55e;font-size:.72rem;font-weight:600;margin-bottom:.15rem;">✓ Tudo pronto pra criar</div>
+                <div style="color:#8b8f93;font-size:.72rem;line-height:1.45;">Com esses dados o torneio já funciona. As seções abaixo são opcionais — só configure se quiser usar Rebuy, Last Chance, Bounty, Passaporte, etc.</div>
+            </div>
+
+            <!-- ═══════════════ SEÇÕES COLAPSÁVEIS ═══════════════ -->
+            <div style="margin-top:1.5rem;border-top:1px solid rgba(255,255,255,.06);">
+
+                <!-- ▶ Rebuy e Add-on -->
+                <div class="t2-coll" data-section="rebuy">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('rebuy')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-rotate" style="margin-right:.3rem;color:#71717a;"></i>Rebuy e Add-on</span>
+                            <span style="color:#52525b;font-size:.7rem;">opcional</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-rebuy" style="color:#52525b;font-size:.7rem;">Configurar</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                            <div><label class="inp-label">Rebuy simples R$</label><input id="t-rebuy-simples" type="number" value="100" class="inp" onchange="t2AtualizarStatusRebuy()"></div>
+                            <div><label class="inp-label">Fichas (simples)</label><input id="t-rebuy-simples-fichas" type="number" value="20000" class="inp"></div>
+                            <div><label class="inp-label">Rebuy duplo R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(0=desabilita)</span></label><input id="t-rebuy-duplo" type="number" value="200" class="inp" onchange="t2AtualizarStatusRebuy()"></div>
+                            <div><label class="inp-label">Fichas (duplo)</label><input id="t-rebuy-duplo-fichas" type="number" value="50000" class="inp"></div>
+                            <div><label class="inp-label">Add-on R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(0=grátis)</span></label><input id="t-addon-valor" type="number" step="0.01" value="0" class="inp" onchange="t2AtualizarStatusRebuy()"></div>
+                            <div><label class="inp-label">Add-on fichas</label><input id="t-addon" type="number" value="0" class="inp"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ▶ Travas de Nível -->
+                <div class="t2-coll" data-section="travas">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('travas')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-lock" style="margin-right:.3rem;color:#71717a;"></i>Travas de nível</span>
+                            <span style="color:#52525b;font-size:.7rem;">limites de compra</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-travas" style="color:#52525b;font-size:.7rem;">Buy-in/RB até 6 · Add-on até 6</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                            <div>
+                                <label class="inp-label">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(buy-in, re-entry, rebuy)</span></label>
+                                <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que buy-in, re-entry e rebuy podem ser registrados" onchange="t2AtualizarStatusTravas()">
+                            </div>
+                            <div>
+                                <label class="inp-label">Add-on até nível</label>
+                                <input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que add-on pode ser registrado" onchange="t2AtualizarStatusTravas()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ▶ Last Chance -->
+                <div class="t2-coll" data-section="lc">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('lc')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-star" style="margin-right:.3rem;color:#71717a;"></i>Last Chance</span>
+                            <span style="color:#52525b;font-size:.7rem;">3ª compra após add-on</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-lc" style="color:#52525b;font-size:.7rem;">Desativado</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.65rem;">
+                            <input type="checkbox" id="t-last-chance-ativo" onchange="_toggleLastChanceForm(this.checked);t2AtualizarStatusLC()" style="width:16px;height:16px;cursor:pointer;accent-color:#a855f7;">
+                            <span style="color:#e7e9ea;font-size:.82rem;">Ativar Last Chance neste torneio</span>
+                        </label>
+                        <div id="t-last-chance-campos" style="display:none;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                                <div><label class="inp-label">Valor R$</label><input id="t-last-chance-valor" type="number" value="200" class="inp" placeholder="Ex: 200"></div>
+                                <div><label class="inp-label">Fichas entregues</label><input id="t-last-chance-fichas" type="number" value="150000" class="inp" placeholder="Ex: 150000"></div>
+                            </div>
+                            <div style="margin-top:.55rem;">
+                                <label class="inp-label">Disponível até o nível</label>
+                                <input id="t-last-chance-ate" type="number" value="12" min="1" class="inp" placeholder="Ex: 12">
+                                <div style="font-size:.62rem;color:#71717a;margin-top:.25rem;">Geralmente 2-3 níveis depois do add-on.</div>
+                            </div>
+                            <div style="margin-top:.55rem;">
+                                <label class="inp-label">Rake sobre Last Chance</label>
+                                <select id="t-last-chance-paga-rake" class="inp">
+                                    <option value="">Usar padrão do clube</option>
+                                    <option value="1">Paga rake (entra no cálculo)</option>
+                                    <option value="0">Sem rake (100% pro prize)</option>
+                                </select>
+                            </div>
+                            <div style="font-size:.68rem;color:#71717a;margin-top:.45rem;line-height:1.4;">Compra liberada <strong>após o nível de add-on</strong>. Mesma mecânica do Jackpot: pode comprar múltiplas vezes.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ▶ Passaporte -->
+                <div class="t2-coll" data-section="pass">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('pass')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-passport" style="margin-right:.3rem;color:#71717a;"></i>Passaporte</span>
+                            <span style="color:#52525b;font-size:.7rem;">produto opcional</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-pass" style="color:#52525b;font-size:.7rem;">Desativado</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.65rem;">
+                            <input type="checkbox" id="t-passaporte-ativo" onchange="atualizarPassaporteUI();t2AtualizarStatusPass()" style="width:16px;height:16px;cursor:pointer;accent-color:#a78bfa;">
+                            <span style="color:#e7e9ea;font-size:.82rem;">Vender passaporte neste torneio</span>
+                        </label>
+                        <div id="t-passaporte-painel" style="display:none;">
+                            <div style="margin-bottom:.55rem;">
+                                <label class="inp-label">Valor (R$)</label>
+                                <input id="t-passaporte-valor" type="number" step="0.5" min="0" value="10" class="inp">
+                            </div>
+                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.35rem;">Fichas extras por tipo de ação:</div>
+                            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.45rem;">
+                                <div><label class="inp-label" style="font-size:.62rem;">Buy-in</label><input id="t-passaporte-fichas-buyin" type="number" min="0" value="5000" class="inp"></div>
+                                <div><label class="inp-label" style="font-size:.62rem;">Rebuy simples</label><input id="t-passaporte-fichas-rebuy-simples" type="number" min="0" value="5000" class="inp"></div>
+                                <div><label class="inp-label" style="font-size:.62rem;">Rebuy duplo</label><input id="t-passaporte-fichas-rebuy-duplo" type="number" min="0" value="5000" class="inp"></div>
+                                <div><label class="inp-label" style="font-size:.62rem;">Re-entry</label><input id="t-passaporte-fichas-reentry" type="number" min="0" value="5000" class="inp"></div>
+                                <div><label class="inp-label" style="font-size:.62rem;">Add-on</label><input id="t-passaporte-fichas-addon" type="number" min="0" value="5000" class="inp"></div>
+                            </div>
+                            <div style="margin-top:.65rem;padding-top:.55rem;border-top:1px dashed #27272a;">
+                                <label class="inp-label" style="font-size:.62rem;">Avulso (sem ação) <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.58rem;">— só em Buy-in FREE</span></label>
+                                <input id="t-passaporte-fichas-avulso" type="number" min="0" value="5000" class="inp">
+                            </div>
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.55rem;line-height:1.45;">
+                                <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
+                                Receita 100% do clube. <strong>Não entra no rake nem no staff.</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ▶ Jackpot -->
+                <div class="t2-coll" data-section="jackpot">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('jackpot')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-gem" style="margin-right:.3rem;color:#71717a;"></i>Jackpot</span>
+                            <span style="color:#52525b;font-size:.7rem;">fichas extras opcionais</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-jackpot" style="color:#52525b;font-size:.7rem;">Sem jackpot</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                            <div><label class="inp-label">Valor R$</label><input id="t-jackpot-valor" type="number" value="0" class="inp" placeholder="0 = sem jackpot" onchange="t2AtualizarStatusJackpot()"></div>
+                            <div><label class="inp-label">Fichas entregues</label><input id="t-jackpot-fichas" type="number" value="0" class="inp"></div>
+                        </div>
+                        <div style="margin-top:.55rem;">
+                            <label class="inp-label">Rake sobre Jackpot</label>
+                            <select id="t-jackpot-paga-rake" class="inp">
                                 <option value="">Usar padrão do clube</option>
                                 <option value="1">Paga rake (entra no cálculo)</option>
-                                <option value="0">Sem rake (vai 100% pro prize)</option>
+                                <option value="0">Sem rake (100% pro prize)</option>
                             </select>
                         </div>
-                        <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.4;">Compra liberada <strong>após o nível de add-on</strong>. Mesma mecânica do Jackpot: pode comprar múltiplas vezes.</div>
+                        <div style="font-size:.68rem;color:#71717a;margin-top:.5rem;line-height:1.4;">Jogador paga R$ X e recebe Y fichas extras. Pode ser comprado múltiplas vezes.</div>
                     </div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;align-items:end;">
-                    <div style="display:flex;flex-direction:column;"><label class="inp-label" style="min-height:2.1rem;">Buy-in R$ <span style="color:#a78bfa;font-weight:400;text-transform:none;font-size:.65rem;">(0 = FREE)</span></label><input id="t-buyin" type="number" min="0" value="100" class="inp" oninput="atualizarBuyinFreeUI()"></div>
-                    <div style="display:flex;flex-direction:column;"><label class="inp-label" style="min-height:2.1rem;">Taxa Adm. R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(opcional, só no buy-in)</span></label><input id="t-taxa-adm" type="number" step="0.01" value="0" class="inp" placeholder="0 = sem taxa" title="Cobrada apenas na 1ª entrada (buy-in). NÃO entra no cálculo do rake."></div>
-                    <div style="display:flex;flex-direction:column;"><label class="inp-label" style="min-height:2.1rem;">Rake %</label><input id="t-rake" type="number" value="20" class="inp"></div>
-                    <div style="display:flex;flex-direction:column;"><label class="inp-label" style="min-height:2.1rem;">Stack Inicial</label><input id="t-stack" type="number" value="20000" class="inp"></div>
-                    <div style="display:flex;flex-direction:column;"><label class="inp-label" style="min-height:2.1rem;">Nível (min)</label><input id="t-tempo" type="number" value="15" class="inp"></div>
-                </div>
-
-                <!-- Bloco Buy-in FREE: só aparece se buy-in = 0 -->
-                <div id="t-buyin-free-bloco" style="display:none;padding:.85rem 1rem;background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.25);border-radius:.6rem;">
-                    <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-gift"></i> Buy-in FREE</div>
-                    <div>
-                        <label class="inp-label">Buy-in FREE até nível <span style="color:#ef4444;">*</span></label>
-                        <input id="t-buyin-free-ate-nivel" type="number" min="1" value="" placeholder="Obrigatório" class="inp">
-                        <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;">Após este nível, buy-in não está mais disponível</div>
-                    </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
-                        <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
-                        Buy-in gratuito. Taxa adm e passaporte continuam funcionando se configurados. Stack base entregue normalmente.
-                        Re-entry também é grátis enquanto a janela de re-entry estiver aberta. Use Rebuy Simples/Duplo se quiser cobrar pelo retorno.
-                    </div>
-                </div>
-
-                <!-- FASE H: Bônus de fichas no registro antecipado -->
-                <div style="padding:.85rem 1rem;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.15);border-radius:.6rem;">
-                    <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;margin-bottom:.65rem;">
-                        <input type="checkbox" id="t-bonus-registro-ativo" onchange="atualizarBonusRegistroUI()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;">
-                        <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-gift"></i> Bônus de fichas no registro antecipado</div>
-                    </label>
-                    <div id="t-bonus-registro-campos" style="display:none;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                            <div>
-                                <label class="inp-label">Fichas extras</label>
-                                <input id="t-bonus-registro-fichas" type="number" min="0" value="5000" class="inp" placeholder="Ex: 5000">
-                            </div>
-                            <div>
-                                <label class="inp-label">Até fim do nível</label>
-                                <input id="t-bonus-registro-ate-nivel" type="number" min="1" value="2" class="inp" placeholder="Ex: 2">
-                            </div>
+                <!-- ▶ Staff / Comissão -->
+                <div class="t2-coll" data-section="staff">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('staff')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-hand-holding-dollar" style="margin-right:.3rem;color:#71717a;"></i>Staff / Comissão (dealers + floor)</span>
                         </div>
-                        <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.5;">
-                            <i class="fa-solid fa-circle-info" style="color:#22c55e;"></i>
-                            Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível recebem <strong>+X fichas extras</strong> no stack. Entra no chipcount e média. Não afeta rake/staff/prize.
-                        </div>
+                        <span class="t2-status" id="t2-status-staff" style="color:#52525b;font-size:.7rem;">Percentual 0%</span>
                     </div>
-                </div>
-
-                <!-- Configuração KO (só aparece conforme o tipo) -->
-                <div id="t-bounty-wrap" style="display:none;padding:.85rem 1rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.6rem;">
-                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-crosshairs"></i> Configuração KO</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                        <div><label class="inp-label">Valor Bounty R$</label><input id="t-bounty-valor" type="number" value="20" class="inp"></div>
-                        <div id="t-pko-split-wrap" style="display:none;"><label class="inp-label">% p/ cabeça</label><input id="t-pko-split" type="number" value="50" min="0" max="100" class="inp"></div>
-                    </div>
-                    <div id="t-bounty-hint" style="font-size:.7rem;color:#71717a;margin-top:.5rem;"></div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;align-items:end;">
-                    <div style="display:flex;flex-direction:column;">
-                        <label class="inp-label" style="min-height:2.1rem;">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.65rem;">(buy-in, re-entry, rebuy)</span></label>
-                        <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que buy-in, re-entry e rebuy podem ser registrados">
-                    </div>
-                    <div style="display:flex;flex-direction:column;">
-                        <label class="inp-label" style="min-height:2.1rem;">Add-on até nível</label>
-                        <input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que add-on pode ser registrado">
-                    </div>
-                </div>
-
-                <!-- Rebuy simples / duplo -->
-                <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
-                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-rotate"></i> Estrutura de Rebuy</div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                        <div><label class="inp-label">Rebuy Simples R$</label><input id="t-rebuy-simples" type="number" value="100" class="inp"></div>
-                        <div><label class="inp-label">Fichas (simples)</label><input id="t-rebuy-simples-fichas" type="number" value="20000" class="inp"></div>
-                        <div><label class="inp-label">Rebuy Duplo R$</label><input id="t-rebuy-duplo" type="number" value="200" class="inp" placeholder="0 = desabilita"></div>
-                        <div><label class="inp-label">Fichas (duplo)</label><input id="t-rebuy-duplo-fichas" type="number" value="50000" class="inp"></div>
-                    </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Deixe rebuy duplo = 0 para permitir apenas o simples</div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                    <div><label class="inp-label">Add-on (R$)</label><input id="t-addon-valor" type="number" step="0.01" value="0" class="inp" placeholder="0 = grátis"></div>
-                    <div><label class="inp-label">Add-on (fichas extras)</label><input id="t-addon" type="number" value="0" class="inp" placeholder="0 = sem add-on"></div>
-                </div>
-
-            </div>
-
-            <!-- Blinds -->
-            <div style="display:flex;flex-direction:column;gap:.75rem;">
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
-                    <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de Blinds</div>
-                    <div style="display:flex;gap:.35rem;">
-                        <button onclick="abrirModalFaixas()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;color:#a855f7;border-color:rgba(168,85,247,.3);" title="Definir tempos por faixa de níveis"><i class="fa-solid fa-layer-group"></i> Faixas de tempo</button>
-                        <button onclick="addBlindRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;">+ Nível</button>
-                        <button onclick="addIntervaloRow()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .7rem;color:#06b6d4;border-color:rgba(6,182,212,.3);"><i class="fa-solid fa-pause"></i> + Intervalo</button>
-                    </div>
-                </div>
-                
-                <!-- Indicador de faixas ativas (mostra resumo se houver) -->
-                <div id="faixas-resumo" style="display:none;padding:.5rem .75rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(124,58,237,.05));border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.7rem;color:#a855f7;"></div>
-                
-                <div style="display:grid;grid-template-columns:1.25rem 2rem 1fr 1fr 1fr 3rem 2rem;gap:.35rem;padding:0 .5rem;">
-                    <span></span>
-                    <span></span>
-                    <span style="font-size:.6rem;color:#52525b;text-align:center;">SB</span>
-                    <span style="font-size:.6rem;color:#52525b;text-align:center;">BB</span>
-                    <span style="font-size:.6rem;color:#52525b;text-align:center;">Ante</span>
-                    <span style="font-size:.6rem;color:#52525b;text-align:center;">Min</span>
-                    <span></span>
-                </div>
-                <div id="blinds-setup" style="display:flex;flex-direction:column;gap:.3rem;max-height:280px;overflow-y:auto;padding-right:.25rem;"></div>
-                
-                <!-- RESUMO DO TORNEIO (calculado em tempo real) -->
-                <div id="torneio-resumo" style="margin-top:.5rem;padding:.85rem 1rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(245,158,11,.05));border:1px solid rgba(255,255,255,.06);border-radius:.6rem;">
-                    <div style="font-size:.6rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">📊 Resumo do Torneio</div>
-                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;">
-                        <div>
-                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">⏱ Tempo total</div>
-                            <div id="resumo-tempo" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
-                        </div>
-                        <div>
-                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">📊 Níveis</div>
-                            <div id="resumo-niveis" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
-                        </div>
-                        <div>
-                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">⏸ Intervalos</div>
-                            <div id="resumo-intervalos" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
-                        </div>
-                        <div>
-                            <div style="font-size:.6rem;color:#9ca3af;margin-bottom:.15rem;">💰 Stack inicial</div>
-                            <div id="resumo-stack" style="font-size:.9rem;color:#fff;font-weight:700;">—</div>
-                        </div>
-                    </div>
-                </div>
-
-            <!-- Passaporte (produto opcional vendido junto com ações) -->
-            <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
-                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;margin-bottom:.65rem;">
-                    <input type="checkbox" id="t-passaporte-ativo" onchange="atualizarPassaporteUI()" style="width:18px;height:18px;cursor:pointer;accent-color:#a78bfa;">
-                    <span style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-passport"></i> Passaporte (opcional)</span>
-                </label>
-                <div id="t-passaporte-painel" style="display:none;">
-                    <div style="margin-bottom:.65rem;">
-                        <label class="inp-label">Valor (R$)</label>
-                        <input id="t-passaporte-valor" type="number" step="0.5" min="0" value="10" class="inp">
-                    </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-bottom:.4rem;">Fichas extras por tipo de ação:</div>
-                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;">
-                        <div>
-                            <label class="inp-label" style="font-size:.65rem;">Buy-in</label>
-                            <input id="t-passaporte-fichas-buyin" type="number" min="0" value="5000" class="inp">
-                        </div>
-                        <div>
-                            <label class="inp-label" style="font-size:.65rem;">Rebuy simples</label>
-                            <input id="t-passaporte-fichas-rebuy-simples" type="number" min="0" value="5000" class="inp">
-                        </div>
-                        <div>
-                            <label class="inp-label" style="font-size:.65rem;">Rebuy duplo</label>
-                            <input id="t-passaporte-fichas-rebuy-duplo" type="number" min="0" value="10000" class="inp">
-                        </div>
-                        <div>
-                            <label class="inp-label" style="font-size:.65rem;">Re-entry</label>
-                            <input id="t-passaporte-fichas-reentry" type="number" min="0" value="5000" class="inp">
-                        </div>
-                        <div style="grid-column:1/-1;">
-                            <label class="inp-label" style="font-size:.65rem;">Add-on</label>
-                            <input id="t-passaporte-fichas-addon" type="number" min="0" value="15000" class="inp">
-                        </div>
-                    </div>
-                    <div style="margin-top:.75rem;padding-top:.65rem;border-top:1px dashed #27272a;">
-                        <label class="inp-label" style="font-size:.65rem;">Avulso (sem ação) <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">— usado só em torneio Buy-in FREE</span></label>
-                        <input id="t-passaporte-fichas-avulso" type="number" min="0" value="5000" class="inp">
-                    </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
-                        <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
-                        Receita 100% do clube. <strong>Não entra no cálculo de rake nem de staff.</strong>
-                        Adiciona fichas extras ao stack do jogador no momento da ação.
-                    </div>
-                </div>
-            </div>
-
-            <!-- Staff / Taxa de serviço — 3 modos: nenhum | percentual (cascata) | fixo (por ação) -->
-            <div style="padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
-                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.65rem;"><i class="fa-solid fa-hand-holding-dollar"></i> Staff (Dealers + Floor)</div>
-
-                <div style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.65rem;">
-                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
-                        <input type="radio" name="t-staff-modo" value="nenhum" id="t-staff-modo-nenhum" onchange="atualizarStaffModoUI()" style="accent-color:#38bdf8;">
-                        <span>Nenhum staff</span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
-                        <input type="radio" name="t-staff-modo" value="percentual" id="t-staff-modo-percentual" checked onchange="atualizarStaffModoUI()" style="accent-color:#38bdf8;">
-                        <span>Percentual sobre pós-rake (cascata)</span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
-                        <input type="radio" name="t-staff-modo" value="fixo" id="t-staff-modo-fixo" onchange="atualizarStaffModoUI()" style="accent-color:#38bdf8;">
-                        <span>Valor fixo em R$ por ação</span>
-                    </label>
-                </div>
-
-                <!-- Painel: Percentual -->
-                <div id="t-staff-painel-percentual">
-                    <label class="inp-label">Staff % (sobre o que sobrou depois do rake)</label>
-                    <input id="t-staff-pct" type="number" step="0.5" min="0" max="50" value="0" class="inp" placeholder="0 = sem staff">
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;line-height:1.5;">
-                        Deduzido do prize pool <strong>em cascata depois do rake do clube</strong>.<br>
-                        <strong>Exemplo:</strong> Bruto R$ 10.000 com rake 20% e staff 3% → Rake: R$ 2.000 · Staff: R$ 240 · Prize: R$ 7.760
-                    </div>
-                </div>
-
-                <!-- Painel: Fixo -->
-                <div id="t-staff-painel-fixo" style="display:none;">
-                    <label class="inp-label">Valor fixo em R$ por ação</label>
-                    <input id="t-staff-fixo-valor" type="number" step="0.5" min="0" value="10" class="inp" placeholder="Ex: 10,00">
-
-                    <!-- FASE G: Modo do staff fixo -->
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.85rem;margin-bottom:.4rem;">Como cobrar o staff?</div>
-                    <div style="display:flex;flex-direction:column;gap:.35rem;">
-                        <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.75rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
-                            <input type="radio" name="t-staff-fixo-modo" value="embutido" id="t-staff-fixo-modo-embutido" checked style="accent-color:#38bdf8;margin-top:.15rem;">
-                            <div style="flex:1;">
-                                <div><strong>Embutido</strong> no preço (recomendado)</div>
-                                <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60 (do flyer). Internamente, R$ 50 vai pro rake e R$ 10 é staff. Não aparece no comprovante.</div>
-                            </div>
-                        </label>
-                        <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.75rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
-                            <input type="radio" name="t-staff-fixo-modo" value="adicional" id="t-staff-fixo-modo-adicional" style="accent-color:#38bdf8;margin-top:.15rem;">
-                            <div style="flex:1;">
-                                <div><strong>Adicional</strong> (transparente)</div>
-                                <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60 + R$ 10 staff = R$ 70. Staff aparece como linha separada no comprovante.</div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <!-- FASE G: Cobrar staff também no Buy-in FREE -->
-                    <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;margin-top:.65rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);">
-                        <input type="checkbox" id="t-staff-fixo-cobrar-free" style="accent-color:var(--gold);">
-                        <span>Cobrar staff fixo também no <strong>Buy-in FREE</strong> (R$ 0 + R$ 10 staff = R$ 10)</span>
-                    </label>
-
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;margin-bottom:.4rem;">Aplicar staff fixo em quais ações?</div>
-                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.35rem;">
-                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.75rem;padding:.3rem .5rem;border-radius:.35rem;background:rgba(56,189,248,.05);">
-                            <input type="checkbox" id="t-staff-fixo-buyin" checked style="accent-color:#38bdf8;">
-                            <span>Buy-in</span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.75rem;padding:.3rem .5rem;border-radius:.35rem;background:rgba(56,189,248,.05);">
-                            <input type="checkbox" id="t-staff-fixo-rebuy" checked style="accent-color:#38bdf8;">
-                            <span>Rebuy</span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.75rem;padding:.3rem .5rem;border-radius:.35rem;background:rgba(56,189,248,.05);">
-                            <input type="checkbox" id="t-staff-fixo-reentry" checked style="accent-color:#38bdf8;">
-                            <span>Re-entry</span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.75rem;padding:.3rem .5rem;border-radius:.35rem;background:rgba(56,189,248,.05);">
-                            <input type="checkbox" id="t-staff-fixo-addon" checked style="accent-color:#38bdf8;">
-                            <span>Add-on</span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.75rem;padding:.3rem .5rem;border-radius:.35rem;background:rgba(56,189,248,.05);grid-column:1/-1;">
-                            <input type="checkbox" id="t-staff-fixo-last-chance" style="accent-color:#38bdf8;">
-                            <span>Last Chance</span>
-                        </label>
-                    </div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.65rem;line-height:1.5;">
-                        <strong>Como funciona:</strong> O valor fixo é descontado de cada ação <strong>antes</strong> do cálculo de rake.<br>
-                        <strong>Exemplo (embutido):</strong> Rebuy R$ 60 com staff fixo R$ 10 e rake 23% → Cliente paga R$ 60 · Base rake R$ 50 · Rake R$ 11,50 · Staff R$ 10 · Prize R$ 38,50
-                    </div>
-                </div>
-            </div>
-            <!-- Comprovante de impressão (térmico) -->
-            <div style="display:flex;flex-direction:column;gap:.65rem;padding:.85rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-top:.75rem;">
-                <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comprovante de impressão</div>
-
-                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.85rem;">
-                    <input type="checkbox" id="t-imprimir-compra" onchange="atualizarComprovanteUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
-                    <span><strong>Comprovante de compra</strong> <span style="font-size:.7rem;color:#71717a;">(buy-in, rebuy, add-on, passaporte, etc.)</span></span>
-                </label>
-
-                <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.85rem;">
-                    <input type="checkbox" id="t-imprimir-jackpot" onchange="atualizarComprovanteUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#a855f7;">
-                    <span><strong>Comprovante de jackpot</strong> <span style="font-size:.7rem;color:#71717a;">(compra avulsa de jackpot)</span></span>
-                </label>
-
-                <div id="t-comprovante-opcoes" style="display:none;padding:.65rem .85rem;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:.4rem;">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.5rem;">
-                        <div>
-                            <label class="inp-label">Vias</label>
-                            <select id="t-comprovante-vias" class="inp">
-                                <option value="1">1 via (jogador)</option>
-                                <option value="2">2 vias (jogador + clube)</option>
-                                <option value="3">3 vias</option>
-                            </select>
-                        </div>
-                        <div style="display:flex;align-items:center;">
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;margin-top:1.2rem;">
-                                <input type="checkbox" id="t-comprovante-assinatura" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
-                                <span>Incluir linha de <strong>assinatura</strong></span>
+                    <div class="t2-coll-body">
+                        <div style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.65rem;">
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
+                                <input type="radio" name="t-staff-modo" value="nenhum" id="t-staff-modo-nenhum" onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;">
+                                <span>Nenhum staff</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
+                                <input type="radio" name="t-staff-modo" value="percentual" id="t-staff-modo-percentual" checked onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;">
+                                <span>Percentual sobre pós-rake (cascata)</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
+                                <input type="radio" name="t-staff-modo" value="fixo" id="t-staff-modo-fixo" onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;">
+                                <span>Valor fixo em R$ por ação</span>
                             </label>
                         </div>
-                    </div>
-                    <div style="font-size:.7rem;color:#71717a;">
-                        <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
-                        Largura do papel é definida nas configurações do clube (80mm ou 58mm).
-                    </div>
-                </div>
-            </div>
-            </div>
 
-            <!-- JACKPOT -->
-            <div style="padding:.85rem 1rem;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;">
-                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-gem"></i> Jackpot (fichas extras opcionais)</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-                    <div><label class="inp-label">Valor R$</label><input id="t-jackpot-valor" type="number" value="0" class="inp" placeholder="0 = sem jackpot"></div>
-                    <div><label class="inp-label">Fichas entregues</label><input id="t-jackpot-fichas" type="number" value="0" class="inp"></div>
-                </div>
-                <div style="margin-top:.6rem;">
-                    <label class="inp-label">Rake sobre Jackpot</label>
-                    <select id="t-jackpot-paga-rake" class="inp">
-                        <option value="">Usar padrão do clube</option>
-                        <option value="1">Paga rake (entra no cálculo)</option>
-                        <option value="0">Sem rake (vai 100% pro prize)</option>
-                    </select>
-                </div>
-                <div style="font-size:.7rem;color:#71717a;margin-top:.5rem;">Jogador paga R$ X e recebe Y fichas extras. Pode ser comprado múltiplas vezes.</div>
-            </div>
+                        <!-- Painel: Percentual -->
+                        <div id="t-staff-painel-percentual">
+                            <label class="inp-label">Staff % (sobre o que sobrou depois do rake)</label>
+                            <input id="t-staff-pct" type="number" step="0.5" min="0" max="50" value="0" class="inp" placeholder="0 = sem staff" onchange="t2AtualizarStatusStaff()">
+                            <div style="font-size:.68rem;color:#71717a;margin-top:.45rem;line-height:1.45;">
+                                <strong>Exemplo:</strong> Bruto R$ 10.000 com rake 20% e staff 3% → Rake: R$ 2.000 · Staff: R$ 240 · Prize: R$ 7.760
+                            </div>
+                        </div>
 
-            <!-- RANKING -->
-            <div style="padding:.85rem 1rem;background:rgba(132,204,22,.04);border:1px solid rgba(132,204,22,.15);border-radius:.6rem;">
-                <div style="font-size:.65rem;color:#84cc16;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-ranking-star"></i> Ranking Mensal</div>
-                <div>
-                    <label class="inp-label">Vincular a ranking</label>
-                    <select id="t-ranking-id" class="inp">
-                        <option value="">Sem ranking</option>
-                    </select>
+                        <!-- Painel: Fixo -->
+                        <div id="t-staff-painel-fixo" style="display:none;">
+                            <label class="inp-label">Valor fixo em R$ por ação</label>
+                            <input id="t-staff-fixo-valor" type="number" step="0.5" min="0" value="10" class="inp" placeholder="Ex: 10,00" onchange="t2AtualizarStatusStaff()">
+
+                            <div style="font-size:.68rem;color:#71717a;margin-top:.75rem;margin-bottom:.35rem;">Como cobrar o staff?</div>
+                            <div style="display:flex;flex-direction:column;gap:.3rem;">
+                                <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.72rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
+                                    <input type="radio" name="t-staff-fixo-modo" value="embutido" id="t-staff-fixo-modo-embutido" checked style="accent-color:#38bdf8;margin-top:.15rem;">
+                                    <div style="flex:1;">
+                                        <div><strong>Embutido</strong> no preço (recomendado)</div>
+                                        <div style="font-size:.62rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60. Internamente, R$ 50 vai pro rake e R$ 10 é staff.</div>
+                                    </div>
+                                </label>
+                                <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.72rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
+                                    <input type="radio" name="t-staff-fixo-modo" value="adicional" id="t-staff-fixo-modo-adicional" style="accent-color:#38bdf8;margin-top:.15rem;">
+                                    <div style="flex:1;">
+                                        <div><strong>Adicional</strong> (transparente)</div>
+                                        <div style="font-size:.62rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60 + R$ 10 staff = R$ 70.</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.75rem;margin-top:.55rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);">
+                                <input type="checkbox" id="t-staff-fixo-cobrar-free" style="accent-color:var(--gold);">
+                                <span>Cobrar staff fixo também no <strong>Buy-in FREE</strong></span>
+                            </label>
+
+                            <div style="font-size:.68rem;color:#71717a;margin-top:.55rem;margin-bottom:.35rem;">Aplicar staff fixo em quais ações?</div>
+                            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.3rem;">
+                                <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.72rem;padding:.28rem .45rem;border-radius:.3rem;background:rgba(56,189,248,.05);">
+                                    <input type="checkbox" id="t-staff-fixo-buyin" checked style="accent-color:#38bdf8;"> <span>Buy-in</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.72rem;padding:.28rem .45rem;border-radius:.3rem;background:rgba(56,189,248,.05);">
+                                    <input type="checkbox" id="t-staff-fixo-rebuy" checked style="accent-color:#38bdf8;"> <span>Rebuy</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.72rem;padding:.28rem .45rem;border-radius:.3rem;background:rgba(56,189,248,.05);">
+                                    <input type="checkbox" id="t-staff-fixo-reentry" checked style="accent-color:#38bdf8;"> <span>Re-entry</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.72rem;padding:.28rem .45rem;border-radius:.3rem;background:rgba(56,189,248,.05);">
+                                    <input type="checkbox" id="t-staff-fixo-addon" checked style="accent-color:#38bdf8;"> <span>Add-on</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.72rem;padding:.28rem .45rem;border-radius:.3rem;background:rgba(56,189,248,.05);grid-column:1/-1;">
+                                    <input type="checkbox" id="t-staff-fixo-last-chance" style="accent-color:#38bdf8;"> <span>Last Chance</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div style="margin-top:.5rem;"><label class="inp-label">% do rake que vai para premiação do ranking</label>
-                    <input id="t-ranking-rake-pct" type="number" value="0" step="0.5" min="0" max="100" class="inp" placeholder="0 = sem repasse">
+
+                <!-- ▶ Comprovantes -->
+                <div class="t2-coll" data-section="print">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('print')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-receipt" style="margin-right:.3rem;color:#71717a;"></i>Comprovantes de impressão</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-print" style="color:#52525b;font-size:.7rem;">Nenhum ativo</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;font-size:.82rem;padding:.5rem .65rem;border-radius:.4rem;background:rgba(6,182,212,.04);margin-bottom:.4rem;">
+                            <input type="checkbox" id="t-imprimir-compra" onchange="atualizarComprovanteUI();t2AtualizarStatusPrint()" style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
+                            <span><strong>Comprovante de compra</strong> <span style="font-size:.65rem;color:#71717a;">(buy-in, rebuy, add-on, passaporte)</span></span>
+                        </label>
+
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;font-size:.82rem;padding:.5rem .65rem;border-radius:.4rem;background:rgba(168,85,247,.04);margin-bottom:.4rem;">
+                            <input type="checkbox" id="t-imprimir-jackpot" onchange="atualizarComprovanteUI();t2AtualizarStatusPrint()" style="width:16px;height:16px;cursor:pointer;accent-color:#a855f7;">
+                            <span><strong>Comprovante de jackpot</strong> <span style="font-size:.65rem;color:#71717a;">(compra avulsa de jackpot)</span></span>
+                        </label>
+
+                        <div id="t-comprovante-opcoes" style="display:none;padding:.55rem .75rem;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.15);border-radius:.4rem;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.4rem;">
+                                <div>
+                                    <label class="inp-label">Vias</label>
+                                    <select id="t-comprovante-vias" class="inp">
+                                        <option value="1">1 via (jogador)</option>
+                                        <option value="2">2 vias (jogador + clube)</option>
+                                        <option value="3">3 vias</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex;align-items:center;">
+                                    <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.72rem;margin-top:1.1rem;">
+                                        <input type="checkbox" id="t-comprovante-assinatura" checked style="width:15px;height:15px;cursor:pointer;accent-color:#06b6d4;">
+                                        <span>Incluir linha de <strong>assinatura</strong></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div style="font-size:.65rem;color:#71717a;line-height:1.4;">
+                                <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
+                                Largura do papel é definida nas configurações do clube (80mm ou 58mm).
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- ▶ Ranking Mensal -->
+                <div class="t2-coll" data-section="ranking">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('ranking')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-ranking-star" style="margin-right:.3rem;color:#71717a;"></i>Ranking mensal</span>
+                            <span style="color:#52525b;font-size:.7rem;">opcional</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-ranking" style="color:#52525b;font-size:.7rem;">Sem ranking</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <div>
+                            <label class="inp-label">Vincular a ranking</label>
+                            <select id="t-ranking-id" class="inp" onchange="t2AtualizarStatusRanking()">
+                                <option value="">Sem ranking</option>
+                            </select>
+                        </div>
+                        <div style="margin-top:.5rem;">
+                            <label class="inp-label">% do rake que vai para premiação do ranking</label>
+                            <input id="t-ranking-rake-pct" type="number" value="0" step="0.5" min="0" max="100" class="inp" placeholder="0 = sem repasse" onchange="t2AtualizarStatusRanking()">
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
-        <button onclick="saveTournament()" class="btn-gold" style="width:100%;padding:1rem;font-size:1rem;border-radius:.75rem;margin-top:1.5rem;">CRIAR E ABRIR TORNEIO</button>
+
+        <!-- ═══════════════ FOOTER ═══════════════ -->
+        <div style="padding:1rem 1.75rem;border-top:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.01);display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+            <div style="display:flex;align-items:center;gap:.55rem;font-size:.7rem;color:#8b8f93;">
+                <span style="color:#a855f7;font-weight:600;">v2 layout</span>
+                <span>·</span>
+                <span>Atalho: <kbd style="background:#1e1e23;padding:.1rem .35rem;border-radius:.2rem;font-size:.65rem;color:#a78bfa;">Ctrl+Enter</kbd> pra criar</span>
+            </div>
+            <div style="display:flex;gap:.5rem;">
+                <button onclick="closeModal('modal-novo-torneio')" class="btn-ghost" style="padding:.65rem 1.1rem;font-size:.85rem;">Cancelar</button>
+                <button onclick="saveTournament()" class="btn-gold" style="padding:.65rem 1.5rem;font-size:.9rem;font-weight:600;">Criar torneio</button>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     ESTILOS DO MODAL V2
+     ═══════════════════════════════════════════════════════════════════ -->
+<style>
+.t2-coll {
+    border-bottom:1px solid rgba(255,255,255,.05);
+}
+.t2-coll:last-child { border-bottom:none; }
+.t2-coll-head {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:.85rem 0;
+    cursor:pointer;
+    user-select:none;
+    transition:opacity .15s ease;
+}
+.t2-coll-head:hover { opacity:.85; }
+.t2-chevron {
+    display:inline-block;
+    width:.85rem;
+    color:#52525b;
+    font-size:.65rem;
+    transition:transform .2s ease;
+}
+.t2-coll.expanded .t2-chevron {
+    transform:rotate(90deg);
+}
+.t2-coll-body {
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .25s ease;
+}
+.t2-coll.expanded .t2-coll-body {
+    max-height:1200px;
+}
+.t2-coll-body > div:first-child,
+.t2-coll-body > label:first-child {
+    margin-top:0;
+}
+.t2-coll-body {
+    padding-left:1.4rem;
+}
+.t2-coll.expanded .t2-coll-body {
+    padding-bottom:1rem;
+}
+.t2-status.t2-active { color:#22c55e !important; font-weight:500; }
+.t2-status.t2-warning { color:#f59e0b !important; font-weight:500; }
+</style>
+
 
 <!-- MODAL: TORNEIO DETALHES -->
 <div id="modal-torneio" class="modal-overlay">
@@ -7217,7 +7398,6 @@ async function _processarMudancaRealtime(tipo, payload) {
                             taxaAdm: parseFloat(e.taxa_adm || 0),
                             passaporte: e.passaporte || null,
                             comboId: e.combo_id || null,
-                            // FASE H: bônus de fichas no registro antecipado
                             bonusFichas: parseInt(e.bonus_fichas || 0),
                         }));
                         t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
@@ -8519,7 +8699,6 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             taxaAdm: parseFloat(e.taxa_adm || 0),
             passaporte: e.passaporte || null,
             comboId: e.combo_id || null,
-            // FASE H: bônus de fichas no registro antecipado
             bonusFichas: parseInt(e.bonus_fichas || 0),
         })),
         eliminados: tElims.map(e => ({
@@ -21618,7 +21797,7 @@ function _getFichasExtrasPassaporte(t) {
     }, 0);
 }
 
-// FASE H: Soma das fichas extras do bônus de registro antecipado (entries com bonusFichas > 0)
+// FASE H: Soma das fichas extras do bônus de registro antecipado
 function _getFichasExtrasBonus(t) {
     if (!t) return 0;
     return (t.entries || []).reduce((s, e) => {
@@ -21627,17 +21806,14 @@ function _getFichasExtrasBonus(t) {
 }
 
 // FASE H: Retorna o valor de fichas extras do bônus pra um BUY-IN feito AGORA, ou 0 se não elegível.
-// Regras: bônus ativo + tipo = buyin + nível atual <= bonusRegistroAteNivel
 function _calcBonusFichasParaEntry(t, tipo) {
     if (!t || !t.bonusRegistroAtivo) return 0;
-    if (tipo !== 'buyin') return 0; // só buy-in (decisão do usuário)
+    if (tipo !== 'buyin') return 0;
     const fichasBonus = Number(t.bonusRegistroFichas) || 0;
     if (fichasBonus <= 0) return 0;
     const ateNivel = Number(t.bonusRegistroAteNivel) || 0;
     if (ateNivel <= 0) return 0;
-    // Se torneio nem começou, considera "antes do nível 1" — vale o bônus
     if (!t.iniciadoEm) return fichasBonus;
-    // Compara nível atual humano com o limite (inclusivo: durante o nível X, ainda vale)
     const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
     return (nivelAtual <= ateNivel) ? fichasBonus : 0;
 }
@@ -32370,5 +32546,259 @@ function atualizarComprovanteUI() {
 })();
 </script>
 
+<script>
+// ════════════════════════════════════════════════════════════════════
+// MODAL NOVO TORNEIO V2 — Controle de seções colapsáveis e status
+// ════════════════════════════════════════════════════════════════════
+// IMPORTANTE: o v2 usa os mesmos IDs do v1 pra preservar 100% das funções
+// existentes (saveTournament, onTipoTorneioChange, etc.).
+//
+// Pra evitar conflito de IDs duplicados, quando o v2 abre fazemos um
+// "swap" temporário: os IDs do modal v1 ganham sufixo "-disabled",
+// e os do v2 ficam com os IDs originais. Ao fechar, devolvemos.
+// ════════════════════════════════════════════════════════════════════
+
+(function () {
+  'use strict';
+
+  // Lista de IDs compartilhados entre v1 e v2 (preciso fazer swap)
+  const SHARED_IDS = [
+    'blinds-setup','faixas-resumo','resumo-intervalos','resumo-niveis',
+    'resumo-stack','resumo-tempo','t-addon','t-addon-nivel','t-addon-valor',
+    't-bounty-hint','t-bounty-valor','t-bounty-wrap','t-buyin',
+    't-buyin-free-ate-nivel','t-buyin-free-bloco','t-comprovante-assinatura',
+    't-comprovante-opcoes','t-comprovante-vias','t-dia-label','t-dia1-wrap',
+    't-dia2-wrap','t-formato','t-imprimir-compra','t-imprimir-jackpot',
+    't-jackpot-fichas','t-jackpot-paga-rake','t-jackpot-valor',
+    't-last-chance-ate','t-last-chance-ativo','t-last-chance-campos',
+    't-last-chance-fichas','t-last-chance-paga-rake','t-last-chance-valor',
+    't-nome','t-passaporte-ativo','t-passaporte-fichas-addon',
+    't-passaporte-fichas-avulso','t-passaporte-fichas-buyin',
+    't-passaporte-fichas-rebuy-duplo','t-passaporte-fichas-rebuy-simples',
+    't-passaporte-fichas-reentry','t-passaporte-painel','t-passaporte-valor',
+    't-pko-split','t-pko-split-wrap','t-rake','t-ranking-id',
+    't-ranking-rake-pct','t-rebuy-duplo','t-rebuy-duplo-fichas',
+    't-rebuy-simples','t-rebuy-simples-fichas','t-reentry','t-series-id',
+    't-series-nome','t-stack','t-staff-fixo-addon','t-staff-fixo-buyin',
+    't-staff-fixo-cobrar-free','t-staff-fixo-last-chance',
+    't-staff-fixo-modo-adicional','t-staff-fixo-modo-embutido',
+    't-staff-fixo-rebuy','t-staff-fixo-reentry','t-staff-fixo-valor',
+    't-staff-modo-fixo','t-staff-modo-nenhum','t-staff-modo-percentual',
+    't-staff-painel-fixo','t-staff-painel-percentual','t-staff-pct',
+    't-taxa-adm','t-tempo','t-tipo','torneio-resumo'
+  ];
+
+  // ─── (removido: ativarV2 e desativarV2 — V1 não existe mais) ──
+
+  // ─── Toggle de seções colapsáveis ──────────────────────────────
+  window.t2ToggleSection = function (sectionKey) {
+    const sec = document.querySelector('.t2-coll[data-section="' + sectionKey + '"]');
+    if (sec) sec.classList.toggle('expanded');
+  };
+
+  // ─── Status: Rebuy e Add-on ────────────────────────────────────
+  window.t2AtualizarStatusRebuy = function () {
+    const elStatus = document.getElementById('t2-status-rebuy');
+    if (!elStatus) return;
+    const simples = parseFloat((document.getElementById('t-rebuy-simples') || {}).value || 0);
+    const duplo = parseFloat((document.getElementById('t-rebuy-duplo') || {}).value || 0);
+    const addon = parseFloat((document.getElementById('t-addon-valor') || {}).value || 0);
+    const parts = [];
+    if (simples > 0) parts.push('RB simples');
+    if (duplo > 0) parts.push('RB duplo');
+    if (addon > 0) parts.push('Add-on');
+    if (parts.length === 0) {
+      elStatus.textContent = 'Sem rebuy/add-on';
+      elStatus.classList.remove('t2-active');
+    } else {
+      elStatus.textContent = parts.join(' · ');
+      elStatus.classList.add('t2-active');
+    }
+  };
+
+  // ─── Status: Travas de Nível ───────────────────────────────────
+  window.t2AtualizarStatusTravas = function () {
+    const elStatus = document.getElementById('t2-status-travas');
+    if (!elStatus) return;
+    const reentry = parseInt((document.getElementById('t-reentry') || {}).value || 0);
+    const addonNivel = parseInt((document.getElementById('t-addon-nivel') || {}).value || 0);
+    const entradas = reentry > 0 ? 'Entradas até N' + reentry : 'Sem trava entradas';
+    const addonTxt = addonNivel > 0 ? 'Add-on até N' + addonNivel : 'Sem trava add-on';
+    elStatus.textContent = entradas + ' · ' + addonTxt;
+  };
+
+  // ─── Status: Last Chance ───────────────────────────────────────
+  window.t2AtualizarStatusLC = function () {
+    const elStatus = document.getElementById('t2-status-lc');
+    if (!elStatus) return;
+    const ativo = (document.getElementById('t-last-chance-ativo') || {}).checked;
+    if (ativo) {
+      const valor = parseFloat((document.getElementById('t-last-chance-valor') || {}).value || 0);
+      elStatus.textContent = valor > 0 ? 'Ativo · R$ ' + valor : 'Ativo';
+      elStatus.classList.add('t2-active');
+    } else {
+      elStatus.textContent = 'Desativado';
+      elStatus.classList.remove('t2-active');
+    }
+  };
+
+  // ─── Status: Passaporte ────────────────────────────────────────
+  window.t2AtualizarStatusPass = function () {
+    const elStatus = document.getElementById('t2-status-pass');
+    if (!elStatus) return;
+    const ativo = (document.getElementById('t-passaporte-ativo') || {}).checked;
+    if (ativo) {
+      const valor = parseFloat((document.getElementById('t-passaporte-valor') || {}).value || 0);
+      elStatus.textContent = valor > 0 ? 'Ativo · R$ ' + valor : 'Ativo';
+      elStatus.classList.add('t2-active');
+    } else {
+      elStatus.textContent = 'Desativado';
+      elStatus.classList.remove('t2-active');
+    }
+  };
+
+  // ─── Status: Jackpot ───────────────────────────────────────────
+  window.t2AtualizarStatusJackpot = function () {
+    const elStatus = document.getElementById('t2-status-jackpot');
+    if (!elStatus) return;
+    const valor = parseFloat((document.getElementById('t-jackpot-valor') || {}).value || 0);
+    const fichas = parseInt((document.getElementById('t-jackpot-fichas') || {}).value || 0);
+    if (valor > 0 && fichas > 0) {
+      elStatus.textContent = 'R$ ' + valor + ' → ' + fichas.toLocaleString('pt-BR') + ' fichas';
+      elStatus.classList.add('t2-active');
+    } else {
+      elStatus.textContent = 'Sem jackpot';
+      elStatus.classList.remove('t2-active');
+    }
+  };
+
+  // ─── Status: Staff ────────────────────────────────────────────
+  window.t2AtualizarStatusStaff = function () {
+    const elStatus = document.getElementById('t2-status-staff');
+    if (!elStatus) return;
+    const modoNenhum = (document.getElementById('t-staff-modo-nenhum') || {}).checked;
+    const modoPct = (document.getElementById('t-staff-modo-percentual') || {}).checked;
+    const modoFixo = (document.getElementById('t-staff-modo-fixo') || {}).checked;
+    if (modoNenhum) {
+      elStatus.textContent = 'Nenhum staff';
+      elStatus.classList.remove('t2-active');
+    } else if (modoPct) {
+      const pct = parseFloat((document.getElementById('t-staff-pct') || {}).value || 0);
+      elStatus.textContent = pct > 0 ? 'Percentual ' + pct + '%' : 'Percentual 0%';
+      if (pct > 0) elStatus.classList.add('t2-active');
+      else elStatus.classList.remove('t2-active');
+    } else if (modoFixo) {
+      const fixo = parseFloat((document.getElementById('t-staff-fixo-valor') || {}).value || 0);
+      elStatus.textContent = fixo > 0 ? 'Fixo R$ ' + fixo + '/ação' : 'Fixo R$ 0';
+      if (fixo > 0) elStatus.classList.add('t2-active');
+      else elStatus.classList.remove('t2-active');
+    }
+  };
+
+  // ─── Status: Comprovantes ──────────────────────────────────────
+  window.t2AtualizarStatusPrint = function () {
+    const elStatus = document.getElementById('t2-status-print');
+    if (!elStatus) return;
+    const compra = (document.getElementById('t-imprimir-compra') || {}).checked;
+    const jackpot = (document.getElementById('t-imprimir-jackpot') || {}).checked;
+    const count = (compra ? 1 : 0) + (jackpot ? 1 : 0);
+    if (count === 0) {
+      elStatus.textContent = 'Nenhum ativo';
+      elStatus.classList.remove('t2-active');
+    } else {
+      elStatus.textContent = count + ' ativo' + (count > 1 ? 's' : '');
+      elStatus.classList.add('t2-active');
+    }
+  };
+
+  // ─── Status: Ranking ───────────────────────────────────────────
+  window.t2AtualizarStatusRanking = function () {
+    const elStatus = document.getElementById('t2-status-ranking');
+    if (!elStatus) return;
+    const sel = document.getElementById('t-ranking-id');
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    const val = sel.value;
+    if (!val || val === '') {
+      elStatus.textContent = 'Sem ranking';
+      elStatus.classList.remove('t2-active');
+    } else {
+      const nome = opt ? opt.textContent : 'Vinculado';
+      const pct = parseFloat((document.getElementById('t-ranking-rake-pct') || {}).value || 0);
+      elStatus.textContent = pct > 0 ? nome + ' · ' + pct + '% rake' : nome;
+      elStatus.classList.add('t2-active');
+    }
+  };
+
+  // ─── Recalcular TODOS os status (chamar ao abrir o modal) ──────
+  window.t2RecalcularTodosStatus = function () {
+    t2AtualizarStatusRebuy();
+    t2AtualizarStatusTravas();
+    t2AtualizarStatusLC();
+    t2AtualizarStatusPass();
+    t2AtualizarStatusJackpot();
+    t2AtualizarStatusStaff();
+    t2AtualizarStatusPrint();
+    t2AtualizarStatusRanking();
+  };
+
+  // ─── Abrir o modal de novo torneio ─────────────────────────────
+  window.abrirNovoTorneioV2 = function () {
+    openModal('modal-novo-torneio');
+
+    setTimeout(function () {
+      // Renderiza barra de templates
+      if (typeof renderTemplatesBar === 'function') {
+        const newList = document.getElementById('template-list-v2');
+        if (newList) {
+          newList.id = 'template-list';
+          renderTemplatesBar();
+          newList.id = 'template-list-v2';
+        }
+      }
+      // Renderiza blinds setup
+      if (typeof renderBlindsSetup === 'function') {
+        renderBlindsSetup();
+      }
+      // Atualiza UIs condicionais
+      if (typeof atualizarBuyinFreeUI === 'function') atualizarBuyinFreeUI();
+      if (typeof onTipoTorneioChange === 'function') onTipoTorneioChange();
+      if (typeof onFormatoChange === 'function') onFormatoChange();
+      if (typeof atualizarStaffModoUI === 'function') atualizarStaffModoUI();
+      if (typeof atualizarPassaporteUI === 'function') atualizarPassaporteUI();
+      if (typeof atualizarComprovanteUI === 'function') atualizarComprovanteUI();
+      if (typeof atualizarBonusRegistroUI === 'function') atualizarBonusRegistroUI();
+      // Atualiza status inline
+      t2RecalcularTodosStatus();
+    }, 80);
+  };
+
+  // ─── (removido: hook de closeModal pra swap reverso — não precisa mais) ────
+
+  // ─── Atalho de teclado Ctrl+Enter pra criar torneio ────────────
+  document.addEventListener('keydown', function (e) {
+    const modal = document.getElementById('modal-novo-torneio');
+    if (modal && modal.style.display !== 'none' &&
+        (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (typeof saveTournament === 'function') {
+        saveTournament();
+      }
+    }
+  });
+
+  // ─── Roteador: sempre abre o V2 (V1 foi removido) ─────────────
+  window.abrirNovoTorneioComTemplates = function () {
+    abrirNovoTorneioV2();
+  };
+
+  // ─── Comando do console (mantido por compatibilidade, no-op) ──
+  window.stackosTorneioV2 = function (ligar) {
+    console.log('%cℹ️ Modal V1 foi removido — agora só existe o V2.', 'color:#a78bfa;font-weight:600;');
+  };
+
+})();
+
+</script>
 </body>
 </html>
