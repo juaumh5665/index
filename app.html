@@ -12527,6 +12527,10 @@ function _abrirModalPromptImpressao(opcoes) {
 // === RECIBO DE PAGAMENTO ===
 function imprimirReciboPagamento(dados) {
     // dados = { jogadorNome, valor, metodo, descricao, ts, taxaAplicada }
+    const taxaAplicada = Number(dados.taxaAplicada) || 0;
+    const valorPago = Number(dados.valor) || 0;
+    const totalCobrado = valorPago + taxaAplicada;
+
     let txt = _printHeader();
     txt += _printCenter('RECIBO DE PAGAMENTO', 32) + '\n';
     txt += _printLine('-', 32) + '\n';
@@ -12534,9 +12538,14 @@ function imprimirReciboPagamento(dados) {
     txt += 'Data: ' + new Date(dados.ts).toLocaleString('pt-BR') + '\n';
     txt += 'Metodo: ' + (dados.metodo || '—') + '\n';
     txt += _printLine('-', 32) + '\n';
-    txt += _printPad('VALOR PAGO', formatMoney(dados.valor || 0)) + '\n';
-    if (dados.taxaAplicada > 0) {
-        txt += _printPad('  (Taxa)', formatMoney(dados.taxaAplicada)) + '\n';
+    if (taxaAplicada > 0) {
+        // Discrimina: valor da dívida quitada + taxa do método + total efetivamente cobrado
+        txt += _printPad('Valor da conta', formatMoney(valorPago)) + '\n';
+        txt += _printPad('Taxa do pagamento', formatMoney(taxaAplicada)) + '\n';
+        txt += _printLine('-', 32) + '\n';
+        txt += _printPad('TOTAL COBRADO', formatMoney(totalCobrado)) + '\n';
+    } else {
+        txt += _printPad('VALOR PAGO', formatMoney(valorPago)) + '\n';
     }
     if (dados.descricao) {
         txt += _printLine('-', 32) + '\n';
@@ -26725,6 +26734,7 @@ function _confirmarPagamentoContaImpl() {
     
     // Para cada split, registrar pagamento + taxa (se houver)
     const metodosUsados = [];
+    let totalTaxaCobrada = 0;  // soma das taxas cobradas do cliente (pro recibo)
     splits.forEach(p => {
         const taxaInfo = calcularTaxa(p.valor, p.metodo);
         let valorCobrado = p.valor;
@@ -26733,10 +26743,11 @@ function _confirmarPagamentoContaImpl() {
         if (taxaInfo.pct > 0) {
             if (cfgFin.aplicarAuto || confirm(`${PAYMENT_METHODS[p.metodo].label}: pagamento de ${formatMoney(p.valor)} tem taxa de ${taxaInfo.pct}% (${formatMoney(taxaInfo.taxa)}).\n\nAplicar taxa?`)) {
                 taxa = taxaInfo.taxa;
+                totalTaxaCobrada += taxa;
             }
         }
         
-        // Pagamento
+        // Pagamento (quita a dívida — taxa NÃO sai do valor pago)
         registrarTransacao({
             jogadorId: pagamentoJogadorId,
             tipo: 'pagamento',
@@ -26746,14 +26757,18 @@ function _confirmarPagamentoContaImpl() {
             origem: 'caixa',
         });
         
-        // Taxa
+        // Taxa: cobrada do cliente POR FORA do valor da dívida (ele paga R$ valor + taxa no cartão).
+        // Registramos como transação INFORMATIVA com valor 0 — não altera o saldo do jogador,
+        // mas fica no extrato pra rastreio. O valor real da taxa vai em `meta.taxa`.
         if (taxa > 0) {
             registrarTransacao({
                 jogadorId: pagamentoJogadorId,
                 tipo: 'taxa',
-                valor: -taxa,
-                descricao: `Taxa ${PAYMENT_METHODS[p.metodo].label} ${taxaInfo.pct}%`,
+                valor: 0,
+                descricao: `Taxa ${PAYMENT_METHODS[p.metodo].label} ${taxaInfo.pct}% (${formatMoney(taxa)}) — cobrada do cliente`,
+                metodo: p.metodo,
                 origem: 'caixa',
+                meta: { taxa: taxa, pct: taxaInfo.pct, valorBase: p.valor },
             });
         }
         
@@ -26762,7 +26777,7 @@ function _confirmarPagamentoContaImpl() {
     
     const valor = valorBase;  // pra log audit
     const metodo = metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo';
-    const taxaAplicada = 0;  // taxa já registrada acima
+    const taxaAplicada = totalTaxaCobrada;  // pro recibo: soma das taxas cobradas
 
     // === FECHAMENTO INTELIGENTE DE COMANDAS ABERTAS ===
     // Regra: comanda só fecha se o pagamento cobrir o valor total dela.
@@ -27713,7 +27728,7 @@ function fecharComandaConfirm() {
             }
         }
         
-        // Pagamento
+        // Pagamento (quita a dívida — taxa NÃO sai do valor pago)
         registrarTransacao({
             jogadorId: c.jogadorId,
             tipo: 'pagamento',
@@ -27724,15 +27739,17 @@ function fecharComandaConfirm() {
             refId: c.id,
         });
         
-        // Taxa, se aplicada
+        // Taxa: cobrada do cliente POR FORA — transação informativa (não altera saldo)
         if (taxa > 0) {
             registrarTransacao({
                 jogadorId: c.jogadorId,
                 tipo: 'taxa',
-                valor: -taxa,
-                descricao: `Taxa ${PAYMENT_METHODS[p.metodo].label} ${taxaInfo.pct}%`,
+                valor: 0,
+                descricao: `Taxa ${PAYMENT_METHODS[p.metodo].label} ${taxaInfo.pct}% (${formatMoney(taxa)}) — cobrada do cliente`,
+                metodo: p.metodo,
                 origem: 'bar',
                 refId: c.id,
+                meta: { taxa: taxa, pct: taxaInfo.pct, valorBase: p.valor },
             });
         }
         
