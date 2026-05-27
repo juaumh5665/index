@@ -5233,6 +5233,34 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                     </div>
 
+                    <!-- FASE I.1: Buy-in PROMOCIONAL (Early Bird) — preço e stack reduzidos no início -->
+                    <div style="padding:.75rem .9rem;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.5rem;">
+                            <input type="checkbox" id="t-buyin-promo-ativo" onchange="atualizarBuyinPromoUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b;">
+                            <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-star"></i> Buy-in promocional (Early Bird)</div>
+                        </label>
+                        <div id="t-buyin-promo-campos" style="display:none;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
+                                <div>
+                                    <label class="inp-label">Valor R$</label>
+                                    <input id="t-buyin-promo-valor" type="number" step="0.01" min="0" value="50" class="inp" placeholder="Ex: 50">
+                                </div>
+                                <div>
+                                    <label class="inp-label">Fichas</label>
+                                    <input id="t-buyin-promo-fichas" type="number" min="0" value="15000" class="inp" placeholder="Ex: 15000">
+                                </div>
+                                <div>
+                                    <label class="inp-label">Até fim do nível</label>
+                                    <input id="t-buyin-promo-ate-nivel" type="number" min="1" value="1" class="inp" placeholder="Ex: 1">
+                                </div>
+                            </div>
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;line-height:1.4;">
+                                <i class="fa-solid fa-circle-info" style="color:#f59e0b;"></i>
+                                Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível pagam o <strong>valor promocional</strong> e recebem stack <strong>diferenciado</strong>. Substitui o buy-in padrão temporariamente. Não se aplica a rebuy/reentry/addon.
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Bloco KO (condicional, aparece conforme tipo) -->
                     <div id="t-bounty-wrap" style="display:none;padding:.75rem .9rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
                         <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;">
@@ -5948,12 +5976,12 @@ document.addEventListener('DOMContentLoaded', function(){
                     <!-- Ativos -->
                     <div>
                         <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Em Jogo</div>
-                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;max-height:250px;overflow-y:auto;padding-right:.25rem;"></div>
                     </div>
                     <!-- Eliminados com ranking -->
                     <div>
                         <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Eliminados</div>
-                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;max-height:250px;overflow-y:auto;padding-right:.25rem;"></div>
                     </div>
                 </div>
 
@@ -7407,6 +7435,9 @@ async function _processarMudancaRealtime(tipo, payload) {
                             passaporte: e.passaporte || null,
                             comboId: e.combo_id || null,
                             bonusFichas: parseInt(e.bonus_fichas || 0),
+                            // FASE I.1: Buy-in PROMO
+                            fichasOverride: parseInt(e.fichas_override || 0),
+                            isPromo: !!e.is_promo,
                         }));
                         t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
                             jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
@@ -7727,6 +7758,11 @@ function _torneioToDb(t) {
         bonus_registro_ativo: !!t.bonusRegistroAtivo,
         bonus_registro_fichas: t.bonusRegistroFichas || 0,
         bonus_registro_ate_nivel: t.bonusRegistroAteNivel || null,
+        // FASE I.1: Buy-in PROMO (Early Bird)
+        buyin_promo_ativo: !!t.buyinPromoAtivo,
+        buyin_promo_valor: t.buyinPromoValor || 0,
+        buyin_promo_fichas: t.buyinPromoFichas || 0,
+        buyin_promo_ate_nivel: t.buyinPromoAteNivel || null,
         imprimir_comprovante_compra: !!t.imprimirComprovanteCompra,
         imprimir_comprovante_jackpot: !!t.imprimirComprovanteJackpot,
         comprovante_vias: t.comprovanteVias || 1,
@@ -8079,6 +8115,9 @@ async function sincronizarEstado() {
                                     passaporte: (e.passaporte && e.passaporte.cobrado) ? e.passaporte : null,
                                     combo_id: e.comboId || null,
                                     bonus_fichas: Number(e.bonusFichas) || 0,
+                                    // FASE I.1: Buy-in PROMO — fichas override e flag
+                                    fichas_override: Number(e.fichasOverride) || 0,
+                                    is_promo: !!e.isPromo,
                                 }));
                                 const { error: errE } = await sb.from('torneio_entries').upsert(entryRows);
                                 if (errE) throw new Error('Upsert entries: ' + errE.message);
@@ -8653,6 +8692,11 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         bonusRegistroAtivo: !!r.bonus_registro_ativo,
         bonusRegistroFichas: parseInt(r.bonus_registro_fichas) || 0,
         bonusRegistroAteNivel: r.bonus_registro_ate_nivel || null,
+        // FASE I.1: Buy-in PROMO (Early Bird)
+        buyinPromoAtivo: !!r.buyin_promo_ativo,
+        buyinPromoValor: parseFloat(r.buyin_promo_valor) || 0,
+        buyinPromoFichas: parseInt(r.buyin_promo_fichas) || 0,
+        buyinPromoAteNivel: r.buyin_promo_ate_nivel || null,
         imprimirComprovanteCompra:  !!r.imprimir_comprovante_compra,
         imprimirComprovanteJackpot: !!r.imprimir_comprovante_jackpot,
         comprovanteVias:            r.comprovante_vias || 1,
@@ -8712,6 +8756,9 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             passaporte: e.passaporte || null,
             comboId: e.combo_id || null,
             bonusFichas: parseInt(e.bonus_fichas || 0),
+            // FASE I.1: Buy-in PROMO
+            fichasOverride: parseInt(e.fichas_override || 0),
+            isPromo: !!e.is_promo,
         })),
         eliminados: tElims.map(e => ({
             id: e.id, jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
@@ -11592,7 +11639,9 @@ function diagTorneio(idx) {
     // Fichas
     let totalFichas = 0;
     (t.entries || []).forEach(e => {
-        if (e.tipo === 'rebuy_simples')      totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
+        // FASE I.1: Se entry tem fichasOverride (buy-in PROMO), usa esse valor
+        if (Number(e.fichasOverride) > 0)    totalFichas += Number(e.fichasOverride);
+        else if (e.tipo === 'rebuy_simples') totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         else if (e.tipo === 'rebuy_duplo')   totalFichas += (t.rebuyDuploFichas || t.stack*2);
         else if (e.tipo === 'addon')         totalFichas += (t.addonFichas || 0);
         else if (e.tipo === 'last_chance')   totalFichas += (t.last_chance_fichas || 0);
@@ -12021,9 +12070,10 @@ function gerarComprovanteCompra(t, dados) {
     if (!t || !dados || !dados.entry) return '';
     const e = dados.entry;
     const col = _printColWidth();
-    const tipoLabel = _labelTipoEntry(e.tipo);
+    const tipoLabel = _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : '');
     const valorAcao = Number(e.valor) || 0;
-    const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+    // FASE I.1: usa fichasOverride se entry for de promo
+    const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
     const taxaAdm = Number(e.taxaAdm) || 0;
     const temPassaporte = e.passaporte && e.passaporte.cobrado;
     const valorPassaporte = temPassaporte ? (Number(e.passaporte.valor) || 0) : 0;
@@ -12191,9 +12241,10 @@ function gerarComprovanteCombo(t, dados) {
 
     // Listar cada ação
     entries.forEach(e => {
-        const tipoLabel = _labelTipoEntry(e.tipo);
+        const tipoLabel = _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : '');
         const valorAcao = Number(e.valor) || 0;
-        const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+        // FASE I.1: usa fichasOverride se entry for de promo
+        const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
         totalGeral += valorAcao;
         fichasTotal += fichasAcao;
 
@@ -12391,11 +12442,12 @@ function gerarExtratoJogadorTorneio(t, jogadorId) {
             const dtFmt = dt.toLocaleString('pt-BR').substring(0, 17);
             txt += dtFmt + ' #' + qtd + '\n';
             const valorAcao = Number(e.valor) || 0;
-            const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+            // FASE I.1: usa fichasOverride se entry for de promo
+            const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
             if (valorAcao > 0) {
-                txt += _printPad('  ' + _labelTipoEntry(e.tipo), formatMoney(valorAcao), col) + '\n';
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : ''), formatMoney(valorAcao), col) + '\n';
             } else {
-                txt += _printPad('  ' + _labelTipoEntry(e.tipo), 'GRATIS', col) + '\n';
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : ''), 'GRATIS', col) + '\n';
             }
             totalGeral += valorAcao;
             fichasTotal += fichasAcao;
@@ -17862,6 +17914,20 @@ function saveTournament() {
             const v = parseInt(document.getElementById('t-bonus-registro-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
         })(),
+        // FASE I.1: Buy-in PROMOCIONAL (Early Bird)
+        buyinPromoAtivo: document.getElementById('t-buyin-promo-ativo')?.checked || false,
+        buyinPromoValor: (function() {
+            const v = parseFloat(document.getElementById('t-buyin-promo-valor')?.value);
+            return (isNaN(v) || v < 0) ? 0 : v;
+        })(),
+        buyinPromoFichas: (function() {
+            const v = parseInt(document.getElementById('t-buyin-promo-fichas')?.value);
+            return (isNaN(v) || v < 0) ? 0 : v;
+        })(),
+        buyinPromoAteNivel: (function() {
+            const v = parseInt(document.getElementById('t-buyin-promo-ate-nivel')?.value);
+            return (isNaN(v) || v <= 0) ? null : v;
+        })(),
         imprimirComprovanteCompra:  document.getElementById('t-imprimir-compra')?.checked || false,
         imprimirComprovanteJackpot: document.getElementById('t-imprimir-jackpot')?.checked || false,
         comprovanteVias:            parseInt(document.getElementById('t-comprovante-vias')?.value) || 1,
@@ -20236,6 +20302,12 @@ function _registrarEntradasCombo(t, jid, acoes) {
         else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
         else if (tipo === 'last_chance') valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
+        // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valorBase do buy-in se elegível
+        const valorPromoCombo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+        if (valorPromoCombo !== null) {
+            valorBase = valorPromoCombo;
+        }
+
         // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
         if (tipo === 'buyin' && valorBase === 0
             && _resolverStaffModo(t) === 'fixo'
@@ -20277,6 +20349,12 @@ function _registrarEntradasCombo(t, jid, acoes) {
         const bonusFichasNessaEntry = _calcBonusFichasParaEntry(t, tipo);
         if (bonusFichasNessaEntry > 0) {
             novaEntry.bonusFichas = bonusFichasNessaEntry;
+        }
+        // FASE I.1: Buy-in PROMO — se elegível, salva fichas customizadas e marca como promo
+        const fichasPromoCombo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
+        if (fichasPromoCombo !== null) {
+            novaEntry.fichasOverride = fichasPromoCombo;
+            novaEntry.isPromo = true;
         }
         // Flag pra agrupar no comprovante
         novaEntry.comboId = ts;
@@ -20453,6 +20531,12 @@ function _registrarEntradaImpl() {
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     if (tipo === 'last_chance')   valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
+    // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valorBase do buy-in se elegível
+    const valorPromo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+    if (valorPromo !== null) {
+        valorBase = valorPromo;
+    }
+
     // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
     // (cliente paga R$ 10 que já tem staff embutido — não cobra staff extra por fora)
     if (tipo === 'buyin' && valorBase === 0
@@ -20498,6 +20582,12 @@ function _registrarEntradaImpl() {
     const bonusFichas = _calcBonusFichasParaEntry(t, tipo);
     if (bonusFichas > 0) {
         novaEntry.bonusFichas = bonusFichas;
+    }
+    // FASE I.1: Buy-in PROMO — se elegível, salva fichas customizadas e marca como promo
+    const fichasPromo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
+    if (fichasPromo !== null) {
+        novaEntry.fichasOverride = fichasPromo;
+        novaEntry.isPromo = true;
     }
     t.entries.push(novaEntry);
     alocarJogadorMesa(t, jid);
@@ -20883,6 +20973,8 @@ function updateTV(idx) {
     // Calcular fichas totais corretamente com rebuys/addons + jackpots + last chance
     // ATENÇÃO: o nome correto do campo é `rebuyFichas` (rebuySimplesFichas era um typo histórico)
     const totalFichas = t.entries.reduce((s, e) => {
+        // FASE I.1: Se entry tem fichasOverride (buy-in PROMO), usa esse valor
+        if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -21160,6 +21252,8 @@ function _computarDadosMiniTV(t) {
         : new Set((t.entries || []).filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
     // Fichas (mesma fórmula do updateTV) — fallback robusto rebuyFichas / rebuySimplesFichas
     const totalFichas = (t.entries || []).reduce((s, e) => {
+        // FASE I.1: Se entry tem fichasOverride (buy-in PROMO), usa esse valor
+        if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -22079,6 +22173,31 @@ function _calcBonusFichasParaEntry(t, tipo) {
     if (!t.iniciadoEm) return fichasBonus;
     const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
     return (nivelAtual <= ateNivel) ? fichasBonus : 0;
+}
+
+// FASE I.1: Buy-in PROMOCIONAL (Early Bird)
+// Verifica se o Buy-in promocional está elegível neste momento (ativo + nível atual <= ateNivel)
+// Aplica APENAS pra tipo='buyin'. Re-entry, rebuy e add-on não recebem promo.
+function _isBuyinPromoElegivel(t, tipo) {
+    if (!t || !t.buyinPromoAtivo) return false;
+    if (tipo !== 'buyin') return false;
+    const ateNivel = Number(t.buyinPromoAteNivel) || 0;
+    if (ateNivel <= 0) return false;
+    if (!t.iniciadoEm) return true; // antes de começar, considera elegível
+    const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
+    return nivelAtual <= ateNivel;
+}
+
+// Retorna o valor R$ a cobrar no buy-in considerando o promo (ou null se não aplicável)
+function _calcValorBuyinPromo(t, tipo) {
+    if (!_isBuyinPromoElegivel(t, tipo)) return null;
+    return Number(t.buyinPromoValor) || 0;
+}
+
+// Retorna as fichas a entregar no buy-in considerando o promo (ou null se não aplicável)
+function _calcFichasBuyinPromo(t, tipo) {
+    if (!_isBuyinPromoElegivel(t, tipo)) return null;
+    return Number(t.buyinPromoFichas) || 0;
 }
 
 function getPrize(t) {
@@ -32729,6 +32848,13 @@ function atualizarPassaporteUI() {
 function atualizarBonusRegistroUI() {
     var cb = document.getElementById('t-bonus-registro-ativo');
     var painel = document.getElementById('t-bonus-registro-campos');
+    if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
+}
+
+// FASE I.1: Buy-in PROMOCIONAL (Early Bird)
+function atualizarBuyinPromoUI() {
+    var cb = document.getElementById('t-buyin-promo-ativo');
+    var painel = document.getElementById('t-buyin-promo-campos');
     if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
 }
 
