@@ -7747,7 +7747,7 @@ function _torneioToDb(t) {
         staff_pct: t.staffPct || 0,
         staff_modo: t.staffModo || null,
         staff_fixo_valor: t.staffFixoValor || 0,
-        staff_fixo_acoes: t.staffFixoAcoes || null,
+        staff_fixo_acoes: t.staffFixoAcoes ? { ...t.staffFixoAcoes, __adicional_v2: !!t.staffFixoAdicionalV2 } : (t.staffFixoAdicionalV2 ? { __adicional_v2: true } : null),
         staff_fixo_modo: t.staffFixoModo || 'embutido',
         staff_fixo_cobrar_free: !!t.staffFixoCobrarFree,
         passaporte_ativo: !!t.passaporteAtivo,
@@ -8681,7 +8681,13 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         staffPct: parseFloat(r.staff_pct || 0),
         staffModo: r.staff_modo || null,
         staffFixoValor: parseFloat(r.staff_fixo_valor || 0),
-        staffFixoAcoes: r.staff_fixo_acoes || null,
+        staffFixoAcoes: (() => {
+            const raw = r.staff_fixo_acoes;
+            if (!raw || typeof raw !== 'object') return null;
+            const { __adicional_v2, ...acoes } = raw;
+            return Object.keys(acoes).length > 0 ? acoes : null;
+        })(),
+        staffFixoAdicionalV2: !!(r.staff_fixo_acoes && typeof r.staff_fixo_acoes === 'object' && r.staff_fixo_acoes.__adicional_v2),
         staffFixoModo: r.staff_fixo_modo || 'embutido',
         staffFixoCobrarFree: !!r.staff_fixo_cobrar_free,
         passaporteAtivo: !!r.passaporte_ativo,
@@ -12081,10 +12087,12 @@ function gerarComprovanteCompra(t, dados) {
 
     // FASE G: Staff fixo — exibição depende do MODO
     // - 'embutido' (default): NÃO mostra no comprovante (já está dentro do preço)
-    // - 'adicional': mostra como linha separada e SOMA no total
+    // - 'adicional' (legado e V2): mostra como linha separada e SOMA no total
+    // Em ambos os casos lemos e.staff (snapshot da entry) — assim reimpressões antigas
+    // continuam corretas mesmo se a config do torneio mudou depois.
     const eligivelStaff = (_resolverStaffModo(t) === 'fixo' && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0));
     const fixoModo = t.staffFixoModo || 'embutido';
-    const staffFixoMostrar = eligivelStaff && fixoModo === 'adicional' ? (Number(t.staffFixoValor) || 0) : 0;
+    const staffFixoMostrar = eligivelStaff && fixoModo === 'adicional' ? (Number(e.staff) || Number(t.staffFixoValor) || 0) : 0;
 
     let txt = _printHeaderCfg();
     txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
@@ -12266,8 +12274,9 @@ function gerarComprovanteCombo(t, dados) {
 
         // Staff fixo incluso (acumula pra mostrar 1 vez no final)
         // FASE G: Staff fixo só conta se MODO adicional (em embutido já está dentro do preço)
-        if (_isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) {
-            staffFixoTotal += (Number(t.staffFixoValor) || 0);
+        // Usa e.staff (snapshot) — assim funciona tanto pro legado quanto pro V2 e mantém reimpressões corretas.
+        if (Number(e.staff) > 0 && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) {
+            staffFixoTotal += Number(e.staff);
         }
 
         // Taxa adm
@@ -17951,6 +17960,7 @@ function saveTournament() {
             addon:       document.getElementById('t-staff-fixo-addon')?.checked ?? true,
             last_chance: document.getElementById('t-staff-fixo-last-chance')?.checked ?? false
         },
+        staffFixoAdicionalV2: true,
         passaporteAtivo:  document.getElementById('t-passaporte-ativo')?.checked || false,
         passaporteValor:  parseFloat(document.getElementById('t-passaporte-valor')?.value) || 0,
         passaporteFichas: {
@@ -20316,6 +20326,13 @@ function _registrarEntradasCombo(t, jid, acoes) {
             valorBase = Number(t.staffFixoValor) || 0;
         }
 
+        // ADICIONAL V2: simetria com embutido para buy-in free + cobrarFree
+        if (tipo === 'buyin' && valorBase === 0
+            && _isStaffFixoAdicionalV2(t)
+            && t.staffFixoCobrarFree) {
+            valorBase = Number(t.staffFixoValor) || 0;
+        }
+
         // Taxa adm: só no buy-in
         const taxaAdm = (tipo === 'buyin' && Number(t.taxaAdm) > 0) ? Number(t.taxaAdm) : 0;
 
@@ -20324,12 +20341,20 @@ function _registrarEntradasCombo(t, jid, acoes) {
         const isPrimeira = (i === 0);
         const passNessaEntry = isPrimeira && passAtivo;
 
-        // FASE G: Staff fixo no modo "adicional" — cobra por ação
+        // FASE G: Staff fixo no modo "adicional" — cobra por ação (legado E V2)
+        const isAdicionalV2Combo = _isStaffFixoAdicionalV2(t);
+        const isAdicionalLegadoCombo = _resolverStaffModo(t) === 'fixo'
+            && (t.staffFixoModo || 'embutido') === 'adicional'
+            && !isAdicionalV2Combo;
         let staffNessaEntry = 0;
-        if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
-            if (_isTipoStaffFixoElegivel(t, tipo, valorBase)) {
-                staffNessaEntry = Number(t.staffFixoValor) || 0;
-            }
+        if ((isAdicionalLegadoCombo || isAdicionalV2Combo) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+            staffNessaEntry = Number(t.staffFixoValor) || 0;
+        }
+
+        // V2: separa o staff de dentro do valorBase pra gravar na entry.
+        let valorEntryCombo = valorBase;
+        if (isAdicionalV2Combo && staffNessaEntry > 0) {
+            valorEntryCombo = Math.max(0, valorBase - staffNessaEntry);
         }
 
         // Cria a entry
@@ -20338,7 +20363,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
             jogadorId: jid,
             tipo,
             ts: ts + i, // timestamps consecutivos pra manter ordem
-            valor: valorBase,
+            valor: valorEntryCombo,
             staff: staffNessaEntry,
             taxaAdm
         };
@@ -20376,8 +20401,11 @@ function _registrarEntradasCombo(t, jid, acoes) {
         }
 
         // Transação do valor base
+        // V2: usa valorEntryCombo (sem staff); staff vai numa tx separada abaixo.
+        // Legado: usa valorBase (cliente paga base + staff).
         const descMap = { buyin:'Buy-in', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
-        if (valorBase > 0) {
+        const valorTxCombo = isAdicionalV2Combo ? valorEntryCombo : valorBase;
+        if (valorTxCombo > 0) {
             const tipoTx = tipo === 'buyin' ? 'buyin'
                 : tipo === 'addon' ? 'addon'
                 : tipo === 'last_chance' ? 'last_chance'
@@ -20385,7 +20413,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
             registrarTransacao({
                 jogadorId: jid,
                 tipo: tipoTx,
-                valor: -valorBase,
+                valor: -valorTxCombo,
                 descricao: `${descMap[tipo]} · ${t.nome}`,
                 origem: 'torneio',
                 refId: t.id,
@@ -20545,6 +20573,14 @@ function _registrarEntradaImpl() {
         && t.staffFixoCobrarFree) {
         valorBase = Number(t.staffFixoValor) || 0;
     }
+
+    // ADICIONAL V2: Em modo adicional V2 + cobrarFree=true, buy-in free também passa a custar R$ staffFixoValor
+    // Simetria com embutido — cliente paga R$ 10 (que vira 100% staff, valor base = 0).
+    if (tipo === 'buyin' && valorBase === 0
+        && _isStaffFixoAdicionalV2(t)
+        && t.staffFixoCobrarFree) {
+        valorBase = Number(t.staffFixoValor) || 0;
+    }
     
     // LOTE 5: Taxa Administrativa — cobrada APENAS no buy-in (1ª entrada)
     // Não entra no rake, mas vai pro caixa do clube (separada contabilmente).
@@ -20554,13 +20590,26 @@ function _registrarEntradaImpl() {
     }
     
     // LOTE 3: Staff não é mais cobrado a parte. Agora é % do prize pool em cascata.
-    // FASE G: EXCETO no modo fixo "adicional", onde staff vem somado ao total cobrado.
+    // FASE G: EXCETO no modo fixo "adicional", onde staff é tratado diferente:
+    //   - LEGADO (torneios antigos): staff é SOMADO ao total (cliente paga valorBase + staff).
+    //   - V2 (torneios novos): staff é DESCONTADO do valorBase (cliente paga só valorBase,
+    //     mas no comprovante aparece quebrado em "Buy-in + Staff fixo").
     let staffCobrado = 0;
-    if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
-        if (_isTipoStaffFixoElegivel(t, tipo, valorBase)) {
-            staffCobrado = Number(t.staffFixoValor) || 0;
-        }
+    const isAdicionalV2 = _isStaffFixoAdicionalV2(t);
+    const isAdicionalLegado = _resolverStaffModo(t) === 'fixo'
+        && (t.staffFixoModo || 'embutido') === 'adicional'
+        && !isAdicionalV2;
+    if ((isAdicionalLegado || isAdicionalV2) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+        staffCobrado = Number(t.staffFixoValor) || 0;
     }
+
+    // V2: separa o staff de dentro do valorBase (mantemos valorBase como "preço pago pelo cliente").
+    // valorEntry é o que vai pra entry.valor (base sem staff).
+    let valorEntry = valorBase;
+    if (isAdicionalV2 && staffCobrado > 0) {
+        valorEntry = Math.max(0, valorBase - staffCobrado);
+    }
+
     const valorRS = valorBase; // mantém variável legada pra compat
     
     // PASSAPORTE (opcional): se torneio ativou e jogador marcou, registra na entry
@@ -20572,9 +20621,15 @@ function _registrarEntradaImpl() {
         passaporteFichas = _getPassaporteFichas(t, tipo);
     }
     
-    const valorTotal = valorBase + staffCobrado + taxaAdmCobrada + passaporteCobrado;
+    // Total cobrado do cliente:
+    //   - Embutido: valorBase (staff já está dentro) + extras
+    //   - Adicional LEGADO: valorBase + staff (somados) + extras → cobra a mais
+    //   - Adicional V2: valorBase + extras (staff já está dentro, cliente paga só valorBase)
+    const valorTotal = isAdicionalV2
+        ? (valorBase + taxaAdmCobrada + passaporteCobrado)
+        : (valorBase + staffCobrado + taxaAdmCobrada + passaporteCobrado);
 
-    const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado, taxaAdm: taxaAdmCobrada };
+    const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorEntry, staff: staffCobrado, taxaAdm: taxaAdmCobrada };
     if (passaporteCobrado > 0) {
         novaEntry.passaporte = { cobrado: true, valor: passaporteCobrado, fichas: passaporteFichas };
     }
@@ -20606,8 +20661,12 @@ function _registrarEntradaImpl() {
     }
 
     // Registra transação no caixa (valor BASE da inscrição — addon agora também tem valor)
+    // V2: usa valorEntry (sem staff) porque o staff vai numa transação separada.
+    //     A soma das duas transações = valorBase pago pelo cliente.
+    // Legado: usa valorBase (preço de tabela); staff é cobrado a parte (cliente paga base + staff).
     const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
-    if (valorBase > 0) {
+    const valorTx = isAdicionalV2 ? valorEntry : valorBase;
+    if (valorTx > 0) {
         const tipoTx = tipo === 'buyin' ? 'buyin'
             : tipo === 'addon' ? 'addon'
             : tipo === 'last_chance' ? 'last_chance'
@@ -20615,7 +20674,7 @@ function _registrarEntradaImpl() {
         registrarTransacao({
             jogadorId: jid,
             tipo: tipoTx,
-            valor: -valorBase,
+            valor: -valorTx,
             descricao: `${descMap[tipo]} · ${t.nome}`,
             origem: 'torneio',
             refId: t.id,
@@ -20667,7 +20726,7 @@ function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0);
+    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0);
     const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
@@ -22004,7 +22063,9 @@ function getRake(t) {
     const bruto = _getBrutoParaRake(t);
     // FASE G: modo do staff fixo afeta como o rake é calculado
     // - 'embutido' (default): preço de tabela JÁ inclui staff. Desconta staff ANTES do rake.
-    // - 'adicional': staff vem somado por fora. Bruto não inclui staff. Rake direto sobre o bruto.
+    // - 'adicional' V2 (torneios novos): cliente paga preço de tabela; e.valor já vem com staff descontado
+    //   (gravado como base sem staff). Bruto NÃO precisa de dedução adicional aqui — já está sem staff.
+    // - 'adicional' LEGADO (torneios antigos sem V2): staff vem somado por fora. Rake direto sobre o bruto.
     const modo = _resolverStaffModo(t);
     if (modo === 'fixo') {
         const fixoModo = t.staffFixoModo || 'embutido';
@@ -22013,7 +22074,11 @@ function getRake(t) {
             const base = Math.max(0, bruto - staffFixo);
             return base * ((Number(t.rake) || 0) / 100);
         }
-        // 'adicional': staff é por fora, bruto não inclui staff → rake sobre bruto cheio
+        // 'adicional' V2: e.valor já está sem staff, então bruto já é a base correta
+        if (_isStaffFixoAdicionalV2(t)) {
+            return bruto * ((Number(t.rake) || 0) / 100);
+        }
+        // 'adicional' LEGADO: staff é por fora, bruto não inclui staff → rake sobre bruto cheio
         return bruto * ((Number(t.rake) || 0) / 100);
     }
     // Modos antigos (nenhum/percentual): comportamento original (sem dedução)
@@ -22027,6 +22092,17 @@ function _resolverStaffModo(t) {
     if (!t) return 'nenhum';
     if (t.staffModo) return t.staffModo;
     return (Number(t.staffPct) || 0) > 0 ? 'percentual' : 'nenhum';
+}
+
+// Detecta se o torneio usa staff fixo "adicional transparente" V2
+// Nessa versão: cliente paga só o preço base, o staff sai DE DENTRO desse preço
+// (igual embutido contabilmente), e o comprovante mostra a quebra "Buy-in + Staff".
+// Torneios antigos sem a flag mantém o comportamento legado (cliente paga base + staff por fora).
+function _isStaffFixoAdicionalV2(t) {
+    if (!t) return false;
+    if (_resolverStaffModo(t) !== 'fixo') return false;
+    if ((t.staffFixoModo || 'embutido') !== 'adicional') return false;
+    return !!t.staffFixoAdicionalV2;
 }
 
 // === BUY-IN FREE (helpers) ===
@@ -22081,11 +22157,13 @@ function _getStaffFixoTotal(t) {
 // BUG-FIX (Sessão 26/05): Staff fixo EMBUTIDO separado por categoria (buyin, reentry, rebuys, addon, lc)
 // Usado APENAS pela renderização do caixa, pra mostrar valores líquidos nos cards.
 // NÃO toca em getRake/getPrize/getStaff (cálculos internos continuam corretos).
+// Roda em modo 'embutido' E em adicional V2 (mesmo comportamento contábil — staff sai de dentro do preço).
 function _getStaffFixoEmbutidoPorTipo(t) {
     const zero = { buyin: 0, reentry: 0, rebuys: 0, addon: 0, last_chance: 0, total: 0 };
     if (!t || _resolverStaffModo(t) !== 'fixo') return zero;
     const fixoModo = t.staffFixoModo || 'embutido';
-    if (fixoModo !== 'embutido') return zero; // só desconta se for embutido
+    const isV2 = _isStaffFixoAdicionalV2(t);
+    if (fixoModo !== 'embutido' && !isV2) return zero;
     const valor = Number(t.staffFixoValor) || 0;
     if (valor <= 0) return zero;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
