@@ -759,6 +759,14 @@
         .inp:focus { border-color: var(--gold); }
         .inp-label { font-size: .7rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: .35rem; }
 
+        /* Aba Jogadores — alinhamento das colunas de ação (chevron · imprimir · estorno) */
+        /* Grid fixo de 3 vagas: cada botão ou seu placeholder ocupa exatamente uma coluna,
+           garantindo que os botões de impressão e lixeira fiquem alinhados verticalmente
+           em todas as linhas (combo, solo e sub-linhas expandidas). */
+        .lanc-acoes { display: inline-grid; grid-template-columns: 1.75rem 1.75rem 1.75rem; gap: .35rem; align-items: center; justify-content: end; }
+        .lanc-acoes > * { width: 1.75rem; height: 1.75rem; box-sizing: border-box; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+        .lanc-acao-vaga { background: transparent; border: none; }
+
         /* Tag status */
         .tag { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2rem .55rem; border-radius: 2rem; }
         .tag-running { background: rgba(34,197,94,.12); color: #22c55e; }
@@ -18562,7 +18570,13 @@ function renderTabLancamentosDetalhados() {
                         <span style="display:inline-flex;font-size:.6rem;font-weight:700;padding:.15rem .4rem;border-radius:.2rem;background:${mSub.color}22;color:${mSub.color};">${mSub.label}</span>
                     </td>
                     <td style="padding:.4rem 1rem;text-align:right;font-weight:600;color:#a1a1aa;white-space:nowrap;" class="mono">${formatMoney(valorSubTotal)}${temExtrasSub ? '<span style="font-size:.55rem;color:#a78bfa;margin-left:.25rem;" title="Inclui taxa adm/passaporte">*</span>' : ''}</td>
-                    <td style="padding:.4rem 1rem;text-align:center;"><span style="font-size:.6rem;color:#3f3f46;">—</span></td>
+                    <td style="padding:.4rem 1rem;text-align:center;">
+                        <div class="lanc-acoes">
+                            <span class="lanc-acao-vaga"></span>
+                            <span class="lanc-acao-vaga"></span>
+                            <span class="lanc-acao-vaga" style="color:#3f3f46;font-size:.6rem;display:inline-flex;align-items:center;justify-content:center;">—</span>
+                        </div>
+                    </td>
                 </tr>`;
             }).join('');
 
@@ -18577,8 +18591,10 @@ function renderTabLancamentosDetalhados() {
                 </td>
                 <td style="padding:.55rem 1rem;text-align:right;font-weight:700;color:#e4e4e7;white-space:nowrap;" class="mono">${formatMoney(l.valor)}${l.temExtras ? '<span style="font-size:.6rem;color:#a78bfa;margin-left:.25rem;" title="Inclui taxa adm/passaporte">*</span>' : ''}</td>
                 <td style="padding:.55rem 1rem;text-align:center;white-space:nowrap;">
-                    <div style="display:inline-flex;gap:.35rem;align-items:center;justify-content:center;">
-                        ${btnExpand}${btnReprint}${btnEstornar}
+                    <div class="lanc-acoes">
+                        ${btnExpand || '<span class="lanc-acao-vaga"></span>'}
+                        ${btnReprint || '<span class="lanc-acao-vaga"></span>'}
+                        ${btnEstornar || '<span class="lanc-acao-vaga"></span>'}
                     </div>
                 </td>
             </tr>${subRows}`;
@@ -18611,8 +18627,10 @@ function renderTabLancamentosDetalhados() {
             </td>
             <td style="padding:.55rem 1rem;text-align:right;font-weight:700;color:#e4e4e7;white-space:nowrap;" class="mono">${formatMoney(l.valor)}${l.temExtras ? '<span style="font-size:.6rem;color:#a78bfa;margin-left:.25rem;" title="Inclui taxa adm/passaporte">*</span>' : ''}</td>
             <td style="padding:.55rem 1rem;text-align:center;white-space:nowrap;">
-                <div style="display:inline-flex;gap:.35rem;align-items:center;justify-content:center;">
-                    ${btnReprint}${btnEstornar}
+                <div class="lanc-acoes">
+                    <span class="lanc-acao-vaga"></span>
+                    ${btnReprint || '<span class="lanc-acao-vaga"></span>'}
+                    ${btnEstornar || '<span class="lanc-acao-vaga"></span>'}
                 </div>
             </td>
         </tr>`;
