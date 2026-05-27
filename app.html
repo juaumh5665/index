@@ -19765,7 +19765,23 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
     const jogadorJaInscrito  = jid && entriesIds.has(jid);
     const jogadorJaTemAddon  = jid && addonsIds.has(jid);
     const jogadorFoiEliminado = jid && elimIds.has(jid);
-    
+
+    // === ESTADO INICIAL: sem jogador selecionado ===
+    // Mostra placeholder único e esconde checkboxes multi pra evitar confusão
+    // (a lista real de opções só faz sentido depois que o jogador é escolhido,
+    //  porque depende do status dele: novo / inscrito / eliminado / já tem add-on)
+    if (!jid) {
+        tipoSel.innerHTML = '<option value="" disabled selected>Selecione um jogador primeiro</option>';
+        tipoSel.style.display = '';
+        const containerMulti = document.getElementById('entrada-acoes-multi');
+        if (containerMulti) {
+            containerMulti.style.display = 'none';
+            containerMulti.innerHTML = '';
+        }
+        atualizarResumoEntrada();
+        return;
+    }
+
     // Helper para adicionar opção considerando trava
     const addOpt = (tipo, label) => {
         const trava = _tipoBloqueadoPorTrava(t, tipo);
