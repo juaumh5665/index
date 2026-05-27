@@ -19838,19 +19838,20 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
     tipoSel.innerHTML = opts.join('');
     
     // === MODO DE EXIBIÇÃO ===
-    // - Jogador já inscrito: usa <select> single (1 ação por vez)
-    // - Jogador novo (sem entrada ainda): usa checkboxes multi (permite combos como Buy-in + Rebuy Duplo)
-    // Add-on/Re-entry ainda exigem inscrição prévia, então sempre vão ficar em modo single.
+    // - Jogador novo: checkboxes multi com Buy-in âncora (combo Buy-in + Rebuy Duplo etc.)
+    // - Jogador já inscrito: checkboxes multi SEM Buy-in (combo Rebuy + Add-on + Last Chance etc.)
+    // - Jogador eliminado: mantém SINGLE (re-entry é caso especial — reativa jogador)
+    // - Sem jogador selecionado: mantém SINGLE (placeholder)
     const containerMulti = document.getElementById('entrada-acoes-multi');
-    const podeMulti = !jogadorJaInscrito && jid && !jogadorFoiEliminado;
+    const podeMulti = jid && !jogadorFoiEliminado;
 
     if (podeMulti && containerMulti) {
         // MODO MULTI — esconde select, renderiza checkboxes
         tipoSel.style.display = 'none';
         containerMulti.style.display = '';
-        _renderCheckboxesEntrada(t, jid, opts);
+        _renderCheckboxesEntrada(t, jid, opts, { jogadorJaInscrito, jogadorJaTemAddon });
     } else {
-        // MODO SINGLE (jogador inscrito ou sem jogador selecionado)
+        // MODO SINGLE (jogador eliminado OU sem jogador selecionado)
         tipoSel.style.display = '';
         if (containerMulti) {
             containerMulti.style.display = 'none';
@@ -19865,26 +19866,33 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
 }
 
 // === FASE F: Checkboxes pra combos de compras (Buy-in + Rebuy Duplo + Add-on etc.)
-// Só renderiza pra jogadores NÃO inscritos. Buy-in vem marcado por padrão e é o tipo "âncora".
-function _renderCheckboxesEntrada(t, jid, optsLegado) {
+// Renderiza pra qualquer jogador NÃO eliminado.
+// - Jogador novo: Buy-in entra como âncora (marcado e travado).
+// - Jogador já inscrito: SEM Buy-in (já fez); pode marcar rebuy/addon/last_chance livremente.
+function _renderCheckboxesEntrada(t, jid, optsLegado, ctx) {
     const container = document.getElementById('entrada-acoes-multi');
     if (!container) return;
 
-    // Lista de tipos disponíveis pra COMBO em entrada nova (sem reentry/addon/lc, que dependem de inscrição prévia)
+    const jogadorJaInscrito = !!(ctx && ctx.jogadorJaInscrito);
+    const jogadorJaTemAddon = !!(ctx && ctx.jogadorJaTemAddon);
+
+    // Lista de tipos disponíveis pra COMBO
     const tiposDisponiveis = [];
 
-    // BUY-IN (sempre disponível pra jogador novo — é a âncora do combo)
-    const trBuyin = _tipoBloqueadoPorTrava(t, 'buyin');
-    tiposDisponiveis.push({
-        tipo: 'buyin',
-        label: 'Buy-in (entrada normal)',
-        valor: Number(t.buyin) || 0,
-        valorLabel: _isBuyinFree(t) ? 'GRÁTIS' : 'R$ ' + (Number(t.buyin) || 0).toFixed(2).replace('.', ','),
-        fichas: Number(t.stack) || 0,
-        bloqueado: trBuyin.bloqueado,
-        motivo: trBuyin.motivo,
-        ancora: true // Buy-in sempre marcado e travado
-    });
+    // BUY-IN: só pra jogador novo (já inscrito não faz buy-in de novo)
+    if (!jogadorJaInscrito) {
+        const trBuyin = _tipoBloqueadoPorTrava(t, 'buyin');
+        tiposDisponiveis.push({
+            tipo: 'buyin',
+            label: 'Buy-in (entrada normal)',
+            valor: Number(t.buyin) || 0,
+            valorLabel: _isBuyinFree(t) ? 'GRÁTIS' : 'R$ ' + (Number(t.buyin) || 0).toFixed(2).replace('.', ','),
+            fichas: Number(t.stack) || 0,
+            bloqueado: trBuyin.bloqueado,
+            motivo: trBuyin.motivo,
+            ancora: true // Buy-in sempre marcado e travado pra jogador novo
+        });
+    }
 
     // REBUY SIMPLES
     const rebuySimpVal = Number(t.rebuyValor || t.rebuySimples || 0);
@@ -19918,19 +19926,39 @@ function _renderCheckboxesEntrada(t, jid, optsLegado) {
         });
     }
 
-    // ADD-ON (jogador novo PODE comprar add-on junto com buy-in se a janela permitir)
+    // ADD-ON (respeita regra: 1 add-on por jogador)
     if (t.addonFichas > 0) {
         const tr = _tipoBloqueadoPorTrava(t, 'addon');
         const aVal = Number(t.addonValor) || 0;
+        const bloqAddon = tr.bloqueado || jogadorJaTemAddon;
+        const motivoAddon = jogadorJaTemAddon ? 'Jogador já comprou add-on (1 por jogador)' : tr.motivo;
         tiposDisponiveis.push({
             tipo: 'addon',
             label: 'Add-on',
             valor: aVal,
             valorLabel: aVal > 0 ? 'R$ ' + aVal.toFixed(2).replace('.', ',') : 'Cortesia',
             fichas: Number(t.addonFichas) || 0,
-            bloqueado: tr.bloqueado,
-            motivo: tr.motivo
+            bloqueado: bloqAddon,
+            motivo: motivoAddon
         });
+    }
+
+    // LAST CHANCE (só faz sentido pra jogador já inscrito; trava já valida nível)
+    if (t.lastChanceAtivo || t.last_chance_ativo) {
+        const lcValor = Number(t.lastChanceValor || t.last_chance_valor || 0);
+        const lcFichas = Number(t.lastChanceFichas || t.last_chance_fichas || 0);
+        if (lcValor > 0 || lcFichas > 0) {
+            const tr = _tipoBloqueadoPorTrava(t, 'last_chance');
+            tiposDisponiveis.push({
+                tipo: 'last_chance',
+                label: 'Last Chance',
+                valor: lcValor,
+                valorLabel: lcValor > 0 ? 'R$ ' + lcValor.toFixed(2).replace('.', ',') : 'Cortesia',
+                fichas: lcFichas,
+                bloqueado: tr.bloqueado,
+                motivo: tr.motivo
+            });
+        }
     }
 
     // Renderiza
@@ -19963,13 +19991,13 @@ function _renderCheckboxesEntrada(t, jid, optsLegado) {
     }).join('');
 }
 
-// FASE F: lê quais ações foram marcadas no modo multi (ordem fixa: buyin → rebuy_simples → rebuy_duplo → addon)
+// FASE F: lê quais ações foram marcadas no modo multi (ordem fixa: buyin → rebuy_simples → rebuy_duplo → addon → last_chance)
 // Retorna array de tipos (string[]). Em modo SINGLE retorna [tipoSelecionado].
 function _getAcoesEntradaSelecionadas() {
     const container = document.getElementById('entrada-acoes-multi');
     // Multi mode?
     if (container && container.style.display !== 'none' && container.children.length > 0) {
-        const ordem = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+        const ordem = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
         const acoes = [];
         ordem.forEach(tipo => {
             const cb = document.getElementById(`entrada-acao-${tipo}`);
@@ -19977,7 +20005,7 @@ function _getAcoesEntradaSelecionadas() {
         });
         return acoes;
     }
-    // Single mode (jogador já inscrito)
+    // Single mode (jogador eliminado ou sem jogador selecionado)
     const sel = document.getElementById('entrada-tipo');
     if (sel && sel.value) return [sel.value];
     return [];
@@ -20009,6 +20037,7 @@ function atualizarResumoEntrada() {
         else if (tipo === 'rebuy_simples') v = Number(t.rebuyValor || t.rebuySimples) || 0;
         else if (tipo === 'rebuy_duplo')   v = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
         else if (tipo === 'addon')         v = Number(t.addonValor) || 0;
+        else if (tipo === 'last_chance')   v = Number(t.lastChanceValor || t.last_chance_valor) || 0;
         // FASE G: Em embutido + cobrarFree, buy-in free vira valor do staff (R$ 10)
         if (tipo === 'buyin' && v === 0
             && _resolverStaffModo(t) === 'fixo'
@@ -20038,6 +20067,7 @@ function atualizarResumoEntrada() {
             else if (tp === 'rebuy_simples') valorAcao = Number(t.rebuyValor || t.rebuySimples) || 0;
             else if (tp === 'rebuy_duplo')   valorAcao = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
             else if (tp === 'addon')         valorAcao = Number(t.addonValor) || 0;
+            else if (tp === 'last_chance')   valorAcao = Number(t.lastChanceValor || t.last_chance_valor) || 0;
             if (_isTipoStaffFixoElegivel(t, tp, valorAcao)) {
                 staff += valorStaff;
             }
@@ -20106,9 +20136,26 @@ function _registrarEntradasCombo(t, jid, acoes) {
         if (trava.bloqueado) return showToast('🔒 ' + trava.motivo + ' (' + _labelTipoEntry(tipo) + ')');
     }
 
-    // Buy-in obrigatório no combo (regra: combo só pra jogador novo entrando)
-    if (!acoes.includes('buyin')) {
-        return showToast('⚠️ Combo precisa incluir Buy-in');
+    // Pelo menos 1 ação precisa estar marcada
+    if (!acoes || acoes.length === 0) {
+        return showToast('⚠️ Selecione ao menos uma ação');
+    }
+
+    // Status do jogador (já inscrito? já tem add-on?)
+    const jaEntrou = t.entries.some(e => String(e.jogadorId) === String(jid) && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
+    const jaTemAddon = t.entries.some(e => String(e.jogadorId) === String(jid) && e.tipo === 'addon');
+
+    // Combo SEM buy-in: jogador precisa já estar inscrito (rebuy/addon/lc não criam inscrição)
+    if (!acoes.includes('buyin') && !jaEntrou) {
+        return showToast('⚠️ Jogador precisa fazer Buy-in para entrar no torneio');
+    }
+    // Combo COM buy-in: jogador não pode estar já inscrito
+    if (acoes.includes('buyin') && jaEntrou) {
+        return showToast('⚠️ Jogador já inscrito. Desmarque o Buy-in.');
+    }
+    // Add-on: regra "1 por jogador"
+    if (acoes.includes('addon') && jaTemAddon) {
+        return showToast('⚠️ Jogador já comprou Add-on (limite: 1 por jogador)');
     }
 
     // Passaporte: 1 só, mas com fichas somadas conforme cada ação marcada
@@ -20132,8 +20179,8 @@ function _registrarEntradasCombo(t, jid, acoes) {
     const ts = Date.now();
 
     // === Loop de criação das entries ===
-    // Buy-in entra primeiro (sempre), depois rebuys, depois add-on (segue ordem natural).
-    const ordemFixa = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+    // Ordem natural: buy-in → rebuys → add-on → last_chance
+    const ordemFixa = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
     const acoesOrdenadas = ordemFixa.filter(tp => acoes.includes(tp));
 
     let i = 0;
@@ -20144,6 +20191,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
         else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
         else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
         else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
+        else if (tipo === 'last_chance') valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
         // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
         if (tipo === 'buyin' && valorBase === 0
@@ -20193,8 +20241,8 @@ function _registrarEntradasCombo(t, jid, acoes) {
         t.entries.push(novaEntry);
         entriesCriadas.push(novaEntry);
 
-        // Aloca jogador na mesa só na primeira ação (buy-in)
-        if (isPrimeira) alocarJogadorMesa(t, jid);
+        // Aloca jogador na mesa apenas quando a ação é buy-in (jogador inscrito já tem mesa)
+        if (tipo === 'buyin') alocarJogadorMesa(t, jid);
 
         // Bounty (PKO/Knockout) — só uma vez no buy-in
         if (tipo === 'buyin' && ['bounty','pko','knockout'].includes(t.tipo)) {
@@ -20207,11 +20255,15 @@ function _registrarEntradasCombo(t, jid, acoes) {
         }
 
         // Transação do valor base
-        const descMap = { buyin:'Buy-in', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on' };
+        const descMap = { buyin:'Buy-in', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
         if (valorBase > 0) {
+            const tipoTx = tipo === 'buyin' ? 'buyin'
+                : tipo === 'addon' ? 'addon'
+                : tipo === 'last_chance' ? 'last_chance'
+                : 'reentry';
             registrarTransacao({
                 jogadorId: jid,
-                tipo: tipo === 'buyin' ? 'buyin' : (tipo === 'addon' ? 'addon' : 'reentry'),
+                tipo: tipoTx,
                 valor: -valorBase,
                 descricao: `${descMap[tipo]} · ${t.nome}`,
                 origem: 'torneio',
@@ -20356,6 +20408,7 @@ function _registrarEntradaImpl() {
     if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
     if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
+    if (tipo === 'last_chance')   valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
     // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
     // (cliente paga R$ 10 que já tem staff embutido — não cobra staff extra por fora)
@@ -20420,11 +20473,15 @@ function _registrarEntradaImpl() {
     }
 
     // Registra transação no caixa (valor BASE da inscrição — addon agora também tem valor)
-    const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on' };
+    const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
     if (valorBase > 0) {
+        const tipoTx = tipo === 'buyin' ? 'buyin'
+            : tipo === 'addon' ? 'addon'
+            : tipo === 'last_chance' ? 'last_chance'
+            : 'reentry';
         registrarTransacao({
             jogadorId: jid,
-            tipo: tipo === 'buyin' ? 'buyin' : (tipo === 'addon' ? 'addon' : 'reentry'),
+            tipo: tipoTx,
             valor: -valorBase,
             descricao: `${descMap[tipo]} · ${t.nome}`,
             origem: 'torneio',
@@ -20490,7 +20547,7 @@ function _registrarEntradaImpl() {
     });
 
     const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
-    showToast(`💰 ${tipo === 'reentry' ? 'Re-entry' : tipo === 'addon' ? 'Add-on' : 'Buy-in'} registrado!${totalLabel}`);
+    showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}`);
 
     // FASE E: oferecer impressão de comprovante (se torneio configurado pra isso)
     if (t.imprimirComprovanteCompra) {
