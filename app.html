@@ -20168,8 +20168,11 @@ function atualizarResumoEntrada() {
     });
 
     let staff = 0;
-    // FASE G: Staff fixo no modo ADICIONAL é somado ao total cobrado.
-    // No modo EMBUTIDO, já está dentro do valorBase (não soma novamente).
+    // FASE G: Staff fixo no modo ADICIONAL (legado e V2).
+    //   - Legado: cliente paga base + staff (somados → total = base + staff).
+    //   - V2: cliente paga só base (staff já está dentro). Mostramos staff só pra exibição/quebra,
+    //     mas NÃO somamos no total.
+    const isV2Resumo = _isStaffFixoAdicionalV2(t);
     if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
         const valorStaff = Number(t.staffFixoValor) || 0;
         acoes.forEach(tp => {
@@ -20218,12 +20221,23 @@ function atualizarResumoEntrada() {
         if (cbPass) cbPass.checked = false;
     }
 
-    const total = valorBase + staff + taxaAdm + passaporte;
+    // Em V2 o staff já está dentro do valorBase — total = valorBase + extras (sem somar staff)
+    // Em legado/embutido: comportamento histórico — total = base + staff + extras
+    const total = isV2Resumo
+        ? (valorBase + taxaAdm + passaporte)
+        : (valorBase + staff + taxaAdm + passaporte);
     if (resumoVal) {
         const partes = [];
         const acoesLabel = acoes.length > 1 ? ` (${acoes.length} ações)` : '';
-        if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ',') + acoesLabel);
-        if (staff > 0)     partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
+        if (isV2Resumo && staff > 0 && valorBase > 0) {
+            // V2: mostra a quebra "(R$ 90 + R$ 10 staff)" — staff sai DE DENTRO do valorBase
+            const valorBaseLiquido = Math.max(0, valorBase - staff);
+            partes.push('R$ ' + valorBaseLiquido.toFixed(2).replace('.', ',') + acoesLabel);
+            partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
+        } else {
+            if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ',') + acoesLabel);
+            if (staff > 0)     partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
+        }
         if (taxaAdm > 0)   partes.push('R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa');
         if (passaporte > 0) partes.push('R$ ' + passaporte.toFixed(2).replace('.', ',') + ' passaporte');
         if (partes.length > 1) {
@@ -22157,13 +22171,13 @@ function _getStaffFixoTotal(t) {
 // BUG-FIX (Sessão 26/05): Staff fixo EMBUTIDO separado por categoria (buyin, reentry, rebuys, addon, lc)
 // Usado APENAS pela renderização do caixa, pra mostrar valores líquidos nos cards.
 // NÃO toca em getRake/getPrize/getStaff (cálculos internos continuam corretos).
-// Roda em modo 'embutido' E em adicional V2 (mesmo comportamento contábil — staff sai de dentro do preço).
+// IMPORTANTE: Não roda em adicional V2 — nesse modo o e.valor já vem sem staff, então os cards
+// já mostram o líquido corretamente sem precisar descontar de novo.
 function _getStaffFixoEmbutidoPorTipo(t) {
     const zero = { buyin: 0, reentry: 0, rebuys: 0, addon: 0, last_chance: 0, total: 0 };
     if (!t || _resolverStaffModo(t) !== 'fixo') return zero;
     const fixoModo = t.staffFixoModo || 'embutido';
-    const isV2 = _isStaffFixoAdicionalV2(t);
-    if (fixoModo !== 'embutido' && !isV2) return zero;
+    if (fixoModo !== 'embutido') return zero; // só desconta se for embutido
     const valor = Number(t.staffFixoValor) || 0;
     if (valor <= 0) return zero;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
@@ -22280,10 +22294,18 @@ function _calcFichasBuyinPromo(t, tipo) {
 
 function getPrize(t) {
     // Prize = (Bruto_comRake - Rake - Staff) + Bruto_semRake
+    // FASE V2: Em modo "adicional V2" (torneios novos), o staff fixo NÃO é subtraído aqui
+    // porque ele já foi separado do bruto na hora de gravar a entry (e.valor vem sem staff).
+    // Em embutido o staff sai do bruto via getRake, mas getStaff devolve o valor — então a fórmula
+    // (bruto - rake - staff) precisa manter o "- staff" pra que a aritmética bata.
+    // Em adicional V2, e.valor já é o líquido sem staff, então subtrair staff de novo é dupla dedução.
     const brutoComRake = _getBrutoParaRake(t);
     const brutoSemRake = _getBrutoSemRake(t);
     const rake = getRake(t);
-    const staff = getStaff(t);
+    let staff = getStaff(t);
+    if (_isStaffFixoAdicionalV2(t)) {
+        staff = 0; // V2: já contabilizado fora do prize (e.valor não inclui staff)
+    }
     const liquido = (brutoComRake - rake - staff) + brutoSemRake;
     
     if (t.tipo === 'knockout') {
