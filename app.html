@@ -4432,6 +4432,30 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <!-- MODAL: CONFIG STATS TV PRO LIVE -->
+<div id="modal-personalizar-prolive" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-palette" style="color:#a78bfa;"></i> Personalizar Pro Live</h3>
+            <button onclick="closeModal('modal-personalizar-prolive')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+            <div>
+                <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Fundo da tela</div>
+                <div id="prolive-bg-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
+            </div>
+            <div>
+                <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Cor do texto (timer)</div>
+                <div id="prolive-text-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;"></div>
+            </div>
+            <div style="font-size:.7rem;color:#71717a;line-height:1.5;">
+                <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
+                A personalização vale para este torneio e aparece tanto na TV aberta pelo app quanto no link público.
+            </div>
+            <button onclick="salvarPersonalizarProLive()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Aplicar</button>
+        </div>
+    </div>
+</div>
+
 <div id="modal-config-stats-tv" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
@@ -5233,34 +5257,6 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                     </div>
 
-                    <!-- FASE I.1: Buy-in PROMOCIONAL (Early Bird) — preço e stack reduzidos no início -->
-                    <div style="padding:.75rem .9rem;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
-                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.5rem;">
-                            <input type="checkbox" id="t-buyin-promo-ativo" onchange="atualizarBuyinPromoUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b;">
-                            <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-star"></i> Buy-in promocional (Early Bird)</div>
-                        </label>
-                        <div id="t-buyin-promo-campos" style="display:none;">
-                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
-                                <div>
-                                    <label class="inp-label">Valor R$</label>
-                                    <input id="t-buyin-promo-valor" type="number" step="0.01" min="0" value="50" class="inp" placeholder="Ex: 50">
-                                </div>
-                                <div>
-                                    <label class="inp-label">Fichas</label>
-                                    <input id="t-buyin-promo-fichas" type="number" min="0" value="15000" class="inp" placeholder="Ex: 15000">
-                                </div>
-                                <div>
-                                    <label class="inp-label">Até fim do nível</label>
-                                    <input id="t-buyin-promo-ate-nivel" type="number" min="1" value="1" class="inp" placeholder="Ex: 1">
-                                </div>
-                            </div>
-                            <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;line-height:1.4;">
-                                <i class="fa-solid fa-circle-info" style="color:#f59e0b;"></i>
-                                Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível pagam o <strong>valor promocional</strong> e recebem stack <strong>diferenciado</strong>. Substitui o buy-in padrão temporariamente. Não se aplica a rebuy/reentry/addon.
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Bloco KO (condicional, aparece conforme tipo) -->
                     <div id="t-bounty-wrap" style="display:none;padding:.75rem .9rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
                         <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.45rem;">
@@ -5744,6 +5740,9 @@ document.addEventListener('DOMContentLoaded', function(){
                     <button onclick="abrirConfigStatsTV()" id="btn-config-stats-tv" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;" title="Configurar stats do layout Pro Live">
                         <i class="fa-solid fa-sliders"></i>
                     </button>
+                    <button onclick="abrirPersonalizarProLive()" id="btn-personalizar-prolive" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;color:#a78bfa;" title="Personalizar fundo e cores do Pro Live">
+                        <i class="fa-solid fa-palette"></i>
+                    </button>
                     <button onclick="abrirPremiacaoProjetada()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;color:var(--gold);" title="Premiação projetada (payout)">
                         <i class="fa-solid fa-trophy"></i>
                     </button>
@@ -5976,12 +5975,12 @@ document.addEventListener('DOMContentLoaded', function(){
                     <!-- Ativos -->
                     <div>
                         <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Em Jogo</div>
-                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;max-height:250px;overflow-y:auto;padding-right:.25rem;"></div>
+                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
                     <!-- Eliminados com ranking -->
                     <div>
                         <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Eliminados</div>
-                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;max-height:250px;overflow-y:auto;padding-right:.25rem;"></div>
+                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
                 </div>
 
@@ -7435,9 +7434,6 @@ async function _processarMudancaRealtime(tipo, payload) {
                             passaporte: e.passaporte || null,
                             comboId: e.combo_id || null,
                             bonusFichas: parseInt(e.bonus_fichas || 0),
-                            // FASE I.1: Buy-in PROMO
-                            fichasOverride: parseInt(e.fichas_override || 0),
-                            isPromo: !!e.is_promo,
                         }));
                         t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
                             jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
@@ -7747,7 +7743,7 @@ function _torneioToDb(t) {
         staff_pct: t.staffPct || 0,
         staff_modo: t.staffModo || null,
         staff_fixo_valor: t.staffFixoValor || 0,
-        staff_fixo_acoes: t.staffFixoAcoes ? { ...t.staffFixoAcoes, __adicional_v2: !!t.staffFixoAdicionalV2 } : (t.staffFixoAdicionalV2 ? { __adicional_v2: true } : null),
+        staff_fixo_acoes: t.staffFixoAcoes || null,
         staff_fixo_modo: t.staffFixoModo || 'embutido',
         staff_fixo_cobrar_free: !!t.staffFixoCobrarFree,
         passaporte_ativo: !!t.passaporteAtivo,
@@ -7758,11 +7754,6 @@ function _torneioToDb(t) {
         bonus_registro_ativo: !!t.bonusRegistroAtivo,
         bonus_registro_fichas: t.bonusRegistroFichas || 0,
         bonus_registro_ate_nivel: t.bonusRegistroAteNivel || null,
-        // FASE I.1: Buy-in PROMO (Early Bird)
-        buyin_promo_ativo: !!t.buyinPromoAtivo,
-        buyin_promo_valor: t.buyinPromoValor || 0,
-        buyin_promo_fichas: t.buyinPromoFichas || 0,
-        buyin_promo_ate_nivel: t.buyinPromoAteNivel || null,
         imprimir_comprovante_compra: !!t.imprimirComprovanteCompra,
         imprimir_comprovante_jackpot: !!t.imprimirComprovanteJackpot,
         comprovante_vias: t.comprovanteVias || 1,
@@ -7802,6 +7793,8 @@ function _torneioToDb(t) {
         caixa_fechado_por: t.caixaTorneio && t.caixaTorneio.fechadoPor || null,
         caixa_resumo: (t.caixaTorneio && t.caixaTorneio.resumoFinal) || null,
         tv_layout: t.tvLayout || 'classico',
+        tv_prolive_bg: t.tvProLiveBg || 'verde',
+        tv_prolive_text: t.tvProLiveText || 'dourado',
         tv_show_prize: t.tvShowPrize !== false,
         pw_stats_visiveis: t.pwStatsVisiveis || null,
         premiacao_proj: t.premiacaoProjetada || null,
@@ -8115,9 +8108,6 @@ async function sincronizarEstado() {
                                     passaporte: (e.passaporte && e.passaporte.cobrado) ? e.passaporte : null,
                                     combo_id: e.comboId || null,
                                     bonus_fichas: Number(e.bonusFichas) || 0,
-                                    // FASE I.1: Buy-in PROMO — fichas override e flag
-                                    fichas_override: Number(e.fichasOverride) || 0,
-                                    is_promo: !!e.isPromo,
                                 }));
                                 const { error: errE } = await sb.from('torneio_entries').upsert(entryRows);
                                 if (errE) throw new Error('Upsert entries: ' + errE.message);
@@ -8681,13 +8671,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         staffPct: parseFloat(r.staff_pct || 0),
         staffModo: r.staff_modo || null,
         staffFixoValor: parseFloat(r.staff_fixo_valor || 0),
-        staffFixoAcoes: (() => {
-            const raw = r.staff_fixo_acoes;
-            if (!raw || typeof raw !== 'object') return null;
-            const { __adicional_v2, ...acoes } = raw;
-            return Object.keys(acoes).length > 0 ? acoes : null;
-        })(),
-        staffFixoAdicionalV2: !!(r.staff_fixo_acoes && typeof r.staff_fixo_acoes === 'object' && r.staff_fixo_acoes.__adicional_v2),
+        staffFixoAcoes: r.staff_fixo_acoes || null,
         staffFixoModo: r.staff_fixo_modo || 'embutido',
         staffFixoCobrarFree: !!r.staff_fixo_cobrar_free,
         passaporteAtivo: !!r.passaporte_ativo,
@@ -8698,11 +8682,6 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         bonusRegistroAtivo: !!r.bonus_registro_ativo,
         bonusRegistroFichas: parseInt(r.bonus_registro_fichas) || 0,
         bonusRegistroAteNivel: r.bonus_registro_ate_nivel || null,
-        // FASE I.1: Buy-in PROMO (Early Bird)
-        buyinPromoAtivo: !!r.buyin_promo_ativo,
-        buyinPromoValor: parseFloat(r.buyin_promo_valor) || 0,
-        buyinPromoFichas: parseInt(r.buyin_promo_fichas) || 0,
-        buyinPromoAteNivel: r.buyin_promo_ate_nivel || null,
         imprimirComprovanteCompra:  !!r.imprimir_comprovante_compra,
         imprimirComprovanteJackpot: !!r.imprimir_comprovante_jackpot,
         comprovanteVias:            r.comprovante_vias || 1,
@@ -8748,6 +8727,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             resumoFinal: r.caixa_resumo,
         },
         tvLayout: r.tv_layout || 'classico',
+        tvProLiveBg: r.tv_prolive_bg || 'verde',
+        tvProLiveText: r.tv_prolive_text || 'dourado',
         tvShowPrize: r.tv_show_prize !== false,
         pwStatsVisiveis: r.pw_stats_visiveis,
         premiacaoProjetada: r.premiacao_proj,
@@ -8762,9 +8743,6 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             passaporte: e.passaporte || null,
             comboId: e.combo_id || null,
             bonusFichas: parseInt(e.bonus_fichas || 0),
-            // FASE I.1: Buy-in PROMO
-            fichasOverride: parseInt(e.fichas_override || 0),
-            isPromo: !!e.is_promo,
         })),
         eliminados: tElims.map(e => ({
             id: e.id, jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
@@ -11645,9 +11623,7 @@ function diagTorneio(idx) {
     // Fichas
     let totalFichas = 0;
     (t.entries || []).forEach(e => {
-        // FASE I.1: Se entry tem fichasOverride (buy-in PROMO), usa esse valor
-        if (Number(e.fichasOverride) > 0)    totalFichas += Number(e.fichasOverride);
-        else if (e.tipo === 'rebuy_simples') totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
+        if (e.tipo === 'rebuy_simples')      totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         else if (e.tipo === 'rebuy_duplo')   totalFichas += (t.rebuyDuploFichas || t.stack*2);
         else if (e.tipo === 'addon')         totalFichas += (t.addonFichas || 0);
         else if (e.tipo === 'last_chance')   totalFichas += (t.last_chance_fichas || 0);
@@ -12076,10 +12052,9 @@ function gerarComprovanteCompra(t, dados) {
     if (!t || !dados || !dados.entry) return '';
     const e = dados.entry;
     const col = _printColWidth();
-    const tipoLabel = _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : '');
+    const tipoLabel = _labelTipoEntry(e.tipo);
     const valorAcao = Number(e.valor) || 0;
-    // FASE I.1: usa fichasOverride se entry for de promo
-    const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
+    const fichasAcao = _fichasStackPorTipo(t, e.tipo);
     const taxaAdm = Number(e.taxaAdm) || 0;
     const temPassaporte = e.passaporte && e.passaporte.cobrado;
     const valorPassaporte = temPassaporte ? (Number(e.passaporte.valor) || 0) : 0;
@@ -12087,12 +12062,10 @@ function gerarComprovanteCompra(t, dados) {
 
     // FASE G: Staff fixo — exibição depende do MODO
     // - 'embutido' (default): NÃO mostra no comprovante (já está dentro do preço)
-    // - 'adicional' (legado e V2): mostra como linha separada e SOMA no total
-    // Em ambos os casos lemos e.staff (snapshot da entry) — assim reimpressões antigas
-    // continuam corretas mesmo se a config do torneio mudou depois.
+    // - 'adicional': mostra como linha separada e SOMA no total
     const eligivelStaff = (_resolverStaffModo(t) === 'fixo' && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0));
     const fixoModo = t.staffFixoModo || 'embutido';
-    const staffFixoMostrar = eligivelStaff && fixoModo === 'adicional' ? (Number(e.staff) || Number(t.staffFixoValor) || 0) : 0;
+    const staffFixoMostrar = eligivelStaff && fixoModo === 'adicional' ? (Number(t.staffFixoValor) || 0) : 0;
 
     let txt = _printHeaderCfg();
     txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
@@ -12249,10 +12222,9 @@ function gerarComprovanteCombo(t, dados) {
 
     // Listar cada ação
     entries.forEach(e => {
-        const tipoLabel = _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : '');
+        const tipoLabel = _labelTipoEntry(e.tipo);
         const valorAcao = Number(e.valor) || 0;
-        // FASE I.1: usa fichasOverride se entry for de promo
-        const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
+        const fichasAcao = _fichasStackPorTipo(t, e.tipo);
         totalGeral += valorAcao;
         fichasTotal += fichasAcao;
 
@@ -12274,9 +12246,8 @@ function gerarComprovanteCombo(t, dados) {
 
         // Staff fixo incluso (acumula pra mostrar 1 vez no final)
         // FASE G: Staff fixo só conta se MODO adicional (em embutido já está dentro do preço)
-        // Usa e.staff (snapshot) — assim funciona tanto pro legado quanto pro V2 e mantém reimpressões corretas.
-        if (Number(e.staff) > 0 && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) {
-            staffFixoTotal += Number(e.staff);
+        if (_isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) {
+            staffFixoTotal += (Number(t.staffFixoValor) || 0);
         }
 
         // Taxa adm
@@ -12451,12 +12422,11 @@ function gerarExtratoJogadorTorneio(t, jogadorId) {
             const dtFmt = dt.toLocaleString('pt-BR').substring(0, 17);
             txt += dtFmt + ' #' + qtd + '\n';
             const valorAcao = Number(e.valor) || 0;
-            // FASE I.1: usa fichasOverride se entry for de promo
-            const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
+            const fichasAcao = _fichasStackPorTipo(t, e.tipo);
             if (valorAcao > 0) {
-                txt += _printPad('  ' + _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : ''), formatMoney(valorAcao), col) + '\n';
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo), formatMoney(valorAcao), col) + '\n';
             } else {
-                txt += _printPad('  ' + _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : ''), 'GRATIS', col) + '\n';
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo), 'GRATIS', col) + '\n';
             }
             totalGeral += valorAcao;
             fichasTotal += fichasAcao;
@@ -17923,20 +17893,6 @@ function saveTournament() {
             const v = parseInt(document.getElementById('t-bonus-registro-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
         })(),
-        // FASE I.1: Buy-in PROMOCIONAL (Early Bird)
-        buyinPromoAtivo: document.getElementById('t-buyin-promo-ativo')?.checked || false,
-        buyinPromoValor: (function() {
-            const v = parseFloat(document.getElementById('t-buyin-promo-valor')?.value);
-            return (isNaN(v) || v < 0) ? 0 : v;
-        })(),
-        buyinPromoFichas: (function() {
-            const v = parseInt(document.getElementById('t-buyin-promo-fichas')?.value);
-            return (isNaN(v) || v < 0) ? 0 : v;
-        })(),
-        buyinPromoAteNivel: (function() {
-            const v = parseInt(document.getElementById('t-buyin-promo-ate-nivel')?.value);
-            return (isNaN(v) || v <= 0) ? null : v;
-        })(),
         imprimirComprovanteCompra:  document.getElementById('t-imprimir-compra')?.checked || false,
         imprimirComprovanteJackpot: document.getElementById('t-imprimir-jackpot')?.checked || false,
         comprovanteVias:            parseInt(document.getElementById('t-comprovante-vias')?.value) || 1,
@@ -17960,7 +17916,6 @@ function saveTournament() {
             addon:       document.getElementById('t-staff-fixo-addon')?.checked ?? true,
             last_chance: document.getElementById('t-staff-fixo-last-chance')?.checked ?? false
         },
-        staffFixoAdicionalV2: true,
         passaporteAtivo:  document.getElementById('t-passaporte-ativo')?.checked || false,
         passaporteValor:  parseFloat(document.getElementById('t-passaporte-valor')?.value) || 0,
         passaporteFichas: {
@@ -20168,11 +20123,8 @@ function atualizarResumoEntrada() {
     });
 
     let staff = 0;
-    // FASE G: Staff fixo no modo ADICIONAL (legado e V2).
-    //   - Legado: cliente paga base + staff (somados → total = base + staff).
-    //   - V2: cliente paga só base (staff já está dentro). Mostramos staff só pra exibição/quebra,
-    //     mas NÃO somamos no total.
-    const isV2Resumo = _isStaffFixoAdicionalV2(t);
+    // FASE G: Staff fixo no modo ADICIONAL é somado ao total cobrado.
+    // No modo EMBUTIDO, já está dentro do valorBase (não soma novamente).
     if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
         const valorStaff = Number(t.staffFixoValor) || 0;
         acoes.forEach(tp => {
@@ -20221,23 +20173,12 @@ function atualizarResumoEntrada() {
         if (cbPass) cbPass.checked = false;
     }
 
-    // Em V2 o staff já está dentro do valorBase — total = valorBase + extras (sem somar staff)
-    // Em legado/embutido: comportamento histórico — total = base + staff + extras
-    const total = isV2Resumo
-        ? (valorBase + taxaAdm + passaporte)
-        : (valorBase + staff + taxaAdm + passaporte);
+    const total = valorBase + staff + taxaAdm + passaporte;
     if (resumoVal) {
         const partes = [];
         const acoesLabel = acoes.length > 1 ? ` (${acoes.length} ações)` : '';
-        if (isV2Resumo && staff > 0 && valorBase > 0) {
-            // V2: mostra a quebra "(R$ 90 + R$ 10 staff)" — staff sai DE DENTRO do valorBase
-            const valorBaseLiquido = Math.max(0, valorBase - staff);
-            partes.push('R$ ' + valorBaseLiquido.toFixed(2).replace('.', ',') + acoesLabel);
-            partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
-        } else {
-            if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ',') + acoesLabel);
-            if (staff > 0)     partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
-        }
+        if (valorBase > 0) partes.push('R$ ' + valorBase.toFixed(2).replace('.', ',') + acoesLabel);
+        if (staff > 0)     partes.push('R$ ' + staff.toFixed(2).replace('.', ',') + ' staff');
         if (taxaAdm > 0)   partes.push('R$ ' + taxaAdm.toFixed(2).replace('.', ',') + ' taxa');
         if (passaporte > 0) partes.push('R$ ' + passaporte.toFixed(2).replace('.', ',') + ' passaporte');
         if (partes.length > 1) {
@@ -20326,23 +20267,10 @@ function _registrarEntradasCombo(t, jid, acoes) {
         else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
         else if (tipo === 'last_chance') valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
-        // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valorBase do buy-in se elegível
-        const valorPromoCombo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
-        if (valorPromoCombo !== null) {
-            valorBase = valorPromoCombo;
-        }
-
         // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
         if (tipo === 'buyin' && valorBase === 0
             && _resolverStaffModo(t) === 'fixo'
             && (t.staffFixoModo || 'embutido') === 'embutido'
-            && t.staffFixoCobrarFree) {
-            valorBase = Number(t.staffFixoValor) || 0;
-        }
-
-        // ADICIONAL V2: simetria com embutido para buy-in free + cobrarFree
-        if (tipo === 'buyin' && valorBase === 0
-            && _isStaffFixoAdicionalV2(t)
             && t.staffFixoCobrarFree) {
             valorBase = Number(t.staffFixoValor) || 0;
         }
@@ -20355,20 +20283,12 @@ function _registrarEntradasCombo(t, jid, acoes) {
         const isPrimeira = (i === 0);
         const passNessaEntry = isPrimeira && passAtivo;
 
-        // FASE G: Staff fixo no modo "adicional" — cobra por ação (legado E V2)
-        const isAdicionalV2Combo = _isStaffFixoAdicionalV2(t);
-        const isAdicionalLegadoCombo = _resolverStaffModo(t) === 'fixo'
-            && (t.staffFixoModo || 'embutido') === 'adicional'
-            && !isAdicionalV2Combo;
+        // FASE G: Staff fixo no modo "adicional" — cobra por ação
         let staffNessaEntry = 0;
-        if ((isAdicionalLegadoCombo || isAdicionalV2Combo) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
-            staffNessaEntry = Number(t.staffFixoValor) || 0;
-        }
-
-        // V2: separa o staff de dentro do valorBase pra gravar na entry.
-        let valorEntryCombo = valorBase;
-        if (isAdicionalV2Combo && staffNessaEntry > 0) {
-            valorEntryCombo = Math.max(0, valorBase - staffNessaEntry);
+        if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
+            if (_isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+                staffNessaEntry = Number(t.staffFixoValor) || 0;
+            }
         }
 
         // Cria a entry
@@ -20377,7 +20297,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
             jogadorId: jid,
             tipo,
             ts: ts + i, // timestamps consecutivos pra manter ordem
-            valor: valorEntryCombo,
+            valor: valorBase,
             staff: staffNessaEntry,
             taxaAdm
         };
@@ -20388,12 +20308,6 @@ function _registrarEntradasCombo(t, jid, acoes) {
         const bonusFichasNessaEntry = _calcBonusFichasParaEntry(t, tipo);
         if (bonusFichasNessaEntry > 0) {
             novaEntry.bonusFichas = bonusFichasNessaEntry;
-        }
-        // FASE I.1: Buy-in PROMO — se elegível, salva fichas customizadas e marca como promo
-        const fichasPromoCombo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
-        if (fichasPromoCombo !== null) {
-            novaEntry.fichasOverride = fichasPromoCombo;
-            novaEntry.isPromo = true;
         }
         // Flag pra agrupar no comprovante
         novaEntry.comboId = ts;
@@ -20415,11 +20329,8 @@ function _registrarEntradasCombo(t, jid, acoes) {
         }
 
         // Transação do valor base
-        // V2: usa valorEntryCombo (sem staff); staff vai numa tx separada abaixo.
-        // Legado: usa valorBase (cliente paga base + staff).
         const descMap = { buyin:'Buy-in', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
-        const valorTxCombo = isAdicionalV2Combo ? valorEntryCombo : valorBase;
-        if (valorTxCombo > 0) {
+        if (valorBase > 0) {
             const tipoTx = tipo === 'buyin' ? 'buyin'
                 : tipo === 'addon' ? 'addon'
                 : tipo === 'last_chance' ? 'last_chance'
@@ -20427,7 +20338,7 @@ function _registrarEntradasCombo(t, jid, acoes) {
             registrarTransacao({
                 jogadorId: jid,
                 tipo: tipoTx,
-                valor: -valorTxCombo,
+                valor: -valorBase,
                 descricao: `${descMap[tipo]} · ${t.nome}`,
                 origem: 'torneio',
                 refId: t.id,
@@ -20573,25 +20484,11 @@ function _registrarEntradaImpl() {
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     if (tipo === 'last_chance')   valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
-    // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valorBase do buy-in se elegível
-    const valorPromo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
-    if (valorPromo !== null) {
-        valorBase = valorPromo;
-    }
-
     // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
     // (cliente paga R$ 10 que já tem staff embutido — não cobra staff extra por fora)
     if (tipo === 'buyin' && valorBase === 0
         && _resolverStaffModo(t) === 'fixo'
         && (t.staffFixoModo || 'embutido') === 'embutido'
-        && t.staffFixoCobrarFree) {
-        valorBase = Number(t.staffFixoValor) || 0;
-    }
-
-    // ADICIONAL V2: Em modo adicional V2 + cobrarFree=true, buy-in free também passa a custar R$ staffFixoValor
-    // Simetria com embutido — cliente paga R$ 10 (que vira 100% staff, valor base = 0).
-    if (tipo === 'buyin' && valorBase === 0
-        && _isStaffFixoAdicionalV2(t)
         && t.staffFixoCobrarFree) {
         valorBase = Number(t.staffFixoValor) || 0;
     }
@@ -20604,26 +20501,13 @@ function _registrarEntradaImpl() {
     }
     
     // LOTE 3: Staff não é mais cobrado a parte. Agora é % do prize pool em cascata.
-    // FASE G: EXCETO no modo fixo "adicional", onde staff é tratado diferente:
-    //   - LEGADO (torneios antigos): staff é SOMADO ao total (cliente paga valorBase + staff).
-    //   - V2 (torneios novos): staff é DESCONTADO do valorBase (cliente paga só valorBase,
-    //     mas no comprovante aparece quebrado em "Buy-in + Staff fixo").
+    // FASE G: EXCETO no modo fixo "adicional", onde staff vem somado ao total cobrado.
     let staffCobrado = 0;
-    const isAdicionalV2 = _isStaffFixoAdicionalV2(t);
-    const isAdicionalLegado = _resolverStaffModo(t) === 'fixo'
-        && (t.staffFixoModo || 'embutido') === 'adicional'
-        && !isAdicionalV2;
-    if ((isAdicionalLegado || isAdicionalV2) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
-        staffCobrado = Number(t.staffFixoValor) || 0;
+    if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
+        if (_isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+            staffCobrado = Number(t.staffFixoValor) || 0;
+        }
     }
-
-    // V2: separa o staff de dentro do valorBase (mantemos valorBase como "preço pago pelo cliente").
-    // valorEntry é o que vai pra entry.valor (base sem staff).
-    let valorEntry = valorBase;
-    if (isAdicionalV2 && staffCobrado > 0) {
-        valorEntry = Math.max(0, valorBase - staffCobrado);
-    }
-
     const valorRS = valorBase; // mantém variável legada pra compat
     
     // PASSAPORTE (opcional): se torneio ativou e jogador marcou, registra na entry
@@ -20635,15 +20519,9 @@ function _registrarEntradaImpl() {
         passaporteFichas = _getPassaporteFichas(t, tipo);
     }
     
-    // Total cobrado do cliente:
-    //   - Embutido: valorBase (staff já está dentro) + extras
-    //   - Adicional LEGADO: valorBase + staff (somados) + extras → cobra a mais
-    //   - Adicional V2: valorBase + extras (staff já está dentro, cliente paga só valorBase)
-    const valorTotal = isAdicionalV2
-        ? (valorBase + taxaAdmCobrada + passaporteCobrado)
-        : (valorBase + staffCobrado + taxaAdmCobrada + passaporteCobrado);
+    const valorTotal = valorBase + staffCobrado + taxaAdmCobrada + passaporteCobrado;
 
-    const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorEntry, staff: staffCobrado, taxaAdm: taxaAdmCobrada };
+    const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: Date.now(), valor: valorBase, staff: staffCobrado, taxaAdm: taxaAdmCobrada };
     if (passaporteCobrado > 0) {
         novaEntry.passaporte = { cobrado: true, valor: passaporteCobrado, fichas: passaporteFichas };
     }
@@ -20651,12 +20529,6 @@ function _registrarEntradaImpl() {
     const bonusFichas = _calcBonusFichasParaEntry(t, tipo);
     if (bonusFichas > 0) {
         novaEntry.bonusFichas = bonusFichas;
-    }
-    // FASE I.1: Buy-in PROMO — se elegível, salva fichas customizadas e marca como promo
-    const fichasPromo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
-    if (fichasPromo !== null) {
-        novaEntry.fichasOverride = fichasPromo;
-        novaEntry.isPromo = true;
     }
     t.entries.push(novaEntry);
     alocarJogadorMesa(t, jid);
@@ -20675,12 +20547,8 @@ function _registrarEntradaImpl() {
     }
 
     // Registra transação no caixa (valor BASE da inscrição — addon agora também tem valor)
-    // V2: usa valorEntry (sem staff) porque o staff vai numa transação separada.
-    //     A soma das duas transações = valorBase pago pelo cliente.
-    // Legado: usa valorBase (preço de tabela); staff é cobrado a parte (cliente paga base + staff).
     const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
-    const valorTx = isAdicionalV2 ? valorEntry : valorBase;
-    if (valorTx > 0) {
+    if (valorBase > 0) {
         const tipoTx = tipo === 'buyin' ? 'buyin'
             : tipo === 'addon' ? 'addon'
             : tipo === 'last_chance' ? 'last_chance'
@@ -20688,7 +20556,7 @@ function _registrarEntradaImpl() {
         registrarTransacao({
             jogadorId: jid,
             tipo: tipoTx,
-            valor: -valorTx,
+            valor: -valorBase,
             descricao: `${descMap[tipo]} · ${t.nome}`,
             origem: 'torneio',
             refId: t.id,
@@ -20740,7 +20608,7 @@ function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0);
+    const numTxsAdicionadas = (valorBase > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0);
     const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
@@ -21046,8 +20914,6 @@ function updateTV(idx) {
     // Calcular fichas totais corretamente com rebuys/addons + jackpots + last chance
     // ATENÇÃO: o nome correto do campo é `rebuyFichas` (rebuySimplesFichas era um typo histórico)
     const totalFichas = t.entries.reduce((s, e) => {
-        // FASE I.1: Se entry tem fichasOverride (buy-in PROMO), usa esse valor
-        if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -21143,6 +21009,8 @@ function updateTV(idx) {
         tournamentName: t.nome,
         tipo:     t.tipo,
         layout:   t.tvLayout || 'classico',
+        proLiveBg: t.tvProLiveBg || 'verde',
+        proLiveText: t.tvProLiveText || 'dourado',
         showPrize: t.tvShowPrize !== false,
         timer:    formatTime(t.tempoRestante || 0),
         nivel:    nivelJogo || 1,
@@ -21325,8 +21193,6 @@ function _computarDadosMiniTV(t) {
         : new Set((t.entries || []).filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
     // Fichas (mesma fórmula do updateTV) — fallback robusto rebuyFichas / rebuySimplesFichas
     const totalFichas = (t.entries || []).reduce((s, e) => {
-        // FASE I.1: Se entry tem fichasOverride (buy-in PROMO), usa esse valor
-        if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -21533,6 +21399,8 @@ function onLayoutChange() {
     // Mostra/oculta botão de config de stats (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
+    const btnPers = document.getElementById('btn-personalizar-prolive');
+    if (btnPers) btnPers.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     showToast('🎨 Layout TV: ' + t.tvLayout);
 }
 
@@ -21562,9 +21430,96 @@ function syncTVControls() {
     // Mostra/oculta botão de stats config (só para Pro Live)
     const btnStats = document.getElementById('btn-config-stats-tv');
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
+    const btnPers = document.getElementById('btn-personalizar-prolive');
+    if (btnPers) btnPers.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     // Aplica visual do tema TV no card do timer (preview ao abrir o modal)
     window._lastMiniTvRender = Date.now(); // marca a renderização inicial
     renderMiniTVPreview(t.tvLayout || 'classico');
+}
+
+// ============================================================
+// PERSONALIZAÇÃO PRO LIVE (fundo + cor de texto) — Etapa 1
+// ============================================================
+const PROLIVE_BGS = [
+    { key:'verde',    nome:'Verde',     css:'radial-gradient(ellipse at 50% 50%, #1a6b4f 0%, #0d3d2e 40%, #062018 90%)' },
+    { key:'azul',     nome:'Azul',      css:'radial-gradient(ellipse at 50% 50%, #1e3a8a 0%, #14245c 40%, #070f2e 90%)' },
+    { key:'roxo',     nome:'Roxo',      css:'linear-gradient(135deg, #4c1d95 0%, #2e1065 45%, #150633 100%)' },
+    { key:'vinho',    nome:'Vinho',     css:'radial-gradient(ellipse at 50% 50%, #7f1d1d 0%, #4c0f12 40%, #260606 90%)' },
+    { key:'preto',    nome:'Preto/Ouro',css:'radial-gradient(ellipse at 50% 40%, #1c1917 0%, #0c0a09 55%, #000 100%)' },
+    { key:'petroleo', nome:'Petróleo',  css:'linear-gradient(160deg, #134e4a 0%, #0c2f2c 50%, #041917 100%)' },
+    { key:'grafite',  nome:'Grafite',   css:'linear-gradient(160deg, #3f3f46 0%, #27272a 50%, #18181b 100%)' },
+    { key:'bordo',    nome:'Bordô',     css:'linear-gradient(135deg, #831843 0%, #500724 50%, #2a0413 100%)' },
+];
+const PROLIVE_TEXTS = [
+    { key:'dourado', nome:'Dourado', cor:'#f5d572' },
+    { key:'branco',  nome:'Branco',  cor:'#ffffff' },
+    { key:'ciano',   nome:'Ciano',   cor:'#22d3ee' },
+];
+
+function abrirPersonalizarProLive() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const bgAtual = t.tvProLiveBg || 'verde';
+    const txtAtual = t.tvProLiveText || 'dourado';
+
+    const bgGrid = document.getElementById('prolive-bg-grid');
+    if (bgGrid) {
+        bgGrid.innerHTML = PROLIVE_BGS.map(b => {
+            const sel = (b.key === bgAtual);
+            return `<button onclick="_selProLiveBg('${b.key}')" data-bgkey="${b.key}" class="prolive-bg-opt" style="
+                cursor:pointer;border-radius:.5rem;overflow:hidden;padding:0;
+                border:2px solid ${sel ? '#a78bfa' : '#27272a'};
+                box-shadow:${sel ? '0 0 0 2px rgba(167,139,250,.3)' : 'none'};">
+                <div style="height:48px;background:${b.css};"></div>
+                <div style="font-size:.65rem;color:#d4d4d8;padding:.3rem 0;text-align:center;background:#0f0f12;">${b.nome}</div>
+            </button>`;
+        }).join('');
+    }
+    const txtGrid = document.getElementById('prolive-text-grid');
+    if (txtGrid) {
+        txtGrid.innerHTML = PROLIVE_TEXTS.map(tx => {
+            const sel = (tx.key === txtAtual);
+            return `<button onclick="_selProLiveText('${tx.key}')" data-txtkey="${tx.key}" class="prolive-text-opt" style="
+                cursor:pointer;border-radius:.5rem;padding:.6rem;background:#0f0f12;
+                border:2px solid ${sel ? '#a78bfa' : '#27272a'};
+                box-shadow:${sel ? '0 0 0 2px rgba(167,139,250,.3)' : 'none'};">
+                <div style="font-size:1.4rem;font-weight:800;color:${tx.cor};font-family:monospace;">00:00</div>
+                <div style="font-size:.65rem;color:#d4d4d8;margin-top:.2rem;">${tx.nome}</div>
+            </button>`;
+        }).join('');
+    }
+    // Estado temporário de seleção
+    window._proLiveBgSel = bgAtual;
+    window._proLiveTextSel = txtAtual;
+    openModal('modal-personalizar-prolive');
+}
+
+function _selProLiveBg(key) {
+    window._proLiveBgSel = key;
+    document.querySelectorAll('.prolive-bg-opt').forEach(el => {
+        const on = el.getAttribute('data-bgkey') === key;
+        el.style.border = '2px solid ' + (on ? '#a78bfa' : '#27272a');
+        el.style.boxShadow = on ? '0 0 0 2px rgba(167,139,250,.3)' : 'none';
+    });
+}
+function _selProLiveText(key) {
+    window._proLiveTextSel = key;
+    document.querySelectorAll('.prolive-text-opt').forEach(el => {
+        const on = el.getAttribute('data-txtkey') === key;
+        el.style.border = '2px solid ' + (on ? '#a78bfa' : '#27272a');
+        el.style.boxShadow = on ? '0 0 0 2px rgba(167,139,250,.3)' : 'none';
+    });
+}
+
+function salvarPersonalizarProLive() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    t.tvProLiveBg = window._proLiveBgSel || 'verde';
+    t.tvProLiveText = window._proLiveTextSel || 'dourado';
+    saveData();
+    updateTV(activeTorneioIdx);
+    closeModal('modal-personalizar-prolive');
+    showToast('🎨 Visual do Pro Live atualizado');
 }
 
 // ============================================================
@@ -22077,9 +22032,7 @@ function getRake(t) {
     const bruto = _getBrutoParaRake(t);
     // FASE G: modo do staff fixo afeta como o rake é calculado
     // - 'embutido' (default): preço de tabela JÁ inclui staff. Desconta staff ANTES do rake.
-    // - 'adicional' V2 (torneios novos): cliente paga preço de tabela; e.valor já vem com staff descontado
-    //   (gravado como base sem staff). Bruto NÃO precisa de dedução adicional aqui — já está sem staff.
-    // - 'adicional' LEGADO (torneios antigos sem V2): staff vem somado por fora. Rake direto sobre o bruto.
+    // - 'adicional': staff vem somado por fora. Bruto não inclui staff. Rake direto sobre o bruto.
     const modo = _resolverStaffModo(t);
     if (modo === 'fixo') {
         const fixoModo = t.staffFixoModo || 'embutido';
@@ -22088,11 +22041,7 @@ function getRake(t) {
             const base = Math.max(0, bruto - staffFixo);
             return base * ((Number(t.rake) || 0) / 100);
         }
-        // 'adicional' V2: e.valor já está sem staff, então bruto já é a base correta
-        if (_isStaffFixoAdicionalV2(t)) {
-            return bruto * ((Number(t.rake) || 0) / 100);
-        }
-        // 'adicional' LEGADO: staff é por fora, bruto não inclui staff → rake sobre bruto cheio
+        // 'adicional': staff é por fora, bruto não inclui staff → rake sobre bruto cheio
         return bruto * ((Number(t.rake) || 0) / 100);
     }
     // Modos antigos (nenhum/percentual): comportamento original (sem dedução)
@@ -22106,17 +22055,6 @@ function _resolverStaffModo(t) {
     if (!t) return 'nenhum';
     if (t.staffModo) return t.staffModo;
     return (Number(t.staffPct) || 0) > 0 ? 'percentual' : 'nenhum';
-}
-
-// Detecta se o torneio usa staff fixo "adicional transparente" V2
-// Nessa versão: cliente paga só o preço base, o staff sai DE DENTRO desse preço
-// (igual embutido contabilmente), e o comprovante mostra a quebra "Buy-in + Staff".
-// Torneios antigos sem a flag mantém o comportamento legado (cliente paga base + staff por fora).
-function _isStaffFixoAdicionalV2(t) {
-    if (!t) return false;
-    if (_resolverStaffModo(t) !== 'fixo') return false;
-    if ((t.staffFixoModo || 'embutido') !== 'adicional') return false;
-    return !!t.staffFixoAdicionalV2;
 }
 
 // === BUY-IN FREE (helpers) ===
@@ -22171,8 +22109,6 @@ function _getStaffFixoTotal(t) {
 // BUG-FIX (Sessão 26/05): Staff fixo EMBUTIDO separado por categoria (buyin, reentry, rebuys, addon, lc)
 // Usado APENAS pela renderização do caixa, pra mostrar valores líquidos nos cards.
 // NÃO toca em getRake/getPrize/getStaff (cálculos internos continuam corretos).
-// IMPORTANTE: Não roda em adicional V2 — nesse modo o e.valor já vem sem staff, então os cards
-// já mostram o líquido corretamente sem precisar descontar de novo.
 function _getStaffFixoEmbutidoPorTipo(t) {
     const zero = { buyin: 0, reentry: 0, rebuys: 0, addon: 0, last_chance: 0, total: 0 };
     if (!t || _resolverStaffModo(t) !== 'fixo') return zero;
@@ -22267,45 +22203,12 @@ function _calcBonusFichasParaEntry(t, tipo) {
     return (nivelAtual <= ateNivel) ? fichasBonus : 0;
 }
 
-// FASE I.1: Buy-in PROMOCIONAL (Early Bird)
-// Verifica se o Buy-in promocional está elegível neste momento (ativo + nível atual <= ateNivel)
-// Aplica APENAS pra tipo='buyin'. Re-entry, rebuy e add-on não recebem promo.
-function _isBuyinPromoElegivel(t, tipo) {
-    if (!t || !t.buyinPromoAtivo) return false;
-    if (tipo !== 'buyin') return false;
-    const ateNivel = Number(t.buyinPromoAteNivel) || 0;
-    if (ateNivel <= 0) return false;
-    if (!t.iniciadoEm) return true; // antes de começar, considera elegível
-    const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
-    return nivelAtual <= ateNivel;
-}
-
-// Retorna o valor R$ a cobrar no buy-in considerando o promo (ou null se não aplicável)
-function _calcValorBuyinPromo(t, tipo) {
-    if (!_isBuyinPromoElegivel(t, tipo)) return null;
-    return Number(t.buyinPromoValor) || 0;
-}
-
-// Retorna as fichas a entregar no buy-in considerando o promo (ou null se não aplicável)
-function _calcFichasBuyinPromo(t, tipo) {
-    if (!_isBuyinPromoElegivel(t, tipo)) return null;
-    return Number(t.buyinPromoFichas) || 0;
-}
-
 function getPrize(t) {
     // Prize = (Bruto_comRake - Rake - Staff) + Bruto_semRake
-    // FASE V2: Em modo "adicional V2" (torneios novos), o staff fixo NÃO é subtraído aqui
-    // porque ele já foi separado do bruto na hora de gravar a entry (e.valor vem sem staff).
-    // Em embutido o staff sai do bruto via getRake, mas getStaff devolve o valor — então a fórmula
-    // (bruto - rake - staff) precisa manter o "- staff" pra que a aritmética bata.
-    // Em adicional V2, e.valor já é o líquido sem staff, então subtrair staff de novo é dupla dedução.
     const brutoComRake = _getBrutoParaRake(t);
     const brutoSemRake = _getBrutoSemRake(t);
     const rake = getRake(t);
-    let staff = getStaff(t);
-    if (_isStaffFixoAdicionalV2(t)) {
-        staff = 0; // V2: já contabilizado fora do prize (e.valor não inclui staff)
-    }
+    const staff = getStaff(t);
     const liquido = (brutoComRake - rake - staff) + brutoSemRake;
     
     if (t.tipo === 'knockout') {
@@ -32948,13 +32851,6 @@ function atualizarPassaporteUI() {
 function atualizarBonusRegistroUI() {
     var cb = document.getElementById('t-bonus-registro-ativo');
     var painel = document.getElementById('t-bonus-registro-campos');
-    if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
-}
-
-// FASE I.1: Buy-in PROMOCIONAL (Early Bird)
-function atualizarBuyinPromoUI() {
-    var cb = document.getElementById('t-buyin-promo-ativo');
-    var painel = document.getElementById('t-buyin-promo-campos');
     if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
 }
 
