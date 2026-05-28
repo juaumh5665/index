@@ -2122,6 +2122,38 @@ function montarCarouselPremiacao(d) {
       } catch(e) {
         console.warn('[TV PUBLIC] não foi possível carregar extras das entries:', e);
       }
+
+      // 🔥 FALLBACK JACKPOT: busca jackpot_compras direto da tabela
+      // torneio_jackpot_compras (o RPC pode não retornar). Sem isso, o
+      // jackpot não aparece na TV pública (contagem e fichas zeradas).
+      try {
+        const idsJ = rodando.map(t => t.id);
+        if (idsJ.length) {
+          const { data: jpRows, error: errJp } = await sb
+            .from('torneio_jackpot_compras')
+            .select('torneio_id, jogador_id, valor, fichas, ts')
+            .in('torneio_id', idsJ);
+          if (!errJp && Array.isArray(jpRows)) {
+            const jpPorTorneio = {};
+            jpRows.forEach(j => {
+              (jpPorTorneio[j.torneio_id] = jpPorTorneio[j.torneio_id] || []).push(j);
+            });
+            rodando.forEach(t => {
+              // Só sobrescreve se o RPC não trouxe (ou trouxe vazio) e a tabela tem dados
+              const daTabela = jpPorTorneio[t.id];
+              const doRpc = Array.isArray(t.jackpot_compras) ? t.jackpot_compras : [];
+              if (daTabela && daTabela.length >= doRpc.length) {
+                t.jackpot_compras = daTabela;
+              }
+            });
+            if (window._debugTv) console.log('[TV PUBLIC] jackpot por torneio:', jpPorTorneio);
+          } else if (errJp) {
+            console.warn('[TV PUBLIC] erro ao ler torneio_jackpot_compras:', errJp);
+          }
+        }
+      } catch(e) {
+        console.warn('[TV PUBLIC] não foi possível carregar jackpot:', e);
+      }
       
       // Detectar se só mudou o timer (sincroniza local) — evita re-render completo
       const novoTorneio = rodando[0];
