@@ -1921,6 +1921,7 @@ function montarCarouselPremiacao(d) {
       tv_show_prize: t.tv_show_prize,
       pwStatsVis: t.pw_stats_visiveis || t.pwStatsVisiveis || null,
       entriesQtd: (t.entries || []).length,
+      bonusFichasTotal: (t.entries || []).reduce((s,e) => s + Number(e.bonus_fichas || 0), 0),
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
       tempoAlvo: t.tempo_alvo,
@@ -2063,6 +2064,49 @@ function montarCarouselPremiacao(d) {
         }
       } catch(e) {
         console.warn('[TV PUBLIC] não foi possível carregar campos extras:', e);
+      }
+
+      // 🔥 FALLBACK ENTRIES: busca bonus_fichas, passaporte e fichas_override
+      // direto da tabela torneio_entries (o RPC pode não retornar esses campos).
+      // Sem isso, o chipcount da TV pública diverge do app (não soma bônus/passaporte/promo).
+      try {
+        const idsT = rodando.map(t => t.id);
+        if (idsT.length) {
+          const { data: entsExtra, error: errEnt } = await sb
+            .from('torneio_entries')
+            .select('torneio_id, jogador_id, tipo, ts, bonus_fichas, passaporte, fichas_override')
+            .in('torneio_id', idsT);
+          if (!errEnt && Array.isArray(entsExtra)) {
+            // Agrupa por torneio
+            const porTorneio = {};
+            entsExtra.forEach(en => {
+              (porTorneio[en.torneio_id] = porTorneio[en.torneio_id] || []).push(en);
+            });
+            rodando.forEach(t => {
+              const lista = porTorneio[t.id];
+              if (!lista || !Array.isArray(t.entries)) return;
+              // Para cada entry do torneio, tenta casar e copiar os campos extras
+              t.entries.forEach(e => {
+                // casamento por jogador_id + tipo + ts (quando disponível); fallback jogador+tipo
+                let m = lista.find(x =>
+                  String(x.jogador_id) === String(e.jogador_id) &&
+                  x.tipo === e.tipo &&
+                  (e.ts == null || x.ts == null || new Date(x.ts).getTime() === new Date(e.ts).getTime())
+                );
+                if (!m) m = lista.find(x => String(x.jogador_id) === String(e.jogador_id) && x.tipo === e.tipo);
+                if (m) {
+                  if (e.bonus_fichas == null) e.bonus_fichas = m.bonus_fichas;
+                  if (e.passaporte == null) e.passaporte = m.passaporte;
+                  if (e.fichas_override == null) e.fichas_override = m.fichas_override;
+                }
+              });
+            });
+          } else if (errEnt) {
+            console.warn('[TV PUBLIC] erro ao ler torneio_entries:', errEnt);
+          }
+        }
+      } catch(e) {
+        console.warn('[TV PUBLIC] não foi possível carregar extras das entries:', e);
       }
       
       // Detectar se só mudou o timer (sincroniza local) — evita re-render completo
@@ -2370,15 +2414,27 @@ function montarCarouselPremiacao(d) {
     const lastChanceFichasQtd = Number(t.last_chance_fichas || 0);
     
     let totalFichas = entries.reduce((s, e) => {
+      // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
+      const override = Number(e.fichas_override || e.fichasOverride || 0);
+      if (override > 0) return s + override;
       if (e.tipo === 'rebuy_simples') return s + rebuySimplesFichas;
       if (e.tipo === 'rebuy_duplo')   return s + rebuyDuploFichas;
       if (e.tipo === 'addon')         return s + addonFichasQtd;
       if (e.tipo === 'last_chance')   return s + lastChanceFichasQtd;
       return s + stackInicial;  // buyin, reentry
     }, 0);
-    
-    // Adiciona jackpot chips
-    const chipCount = totalFichas + jackpotFichas;
+
+    // FASE H: fichas extras do bônus de registro antecipado (e.bonus_fichas por entry)
+    const bonusFichas = entries.reduce((s, e) => s + Number(e.bonus_fichas || e.bonusFichas || 0), 0);
+    // Passaporte: fichas extras quando a entry comprou passaporte
+    const passaporteFichas = entries.reduce((s, e) => {
+      const p = e.passaporte;
+      if (p && (p.cobrado || p.fichas)) return s + Number(p.fichas || 0);
+      return s;
+    }, 0);
+
+    // Adiciona jackpot chips + bônus + passaporte (espelha EXATAMENTE o app)
+    const chipCount = totalFichas + jackpotFichas + bonusFichas + passaporteFichas;
     
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
     
