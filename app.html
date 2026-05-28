@@ -10219,25 +10219,10 @@ async function iniciar2FAEnroll() {
             uri: data.totp.uri,
         };
 
-        // 4. Renderiza o QR. Estratégia: preferir geração LOCAL a partir do otpauth URI
-        //    (sempre confiável, offline), e só usar o qr_code do Supabase como fallback.
-        const qrEl = document.getElementById('mfa-qr');
-        if (qrEl) {
-            if (data.totp.uri && typeof window.QRCode !== 'undefined' && window.QRCode.toCanvas) {
-                _mfaRenderQrDeUri(data.totp.uri);
-            } else {
-                const qr = data.totp.qr_code || '';
-                if (typeof qr === 'string' && qr.trim().startsWith('<svg')) {
-                    qrEl.innerHTML = `<div style="width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;display:flex;align-items:center;justify-content:center;">${qr}</div>`;
-                } else if (typeof qr === 'string' && qr.startsWith('data:')) {
-                    qrEl.innerHTML = `<img src="${qr}" alt="QR Code 2FA" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;" onerror="_mfaQrFallback()">`;
-                } else if (data.totp.uri) {
-                    _mfaRenderQrDeUri(data.totp.uri);
-                } else {
-                    _mfaQrManualInstrucao();
-                }
-            }
-        }
+        // 4. Renderiza o QR via construção DOM pura (sem innerHTML com template strings,
+        //    que podem vazar como texto se algo na string quebrar). Estratégia:
+        //    canvas local a partir do otpauth URI (sempre confiável) → fallbacks.
+        _mfaRenderQR(data.totp);
         const secEl = document.getElementById('mfa-secret');
         if (secEl) secEl.innerText = data.totp.secret || '—';
         const codeInp = document.getElementById('mfa-code-input');
@@ -10267,45 +10252,113 @@ async function iniciar2FAEnroll() {
     }
 }
 
-// Gera o QR a partir do otpauth URI usando a lib qrcode (client-side, offline).
-function _mfaRenderQrDeUri(uri) {
+// === Renderização do QR de 2FA (construção DOM pura, sem innerHTML/template strings) ===
+// Estratégia em cascata:
+//   1. Gera canvas localmente a partir do otpauth URI (lib qrcode) — sempre confiável
+//   2. Se a lib não carregou mas o Supabase mandou SVG inline, usa o SVG
+//   3. Se mandou data-uri de imagem, usa <img>
+//   4. Último caso: instrução pra usar o código manual
+function _mfaRenderQR(totp) {
     const qrEl = document.getElementById('mfa-qr');
-    if (!qrEl || !uri) return;
-    // Se a lib qrcode carregou, gera um canvas localmente (sempre confiável)
-    if (typeof window.QRCode !== 'undefined' && window.QRCode.toCanvas) {
+    if (!qrEl) return;
+    while (qrEl.firstChild) qrEl.removeChild(qrEl.firstChild); // limpa sem innerHTML
+
+    const uri = totp && totp.uri;
+    const qrRaw = (totp && totp.qr_code) || '';
+
+    // 1. Canvas local via lib qrcode (preferido)
+    const temLib = () => typeof window.QRCode !== 'undefined' && typeof window.QRCode.toCanvas === 'function';
+    const desenhar = () => {
         const canvas = document.createElement('canvas');
         window.QRCode.toCanvas(canvas, uri, { width: 200, margin: 1 }, (err) => {
-            if (err) {
-                console.warn('[MFA] QRCode.toCanvas falhou:', err);
-                _mfaQrManualInstrucao();
-                return;
-            }
-            qrEl.innerHTML = '';
+            if (err) { console.warn('[MFA] toCanvas falhou:', err); _mfaQrSVGouManual(qrRaw); return; }
+            while (qrEl.firstChild) qrEl.removeChild(qrEl.firstChild);
             const box = document.createElement('div');
             box.style.cssText = 'background:#fff;padding:8px;border-radius:.5rem;display:inline-block;';
             box.appendChild(canvas);
             qrEl.appendChild(box);
         });
-    } else {
-        _mfaQrManualInstrucao();
+    };
+
+    if (uri && temLib()) { desenhar(); return; }
+
+    // Lib ainda não carregou? Tenta carregar sob demanda e desenhar quando pronto.
+    if (uri && !temLib()) {
+        // Mostra "gerando..." enquanto carrega
+        const loading = document.createElement('div');
+        loading.style.cssText = 'width:200px;height:200px;display:flex;align-items:center;justify-content:center;color:#71717a;font-size:.78rem;';
+        loading.textContent = 'Gerando QR...';
+        qrEl.appendChild(loading);
+        _mfaCarregarLibQR().then((ok) => {
+            if (ok && temLib()) desenhar();
+            else _mfaQrSVGouManual(qrRaw);
+        }).catch(() => _mfaQrSVGouManual(qrRaw));
+        return;
     }
+
+    // Sem URI: fallbacks diretos
+    _mfaQrSVGouManual(qrRaw);
 }
 
-// Instrução de fallback final: usar o código manual
+// Carrega a lib qrcode sob demanda (caso o <script> do head não tenha carregado a tempo).
+let _mfaLibQRPromise = null;
+function _mfaCarregarLibQR() {
+    if (typeof window.QRCode !== 'undefined' && window.QRCode.toCanvas) return Promise.resolve(true);
+    if (_mfaLibQRPromise) return _mfaLibQRPromise;
+    _mfaLibQRPromise = new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+        // timeout de segurança (5s)
+        setTimeout(() => resolve(typeof window.QRCode !== 'undefined'), 5000);
+    });
+    return _mfaLibQRPromise;
+}
+
+// Fallback: usa SVG inline do Supabase, ou data-uri, ou instrução manual.
+function _mfaQrSVGouManual(qrRaw) {
+    const qrEl = document.getElementById('mfa-qr');
+    if (!qrEl) return;
+    while (qrEl.firstChild) qrEl.removeChild(qrEl.firstChild);
+
+    if (typeof qrRaw === 'string' && qrRaw.trim().startsWith('<svg')) {
+        const box = document.createElement('div');
+        box.style.cssText = 'width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;display:flex;align-items:center;justify-content:center;';
+        // SVG do Supabase é confiável; usar innerHTML só pro SVG isolado
+        box.innerHTML = qrRaw;
+        qrEl.appendChild(box);
+        return;
+    }
+    if (typeof qrRaw === 'string' && qrRaw.startsWith('data:image')) {
+        const img = document.createElement('img');
+        img.alt = 'QR Code 2FA';
+        img.style.cssText = 'width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;';
+        img.onerror = () => _mfaQrManualInstrucao();
+        img.src = qrRaw;
+        qrEl.appendChild(img);
+        return;
+    }
+    _mfaQrManualInstrucao();
+}
+
+// Instrução de fallback final: usar o código manual (construção DOM pura)
 function _mfaQrManualInstrucao() {
     const qrEl = document.getElementById('mfa-qr');
     if (!qrEl) return;
-    qrEl.innerHTML = `
-        <div style="width:200px;background:#0a0a0b;padding:1rem;border-radius:.5rem;text-align:center;">
-            <i class="fa-solid fa-keyboard" style="color:var(--gold);font-size:1.5rem;"></i>
-            <div style="font-size:.72rem;color:#a1a1aa;margin-top:.5rem;line-height:1.4;">QR indisponível. Adicione manualmente no app autenticador usando o código abaixo.</div>
-        </div>`;
-}
-
-// Fallback se a <img> do QR falhar ao carregar
-function _mfaQrFallback() {
-    if (_mfaEnrollState && _mfaEnrollState.uri) _mfaRenderQrDeUri(_mfaEnrollState.uri);
-    else _mfaQrManualInstrucao();
+    while (qrEl.firstChild) qrEl.removeChild(qrEl.firstChild);
+    const box = document.createElement('div');
+    box.style.cssText = 'width:200px;background:#0a0a0b;padding:1rem;border-radius:.5rem;text-align:center;';
+    const icon = document.createElement('i');
+    icon.className = 'fa-solid fa-keyboard';
+    icon.style.cssText = 'color:var(--gold);font-size:1.5rem;';
+    const txt = document.createElement('div');
+    txt.style.cssText = 'font-size:.72rem;color:#a1a1aa;margin-top:.5rem;line-height:1.4;';
+    txt.textContent = 'QR indisponível. Adicione manualmente no app autenticador usando o código abaixo.';
+    box.appendChild(icon);
+    box.appendChild(txt);
+    qrEl.appendChild(box);
 }
 
 // Confirma o enrollment: valida o código de 6 dígitos digitado pelo usuário.
