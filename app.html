@@ -1475,6 +1475,35 @@ body.tema-claro #login-screen [style*="color: #d4d4d8"] {
 .sensitive-timer.warning {
     color: #ef4444;
 }
+
+/* ===== CONTAS A PAGAR ===== */
+.cp-fbtn { background:none; border:none; color:#71717a; padding:.6rem .9rem; font-size:.8rem; font-weight:700; cursor:pointer; font-family:inherit; }
+.cp-fbtn.cp-active { background:#1c1c1f; color:#f59e0b; }
+.cp-bill { display:grid; grid-template-columns:auto 1fr auto auto; gap:1rem; align-items:center; padding:.95rem 1.1rem; border-bottom:1px solid #26262b; transition:.12s; }
+.cp-bill:last-child { border-bottom:none; }
+.cp-bill:hover { background:#1c1c1f; }
+.cp-bill-icon { width:42px; height:42px; border-radius:.6rem; display:grid; place-items:center; font-size:1.1rem; flex-shrink:0; }
+.cp-tag { font-size:.62rem; padding:.12rem .45rem; border-radius:.3rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+.cp-tag-recorrente { background:rgba(59,130,246,.12); color:#3b82f6; }
+.cp-tag-avulsa { background:rgba(168,139,250,.12); color:#a78bfa; }
+.cp-status { display:inline-flex; align-items:center; gap:.35rem; font-size:.72rem; font-weight:700; padding:.35rem .7rem; border-radius:.4rem; white-space:nowrap; }
+.cp-status.pago { background:rgba(16,185,129,.12); color:#10b981; }
+.cp-status.pendente { background:rgba(245,158,11,.12); color:#f59e0b; }
+.cp-status.atrasado { background:rgba(239,68,68,.12); color:#ef4444; }
+.cp-icon-btn { width:32px; height:32px; border-radius:.45rem; background:#1c1c1f; border:1px solid #26262b; color:#71717a; cursor:pointer; display:grid; place-items:center; font-size:.8rem; transition:.12s; }
+.cp-icon-btn:hover { color:#f59e0b; border-color:#f59e0b; }
+.cp-icon-btn.cp-pay:hover { color:#10b981; border-color:#10b981; }
+.cp-cat-opt { background:#141416; border:2px solid #26262b; border-radius:.55rem; padding:.6rem .3rem; text-align:center; cursor:pointer; transition:.12s; }
+.cp-cat-opt:hover { border-color:#f59e0b; }
+.cp-cat-opt.cp-sel { border-color:#f59e0b; background:rgba(245,158,11,.08); }
+.cp-cat-opt i { font-size:1.1rem; display:block; margin-bottom:.25rem; }
+.cp-cat-opt span { font-size:.62rem; color:#71717a; }
+.cp-upcoming { display:flex; align-items:center; gap:.7rem; padding:.6rem 0; border-bottom:1px solid #26262b; font-size:.82rem; }
+.cp-upcoming:last-child { border-bottom:none; }
+@media (max-width:900px) {
+  .cp-main-grid { grid-template-columns:1fr !important; }
+  .cp-summary-grid { grid-template-columns:repeat(2,1fr) !important; }
+}
 </style>
 </head>
 <body class="overflow-hidden">
@@ -2138,6 +2167,9 @@ document.addEventListener('DOMContentLoaded', function(){
             <div onclick="showPage('caixa')" id="nav-caixa" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-cash-register nav-ico" style="width:16px;color:#10b981;"></i> Caixa
             </div>
+            <div onclick="showPage('contaspagar')" id="nav-contaspagar" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
+                <i class="fa-solid fa-file-invoice-dollar nav-ico" style="width:16px;color:#f59e0b;"></i> Contas a Pagar
+            </div>
             <div onclick="showPage('relatorios')" id="nav-relatorios" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-chart-line nav-ico" style="width:16px;color:#06b6d4;"></i> Relatórios
             </div>
@@ -2611,6 +2643,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <button class="tab-btn"        id="reltab-btn-bar"       onclick="switchReportTab('rel-bar', this)"><i class="fa-solid fa-utensils"></i> Bar</button>
                     <button class="tab-btn"        id="reltab-btn-clientes"  onclick="switchReportTab('rel-clientes', this)"><i class="fa-solid fa-users"></i> Clientes</button>
                     <button class="tab-btn"        id="reltab-btn-pagamentos" onclick="switchReportTab('rel-pagamentos', this)"><i class="fa-solid fa-credit-card"></i> Pagamentos</button>
+                    <button class="tab-btn"        id="reltab-btn-contaspagar" onclick="switchReportTab('rel-contaspagar', this); _cpRenderRelatorio();"><i class="fa-solid fa-file-invoice-dollar"></i> Contas a Pagar</button>
                 </div>
 
                 <!-- ABA: VISÃO GERAL -->
@@ -2778,6 +2811,26 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div class="stat-card" style="padding:1.25rem;">
                         <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Recebimentos por Forma de Pagamento</div>
                         <div id="rp-pagamentos-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+
+                <!-- ABA: CONTAS A PAGAR -->
+                <div id="rel-contaspagar" class="reltab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.9rem;margin-bottom:1.5rem;">
+                        <div class="stat-card" style="border-color:rgba(16,185,129,.3);">
+                            <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Total Pago no período</div>
+                            <div id="cp-rel-pago" style="font-size:1.7rem;font-weight:900;color:#10b981;font-family:var(--font-mono);margin-top:.45rem;">R$ 0</div>
+                            <div id="cp-rel-pago-cnt" style="font-size:.72rem;color:#71717a;margin-top:.3rem;">0 contas</div>
+                        </div>
+                        <div class="stat-card" style="border-color:rgba(245,158,11,.3);">
+                            <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Pendente no período</div>
+                            <div id="cp-rel-pendente" style="font-size:1.7rem;font-weight:900;color:#f59e0b;font-family:var(--font-mono);margin-top:.45rem;">R$ 0</div>
+                            <div id="cp-rel-pendente-cnt" style="font-size:.72rem;color:#71717a;margin-top:.3rem;">0 contas</div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Lista de Contas no Período</div>
+                        <div id="cp-rel-lista" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
                 </div>
 
@@ -3546,6 +3599,84 @@ document.addEventListener('DOMContentLoaded', function(){
                 <!-- TAB: VOUCHERS -->
                 <div id="tvtab-vouchers" class="tvtab-content stat-card" style="padding:1rem;display:none;">
                     <div id="tv-lista-vouchers" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <!-- CONTAS A PAGAR -->
+            <div id="page-contaspagar" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:.25rem;"><i class="fa-solid fa-file-invoice-dollar" style="color:#f59e0b;"></i> Contas a Pagar</h2>
+                        <div style="font-size:.8rem;color:#71717a;">Gerencie as despesas do seu clube — energia, internet, aluguel e mais</div>
+                    </div>
+                    <button class="btn-gold" onclick="cpAbrirModal()" style="padding:.7rem 1.1rem;border-radius:.6rem;font-weight:700;">
+                        <i class="fa-solid fa-plus"></i> Nova Conta
+                    </button>
+                </div>
+
+                <!-- Cards de resumo -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.5rem;" class="cp-summary-grid">
+                    <div class="stat-card" style="border-color:rgba(239,68,68,.3);">
+                        <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;display:flex;align-items:center;gap:.4rem;">
+                            <i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;"></i> Atrasadas
+                        </div>
+                        <div id="cp-sum-atrasado" style="font-size:1.7rem;font-weight:900;color:#ef4444;font-family:var(--font-mono);margin-top:.45rem;">R$ 0</div>
+                        <div id="cp-cnt-atrasado" style="font-size:.72rem;color:#71717a;margin-top:.3rem;">0 contas</div>
+                    </div>
+                    <div class="stat-card" style="border-color:rgba(245,158,11,.3);">
+                        <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;display:flex;align-items:center;gap:.4rem;">
+                            <i class="fa-solid fa-clock" style="color:#f59e0b;"></i> A Vencer (mês)
+                        </div>
+                        <div id="cp-sum-pendente" style="font-size:1.7rem;font-weight:900;color:#f59e0b;font-family:var(--font-mono);margin-top:.45rem;">R$ 0</div>
+                        <div id="cp-cnt-pendente" style="font-size:.72rem;color:#71717a;margin-top:.3rem;">0 contas</div>
+                    </div>
+                    <div class="stat-card" style="border-color:rgba(16,185,129,.3);">
+                        <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;display:flex;align-items:center;gap:.4rem;">
+                            <i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Pago (mês)
+                        </div>
+                        <div id="cp-sum-pago" style="font-size:1.7rem;font-weight:900;color:#10b981;font-family:var(--font-mono);margin-top:.45rem;">R$ 0</div>
+                        <div id="cp-cnt-pago" style="font-size:.72rem;color:#71717a;margin-top:.3rem;">0 contas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;display:flex;align-items:center;gap:.4rem;">
+                            <i class="fa-solid fa-wallet" style="color:#f59e0b;"></i> Total do Mês
+                        </div>
+                        <div id="cp-sum-total" style="font-size:1.7rem;font-weight:900;color:#f59e0b;font-family:var(--font-mono);margin-top:.45rem;">R$ 0</div>
+                        <div style="font-size:.72rem;color:#71717a;margin-top:.3rem;" id="cp-mes-label">Mês atual</div>
+                    </div>
+                </div>
+
+                <!-- Toolbar -->
+                <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+                    <div style="flex:1;min-width:200px;position:relative;">
+                        <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:#71717a;"></i>
+                        <input type="text" id="cp-search" placeholder="Buscar conta ou fornecedor..." oninput="cpRender()" class="inp" style="padding-left:2.3rem;">
+                    </div>
+                    <div id="cp-filter-status" style="display:flex;background:#141416;border:1px solid #26262b;border-radius:.6rem;overflow:hidden;">
+                        <button class="cp-fbtn cp-active" data-f="todas" onclick="cpSetFilter(this)">Todas</button>
+                        <button class="cp-fbtn" data-f="pendente" onclick="cpSetFilter(this)">Pendentes</button>
+                        <button class="cp-fbtn" data-f="atrasado" onclick="cpSetFilter(this)">Atrasadas</button>
+                        <button class="cp-fbtn" data-f="pago" onclick="cpSetFilter(this)">Pagas</button>
+                    </div>
+                </div>
+
+                <!-- Layout principal: lista + sidebar -->
+                <div style="display:grid;grid-template-columns:1fr 300px;gap:1.2rem;" class="cp-main-grid">
+                    <div id="cp-bills" style="background:#141416;border:1px solid #26262b;border-radius:.9rem;overflow:hidden;"></div>
+                    <div>
+                        <div style="background:#141416;border:1px solid #26262b;border-radius:.9rem;padding:1.1rem;margin-bottom:1.2rem;">
+                            <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#71717a;margin-bottom:.9rem;">
+                                <i class="fa-solid fa-chart-pie"></i> Por Categoria
+                            </div>
+                            <div id="cp-cat-chart"></div>
+                        </div>
+                        <div style="background:#141416;border:1px solid #26262b;border-radius:.9rem;padding:1.1rem;">
+                            <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#71717a;margin-bottom:.9rem;">
+                                <i class="fa-solid fa-calendar-day"></i> Próximos Vencimentos
+                            </div>
+                            <div id="cp-upcoming"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -4484,6 +4615,68 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <!-- MODAL: CONFIG STATS TV PRO LIVE -->
+<div id="modal-contaspagar" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #26262b;border-radius:1.1rem;padding:1.6rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+            <h3 id="cp-modal-title" style="font-size:1.15rem;font-weight:800;">Nova Conta</h3>
+            <button onclick="closeModal('modal-contaspagar')" style="background:none;border:none;color:#71717a;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="margin-bottom:.9rem;">
+            <label class="inp-label">Descrição</label>
+            <input type="text" id="cp-f-nome" class="inp" placeholder="Ex: Conta de Energia - CELESC">
+        </div>
+        <div style="margin-bottom:.9rem;">
+            <label class="inp-label">Categoria</label>
+            <div id="cp-cat-picker" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:.9rem;">
+            <div>
+                <label class="inp-label">Valor (R$)</label>
+                <input type="number" id="cp-f-valor" class="inp" step="0.01" placeholder="0,00">
+            </div>
+            <div>
+                <label class="inp-label">Vencimento</label>
+                <input type="date" id="cp-f-venc" class="inp">
+            </div>
+        </div>
+        <div style="margin-bottom:.9rem;">
+            <label class="inp-label">Fornecedor / Credor (opcional)</label>
+            <input type="text" id="cp-f-fornecedor" class="inp" placeholder="Ex: CELESC, Vivo, Imobiliária...">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:.9rem;">
+            <div>
+                <label class="inp-label">Forma de Pagamento</label>
+                <select id="cp-f-forma" class="inp">
+                    <option value="pix">PIX</option>
+                    <option value="boleto">Boleto</option>
+                    <option value="cartao">Cartão</option>
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="debito">Débito automático</option>
+                </select>
+            </div>
+            <div>
+                <label class="inp-label">Status</label>
+                <select id="cp-f-status" class="inp">
+                    <option value="pendente">Pendente</option>
+                    <option value="pago">Pago</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:flex;align-items:center;gap:.6rem;background:#141416;border:1px solid #26262b;border-radius:.55rem;padding:.7rem .8rem;cursor:pointer;">
+                <input type="checkbox" id="cp-f-recorrente" style="width:18px;height:18px;accent-color:#f59e0b;cursor:pointer;">
+                <div>
+                    <div style="font-size:.85rem;font-weight:600;">Conta recorrente (mensal)</div>
+                    <div style="font-size:.7rem;color:#71717a;">Marca esta conta como recorrente</div>
+                </div>
+            </label>
+        </div>
+        <button class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;font-weight:700;" onclick="cpSalvarConta()">
+            <i class="fa-solid fa-check"></i> Salvar Conta
+        </button>
+    </div>
+</div>
+
 <div id="modal-personalizar-prolive" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
@@ -6571,6 +6764,8 @@ let barGrupos  = JSON.parse(localStorage.getItem('ps_bar_grupos')) || ['Refriger
 let _barGruposMap = JSON.parse(localStorage.getItem('ps_bar_grupos_map') || 'null') || { nomeParaId: {}, idParaNome: {} };
 let barProdutos= JSON.parse(localStorage.getItem('ps_bar_produtos'))|| [];
 let barComandas= JSON.parse(localStorage.getItem('ps_bar_comandas'))|| [];
+// Contas a Pagar (carregado do Supabase no boot)
+let contasPagar = [];
 let cashMesas  = JSON.parse(localStorage.getItem('ps_cash_mesas'))  || [];
 let usuarios   = JSON.parse(localStorage.getItem('ps_usuarios'))    || [];
 let config     = JSON.parse(localStorage.getItem('ps_config'))      || {};
@@ -6654,7 +6849,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash','stackbar'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot','ticketsvouchers','stackbar'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa','stackbar'] },
@@ -17902,6 +18097,7 @@ function showPage(page) {
     if (page === 'config')    renderConfig();
     if (page === 'assinatura') renderAssinatura();
     if (page === 'caixa')     renderCaixa();
+    if (page === 'contaspagar') { cpCarregarSupabase(); cpRender(); }
     if (page === 'ticketsvouchers') renderTicketsVouchers();
     if (page === 'relatorios') {
         setReportPeriod(_reportPeriod.tipo || '30d');
@@ -22096,6 +22292,409 @@ function syncTVControls() {
     window._lastMiniTvRender = Date.now(); // marca a renderização inicial
     renderMiniTVPreview(t.tvLayout || 'classico');
 }
+
+// ============================================================
+// CONTAS A PAGAR
+// ============================================================
+const CP_CATEGORIAS = {
+    energia:    { nome:'Energia',    icon:'fa-bolt',      cor:'#f59e0b' },
+    internet:   { nome:'Internet',   icon:'fa-wifi',      cor:'#3b82f6' },
+    aluguel:    { nome:'Aluguel',    icon:'fa-house',     cor:'#a78bfa' },
+    agua:       { nome:'Água',       icon:'fa-droplet',   cor:'#06b6d4' },
+    salario:    { nome:'Salários',   icon:'fa-users',     cor:'#10b981' },
+    fornecedor: { nome:'Fornecedor', icon:'fa-truck',     cor:'#ec4899' },
+    imposto:    { nome:'Impostos',   icon:'fa-landmark',  cor:'#ef4444' },
+    outros:     { nome:'Outros',     icon:'fa-ellipsis',  cor:'#71717a' },
+};
+let _cpFiltroStatus = 'todas';
+let _cpCatSelecionada = 'energia';
+let _cpEditandoId = null;
+
+function _cpFmt(v) { return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function _cpFmtShort(v) { return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function _cpHoje() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function _cpStatusReal(c) {
+    if (c.status === 'pago') return 'pago';
+    const v = new Date(c.venc + 'T00:00:00');
+    return v < _cpHoje() ? 'atrasado' : 'pendente';
+}
+function _cpDiasAte(venc) {
+    const v = new Date(venc + 'T00:00:00');
+    return Math.round((v - _cpHoje()) / (1000*60*60*24));
+}
+function _cpMesAtualStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function cpRender() {
+    const mesAtual = _cpMesAtualStr();
+    const doMes = contasPagar.filter(c => (c.venc||'').startsWith(mesAtual));
+    const atrasadas = contasPagar.filter(c => _cpStatusReal(c) === 'atrasado');
+    const pendentes = doMes.filter(c => _cpStatusReal(c) === 'pendente');
+    const pagas = doMes.filter(c => c.status === 'pago');
+    const sum = arr => arr.reduce((s,c) => s + Number(c.valor||0), 0);
+
+    const elAtr = document.getElementById('cp-sum-atrasado');
+    if (elAtr) elAtr.textContent = _cpFmtShort(sum(atrasadas));
+    const elCntAtr = document.getElementById('cp-cnt-atrasado');
+    if (elCntAtr) elCntAtr.textContent = atrasadas.length + ' conta' + (atrasadas.length !== 1 ? 's' : '');
+    const elPend = document.getElementById('cp-sum-pendente');
+    if (elPend) elPend.textContent = _cpFmtShort(sum(pendentes));
+    const elCntPend = document.getElementById('cp-cnt-pendente');
+    if (elCntPend) elCntPend.textContent = pendentes.length + ' conta' + (pendentes.length !== 1 ? 's' : '');
+    const elPago = document.getElementById('cp-sum-pago');
+    if (elPago) elPago.textContent = _cpFmtShort(sum(pagas));
+    const elCntPago = document.getElementById('cp-cnt-pago');
+    if (elCntPago) elCntPago.textContent = pagas.length + ' conta' + (pagas.length !== 1 ? 's' : '');
+    const elTotal = document.getElementById('cp-sum-total');
+    if (elTotal) elTotal.textContent = _cpFmtShort(sum(doMes));
+
+    // Lista filtrada
+    const buscaEl = document.getElementById('cp-search');
+    const busca = (buscaEl ? buscaEl.value : '').toLowerCase();
+    let lista = contasPagar.filter(c => {
+        const okStatus = _cpFiltroStatus === 'todas' || _cpStatusReal(c) === _cpFiltroStatus;
+        const okBusca = !busca || (c.nome||'').toLowerCase().includes(busca) || (c.fornecedor||'').toLowerCase().includes(busca);
+        return okStatus && okBusca;
+    });
+    const ord = { atrasado:0, pendente:1, pago:2 };
+    lista.sort((a,b) => ord[_cpStatusReal(a)] - ord[_cpStatusReal(b)] || (a.venc||'').localeCompare(b.venc||''));
+
+    const panel = document.getElementById('cp-bills');
+    if (!panel) return;
+    if (!lista.length) {
+        panel.innerHTML = '<div style="padding:3rem 1rem;text-align:center;color:#71717a;"><i class="fa-solid fa-receipt" style="font-size:2.5rem;margin-bottom:.8rem;opacity:.4;display:block;"></i><div>Nenhuma conta encontrada</div></div>';
+    } else {
+        panel.innerHTML = lista.map(c => {
+            const cat = CP_CATEGORIAS[c.cat] || CP_CATEGORIAS.outros;
+            const st = _cpStatusReal(c);
+            const dias = _cpDiasAte(c.venc);
+            let dataTxt;
+            if (st === 'pago') dataTxt = 'Pago';
+            else if (st === 'atrasado') dataTxt = Math.abs(dias) + ' dia' + (Math.abs(dias)!==1?'s':'') + ' atrás';
+            else if (dias === 0) dataTxt = 'Vence hoje';
+            else dataTxt = 'Vence em ' + dias + ' dia' + (dias!==1?'s':'');
+            const stIcon = st === 'pago' ? 'fa-circle-check' : (st === 'atrasado' ? 'fa-triangle-exclamation' : 'fa-clock');
+            const stLabel = st === 'pago' ? 'Pago' : (st === 'atrasado' ? 'Atrasado' : 'Pendente');
+            const vencFmt = new Date(c.venc + 'T00:00:00').toLocaleDateString('pt-BR');
+            const fornHtml = c.fornecedor ? '<span><i class="fa-regular fa-building"></i> ' + _cpEscape(c.fornecedor) + '</span>' : '';
+            const payBtn = st !== 'pago' ? '<button class="cp-icon-btn cp-pay" title="Marcar como pago" onclick="cpMarcarPago(\'' + c.id + '\')"><i class="fa-solid fa-check"></i></button>' : '';
+            return '<div class="cp-bill">' +
+                '<div class="cp-bill-icon" style="background:' + cat.cor + '22;color:' + cat.cor + ';"><i class="fa-solid ' + cat.icon + '"></i></div>' +
+                '<div>' +
+                    '<h4 style="font-size:.95rem;font-weight:700;margin-bottom:.15rem;">' + _cpEscape(c.nome) + '</h4>' +
+                    '<div style="font-size:.72rem;color:#71717a;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;">' +
+                        '<span><i class="fa-regular fa-calendar"></i> ' + vencFmt + '</span>' +
+                        fornHtml +
+                        '<span class="cp-tag ' + (c.recorrente ? 'cp-tag-recorrente' : 'cp-tag-avulsa') + '">' + (c.recorrente ? 'Recorrente' : 'Avulsa') + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div style="text-align:right;">' +
+                    '<div style="font-size:1.05rem;font-weight:800;font-family:var(--font-mono);">' + _cpFmt(c.valor) + '</div>' +
+                    '<div style="font-size:.68rem;color:' + (st==='atrasado'?'#ef4444':'#71717a') + ';">' + dataTxt + '</div>' +
+                '</div>' +
+                '<div style="display:flex;align-items:center;gap:.7rem;">' +
+                    '<span class="cp-status ' + st + '"><i class="fa-solid ' + stIcon + '"></i> ' + stLabel + '</span>' +
+                    '<div style="display:flex;gap:.35rem;">' +
+                        payBtn +
+                        '<button class="cp-icon-btn" title="Editar" onclick="cpEditar(\'' + c.id + '\')"><i class="fa-solid fa-pen"></i></button>' +
+                        '<button class="cp-icon-btn" title="Excluir" onclick="cpExcluir(\'' + c.id + '\')"><i class="fa-solid fa-trash"></i></button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    _cpRenderCatChart();
+    _cpRenderUpcoming();
+}
+
+function _cpEscape(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function _cpRenderCatChart() {
+    const mesAtual = _cpMesAtualStr();
+    const porCat = {};
+    contasPagar.filter(c => (c.venc||'').startsWith(mesAtual)).forEach(c => {
+        porCat[c.cat] = (porCat[c.cat]||0) + Number(c.valor||0);
+    });
+    const total = Object.values(porCat).reduce((s,v) => s+v, 0) || 1;
+    const ordenado = Object.entries(porCat).sort((a,b) => b[1]-a[1]);
+    const el = document.getElementById('cp-cat-chart');
+    if (!el) return;
+    el.innerHTML = ordenado.map(([k,v]) => {
+        const cat = CP_CATEGORIAS[k] || CP_CATEGORIAS.outros;
+        const pct = (v/total*100).toFixed(0);
+        return '<div style="margin-bottom:.8rem;">' +
+            '<div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;margin-bottom:.2rem;">' +
+                '<span style="width:10px;height:10px;border-radius:50%;background:' + cat.cor + ';flex-shrink:0;"></span>' +
+                '<span style="flex:1;">' + cat.nome + '</span>' +
+                '<span style="font-family:var(--font-mono);font-weight:700;font-size:.8rem;">' + _cpFmtShort(v) + '</span>' +
+            '</div>' +
+            '<div style="height:6px;background:#1c1c1f;border-radius:3px;overflow:hidden;">' +
+                '<span style="display:block;height:100%;width:' + pct + '%;background:' + cat.cor + ';border-radius:3px;"></span>' +
+            '</div>' +
+        '</div>';
+    }).join('') || '<div style="color:#71717a;font-size:.8rem;">Sem dados</div>';
+}
+
+function _cpRenderUpcoming() {
+    const prox = contasPagar.filter(c => _cpStatusReal(c) !== 'pago')
+        .sort((a,b) => (a.venc||'').localeCompare(b.venc||'')).slice(0,5);
+    const meses = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+    const el = document.getElementById('cp-upcoming');
+    if (!el) return;
+    el.innerHTML = prox.map(c => {
+        const cat = CP_CATEGORIAS[c.cat] || CP_CATEGORIAS.outros;
+        const d = new Date(c.venc + 'T00:00:00');
+        const st = _cpStatusReal(c);
+        return '<div class="cp-upcoming">' +
+            '<div style="width:42px;text-align:center;flex-shrink:0;">' +
+                '<div style="font-size:1.1rem;font-weight:900;line-height:1;' + (st==='atrasado'?'color:#ef4444;':'') + '">' + d.getDate() + '</div>' +
+                '<div style="font-size:.6rem;color:#71717a;text-transform:uppercase;">' + meses[d.getMonth()] + '</div>' +
+            '</div>' +
+            '<div style="flex:1;">' +
+                '<div style="font-weight:700;font-size:.82rem;">' + _cpEscape(c.nome) + '</div>' +
+                '<div style="font-size:.72rem;color:#71717a;font-family:var(--font-mono);">' + _cpFmt(c.valor) + '</div>' +
+            '</div>' +
+            '<i class="fa-solid ' + cat.icon + '" style="color:' + cat.cor + ';"></i>' +
+        '</div>';
+    }).join('') || '<div style="color:#71717a;font-size:.8rem;">Nenhuma conta pendente 🎉</div>';
+}
+
+function cpSetFilter(btn) {
+    document.querySelectorAll('#cp-filter-status .cp-fbtn').forEach(b => b.classList.remove('cp-active'));
+    btn.classList.add('cp-active');
+    _cpFiltroStatus = btn.dataset.f;
+    cpRender();
+}
+
+async function cpMarcarPago(id) {
+    const c = contasPagar.find(x => x.id === id);
+    if (!c) return;
+    c.status = 'pago';
+    c.pagoEm = new Date().toISOString();
+    await _cpUpsertSupabase(c);
+    cpRender();
+    showToast && showToast('✅ Conta marcada como paga');
+}
+
+async function cpExcluir(id) {
+    if (!confirm('Excluir esta conta? Essa ação não pode ser desfeita.')) return;
+    const c = contasPagar.find(x => x.id === id);
+    if (!c) return;
+    try {
+        if (window.sb) {
+            const { error } = await sb.from('contas_pagar').delete().eq('id', id);
+            if (error) throw error;
+        }
+        contasPagar = contasPagar.filter(x => x.id !== id);
+        cpRender();
+        showToast && showToast('🗑️ Conta excluída');
+    } catch(e) {
+        console.error('[CP] excluir:', e);
+        alert('Erro ao excluir: ' + (e.message || e));
+    }
+}
+
+function cpEditar(id) {
+    const c = contasPagar.find(x => x.id === id);
+    if (!c) return;
+    _cpEditandoId = id;
+    document.getElementById('cp-modal-title').textContent = 'Editar Conta';
+    document.getElementById('cp-f-nome').value = c.nome || '';
+    document.getElementById('cp-f-valor').value = c.valor || '';
+    document.getElementById('cp-f-venc').value = c.venc || '';
+    document.getElementById('cp-f-fornecedor').value = c.fornecedor || '';
+    document.getElementById('cp-f-forma').value = c.forma || 'pix';
+    document.getElementById('cp-f-status').value = c.status === 'pago' ? 'pago' : 'pendente';
+    document.getElementById('cp-f-recorrente').checked = !!c.recorrente;
+    _cpCatSelecionada = c.cat || 'outros';
+    _cpRenderCatPicker();
+    openModal('modal-contaspagar');
+}
+
+function cpAbrirModal() {
+    _cpEditandoId = null;
+    document.getElementById('cp-modal-title').textContent = 'Nova Conta';
+    document.getElementById('cp-f-nome').value = '';
+    document.getElementById('cp-f-valor').value = '';
+    const hojeStr = new Date().toISOString().slice(0,10);
+    document.getElementById('cp-f-venc').value = hojeStr;
+    document.getElementById('cp-f-fornecedor').value = '';
+    document.getElementById('cp-f-forma').value = 'pix';
+    document.getElementById('cp-f-status').value = 'pendente';
+    document.getElementById('cp-f-recorrente').checked = false;
+    _cpCatSelecionada = 'energia';
+    _cpRenderCatPicker();
+    openModal('modal-contaspagar');
+}
+
+function _cpRenderCatPicker() {
+    const el = document.getElementById('cp-cat-picker');
+    if (!el) return;
+    el.innerHTML = Object.entries(CP_CATEGORIAS).map(([k,c]) =>
+        '<div class="cp-cat-opt ' + (k === _cpCatSelecionada ? 'cp-sel' : '') + '" onclick="_cpSelCat(\'' + k + '\')">' +
+            '<i class="fa-solid ' + c.icon + '" style="color:' + c.cor + ';"></i>' +
+            '<span>' + c.nome + '</span>' +
+        '</div>'
+    ).join('');
+}
+function _cpSelCat(k) { _cpCatSelecionada = k; _cpRenderCatPicker(); }
+
+async function cpSalvarConta() {
+    const nome = document.getElementById('cp-f-nome').value.trim();
+    const valor = parseFloat(document.getElementById('cp-f-valor').value);
+    const venc = document.getElementById('cp-f-venc').value;
+    if (!nome || isNaN(valor) || valor <= 0 || !venc) {
+        alert('Preencha descrição, valor (maior que zero) e vencimento.');
+        return;
+    }
+    const statusEsc = document.getElementById('cp-f-status').value;
+    const dados = {
+        nome, valor, venc,
+        cat: _cpCatSelecionada,
+        fornecedor: document.getElementById('cp-f-fornecedor').value.trim(),
+        forma: document.getElementById('cp-f-forma').value,
+        status: statusEsc,
+        recorrente: document.getElementById('cp-f-recorrente').checked,
+        pagoEm: statusEsc === 'pago' ? new Date().toISOString() : null,
+    };
+    try {
+        if (_cpEditandoId) {
+            const c = contasPagar.find(x => x.id === _cpEditandoId);
+            if (c) Object.assign(c, dados);
+            await _cpUpsertSupabase(c);
+        } else {
+            const nova = { id: _genUuid(), ...dados, criadoEm: new Date().toISOString() };
+            contasPagar.push(nova);
+            await _cpUpsertSupabase(nova);
+        }
+        closeModal('modal-contaspagar');
+        cpRender();
+        showToast && showToast('💰 Conta salva');
+    } catch(e) {
+        console.error('[CP] salvar:', e);
+        alert('Erro ao salvar: ' + (e.message || e));
+    }
+}
+
+// ---- Persistência Supabase ----
+async function _cpUpsertSupabase(c) {
+    if (!window.sb || !c) return;
+    try {
+        const clubeId = (currentUser && currentUser.clube_id) || (window.sbClube && sbClube.id) || null;
+        if (!clubeId) { console.warn('[CP] sem clube_id, salvando só local'); return; }
+        const row = {
+            id: c.id,
+            clube_id: clubeId,
+            nome: c.nome,
+            categoria: c.cat,
+            valor: c.valor,
+            vencimento: c.venc,
+            status: c.status,
+            fornecedor: c.fornecedor || null,
+            forma_pagamento: c.forma || null,
+            recorrente: !!c.recorrente,
+            pago_em: c.pagoEm || null,
+        };
+        const { error } = await sb.from('contas_pagar').upsert(row);
+        if (error) throw error;
+    } catch(e) {
+        console.error('[CP] upsert:', e);
+        throw e;
+    }
+}
+
+async function cpCarregarSupabase() {
+    if (!window.sb) return;
+    try {
+        const clubeId = (currentUser && currentUser.clube_id) || (window.sbClube && sbClube.id) || null;
+        if (!clubeId) return;
+        const { data, error } = await sb.from('contas_pagar')
+            .select('*').eq('clube_id', clubeId).order('vencimento', { ascending: true });
+        if (error) throw error;
+        contasPagar = (data || []).map(r => ({
+            id: r.id,
+            nome: r.nome,
+            cat: r.categoria,
+            valor: parseFloat(r.valor) || 0,
+            venc: r.vencimento,
+            status: r.status,
+            fornecedor: r.fornecedor || '',
+            forma: r.forma_pagamento || 'pix',
+            recorrente: !!r.recorrente,
+            pagoEm: r.pago_em || null,
+            criadoEm: r.created_at || null,
+        }));
+        cpRender();
+    } catch(e) {
+        console.error('[CP] carregar:', e);
+    }
+}
+
+// ---- Relatório de Contas a Pagar ----
+async function _cpRenderRelatorio() {
+    // Garante dados carregados antes de renderizar
+    if (!contasPagar.length) {
+        try { await cpCarregarSupabase(); } catch(e) { console.warn('[CP] carregar p/ relatório:', e); }
+    }
+    // Usa o filtro de período global da página de relatórios
+    const periodo = (typeof _reportPeriod !== 'undefined' && _reportPeriod) ? _reportPeriod : null;
+    let de = null, ate = null;
+    if (periodo && periodo.de && periodo.ate) {
+        de = new Date(periodo.de + 'T00:00:00');
+        ate = new Date(periodo.ate + 'T23:59:59');
+    }
+
+    const noPeriodo = c => {
+        if (!de || !ate) return true; // sem filtro = todas
+        const v = new Date((c.venc || '') + 'T00:00:00');
+        return v >= de && v <= ate;
+    };
+
+    const lista = contasPagar.filter(noPeriodo);
+    const pagas = lista.filter(c => c.status === 'pago');
+    const pendentes = lista.filter(c => c.status !== 'pago');
+    const sum = arr => arr.reduce((s,c) => s + Number(c.valor||0), 0);
+
+    const elPago = document.getElementById('cp-rel-pago');
+    if (elPago) elPago.textContent = _cpFmt(sum(pagas));
+    const elPagoCnt = document.getElementById('cp-rel-pago-cnt');
+    if (elPagoCnt) elPagoCnt.textContent = pagas.length + ' conta' + (pagas.length !== 1 ? 's' : '');
+    const elPend = document.getElementById('cp-rel-pendente');
+    if (elPend) elPend.textContent = _cpFmt(sum(pendentes));
+    const elPendCnt = document.getElementById('cp-rel-pendente-cnt');
+    if (elPendCnt) elPendCnt.textContent = pendentes.length + ' conta' + (pendentes.length !== 1 ? 's' : '');
+
+    const elLista = document.getElementById('cp-rel-lista');
+    if (!elLista) return;
+    if (!lista.length) {
+        elLista.innerHTML = '<div style="color:#71717a;font-size:.85rem;padding:1rem;text-align:center;">Nenhuma conta no período selecionado</div>';
+        return;
+    }
+    const ord = { atrasado:0, pendente:1, pago:2 };
+    const ordenada = [...lista].sort((a,b) => ord[_cpStatusReal(a)] - ord[_cpStatusReal(b)] || (a.venc||'').localeCompare(b.venc||''));
+    elLista.innerHTML = ordenada.map(c => {
+        const cat = CP_CATEGORIAS[c.cat] || CP_CATEGORIAS.outros;
+        const st = _cpStatusReal(c);
+        const vencFmt = new Date(c.venc + 'T00:00:00').toLocaleDateString('pt-BR');
+        const stLabel = st === 'pago' ? 'Pago' : (st === 'atrasado' ? 'Atrasado' : 'Pendente');
+        return '<div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:.75rem;align-items:center;padding:.6rem .8rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">' +
+            '<i class="fa-solid ' + cat.icon + '" style="color:' + cat.cor + ';width:18px;text-align:center;"></i>' +
+            '<div>' +
+                '<div style="font-size:.85rem;font-weight:600;">' + _cpEscape(c.nome) + '</div>' +
+                '<div style="font-size:.7rem;color:#71717a;">' + vencFmt + (c.fornecedor ? ' · ' + _cpEscape(c.fornecedor) : '') + '</div>' +
+            '</div>' +
+            '<span class="cp-status ' + st + '" style="font-size:.65rem;">' + stLabel + '</span>' +
+            '<div style="font-family:var(--font-mono);font-weight:700;font-size:.9rem;text-align:right;min-width:90px;">' + _cpFmt(c.valor) + '</div>' +
+        '</div>';
+    }).join('');
+}
+
 
 // ============================================================
 // PERSONALIZAÇÃO PRO LIVE (fundo + cor de texto) — Etapa 1
@@ -30303,6 +30902,7 @@ function renderRelatorios() {
     renderRelBar();
     renderRelClientes();
     renderRelPagamentos();
+    if (typeof _cpRenderRelatorio === 'function') _cpRenderRelatorio();
 }
 
 // ============================================================
