@@ -27568,10 +27568,11 @@ function renderCaixaAberto() {
         comandasAbertasMap.set(c.jogadorId, existente);
     });
 
-    // CAIXA GERAL: usa saldo SEM cash (cash tem caixa próprio por mesa)
-    // Anexa info da comanda aberta de cada jogador
+    // Saldo COMPLETO do jogador (incluindo transações de cash) — bate com Dashboard e modal de extrato.
+    // Importante: o fluxo de PAGAMENTO continua usando getSaldoJogadorCaixaGeral pra separar
+    // o que é cobrado no caixa do que pertence às comandas/cash. Aqui é só EXIBIÇÃO.
     const saldos = jogadores.map(j => {
-        const saldo = getSaldoJogadorCaixaGeral(j.id);
+        const saldo = getSaldoJogador(j.id);
         const comanda = comandasAbertasMap.get(j.id) || null;
         return { jogador: j, saldo, comanda };
     });
