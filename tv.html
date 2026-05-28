@@ -1921,7 +1921,7 @@ function montarCarouselPremiacao(d) {
       tv_show_prize: t.tv_show_prize,
       pwStatsVis: t.pw_stats_visiveis || t.pwStatsVisiveis || null,
       entriesQtd: (t.entries || []).length,
-      bonusFichasTotal: (t.entries || []).reduce((s,e) => s + Number(e.bonus_fichas || 0), 0),
+      bonusFichasTotal: Number(t._extrasBonusFichas || 0) + Number(t._extrasPassaporteFichas || 0),
       eliminadosQtd: (t.eliminados || []).length,
       jackpotQtd: (t.jackpot_compras || []).length,
       tempoAlvo: t.tempo_alvo,
@@ -2066,41 +2066,55 @@ function montarCarouselPremiacao(d) {
         console.warn('[TV PUBLIC] não foi possível carregar campos extras:', e);
       }
 
-      // 🔥 FALLBACK ENTRIES: busca bonus_fichas, passaporte e fichas_override
-      // direto da tabela torneio_entries (o RPC pode não retornar esses campos).
-      // Sem isso, o chipcount da TV pública diverge do app (não soma bônus/passaporte/promo).
+      // 🔥 FALLBACK ENTRIES: soma bonus_fichas, passaporte e fichas_override
+      // DIRETO da tabela torneio_entries (fonte da verdade). O RPC pode não
+      // retornar esses campos, causando chipcount divergente do app.
+      // Em vez de casar entry-por-entry (frágil), somamos os TOTAIS de fichas
+      // extras por torneio e usamos no chipcount. Isso é à prova de:
+      //   - RPC que retorna bonus_fichas=0/null
+      //   - múltiplas entries do mesmo jogador
+      //   - ordem diferente entre RPC e tabela
       try {
         const idsT = rodando.map(t => t.id);
         if (idsT.length) {
           const { data: entsExtra, error: errEnt } = await sb
             .from('torneio_entries')
-            .select('torneio_id, jogador_id, tipo, ts, bonus_fichas, passaporte, fichas_override')
+            .select('torneio_id, bonus_fichas, passaporte, fichas_override, tipo')
             .in('torneio_id', idsT);
           if (!errEnt && Array.isArray(entsExtra)) {
-            // Agrupa por torneio
-            const porTorneio = {};
+            // Soma os extras de fichas por torneio
+            const extrasPorTorneio = {};
             entsExtra.forEach(en => {
-              (porTorneio[en.torneio_id] = porTorneio[en.torneio_id] || []).push(en);
+              const tid = en.torneio_id;
+              if (!extrasPorTorneio[tid]) {
+                extrasPorTorneio[tid] = { bonus: 0, passaporte: 0, override: 0, overrideEntries: [] };
+              }
+              const acc = extrasPorTorneio[tid];
+              acc.bonus += Number(en.bonus_fichas || 0);
+              // passaporte pode vir como objeto {cobrado, fichas} ou string JSON
+              let p = en.passaporte;
+              if (typeof p === 'string') { try { p = JSON.parse(p); } catch(_) { p = null; } }
+              if (p && (p.cobrado || p.fichas)) acc.passaporte += Number(p.fichas || 0);
+              // fichas_override: substitui o stack daquela entry. Guardamos o
+              // delta (override - stack) pra ajustar; mas como não sabemos o
+              // stack aqui, somamos os overrides e a contagem pra ajustar depois.
+              const ov = Number(en.fichas_override || 0);
+              if (ov > 0) acc.overrideEntries.push(ov);
             });
+            // Anexa os totais ao objeto do torneio
             rodando.forEach(t => {
-              const lista = porTorneio[t.id];
-              if (!lista || !Array.isArray(t.entries)) return;
-              // Para cada entry do torneio, tenta casar e copiar os campos extras
-              t.entries.forEach(e => {
-                // casamento por jogador_id + tipo + ts (quando disponível); fallback jogador+tipo
-                let m = lista.find(x =>
-                  String(x.jogador_id) === String(e.jogador_id) &&
-                  x.tipo === e.tipo &&
-                  (e.ts == null || x.ts == null || new Date(x.ts).getTime() === new Date(e.ts).getTime())
-                );
-                if (!m) m = lista.find(x => String(x.jogador_id) === String(e.jogador_id) && x.tipo === e.tipo);
-                if (m) {
-                  if (e.bonus_fichas == null) e.bonus_fichas = m.bonus_fichas;
-                  if (e.passaporte == null) e.passaporte = m.passaporte;
-                  if (e.fichas_override == null) e.fichas_override = m.fichas_override;
-                }
-              });
+              const acc = extrasPorTorneio[t.id];
+              if (acc) {
+                t._extrasBonusFichas = acc.bonus;
+                t._extrasPassaporteFichas = acc.passaporte;
+                t._extrasOverrideList = acc.overrideEntries;
+              } else {
+                t._extrasBonusFichas = 0;
+                t._extrasPassaporteFichas = 0;
+                t._extrasOverrideList = [];
+              }
             });
+            if (window._debugTv) console.log('[TV PUBLIC] extras fichas por torneio:', extrasPorTorneio);
           } else if (errEnt) {
             console.warn('[TV PUBLIC] erro ao ler torneio_entries:', errEnt);
           }
@@ -2424,17 +2438,34 @@ function montarCarouselPremiacao(d) {
       return s + stackInicial;  // buyin, reentry
     }, 0);
 
-    // FASE H: fichas extras do bônus de registro antecipado (e.bonus_fichas por entry)
-    const bonusFichas = entries.reduce((s, e) => s + Number(e.bonus_fichas || e.bonusFichas || 0), 0);
-    // Passaporte: fichas extras quando a entry comprou passaporte
-    const passaporteFichas = entries.reduce((s, e) => {
-      const p = e.passaporte;
-      if (p && (p.cobrado || p.fichas)) return s + Number(p.fichas || 0);
-      return s;
-    }, 0);
+    // FASE H + Passaporte: fichas extras.
+    // PRIORIDADE: usar os totais lidos DIRETO da tabela torneio_entries
+    // (t._extrasBonusFichas/_extrasPassaporteFichas), que é a fonte da verdade.
+    // Fallback: somar dos campos das entries do RPC (caso a tabela não tenha sido lida).
+    let bonusFichas = 0, passaporteFichas = 0;
+    if (t._extrasBonusFichas != null || t._extrasPassaporteFichas != null) {
+      bonusFichas = Number(t._extrasBonusFichas || 0);
+      passaporteFichas = Number(t._extrasPassaporteFichas || 0);
+    } else {
+      bonusFichas = entries.reduce((s, e) => s + Number(e.bonus_fichas || e.bonusFichas || 0), 0);
+      passaporteFichas = entries.reduce((s, e) => {
+        const p = e.passaporte;
+        if (p && (p.cobrado || p.fichas)) return s + Number(p.fichas || 0);
+        return s;
+      }, 0);
+    }
 
-    // Adiciona jackpot chips + bônus + passaporte (espelha EXATAMENTE o app)
-    const chipCount = totalFichas + jackpotFichas + bonusFichas + passaporteFichas;
+    // FASE I.1 (buy-in PROMO via tabela): se a tabela trouxe overrides e as
+    // entries do RPC NÃO tinham fichas_override, ajusta o delta (override - stack).
+    let overrideDelta = 0;
+    const rpcTinhaOverride = entries.some(e => Number(e.fichas_override || e.fichasOverride || 0) > 0);
+    if (!rpcTinhaOverride && Array.isArray(t._extrasOverrideList) && t._extrasOverrideList.length) {
+      // Cada override substitui um stack inicial → soma (override - stack)
+      overrideDelta = t._extrasOverrideList.reduce((s, ov) => s + (Number(ov) - stackInicial), 0);
+    }
+
+    // Adiciona jackpot chips + bônus + passaporte + ajuste de override (espelha o app)
+    const chipCount = totalFichas + jackpotFichas + bonusFichas + passaporteFichas + overrideDelta;
     
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
     
