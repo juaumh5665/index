@@ -10187,10 +10187,17 @@ async function iniciar2FAEnroll() {
             }
         }
 
-        // 2. Enroll com friendlyName ÚNICO (timestamp) — evita colisão de nome
-        //    mesmo que sobre algum fator não removido por falha de rede.
+        // 2. Enroll com issuer + friendlyName.
+        //    - issuer: nome que aparece no app autenticador (StackOS) — sobrepõe o Site URL
+        //      do Supabase (que pode estar como "localhost:3000" em dev).
+        //    - friendlyName: identificador único interno (precisa ser único por usuário).
+        const emailUser = (currentUser && currentUser.email) || (sbSession && sbSession.user && sbSession.user.email) || '';
         const friendlyName = 'StackOS-' + Date.now();
-        let resp = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName });
+        let resp = await sb.auth.mfa.enroll({
+            factorType: 'totp',
+            friendlyName,
+            issuer: 'StackOS',
+        });
 
         // 3. Se ainda assim falhar por nome existente, tenta limpar de novo e repetir 1x.
         if (resp.error && /already exists/i.test(resp.error.message || '')) {
@@ -10202,7 +10209,11 @@ async function iniciar2FAEnroll() {
                     }
                 }
             }
-            resp = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'StackOS-' + Date.now() });
+            resp = await sb.auth.mfa.enroll({
+                factorType: 'totp',
+                friendlyName: 'StackOS-' + Date.now(),
+                issuer: 'StackOS',
+            });
         }
 
         if (resp.error) throw resp.error;
@@ -10211,6 +10222,12 @@ async function iniciar2FAEnroll() {
         if (!data || !data.totp) {
             throw new Error('Resposta inesperada do servidor ao gerar 2FA');
         }
+
+        // Normaliza o otpauth URI pra garantir issuer/label "StackOS" mesmo que
+        // o Site URL do Supabase esteja como localhost. Reescreve o label e o param issuer
+        // preservando o secret (que é o que realmente importa pro TOTP).
+        const emailLabel = emailUser || 'conta';
+        data.totp.uri = _mfaNormalizarOtpauthUri(data.totp.uri, data.totp.secret, 'StackOS', emailLabel);
 
         _mfaEnrollState = {
             factorId: data.id,
@@ -10249,6 +10266,35 @@ async function iniciar2FAEnroll() {
         showToast('⚠️ ' + msg);
     } finally {
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
+}
+
+// Reescreve o otpauth URI pra garantir issuer/label corretos no app autenticador.
+// Formato: otpauth://totp/{issuer}:{label}?secret={SECRET}&issuer={issuer}&algorithm=SHA1&digits=6&period=30
+// Mantém o secret original (essencial pro TOTP funcionar); só ajusta os nomes exibidos.
+function _mfaNormalizarOtpauthUri(uriOriginal, secret, issuer, label) {
+    try {
+        let sec = secret;
+        if (!sec && uriOriginal) {
+            const m = uriOriginal.match(/[?&]secret=([^&]+)/i);
+            if (m) sec = decodeURIComponent(m[1]);
+        }
+        if (!sec) return uriOriginal; // sem secret não dá pra reconstruir; mantém original
+
+        // Preserva parâmetros do original (algorithm, digits, period) se existirem
+        let algorithm = 'SHA1', digits = '6', period = '30';
+        if (uriOriginal) {
+            const ga = uriOriginal.match(/[?&]algorithm=([^&]+)/i); if (ga) algorithm = ga[1];
+            const gd = uriOriginal.match(/[?&]digits=([^&]+)/i);    if (gd) digits = gd[1];
+            const gp = uriOriginal.match(/[?&]period=([^&]+)/i);    if (gp) period = gp[1];
+        }
+
+        const iss = encodeURIComponent(issuer || 'StackOS');
+        const lbl = encodeURIComponent(label || 'conta');
+        return `otpauth://totp/${iss}:${lbl}?secret=${encodeURIComponent(sec)}&issuer=${iss}&algorithm=${algorithm}&digits=${digits}&period=${period}`;
+    } catch (e) {
+        console.warn('[MFA] normalizar URI falhou, usando original:', e.message);
+        return uriOriginal;
     }
 }
 
