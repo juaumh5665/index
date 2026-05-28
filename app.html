@@ -26,6 +26,8 @@
     </script>
     <!-- ===== SUPABASE BACKEND ===== -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- QR Code (fallback robusto pro 2FA — gera QR localmente a partir do otpauth URI) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -4370,7 +4372,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
             <div style="font-size:1.05rem;font-weight:800;color:#fff;"><i class="fa-solid fa-shield-halved" style="color:var(--gold);"></i> Ativar 2FA</div>
-            <button onclick="closeModal('modal-2fa-setup')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+            <button onclick="cancelar2FASetup()" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
 
         <!-- ETAPA 1: QR CODE -->
@@ -10169,37 +10171,80 @@ async function iniciar2FAEnroll() {
     const btn = document.getElementById('btn-2fa-ativar');
     if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
     try {
-        // Se já houver um fator não-verificado pendente, remove pra não acumular
+        // 1. Limpa QUALQUER fator não-verificado pendente (de tentativas anteriores).
+        //    Se não limpar, o Supabase recusa o novo enroll com erro 422
+        //    ("a factor with the friendly name already exists").
         const fatoresExistentes = await mfaListarFatores();
-        if (fatoresExistentes) {
+        if (fatoresExistentes && fatoresExistentes.length) {
             for (const f of fatoresExistentes) {
-                if (f.status === 'unverified') {
-                    try { await sb.auth.mfa.unenroll({ factorId: f.id }); } catch(_) {}
+                if (f.status !== 'verified') {
+                    try {
+                        await sb.auth.mfa.unenroll({ factorId: f.id });
+                    } catch (e) {
+                        console.warn('[MFA] não consegui remover fator pendente', f.id, e.message);
+                    }
                 }
             }
         }
 
-        const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp' });
-        if (error) throw error;
+        // 2. Enroll com friendlyName ÚNICO (timestamp) — evita colisão de nome
+        //    mesmo que sobre algum fator não removido por falha de rede.
+        const friendlyName = 'StackOS-' + Date.now();
+        let resp = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName });
+
+        // 3. Se ainda assim falhar por nome existente, tenta limpar de novo e repetir 1x.
+        if (resp.error && /already exists/i.test(resp.error.message || '')) {
+            const fs2 = await mfaListarFatores();
+            if (fs2) {
+                for (const f of fs2) {
+                    if (f.status !== 'verified') {
+                        try { await sb.auth.mfa.unenroll({ factorId: f.id }); } catch(_) {}
+                    }
+                }
+            }
+            resp = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'StackOS-' + Date.now() });
+        }
+
+        if (resp.error) throw resp.error;
+        const data = resp.data;
+
+        if (!data || !data.totp) {
+            throw new Error('Resposta inesperada do servidor ao gerar 2FA');
+        }
 
         _mfaEnrollState = {
             factorId: data.id,
-            qr: data.totp.qr_code,    // SVG data URI do QR code
-            secret: data.totp.secret, // segredo manual (caso não consiga escanear)
+            qr: data.totp.qr_code,
+            secret: data.totp.secret,
             uri: data.totp.uri,
         };
 
-        // Popula o modal
+        // 4. Renderiza o QR. Estratégia: preferir geração LOCAL a partir do otpauth URI
+        //    (sempre confiável, offline), e só usar o qr_code do Supabase como fallback.
         const qrEl = document.getElementById('mfa-qr');
-        if (qrEl) qrEl.innerHTML = `<img src="${data.totp.qr_code}" alt="QR Code 2FA" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;">`;
+        if (qrEl) {
+            if (data.totp.uri && typeof window.QRCode !== 'undefined' && window.QRCode.toCanvas) {
+                _mfaRenderQrDeUri(data.totp.uri);
+            } else {
+                const qr = data.totp.qr_code || '';
+                if (typeof qr === 'string' && qr.trim().startsWith('<svg')) {
+                    qrEl.innerHTML = `<div style="width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;display:flex;align-items:center;justify-content:center;">${qr}</div>`;
+                } else if (typeof qr === 'string' && qr.startsWith('data:')) {
+                    qrEl.innerHTML = `<img src="${qr}" alt="QR Code 2FA" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;" onerror="_mfaQrFallback()">`;
+                } else if (data.totp.uri) {
+                    _mfaRenderQrDeUri(data.totp.uri);
+                } else {
+                    _mfaQrManualInstrucao();
+                }
+            }
+        }
         const secEl = document.getElementById('mfa-secret');
-        if (secEl) secEl.innerText = data.totp.secret;
+        if (secEl) secEl.innerText = data.totp.secret || '—';
         const codeInp = document.getElementById('mfa-code-input');
         if (codeInp) codeInp.value = '';
         const errEl = document.getElementById('mfa-enroll-error');
         if (errEl) errEl.style.display = 'none';
 
-        // Reset etapas do modal
         document.getElementById('mfa-step-qr').style.display = 'block';
         document.getElementById('mfa-step-recovery').style.display = 'none';
 
@@ -10207,13 +10252,60 @@ async function iniciar2FAEnroll() {
         setTimeout(() => { const c = document.getElementById('mfa-code-input'); if (c) c.focus(); }, 200);
     } catch (e) {
         console.error('[MFA] enroll:', e);
-        const msg = (e.message || '').toLowerCase().includes('mfa')
-            ? 'MFA não está habilitado no projeto Supabase. Habilite em Authentication → MFA.'
-            : (e.message || 'Erro ao iniciar 2FA');
+        let msg;
+        const lower = (e.message || '').toLowerCase();
+        if (lower.includes('not enabled') || lower.includes('mfa') && lower.includes('disabled')) {
+            msg = 'MFA não está habilitado no projeto Supabase. Habilite em Authentication → MFA.';
+        } else if (lower.includes('already exists')) {
+            msg = 'Já existe uma configuração de 2FA pendente. Recarregue a página e tente de novo.';
+        } else {
+            msg = e.message || 'Erro ao iniciar 2FA';
+        }
         showToast('⚠️ ' + msg);
     } finally {
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
+}
+
+// Gera o QR a partir do otpauth URI usando a lib qrcode (client-side, offline).
+function _mfaRenderQrDeUri(uri) {
+    const qrEl = document.getElementById('mfa-qr');
+    if (!qrEl || !uri) return;
+    // Se a lib qrcode carregou, gera um canvas localmente (sempre confiável)
+    if (typeof window.QRCode !== 'undefined' && window.QRCode.toCanvas) {
+        const canvas = document.createElement('canvas');
+        window.QRCode.toCanvas(canvas, uri, { width: 200, margin: 1 }, (err) => {
+            if (err) {
+                console.warn('[MFA] QRCode.toCanvas falhou:', err);
+                _mfaQrManualInstrucao();
+                return;
+            }
+            qrEl.innerHTML = '';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#fff;padding:8px;border-radius:.5rem;display:inline-block;';
+            box.appendChild(canvas);
+            qrEl.appendChild(box);
+        });
+    } else {
+        _mfaQrManualInstrucao();
+    }
+}
+
+// Instrução de fallback final: usar o código manual
+function _mfaQrManualInstrucao() {
+    const qrEl = document.getElementById('mfa-qr');
+    if (!qrEl) return;
+    qrEl.innerHTML = `
+        <div style="width:200px;background:#0a0a0b;padding:1rem;border-radius:.5rem;text-align:center;">
+            <i class="fa-solid fa-keyboard" style="color:var(--gold);font-size:1.5rem;"></i>
+            <div style="font-size:.72rem;color:#a1a1aa;margin-top:.5rem;line-height:1.4;">QR indisponível. Adicione manualmente no app autenticador usando o código abaixo.</div>
+        </div>`;
+}
+
+// Fallback se a <img> do QR falhar ao carregar
+function _mfaQrFallback() {
+    if (_mfaEnrollState && _mfaEnrollState.uri) _mfaRenderQrDeUri(_mfaEnrollState.uri);
+    else _mfaQrManualInstrucao();
 }
 
 // Confirma o enrollment: valida o código de 6 dígitos digitado pelo usuário.
@@ -10262,6 +10354,27 @@ function finalizar2FASetup() {
     closeModal('modal-2fa-setup');
     showToast('🔒 2FA ativado com sucesso!');
     renderSegurancaStats();
+}
+
+// Cancela o setup ANTES de verificar: remove o fator pendente pra não colidir
+// na próxima tentativa, e fecha o modal.
+async function cancelar2FASetup() {
+    closeModal('modal-2fa-setup');
+    // Se há um enroll pendente não confirmado, remove o fator
+    if (_mfaEnrollState && _mfaEnrollState.factorId) {
+        const fid = _mfaEnrollState.factorId;
+        _mfaEnrollState = null;
+        try {
+            // Só remove se ainda estiver unverified (não apaga um 2FA já ativo)
+            const fatores = await mfaListarFatores();
+            const f = (fatores || []).find(x => x.id === fid);
+            if (f && f.status !== 'verified') {
+                await sb.auth.mfa.unenroll({ factorId: fid });
+            }
+        } catch (e) {
+            console.warn('[MFA] limpeza ao cancelar:', e.message);
+        }
+    }
 }
 
 // Desativa o 2FA — pede confirmação e remove todos os fatores TOTP.
