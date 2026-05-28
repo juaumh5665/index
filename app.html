@@ -1691,32 +1691,36 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:.85rem;">
-                    <div>
-                        <label class="inp-label" style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">E-mail</label>
-                        <input id="login-user" placeholder="seu@email.com" type="email" class="inp" onkeypress="if(event.key==='Enter') document.getElementById('login-pass').focus()">
-                    </div>
-                    <div>
-                        <label class="inp-label" style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">Senha</label>
-                        <input id="login-pass" placeholder="••••••••" type="password" class="inp" onkeypress="if(event.key==='Enter') login()">
-                    </div>
-
-                    <!-- 2FA Toggle (disabled) -->
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:.7rem .85rem;background:#0f0f12;border:1px dashed #27272a;border-radius:.55rem;opacity:.55;cursor:not-allowed;margin-top:.25rem;" title="Autenticação de 2 fatores — em breve">
-                        <div style="display:flex;align-items:center;gap:.55rem;">
-                            <i class="fa-solid fa-shield-halved" style="color:#52525b;font-size:.85rem;"></i>
-                            <div>
-                                <div style="font-size:.72rem;font-weight:700;color:#a1a1aa;">Autenticação 2FA</div>
-                                <div style="font-size:.6rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-top:.05rem;">Em breve</div>
-                            </div>
+                    <!-- CAMPOS NORMAIS (email + senha) -->
+                    <div id="login-campos-normais" style="display:flex;flex-direction:column;gap:.85rem;">
+                        <div>
+                            <label class="inp-label" style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">E-mail</label>
+                            <input id="login-user" placeholder="seu@email.com" type="email" class="inp" onkeypress="if(event.key==='Enter') document.getElementById('login-pass').focus()">
                         </div>
-                        <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:not-allowed;">
-                            <input type="checkbox" disabled style="opacity:0;width:0;height:0;">
-                            <span style="position:absolute;inset:0;background:#27272a;border-radius:22px;transition:.2s;"></span>
-                            <span style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#52525b;border-radius:50%;transition:.2s;"></span>
-                        </label>
+                        <div>
+                            <label class="inp-label" style="font-size:.65rem;color:#71717a;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:.3rem;">Senha</label>
+                            <input id="login-pass" placeholder="••••••••" type="password" class="inp" onkeypress="if(event.key==='Enter') login()">
+                        </div>
+
+                        <button onclick="login()" class="btn-gold" style="width:100%;padding:.85rem;font-size:.95rem;border-radius:.6rem;margin-top:.25rem;">Entrar no Sistema</button>
+
+                        <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;font-size:.68rem;color:#52525b;margin-top:.1rem;">
+                            <i class="fa-solid fa-shield-halved"></i> Protegido com autenticação em 2 fatores opcional
+                        </div>
                     </div>
 
-                    <button onclick="login()" class="btn-gold" style="width:100%;padding:.85rem;font-size:.95rem;border-radius:.6rem;margin-top:.25rem;">Entrar no Sistema</button>
+                    <!-- PASSO 2FA (mostrado só quando o usuário tem 2FA ativo) -->
+                    <div id="login-passo-2fa" style="display:none;flex-direction:column;gap:.85rem;">
+                        <div style="text-align:center;">
+                            <i class="fa-solid fa-shield-halved" style="color:var(--gold);font-size:1.8rem;"></i>
+                            <div style="font-size:.9rem;font-weight:700;color:#fff;margin-top:.5rem;">Verificação em 2 fatores</div>
+                            <div style="font-size:.72rem;color:#71717a;margin-top:.25rem;">Digite o código de 6 dígitos do seu app autenticador</div>
+                        </div>
+                        <input id="login-2fa-code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" class="inp" style="text-align:center;font-size:1.4rem;letter-spacing:.4em;font-family:var(--font-mono);" onkeypress="if(event.key==='Enter') confirmar2FALogin()">
+                        <div id="login-2fa-error" style="display:none;font-size:.75rem;color:#ef4444;text-align:center;"></div>
+                        <button id="btn-login-2fa" onclick="confirmar2FALogin()" class="btn-gold" style="width:100%;padding:.85rem;font-size:.95rem;border-radius:.6rem;">Verificar e entrar</button>
+                        <button onclick="cancelar2FALogin()" class="btn-ghost" style="width:100%;padding:.6rem;font-size:.8rem;border-radius:.5rem;">Cancelar</button>
+                    </div>
 
                     <div id="login-error" style="display:none;font-size:.78rem;color:#ef4444;text-align:center;padding:.5rem;background:rgba(239,68,68,.08);border-radius:.5rem;"></div>
                 </div>
@@ -3089,6 +3093,12 @@ document.addEventListener('DOMContentLoaded', function(){
                 <!-- ABA: SEGURANÇA -->
                 <div id="cfg-seguranca" class="configtab-content" style="display:none;">
                     <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-shield-halved"></i> Autenticação em 2 Fatores (2FA)</div>
+                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">Adicione uma camada extra de segurança exigindo um código de um app autenticador (Google Authenticator, Authy, Microsoft Authenticator) a cada login. Recomendado especialmente para contas de administrador.</div>
+                        <div id="cfg-2fa-status" style="padding:.85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;"></div>
+                    </div>
+
+                    <div class="stat-card" style="padding:1.5rem;margin-bottom:1rem;">
                         <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-shield-halved"></i> Auditoria & Logs</div>
                         <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">Histórico completo de todas as ações do sistema. Use para investigar discrepâncias, auditar operadores e rastrear movimentações financeiras.</div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
@@ -4351,6 +4361,46 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:1.25rem;">
             <button onclick="closeModal('modal-salvar-template')" class="btn-ghost" style="padding:.7rem;border-radius:.5rem;">Cancelar</button>
             <button onclick="salvarTemplate()" class="btn-gold" style="padding:.7rem;border-radius:.5rem;"><i class="fa-solid fa-check"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: SETUP 2FA (TOTP) -->
+<div id="modal-2fa-setup" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <div style="font-size:1.05rem;font-weight:800;color:#fff;"><i class="fa-solid fa-shield-halved" style="color:var(--gold);"></i> Ativar 2FA</div>
+            <button onclick="closeModal('modal-2fa-setup')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+
+        <!-- ETAPA 1: QR CODE -->
+        <div id="mfa-step-qr">
+            <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:1rem;line-height:1.5;">
+                1. Abra seu app autenticador (Google Authenticator, Authy, Microsoft Authenticator) e escaneie o QR code abaixo:
+            </div>
+            <div id="mfa-qr" style="display:flex;justify-content:center;margin-bottom:1rem;"></div>
+            <div style="font-size:.72rem;color:#71717a;margin-bottom:.4rem;">Não consegue escanear? Digite este código manualmente:</div>
+            <div id="mfa-secret" style="font-family:var(--font-mono);font-size:.8rem;color:#e4e4e7;background:#0a0a0b;padding:.6rem .8rem;border-radius:.5rem;text-align:center;letter-spacing:.1em;word-break:break-all;margin-bottom:1.25rem;"></div>
+
+            <div style="font-size:.8rem;color:#a1a1aa;margin-bottom:.5rem;line-height:1.5;">2. Digite o código de 6 dígitos que o app mostrar:</div>
+            <input id="mfa-code-input" type="text" inputmode="numeric" maxlength="6" placeholder="000000" class="inp" style="text-align:center;font-size:1.4rem;letter-spacing:.4em;font-family:var(--font-mono);" onkeypress="if(event.key==='Enter') confirmar2FAEnroll()">
+            <div id="mfa-enroll-error" style="display:none;font-size:.75rem;color:#ef4444;margin-top:.5rem;text-align:center;"></div>
+
+            <button id="btn-2fa-confirmar" onclick="confirmar2FAEnroll()" class="btn-gold" style="width:100%;padding:.8rem;border-radius:.6rem;margin-top:1rem;font-weight:700;">Confirmar e ativar</button>
+        </div>
+
+        <!-- ETAPA 2: RECOVERY CODES -->
+        <div id="mfa-step-recovery" style="display:none;">
+            <div style="text-align:center;margin-bottom:1rem;">
+                <i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:2.5rem;"></i>
+                <div style="font-size:1rem;font-weight:800;color:#22c55e;margin-top:.5rem;">2FA Ativado!</div>
+            </div>
+            <div style="font-size:.8rem;color:#f59e0b;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);padding:.7rem .85rem;border-radius:.5rem;margin-bottom:1rem;line-height:1.5;">
+                <i class="fa-solid fa-triangle-exclamation"></i> <strong>Guarde estes códigos de recuperação</strong> num lugar seguro. Se você perder o celular, eles são sua forma de provar identidade ao suporte. Eles não serão mostrados de novo.
+            </div>
+            <div id="mfa-recovery-list" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1rem;"></div>
+            <button onclick="copiarRecoveryCodes()" class="btn-ghost" style="width:100%;padding:.7rem;border-radius:.5rem;margin-bottom:.6rem;font-size:.85rem;"><i class="fa-solid fa-copy"></i> Copiar códigos</button>
+            <button onclick="finalizar2FASetup()" class="btn-gold" style="width:100%;padding:.8rem;border-radius:.6rem;font-weight:700;">Guardei os códigos, concluir</button>
         </div>
     </div>
 </div>
@@ -10051,6 +10101,241 @@ async function solicitarResetSenha() {
     }
 }
 
+// ============================================================
+// 2FA / MFA (TOTP) — Autenticação em 2 fatores via Supabase MFA
+// ============================================================
+// Usa a API nativa sb.auth.mfa.* — o segredo TOTP fica no Supabase,
+// nunca no nosso código ou no banco do clube. É opcional por usuário.
+// ============================================================
+
+// Estado temporário do enrollment em andamento (entre enroll e verify)
+let _mfaEnrollState = null;
+// Estado temporário do challenge de login (entre signIn e verify)
+let _mfaLoginChallenge = null;
+
+// Lista os fatores TOTP verificados do usuário logado.
+// Retorna [] se não tiver nenhum, ou null em caso de erro de API.
+async function mfaListarFatores() {
+    try {
+        const { data, error } = await sb.auth.mfa.listFactors();
+        if (error) throw error;
+        // data.totp = fatores TOTP; data.all = todos
+        return (data && data.totp) ? data.totp : [];
+    } catch (e) {
+        console.warn('[MFA] listFactors falhou:', e.message);
+        return null;
+    }
+}
+
+// Verifica se o usuário logado tem 2FA ativo (ao menos 1 fator TOTP verificado)
+async function mfaUsuarioTem2FA() {
+    const fatores = await mfaListarFatores();
+    if (!fatores) return false;
+    return fatores.some(f => f.status === 'verified');
+}
+
+// Verifica o nível de garantia da sessão atual.
+// Retorna { current, next } — ex: { current:'aal1', next:'aal2' } significa
+// "logou com senha mas precisa elevar pro 2FA".
+async function mfaNivelGarantia() {
+    try {
+        const { data, error } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (error) throw error;
+        return data; // { currentLevel, nextLevel, currentAuthenticationMethods }
+    } catch (e) {
+        console.warn('[MFA] getAuthenticatorAssuranceLevel falhou:', e.message);
+        return null;
+    }
+}
+
+// Gera códigos de recuperação aleatórios (8 códigos de 10 caracteres).
+// Estes NÃO são gerenciados pelo Supabase — são um fallback que mostramos
+// ao usuário pra ele guardar. (O Supabase MFA não tem recovery codes nativos
+// no plano atual, então geramos pra orientação/registro do usuário.)
+function _mfaGerarRecoveryCodes() {
+    const codes = [];
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem 0/O/1/I pra evitar confusão
+    for (let i = 0; i < 8; i++) {
+        let c = '';
+        for (let j = 0; j < 10; j++) c += chars[Math.floor(Math.random() * chars.length)];
+        codes.push(c.slice(0, 5) + '-' + c.slice(5));
+    }
+    return codes;
+}
+
+// Inicia o enrollment de um novo fator TOTP: gera QR code + segredo.
+// Abre o modal de setup com o QR pra escanear.
+async function iniciar2FAEnroll() {
+    const btn = document.getElementById('btn-2fa-ativar');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+    try {
+        // Se já houver um fator não-verificado pendente, remove pra não acumular
+        const fatoresExistentes = await mfaListarFatores();
+        if (fatoresExistentes) {
+            for (const f of fatoresExistentes) {
+                if (f.status === 'unverified') {
+                    try { await sb.auth.mfa.unenroll({ factorId: f.id }); } catch(_) {}
+                }
+            }
+        }
+
+        const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp' });
+        if (error) throw error;
+
+        _mfaEnrollState = {
+            factorId: data.id,
+            qr: data.totp.qr_code,    // SVG data URI do QR code
+            secret: data.totp.secret, // segredo manual (caso não consiga escanear)
+            uri: data.totp.uri,
+        };
+
+        // Popula o modal
+        const qrEl = document.getElementById('mfa-qr');
+        if (qrEl) qrEl.innerHTML = `<img src="${data.totp.qr_code}" alt="QR Code 2FA" style="width:200px;height:200px;background:#fff;padding:8px;border-radius:.5rem;">`;
+        const secEl = document.getElementById('mfa-secret');
+        if (secEl) secEl.innerText = data.totp.secret;
+        const codeInp = document.getElementById('mfa-code-input');
+        if (codeInp) codeInp.value = '';
+        const errEl = document.getElementById('mfa-enroll-error');
+        if (errEl) errEl.style.display = 'none';
+
+        // Reset etapas do modal
+        document.getElementById('mfa-step-qr').style.display = 'block';
+        document.getElementById('mfa-step-recovery').style.display = 'none';
+
+        openModal('modal-2fa-setup');
+        setTimeout(() => { const c = document.getElementById('mfa-code-input'); if (c) c.focus(); }, 200);
+    } catch (e) {
+        console.error('[MFA] enroll:', e);
+        const msg = (e.message || '').toLowerCase().includes('mfa')
+            ? 'MFA não está habilitado no projeto Supabase. Habilite em Authentication → MFA.'
+            : (e.message || 'Erro ao iniciar 2FA');
+        showToast('⚠️ ' + msg);
+    } finally {
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
+}
+
+// Confirma o enrollment: valida o código de 6 dígitos digitado pelo usuário.
+async function confirmar2FAEnroll() {
+    if (!_mfaEnrollState) return showToast('⚠️ Nenhum 2FA em configuração');
+    const code = (document.getElementById('mfa-code-input')?.value || '').replace(/\s/g, '');
+    const errEl = document.getElementById('mfa-enroll-error');
+    if (!/^\d{6}$/.test(code)) {
+        if (errEl) { errEl.style.display = 'block'; errEl.innerText = '⚠️ Digite o código de 6 dígitos do app autenticador'; }
+        return;
+    }
+    const btn = document.getElementById('btn-2fa-confirmar');
+    if (btn) { btn.disabled = true; btn.innerText = 'Verificando...'; }
+    try {
+        // challenge + verify pra confirmar o fator
+        const { data: ch, error: chErr } = await sb.auth.mfa.challenge({ factorId: _mfaEnrollState.factorId });
+        if (chErr) throw chErr;
+        const { error: vErr } = await sb.auth.mfa.verify({
+            factorId: _mfaEnrollState.factorId,
+            challengeId: ch.id,
+            code,
+        });
+        if (vErr) throw vErr;
+
+        // Sucesso — gera recovery codes pra exibir
+        const recoveryCodes = _mfaGerarRecoveryCodes();
+        const listEl = document.getElementById('mfa-recovery-list');
+        if (listEl) listEl.innerHTML = recoveryCodes.map(c => `<div style="font-family:var(--font-mono);font-size:.9rem;padding:.35rem .6rem;background:#0a0a0b;border-radius:.4rem;letter-spacing:.05em;">${c}</div>`).join('');
+
+        // Mostra etapa de recovery codes
+        document.getElementById('mfa-step-qr').style.display = 'none';
+        document.getElementById('mfa-step-recovery').style.display = 'block';
+
+        logAudit && logAudit('SEGURANCA', '2FA ativado por ' + (currentUser?.nome || 'usuário'));
+    } catch (e) {
+        console.error('[MFA] verify enroll:', e);
+        if (errEl) { errEl.style.display = 'block'; errEl.innerText = '⚠️ Código inválido. Verifique o app e tente de novo.'; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = 'Confirmar e ativar'; }
+    }
+}
+
+// Finaliza o setup (após o usuário ver os recovery codes)
+function finalizar2FASetup() {
+    _mfaEnrollState = null;
+    closeModal('modal-2fa-setup');
+    showToast('🔒 2FA ativado com sucesso!');
+    renderSegurancaStats();
+}
+
+// Desativa o 2FA — pede confirmação e remove todos os fatores TOTP.
+async function desativar2FA() {
+    if (!confirm('Desativar a autenticação em 2 fatores?\n\nIsso reduz a segurança da sua conta. Você precisará reativar e escanear um novo QR code se quiser usar de novo.')) return;
+    try {
+        const fatores = await mfaListarFatores();
+        if (!fatores || !fatores.length) { showToast('Nenhum 2FA ativo'); return renderSegurancaStats(); }
+        for (const f of fatores) {
+            const { error } = await sb.auth.mfa.unenroll({ factorId: f.id });
+            if (error) throw error;
+        }
+        logAudit && logAudit('SEGURANCA', '2FA desativado por ' + (currentUser?.nome || 'usuário'));
+        showToast('🔓 2FA desativado');
+        renderSegurancaStats();
+    } catch (e) {
+        console.error('[MFA] unenroll:', e);
+        showToast('⚠️ ' + (e.message || 'Erro ao desativar 2FA'));
+    }
+}
+
+// Copia os recovery codes pra área de transferência
+function copiarRecoveryCodes() {
+    const listEl = document.getElementById('mfa-recovery-list');
+    if (!listEl) return;
+    const txt = Array.from(listEl.children).map(c => c.innerText).join('\n');
+    navigator.clipboard?.writeText(txt).then(
+        () => showToast('📋 Códigos copiados'),
+        () => showToast('⚠️ Não foi possível copiar')
+    );
+}
+
+// Renderiza o status do 2FA no card da aba Segurança
+async function renderStatus2FA() {
+    const wrap = document.getElementById('cfg-2fa-status');
+    if (!wrap) return;
+    wrap.innerHTML = '<span style="color:#71717a;font-size:.8rem;">Verificando...</span>';
+    const tem2FA = await mfaUsuarioTem2FA();
+    const fatores = await mfaListarFatores();
+    if (fatores === null) {
+        // API indisponível (MFA não habilitado no projeto)
+        wrap.innerHTML = `
+            <div style="font-size:.8rem;color:#f59e0b;padding:.6rem .8rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i> MFA não está habilitado no projeto Supabase. Habilite em Authentication → MFA pra usar 2FA.
+            </div>`;
+        return;
+    }
+    if (tem2FA) {
+        wrap.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <i class="fa-solid fa-circle-check" style="color:#22c55e;font-size:1.1rem;"></i>
+                    <div>
+                        <div style="font-size:.85rem;font-weight:700;color:#22c55e;">2FA Ativo</div>
+                        <div style="font-size:.7rem;color:#71717a;">Sua conta está protegida com autenticação em 2 fatores</div>
+                    </div>
+                </div>
+                <button onclick="desativar2FA()" class="btn-ghost" style="padding:.6rem 1rem;border-radius:.5rem;font-size:.8rem;color:#ef4444;border-color:rgba(239,68,68,.3);"><i class="fa-solid fa-shield-xmark"></i> Desativar</button>
+            </div>`;
+    } else {
+        wrap.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <i class="fa-solid fa-shield-halved" style="color:#71717a;font-size:1.1rem;"></i>
+                    <div>
+                        <div style="font-size:.85rem;font-weight:700;color:#a1a1aa;">2FA Inativo</div>
+                        <div style="font-size:.7rem;color:#71717a;">Ative pra exigir um código do app autenticador a cada login</div>
+                    </div>
+                </div>
+                <button id="btn-2fa-ativar" onclick="iniciar2FAEnroll()" class="btn-gold" style="padding:.6rem 1rem;border-radius:.5rem;font-size:.8rem;"><i class="fa-solid fa-shield-halved"></i> Ativar 2FA</button>
+            </div>`;
+    }
+}
+
 sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
         sbSession = null; sbClube = null; currentUser = null;
@@ -10088,44 +10373,25 @@ async function login() {
         if (error) throw error;
 
         sbSession = data.session;
-        await carregarUsuarioEClube(data.user);
 
-        // Se acessou via ?admin=1, tentar abrir painel admin
-        if (window._goToAdmin) {
-            const ok = await adminVerificarAcessoEMostrar();
-            if (ok) {
-                logAudit('LOGIN', `Login admin: ${currentUser?.nome || data.user.email}`);
-                return;
+        // 2FA: verifica se a sessão precisa ser elevada pra aal2 (usuário tem TOTP ativo)
+        let precisaMFA = false;
+        try {
+            const aal = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+            // nextLevel = 'aal2' e currentLevel = 'aal1' → tem 2FA e precisa do código
+            if (aal && aal.data && aal.data.nextLevel === 'aal2' && aal.data.currentLevel === 'aal1') {
+                precisaMFA = true;
             }
-            // Se não é admin, segue fluxo normal
+        } catch (e) { console.warn('[MFA] checagem AAL no login:', e.message); }
+
+        if (precisaMFA) {
+            // Não prossegue: mostra o passo de código 2FA
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerText = 'Entrar no Sistema'; }
+            await mostrarPasso2FALogin();
+            return;
         }
 
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('main-app').style.display = 'flex';
-        document.body.classList.remove('auth-active');
-
-        applyPermissions();
-        renderDashboard();
-        iniciarRelogio();
-        logAudit('LOGIN', `Login: ${currentUser.nome}`);
-        iniciarBackupAutomatico();
-        atualizarStatusDB();
-        // Carregar dados de assinatura e renderizar banner global
-        carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
-        // Iniciar realtime cross-device
-        try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
-        // Carrega TODO o estado do clube em background (não bloqueia UI)
-        (async () => {
-            try {
-                await db.jogadores.list();
-                await carregarEstadoDoSupabase();
-                renderJogadores();
-                renderTorneiosList();
-                renderDashboard();
-                console.log('✅ Estado completo carregado');
-            } catch (e) { console.warn('Carregar estado:', e); }
-        })();
-        showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
+        await _finalizarLoginComSucesso(data.user);
     } catch (e) {
         console.error('Login erro:', e);
         errEl.style.display = 'block';
@@ -10137,6 +10403,110 @@ async function login() {
     } finally {
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerText = 'Entrar no Sistema'; }
     }
+}
+
+// Fluxo de sucesso pós-login (chamado tanto no login normal quanto após o 2FA).
+async function _finalizarLoginComSucesso(authUser) {
+    await carregarUsuarioEClube(authUser);
+
+    // Se acessou via ?admin=1, tentar abrir painel admin
+    if (window._goToAdmin) {
+        const ok = await adminVerificarAcessoEMostrar();
+        if (ok) {
+            logAudit('LOGIN', `Login admin: ${currentUser?.nome || authUser.email}`);
+            return;
+        }
+    }
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'flex';
+    document.body.classList.remove('auth-active');
+
+    applyPermissions();
+    renderDashboard();
+    iniciarRelogio();
+    logAudit('LOGIN', `Login: ${currentUser.nome}`);
+    iniciarBackupAutomatico();
+    atualizarStatusDB();
+    carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
+    try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
+    (async () => {
+        try {
+            await db.jogadores.list();
+            await carregarEstadoDoSupabase();
+            renderJogadores();
+            renderTorneiosList();
+            renderDashboard();
+            console.log('✅ Estado completo carregado');
+        } catch (e) { console.warn('Carregar estado:', e); }
+    })();
+    showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
+}
+
+// Mostra o passo de código 2FA na tela de login (esconde os campos de senha)
+async function mostrarPasso2FALogin() {
+    // Pega o factorId TOTP verificado pra o challenge
+    const fatores = await mfaListarFatores();
+    const totp = (fatores || []).find(f => f.status === 'verified');
+    if (!totp) {
+        // Sem fator verificado — não deveria chegar aqui; segue login normal
+        showToast('⚠️ Erro ao localizar fator 2FA. Tente novamente.');
+        return;
+    }
+    _mfaLoginChallenge = { factorId: totp.id };
+
+    const passoNormal = document.getElementById('login-campos-normais');
+    const passo2fa = document.getElementById('login-passo-2fa');
+    if (passoNormal) passoNormal.style.display = 'none';
+    if (passo2fa) passo2fa.style.display = 'block';
+    const inp = document.getElementById('login-2fa-code');
+    if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 150); }
+    const err = document.getElementById('login-2fa-error');
+    if (err) err.style.display = 'none';
+}
+
+// Confirma o código 2FA digitado no login
+async function confirmar2FALogin() {
+    if (!_mfaLoginChallenge) return;
+    const code = (document.getElementById('login-2fa-code')?.value || '').replace(/\s/g, '');
+    const err = document.getElementById('login-2fa-error');
+    if (!/^\d{6}$/.test(code)) {
+        if (err) { err.style.display = 'block'; err.innerText = '⚠️ Digite o código de 6 dígitos'; }
+        return;
+    }
+    const btn = document.getElementById('btn-login-2fa');
+    if (btn) { btn.disabled = true; btn.innerText = 'Verificando...'; }
+    try {
+        const { data: ch, error: chErr } = await sb.auth.mfa.challenge({ factorId: _mfaLoginChallenge.factorId });
+        if (chErr) throw chErr;
+        const { data: vData, error: vErr } = await sb.auth.mfa.verify({
+            factorId: _mfaLoginChallenge.factorId,
+            challengeId: ch.id,
+            code,
+        });
+        if (vErr) throw vErr;
+
+        // Sessão elevada pra aal2 — prossegue
+        sbSession = vData;
+        _mfaLoginChallenge = null;
+        const { data: { user } } = await sb.auth.getUser();
+        await _finalizarLoginComSucesso(user);
+    } catch (e) {
+        console.error('[MFA] verify login:', e);
+        if (err) { err.style.display = 'block'; err.innerText = '⚠️ Código inválido. Tente de novo.'; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = 'Verificar e entrar'; }
+    }
+}
+
+// Cancela o 2FA no login e volta pros campos de senha (faz signOut da sessão aal1)
+async function cancelar2FALogin() {
+    _mfaLoginChallenge = null;
+    try { await sb.auth.signOut(); } catch(_) {}
+    const passoNormal = document.getElementById('login-campos-normais');
+    const passo2fa = document.getElementById('login-passo-2fa');
+    if (passo2fa) passo2fa.style.display = 'none';
+    if (passoNormal) passoNormal.style.display = 'block';
 }
 
 
@@ -11919,6 +12289,8 @@ function abrirModalBackups() {
 
 
 function renderSegurancaStats() {
+    // 2FA status (assíncrono — não bloqueia o resto)
+    if (typeof renderStatus2FA === 'function') { renderStatus2FA().catch(e => console.warn('[2FA]', e)); }
     const auditStatsEl = document.getElementById('cfg-audit-stats');
     if (auditStatsEl) {
         const total = auditoria.length;
@@ -14616,6 +14988,11 @@ function mostrarTelaLogin() {
     document.getElementById('invite-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
     document.body.classList.add('auth-active');
+    // Garante que o passo de 2FA esteja oculto e os campos normais visíveis
+    const passoNormal = document.getElementById('login-campos-normais');
+    const passo2fa = document.getElementById('login-passo-2fa');
+    if (passo2fa) passo2fa.style.display = 'none';
+    if (passoNormal) passoNormal.style.display = 'flex';
     // Limpa URL params para não ficar repetindo a tela
     if (window.history && window.history.replaceState) {
         window.history.replaceState(null, '', window.location.pathname);
