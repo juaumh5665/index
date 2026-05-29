@@ -23201,15 +23201,11 @@ function _credValidarVenda(jogadorId, valorVenda, areaVenda) {
 
     const limite = Number(j.limiteCredito) || 0;
     if (limite <= 0) {
-        // Sem limite cadastrado → trata como sem crédito
-        return {
-            nivel: 'bloqueio',
-            motivo: 'sem_limite',
-            mensagem: 'Jogador sem limite de crédito',
-            detalhes: 'Não há limite cadastrado. Defina um limite no cadastro ou cobre à vista.',
-            jogador: j,
-            valorVenda,
-        };
+        // Sem limite cadastrado → modo "legado" (não bloqueia, comportamento como antes da feature)
+        // Apenas retorna OK pra não quebrar clubes que ainda não cadastraram limites.
+        // O admin precisa cadastrar um limite (ou marcar "Sem crédito" explicitamente)
+        // pra que o sistema de validação comece a atuar nesse jogador.
+        return { nivel:'ok', jogador:j };
     }
 
     const divida = _credGetDividaJogador(jogadorId);
