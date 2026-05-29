@@ -2170,6 +2170,10 @@ document.addEventListener('DOMContentLoaded', function(){
             <div onclick="showPage('contaspagar')" id="nav-contaspagar" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-file-invoice-dollar nav-ico" style="width:16px;color:#f59e0b;"></i> Contas a Pagar
             </div>
+            <div onclick="showPage('credito')" id="nav-credito" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
+                <i class="fa-solid fa-credit-card nav-ico" style="width:16px;color:#ef4444;"></i> Crédito
+                <span id="nav-credito-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:.4rem;font-weight:800;">0</span>
+            </div>
             <div onclick="showPage('relatorios')" id="nav-relatorios" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-chart-line nav-ico" style="width:16px;color:#06b6d4;"></i> Relatórios
             </div>
@@ -2960,6 +2964,49 @@ document.addEventListener('DOMContentLoaded', function(){
                             </div>
                         </div>
                     </div>
+
+                    <!-- CONTROLE DE CRÉDITO DO JOGADOR -->
+                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-credit-card"></i> Controle de Crédito (Limite por Jogador)</div>
+                        <div style="font-size:.78rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
+                            Escolha em quais tipos de venda o limite de crédito do jogador será verificado. Quando o jogador atingir o limite, o sistema avisa o operador e pode bloquear novas vendas até quitação ou aprovação do admin.
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+                            <label class="pref-option" style="cursor:pointer;">
+                                <input type="checkbox" id="cfg-credito-buyin" checked>
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-trophy" style="color:#f59e0b;"></i> Buy-in / Rebuy / Add-on</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Torneios e cash game</div>
+                                </div>
+                            </label>
+                            <label class="pref-option" style="cursor:pointer;">
+                                <input type="checkbox" id="cfg-credito-cash" checked>
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-coins" style="color:#a78bfa;"></i> Entrada em Cash</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Mesa de cash com fichas</div>
+                                </div>
+                            </label>
+                            <label class="pref-option" style="cursor:pointer;">
+                                <input type="checkbox" id="cfg-credito-bar" checked>
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-utensils" style="color:#10b981;"></i> Bar / Comanda</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Consumo de bar na conta</div>
+                                </div>
+                            </label>
+                            <label class="pref-option" style="cursor:pointer;">
+                                <input type="checkbox" id="cfg-credito-jackpot" checked>
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-gem" style="color:#a855f7;"></i> Jackpot</div>
+                                    <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">Compra de fichas extras</div>
+                                </div>
+                            </label>
+                        </div>
+                        <div style="font-size:.7rem;color:#52525b;margin-top:.75rem;line-height:1.5;">
+                            <i class="fa-solid fa-circle-info"></i>
+                            Mesmo desativado em alguma área, alertas visuais sobre o saldo continuam aparecendo. Apenas o <strong>bloqueio</strong> e a <strong>solicitação de autorização</strong> dependem desta configuração.
+                        </div>
+                    </div>
+
                     <button onclick="salvarPreferencias()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;">Salvar Preferências</button>
                 </div>
 
@@ -3677,6 +3724,45 @@ document.addEventListener('DOMContentLoaded', function(){
                             <div id="cp-upcoming"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- CRÉDITO (Solicitações + Histórico) -->
+            <div id="page-credito" class="page-content fade-in" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h2 style="font-size:1.4rem;font-weight:800;margin-bottom:.25rem;"><i class="fa-solid fa-credit-card" style="color:#ef4444;"></i> Controle de Crédito</h2>
+                        <div style="font-size:.8rem;color:#71717a;">Solicitações pendentes, histórico de aprovações e visão geral do crédito dos jogadores</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div style="display:flex;gap:.25rem;margin-bottom:1.5rem;border-bottom:1px solid #1e1e23;padding-bottom:.75rem;flex-wrap:wrap;">
+                    <button class="tab-btn active" id="credtab-btn-pendentes" onclick="switchCreditoTab('cred-pendentes', this)">
+                        <i class="fa-solid fa-clock"></i> Pendentes
+                        <span id="cred-pendentes-badge" style="display:none;margin-left:.4rem;background:#ef4444;color:#fff;font-size:.65rem;padding:.05rem .35rem;border-radius:.3rem;">0</span>
+                    </button>
+                    <button class="tab-btn" id="credtab-btn-historico" onclick="switchCreditoTab('cred-historico', this)"><i class="fa-solid fa-clock-rotate-left"></i> Histórico</button>
+                    <button class="tab-btn" id="credtab-btn-jogadores" onclick="switchCreditoTab('cred-jogadores', this)"><i class="fa-solid fa-users"></i> Jogadores</button>
+                </div>
+
+                <!-- ABA: PENDENTES -->
+                <div id="cred-pendentes" class="credtab-content">
+                    <div id="cred-pendentes-lista" style="display:flex;flex-direction:column;gap:.6rem;"></div>
+                </div>
+
+                <!-- ABA: HISTÓRICO -->
+                <div id="cred-historico" class="credtab-content" style="display:none;">
+                    <div id="cred-historico-lista" style="display:flex;flex-direction:column;gap:.6rem;"></div>
+                </div>
+
+                <!-- ABA: JOGADORES (visão geral por jogador) -->
+                <div id="cred-jogadores" class="credtab-content" style="display:none;">
+                    <div style="margin-bottom:.75rem;position:relative;">
+                        <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:#71717a;"></i>
+                        <input type="text" id="cred-search-jogador" placeholder="Buscar jogador..." oninput="renderCreditoJogadores()" class="inp" style="padding-left:2.3rem;">
+                    </div>
+                    <div id="cred-jogadores-lista" style="display:flex;flex-direction:column;gap:.5rem;"></div>
                 </div>
             </div>
 
@@ -4615,6 +4701,71 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <!-- MODAL: CONFIG STATS TV PRO LIVE -->
+<!-- ════════ MODAIS DE CRÉDITO ════════ -->
+
+<!-- Modal de AVISO/BLOQUEIO durante venda -->
+<div id="modal-credito-validacao" class="modal-overlay">
+    <div style="background:#111113;border:2px solid #ef4444;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
+        <div style="text-align:center;margin-bottom:1.25rem;">
+            <div id="cv-icon" style="font-size:3rem;margin-bottom:.5rem;">⛔</div>
+            <h3 id="cv-titulo" style="font-weight:800;font-size:1.2rem;color:#ef4444;">Limite de crédito atingido</h3>
+        </div>
+        <div id="cv-conteudo" style="font-size:.9rem;line-height:1.5;color:#e5e5e5;margin-bottom:1.25rem;text-align:center;"></div>
+        <div id="cv-detalhes" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.85rem;margin-bottom:1rem;font-size:.8rem;"></div>
+        <div id="cv-acoes" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+    </div>
+</div>
+
+<!-- Modal de SOLICITAR autorização (operador) -->
+<div id="modal-credito-solicitar" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #f59e0b;border-radius:1.25rem;padding:1.6rem;width:100%;max-width:440px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-bell" style="color:#f59e0b;"></i> Solicitar Autorização</h3>
+            <button onclick="closeModal('modal-credito-solicitar')" style="background:none;border:none;color:#71717a;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <div id="cs-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.85rem;margin-bottom:1rem;font-size:.85rem;"></div>
+        <div style="margin-bottom:.9rem;">
+            <label class="inp-label">Valor extra solicitado (R$)</label>
+            <input type="number" step="0.01" min="0" id="cs-valor-extra" class="inp" placeholder="Ex: 200">
+            <div style="font-size:.68rem;color:#71717a;margin-top:.25rem;">Limite adicional necessário pra liberar a venda</div>
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label class="inp-label">Motivo / observação</label>
+            <textarea id="cs-motivo" class="inp" rows="3" placeholder="Ex: Cliente quer fazer mais 2 rebuys, já pagou outros dias"></textarea>
+        </div>
+        <div style="display:flex;gap:.5rem;">
+            <button onclick="closeModal('modal-credito-solicitar')" class="btn-ghost" style="flex:1;padding:.75rem;border-radius:.5rem;">Cancelar</button>
+            <button onclick="cred_enviarSolicitacao()" class="btn-gold" style="flex:2;padding:.75rem;border-radius:.5rem;"><i class="fa-solid fa-paper-plane"></i> Enviar ao Admin</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de APROVAR/RECUSAR solicitação (admin) -->
+<div id="modal-credito-aprovar" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:1.6rem;width:100%;max-width:480px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-gavel" style="color:#f59e0b;"></i> Analisar Solicitação</h3>
+            <button onclick="closeModal('modal-credito-aprovar')" style="background:none;border:none;color:#71717a;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <div id="ca-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:1rem;margin-bottom:1rem;font-size:.85rem;"></div>
+        <div style="margin-bottom:.9rem;">
+            <label class="inp-label">Observação do admin (opcional)</label>
+            <textarea id="ca-obs" class="inp" rows="2" placeholder="Ex: aprovado, cliente avisou que paga amanhã"></textarea>
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+                <input type="checkbox" id="ca-aumentar-limite" style="width:16px;height:16px;accent-color:#f59e0b;">
+                <span style="font-size:.85rem;">Aumentar o limite permanente do jogador para o novo valor</span>
+            </label>
+            <div style="font-size:.68rem;color:#71717a;margin-top:.25rem;margin-left:1.7rem;">Se desmarcado, libera só esta venda; o limite original volta depois</div>
+        </div>
+        <div style="display:flex;gap:.5rem;">
+            <button onclick="cred_recusar()" style="flex:1;padding:.75rem;border-radius:.5rem;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);font-weight:700;cursor:pointer;"><i class="fa-solid fa-xmark"></i> Recusar</button>
+            <button onclick="cred_aprovar()" style="flex:2;padding:.75rem;border-radius:.5rem;background:#10b981;color:#000;border:none;font-weight:700;cursor:pointer;"><i class="fa-solid fa-check"></i> Aprovar</button>
+        </div>
+    </div>
+</div>
+
 <div id="modal-contaspagar" class="modal-overlay">
     <div style="background:#111113;border:1px solid #26262b;border-radius:1.1rem;padding:1.6rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
@@ -5339,6 +5490,44 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div><label class="inp-label">Cidade</label><input id="j-cidade" class="inp" placeholder="Ex: Pato Branco"></div>
                 <div><label class="inp-label">UF</label><input id="j-uf" class="inp" placeholder="PR" maxlength="2" style="text-transform:uppercase;"></div>
             </div>
+
+            <!-- ────── CONTROLE DE CRÉDITO ────── -->
+            <div style="border-top:1px solid #1e1e23;padding-top:1rem;margin-top:.25rem;">
+                <div style="font-size:.7rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">
+                    <i class="fa-solid fa-credit-card"></i> Controle de Crédito
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.6rem;">
+                    <div>
+                        <label class="inp-label">Categoria</label>
+                        <select id="j-categoria-credito" class="inp" onchange="_jOnCategoriaChange()">
+                            <option value="regular">👤 Regular</option>
+                            <option value="vip">🌟 VIP</option>
+                            <option value="restrito">⚠️ Restrito</option>
+                            <option value="sem_credito">🚫 Sem crédito</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="inp-label">Limite (R$)</label>
+                        <input id="j-limite-credito" type="number" step="0.01" min="0" class="inp" placeholder="Ex: 300">
+                    </div>
+                </div>
+                <label style="display:flex;align-items:flex-start;gap:.6rem;cursor:pointer;padding:.55rem .7rem;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:.5rem;">
+                    <input type="checkbox" id="j-bloqueado" style="width:16px;height:16px;accent-color:#ef4444;margin-top:.15rem;cursor:pointer;" onchange="_jOnBloqueadoChange()">
+                    <div>
+                        <div style="font-size:.8rem;font-weight:700;color:#ef4444;">Bloquear vendas a prazo</div>
+                        <div style="font-size:.68rem;color:#71717a;margin-top:.1rem;">Jogador só pode comprar à vista</div>
+                    </div>
+                </label>
+                <div id="j-motivo-wrap" style="display:none;margin-top:.5rem;">
+                    <label class="inp-label">Motivo do bloqueio</label>
+                    <input id="j-motivo-bloqueio" class="inp" placeholder="Ex: Calote em 12/05/26">
+                </div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.5rem;line-height:1.4;">
+                    <i class="fa-solid fa-circle-info" style="color:#f59e0b;"></i>
+                    Avisos automáticos: 60% (leve) · 80% (forte) · 100% (bloqueio com opção de pedir autorização ao admin).
+                </div>
+            </div>
+
             <input type="hidden" id="j-edit-id" value="">
             <button onclick="salvarJogador()" id="j-submit-btn" class="btn-gold" style="padding:.85rem;font-size:.95rem;border-radius:.6rem;margin-top:.5rem;">Cadastrar</button>
         </div>
@@ -5498,6 +5687,34 @@ document.addEventListener('DOMContentLoaded', function(){
                             <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;line-height:1.4;">
                                 <i class="fa-solid fa-circle-info" style="color:#22c55e;"></i>
                                 Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível recebem <strong>+X fichas extras</strong>. Entra no chipcount e média.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FASE I.1: Buy-in PROMOCIONAL (Early Bird) -->
+                    <div style="padding:.75rem .9rem;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;">
+                        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;margin-bottom:.5rem;">
+                            <input type="checkbox" id="t-buyin-promo-ativo" onchange="atualizarBuyinPromoUI()" style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b;">
+                            <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-star"></i> Buy-in promocional (Early Bird)</div>
+                        </label>
+                        <div id="t-buyin-promo-campos" style="display:none;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;">
+                                <div>
+                                    <label class="inp-label">Valor R$</label>
+                                    <input id="t-buyin-promo-valor" type="number" step="0.01" min="0" value="50" class="inp" placeholder="Ex: 50">
+                                </div>
+                                <div>
+                                    <label class="inp-label">Fichas</label>
+                                    <input id="t-buyin-promo-fichas" type="number" min="0" value="15000" class="inp" placeholder="Ex: 15000">
+                                </div>
+                                <div>
+                                    <label class="inp-label">Até fim do nível</label>
+                                    <input id="t-buyin-promo-ate-nivel" type="number" min="1" value="1" class="inp" placeholder="Ex: 1">
+                                </div>
+                            </div>
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;line-height:1.4;">
+                                <i class="fa-solid fa-circle-info" style="color:#f59e0b;"></i>
+                                Jogadores que fizerem <strong>Buy-in</strong> até o final desse nível pagam o <strong>valor promocional</strong> e recebem stack <strong>diferenciado</strong>. Não se aplica a rebuy/reentry/addon.
                             </div>
                         </div>
                     </div>
@@ -6849,7 +7066,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','credito','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash','stackbar'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot','ticketsvouchers','stackbar'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa','stackbar'] },
@@ -7107,6 +7324,11 @@ function _jogadorFromDb(row) {
         cpf: row.cpf || '',
         email: row.email || '',
         notas: row.notas || '',
+        // Controle de Crédito (Fases 1+2+3)
+        limiteCredito: parseFloat(row.limite_credito) || 0,
+        categoriaCredito: row.categoria_credito || 'regular',
+        bloqueado: !!row.bloqueado,
+        motivoBloqueio: row.motivo_bloqueio || null,
         criadoEm: row.criado_em ? new Date(row.criado_em).getTime() : Date.now(),
     };
 }
@@ -7124,6 +7346,11 @@ function _jogadorToDb(j) {
         cpf: j.cpf || null,
         email: j.email || null,
         notas: j.notas || null,
+        // Controle de Crédito (Fases 1+2+3)
+        limite_credito: Number(j.limiteCredito) || 0,
+        categoria_credito: j.categoriaCredito || 'regular',
+        bloqueado: !!j.bloqueado,
+        motivo_bloqueio: j.motivoBloqueio || null,
     };
 }
 
@@ -7681,6 +7908,9 @@ async function _processarMudancaRealtime(tipo, payload) {
                             passaporte: e.passaporte || null,
                             comboId: e.combo_id || null,
                             bonusFichas: parseInt(e.bonus_fichas || 0),
+                            // FASE I.1: Buy-in PROMO
+                            fichasOverride: parseInt(e.fichas_override || 0),
+                            isPromo: !!e.is_promo,
                         }));
                         t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
                             jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
@@ -8001,6 +8231,11 @@ function _torneioToDb(t) {
         bonus_registro_ativo: !!t.bonusRegistroAtivo,
         bonus_registro_fichas: t.bonusRegistroFichas || 0,
         bonus_registro_ate_nivel: t.bonusRegistroAteNivel || null,
+        // FASE I.1: Buy-in PROMO (Early Bird)
+        buyin_promo_ativo: !!t.buyinPromoAtivo,
+        buyin_promo_valor: t.buyinPromoValor || 0,
+        buyin_promo_fichas: t.buyinPromoFichas || 0,
+        buyin_promo_ate_nivel: t.buyinPromoAteNivel || null,
         imprimir_comprovante_compra: !!t.imprimirComprovanteCompra,
         imprimir_comprovante_jackpot: !!t.imprimirComprovanteJackpot,
         comprovante_vias: t.comprovanteVias || 1,
@@ -8355,6 +8590,9 @@ async function sincronizarEstado() {
                                     passaporte: (e.passaporte && e.passaporte.cobrado) ? e.passaporte : null,
                                     combo_id: e.comboId || null,
                                     bonus_fichas: Number(e.bonusFichas) || 0,
+                                    // FASE I.1: Buy-in PROMO
+                                    fichas_override: Number(e.fichasOverride) || 0,
+                                    is_promo: !!e.isPromo,
                                 }));
                                 const { error: errE } = await sb.from('torneio_entries').upsert(entryRows);
                                 if (errE) throw new Error('Upsert entries: ' + errE.message);
@@ -8935,6 +9173,11 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         bonusRegistroAtivo: !!r.bonus_registro_ativo,
         bonusRegistroFichas: parseInt(r.bonus_registro_fichas) || 0,
         bonusRegistroAteNivel: r.bonus_registro_ate_nivel || null,
+        // FASE I.1: Buy-in PROMO (Early Bird)
+        buyinPromoAtivo: !!r.buyin_promo_ativo,
+        buyinPromoValor: parseFloat(r.buyin_promo_valor) || 0,
+        buyinPromoFichas: parseInt(r.buyin_promo_fichas) || 0,
+        buyinPromoAteNivel: r.buyin_promo_ate_nivel || null,
         imprimirComprovanteCompra:  !!r.imprimir_comprovante_compra,
         imprimirComprovanteJackpot: !!r.imprimir_comprovante_jackpot,
         comprovanteVias:            r.comprovante_vias || 1,
@@ -8996,6 +9239,9 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             passaporte: e.passaporte || null,
             comboId: e.combo_id || null,
             bonusFichas: parseInt(e.bonus_fichas || 0),
+            // FASE I.1: Buy-in PROMO
+            fichasOverride: parseInt(e.fichas_override || 0),
+            isPromo: !!e.is_promo,
         })),
         eliminados: tElims.map(e => ({
             id: e.id, jogadorId: e.jogador_id, eliminadorId: e.eliminador_id,
@@ -10836,6 +11082,8 @@ async function _finalizarLoginComSucesso(authUser) {
     iniciarBackupAutomatico();
     atualizarStatusDB();
     carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
+    // Carrega solicitações de crédito pra badge aparecer no menu
+    try { cred_carregarSupabase().catch(e => console.warn('[CRED] boot:', e)); } catch(e) {}
     try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
     (async () => {
         try {
@@ -12406,7 +12654,9 @@ function diagTorneio(idx) {
     // Fichas
     let totalFichas = 0;
     (t.entries || []).forEach(e => {
-        if (e.tipo === 'rebuy_simples')      totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
+        // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
+        if (Number(e.fichasOverride) > 0)    totalFichas += Number(e.fichasOverride);
+        else if (e.tipo === 'rebuy_simples') totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         else if (e.tipo === 'rebuy_duplo')   totalFichas += (t.rebuyDuploFichas || t.stack*2);
         else if (e.tipo === 'addon')         totalFichas += (t.addonFichas || 0);
         else if (e.tipo === 'last_chance')   totalFichas += (t.last_chance_fichas || 0);
@@ -12837,9 +13087,10 @@ function gerarComprovanteCompra(t, dados) {
     if (!t || !dados || !dados.entry) return '';
     const e = dados.entry;
     const col = _printColWidth();
-    const tipoLabel = _labelTipoEntry(e.tipo);
+    const tipoLabel = _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : '');
     const valorAcao = Number(e.valor) || 0;
-    const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+    // FASE I.1: usa fichasOverride se entry for de promo
+    const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
     const taxaAdm = Number(e.taxaAdm) || 0;
     const temPassaporte = e.passaporte && e.passaporte.cobrado;
     const valorPassaporte = temPassaporte ? (Number(e.passaporte.valor) || 0) : 0;
@@ -13008,9 +13259,10 @@ function gerarComprovanteCombo(t, dados) {
 
     // Listar cada ação
     entries.forEach(e => {
-        const tipoLabel = _labelTipoEntry(e.tipo);
+        const tipoLabel = _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : '');
         const valorAcao = Number(e.valor) || 0;
-        const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+        // FASE I.1: usa fichasOverride se entry for de promo
+        const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
         totalGeral += valorAcao;
         fichasTotal += fichasAcao;
 
@@ -13209,11 +13461,12 @@ function gerarExtratoJogadorTorneio(t, jogadorId) {
             const dtFmt = dt.toLocaleString('pt-BR').substring(0, 17);
             txt += dtFmt + ' #' + qtd + '\n';
             const valorAcao = Number(e.valor) || 0;
-            const fichasAcao = _fichasStackPorTipo(t, e.tipo);
+            // FASE I.1: usa fichasOverride se entry for de promo
+            const fichasAcao = (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
             if (valorAcao > 0) {
-                txt += _printPad('  ' + _labelTipoEntry(e.tipo), formatMoney(valorAcao), col) + '\n';
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : ''), formatMoney(valorAcao), col) + '\n';
             } else {
-                txt += _printPad('  ' + _labelTipoEntry(e.tipo), 'GRATIS', col) + '\n';
+                txt += _printPad('  ' + _labelTipoEntry(e.tipo) + (e.isPromo ? ' PROMO' : ''), 'GRATIS', col) + '\n';
             }
             totalGeral += valorAcao;
             fichasTotal += fichasAcao;
@@ -14788,6 +15041,11 @@ function _capturarConfigTorneio() {
         bountyValor:    parseFloat((document.getElementById('t-bounty-valor') || {}).value) || 0,
         bountyKoSplit:  parseFloat((document.getElementById('t-pko-split') || {}).value) || 50,
         rankingRakePct: parseFloat((document.getElementById('t-ranking-rake-pct') || {}).value) || 0,
+        // FASE I.1: Buy-in PROMO (Early Bird)
+        buyinPromoAtivo:    (document.getElementById('t-buyin-promo-ativo') || {}).checked || false,
+        buyinPromoValor:    parseFloat((document.getElementById('t-buyin-promo-valor') || {}).value) || 0,
+        buyinPromoFichas:   parseInt((document.getElementById('t-buyin-promo-fichas') || {}).value) || 0,
+        buyinPromoAteNivel: parseInt((document.getElementById('t-buyin-promo-ate-nivel') || {}).value) || null,
         // estrutura de blinds (snapshot)
         blinds: typeof blindStructure !== 'undefined' ? JSON.parse(JSON.stringify(blindStructure)) : [],
     };
@@ -14835,6 +15093,16 @@ function _aplicarConfigTorneio(cfg) {
     set('t-bounty-valor', cfg.bountyValor);
     set('t-pko-split', cfg.bountyKoSplit);
     set('t-ranking-rake-pct', cfg.rankingRakePct);
+
+    // FASE I.1: Buy-in PROMO (Early Bird)
+    const cbPromo = document.getElementById('t-buyin-promo-ativo');
+    if (cbPromo) {
+        cbPromo.checked = !!cfg.buyinPromoAtivo;
+        if (typeof atualizarBuyinPromoUI === 'function') atualizarBuyinPromoUI();
+    }
+    set('t-buyin-promo-valor', cfg.buyinPromoValor);
+    set('t-buyin-promo-fichas', cfg.buyinPromoFichas);
+    set('t-buyin-promo-ate-nivel', cfg.buyinPromoAteNivel);
 
     // Aplica blinds
     if (cfg.blinds && cfg.blinds.length && typeof blindStructure !== 'undefined') {
@@ -18098,6 +18366,7 @@ function showPage(page) {
     if (page === 'assinatura') renderAssinatura();
     if (page === 'caixa')     renderCaixa();
     if (page === 'contaspagar') { cpCarregarSupabase(); cpRender(); }
+    if (page === 'credito') { cred_carregarSupabase(); renderCreditoPage(); }
     if (page === 'ticketsvouchers') renderTicketsVouchers();
     if (page === 'relatorios') {
         setReportPeriod(_reportPeriod.tipo || '30d');
@@ -18189,6 +18458,11 @@ async function salvarJogador() {
         whatsapp: document.getElementById('j-whatsapp').value.trim(),
         cidade:   document.getElementById('j-cidade').value.trim(),
         uf:       document.getElementById('j-uf').value.trim().toUpperCase(),
+        // Controle de Crédito
+        categoriaCredito: document.getElementById('j-categoria-credito')?.value || 'regular',
+        limiteCredito:    parseFloat(document.getElementById('j-limite-credito')?.value) || 0,
+        bloqueado:        document.getElementById('j-bloqueado')?.checked || false,
+        motivoBloqueio:   document.getElementById('j-motivo-bloqueio')?.value.trim() || null,
     };
 
     // UI: estado de loading
@@ -18230,6 +18504,17 @@ function limparFormularioJogador() {
     document.getElementById('j-cidade').value = '';
     document.getElementById('j-uf').value = '';
     document.getElementById('j-edit-id').value = '';
+    // Crédito (default Regular sem bloqueio)
+    const selCat = document.getElementById('j-categoria-credito');
+    if (selCat) selCat.value = 'regular';
+    const inpLim = document.getElementById('j-limite-credito');
+    if (inpLim) inpLim.value = '';
+    const cbBl = document.getElementById('j-bloqueado');
+    if (cbBl) cbBl.checked = false;
+    const inpMot = document.getElementById('j-motivo-bloqueio');
+    if (inpMot) inpMot.value = '';
+    const wrapMot = document.getElementById('j-motivo-wrap');
+    if (wrapMot) wrapMot.style.display = 'none';
     document.getElementById('j-modal-titulo').innerText = 'Cadastrar Jogador';
     document.getElementById('j-submit-btn').innerText = 'Cadastrar';
 }
@@ -18244,6 +18529,17 @@ function editarJogador(jogadorId) {
     document.getElementById('j-whatsapp').value = j.whatsapp || '';
     document.getElementById('j-cidade').value = j.cidade || '';
     document.getElementById('j-uf').value = j.uf || '';
+    // Crédito
+    const selCat = document.getElementById('j-categoria-credito');
+    if (selCat) selCat.value = j.categoriaCredito || 'regular';
+    const inpLim = document.getElementById('j-limite-credito');
+    if (inpLim) inpLim.value = j.limiteCredito || '';
+    const cbBl = document.getElementById('j-bloqueado');
+    if (cbBl) cbBl.checked = !!j.bloqueado;
+    const inpMot = document.getElementById('j-motivo-bloqueio');
+    if (inpMot) inpMot.value = j.motivoBloqueio || '';
+    const wrapMot = document.getElementById('j-motivo-wrap');
+    if (wrapMot) wrapMot.style.display = j.bloqueado ? '' : 'none';
     document.getElementById('j-modal-titulo').innerText = 'Editar Jogador';
     document.getElementById('j-submit-btn').innerText = 'Salvar Alterações';
 
@@ -18684,6 +18980,20 @@ function saveTournament() {
         })(),
         bonusRegistroAteNivel: (function() {
             const v = parseInt(document.getElementById('t-bonus-registro-ate-nivel')?.value);
+            return (isNaN(v) || v <= 0) ? null : v;
+        })(),
+        // FASE I.1: Buy-in PROMOCIONAL (Early Bird)
+        buyinPromoAtivo: document.getElementById('t-buyin-promo-ativo')?.checked || false,
+        buyinPromoValor: (function() {
+            const v = parseFloat(document.getElementById('t-buyin-promo-valor')?.value);
+            return (isNaN(v) || v < 0) ? 0 : v;
+        })(),
+        buyinPromoFichas: (function() {
+            const v = parseInt(document.getElementById('t-buyin-promo-fichas')?.value);
+            return (isNaN(v) || v < 0) ? 0 : v;
+        })(),
+        buyinPromoAteNivel: (function() {
+            const v = parseInt(document.getElementById('t-buyin-promo-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
         })(),
         imprimirComprovanteCompra:  document.getElementById('t-imprimir-compra')?.checked || false,
@@ -21005,15 +21315,80 @@ function atualizarResumoEntrada() {
 }
 
 function registrarEntrada() {
-    return comLock('registrarEntrada', function() {
+    return comLock('registrarEntrada', async function() {
+        // Hook de validação de crédito ANTES de criar a entry
+        try {
+            if (typeof _credValidarAntesDeEntradaImpl === 'function') {
+                const ok = await _credValidarAntesDeEntradaImpl();
+                if (!ok) return; // operador cancelou ou pediu autorização
+            }
+        } catch(e) { console.warn('[CRED] validacao entry:', e); }
         return _registrarEntradaImpl();
     }, '⏳ Processando entrada, aguarde...');
+}
+
+// Resolve jogador + valor que ESTÁ na UI do modal "Nova Entrada" pra validar crédito
+async function _credValidarAntesDeEntradaImpl() {
+    try {
+        // Espelha as leituras que o _registrarEntradaImpl faz
+        const tIdx = activeTorneioIdx;
+        const t = torneios[tIdx];
+        if (!t) return true;
+        const sel = document.getElementById('entrada-jogador');
+        const jid = sel ? sel.value : null;
+        if (!jid) return true;
+        const tipoEl = document.querySelector('input[name="entrada-tipo"]:checked');
+        const tipo = tipoEl ? tipoEl.value : 'buyin';
+        // Calcula valor estimado da venda (sem staff/passaporte por simplicidade — é estimativa)
+        let valor = t.buyin || 0;
+        if (tipo === 'reentry')       valor = Number(t.reentryValor || t.buyin) || 0;
+        if (tipo === 'rebuy_simples') valor = Number(t.rebuyValor || t.rebuySimples) || 0;
+        if (tipo === 'rebuy_duplo')   valor = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+        if (tipo === 'addon')         valor = Number(t.addonValor) || 0;
+        if (tipo === 'last_chance')   valor = Number(t.lastChanceValor || t.last_chance_valor) || 0;
+        // Buy-in PROMO substitui
+        if (typeof _calcValorBuyinPromo === 'function') {
+            const vp = _calcValorBuyinPromo(t, tipo);
+            if (vp !== null) valor = vp;
+        }
+        if (valor <= 0) return true; // FREE não valida crédito
+        return await credito_validarAntesDe(jid, valor, 'buyin');
+    } catch(e) {
+        console.warn('[CRED] erro validar entry:', e);
+        return true; // não bloqueia em caso de erro
+    }
 }
 
 // FASE F: Handler de COMBO de ações (Buy-in + Rebuy Duplo, etc.)
 // Cria uma entry por ação, registra transações separadas, e gera UM comprovante consolidado.
 // Reutiliza a infraestrutura existente (_registrarUmaEntryDireta) pra evitar duplicar lógica.
-function _registrarEntradasCombo(t, jid, acoes) {
+async function _registrarEntradasCombo(t, jid, acoes) {
+    // Hook de crédito: soma valores estimados das ações do combo e valida
+    try {
+        if (jid && Array.isArray(acoes) && acoes.length) {
+            let valorTotalCombo = 0;
+            for (const tp of acoes) {
+                let v = 0;
+                if (tp === 'buyin')          v = Number(t.buyin) || 0;
+                else if (tp === 'reentry')   v = Number(t.reentryValor || t.buyin) || 0;
+                else if (tp === 'rebuy_simples') v = Number(t.rebuyValor || t.rebuySimples) || 0;
+                else if (tp === 'rebuy_duplo')   v = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+                else if (tp === 'addon')     v = Number(t.addonValor) || 0;
+                else if (tp === 'last_chance') v = Number(t.lastChanceValor || t.last_chance_valor) || 0;
+                // Buy-in PROMO substitui
+                if (typeof _calcValorBuyinPromo === 'function') {
+                    const vp = _calcValorBuyinPromo(t, tp);
+                    if (vp !== null) v = vp;
+                }
+                valorTotalCombo += v;
+            }
+            if (valorTotalCombo > 0 && typeof credito_validarAntesDe === 'function') {
+                const ok = await credito_validarAntesDe(jid, valorTotalCombo, 'buyin');
+                if (!ok) return;
+            }
+        }
+    } catch(e) { console.warn('[CRED] validacao combo:', e); }
+
     // Validações comuns aplicadas pelo handler single ficam centralizadas aqui pra todas as ações
     const eliminado = t.eliminados.some(e => String(e.jogadorId) === String(jid));
     if (eliminado) return showToast('⚠️ Jogador eliminado — use Re-entry');
@@ -21081,6 +21456,10 @@ function _registrarEntradasCombo(t, jid, acoes) {
         else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
         else if (tipo === 'last_chance') valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
+        // FASE I.1: Buy-in PROMOCIONAL — substitui valorBase do buy-in se elegível
+        const valorPromoCombo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+        if (valorPromoCombo !== null) valorBase = valorPromoCombo;
+
         // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
         if (tipo === 'buyin' && valorBase === 0
             && _resolverStaffModo(t) === 'fixo'
@@ -21137,6 +21516,12 @@ function _registrarEntradasCombo(t, jid, acoes) {
         const bonusFichasNessaEntry = _calcBonusFichasParaEntry(t, tipo);
         if (bonusFichasNessaEntry > 0) {
             novaEntry.bonusFichas = bonusFichasNessaEntry;
+        }
+        // FASE I.1: Buy-in PROMO — se elegível, salva fichas customizadas e marca como promo
+        const fichasPromoCombo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
+        if (fichasPromoCombo !== null) {
+            novaEntry.fichasOverride = fichasPromoCombo;
+            novaEntry.isPromo = true;
         }
         // Flag pra agrupar no comprovante
         novaEntry.comboId = ts;
@@ -21315,6 +21700,10 @@ function _registrarEntradaImpl() {
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     if (tipo === 'last_chance')   valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
+    // FASE I.1: Buy-in PROMOCIONAL — substitui valorBase se elegível
+    const valorPromo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+    if (valorPromo !== null) valorBase = valorPromo;
+
     // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
     // (cliente paga R$ 10 que já tem staff embutido — não cobra staff extra por fora)
     if (tipo === 'buyin' && valorBase === 0
@@ -21382,6 +21771,12 @@ function _registrarEntradaImpl() {
     const bonusFichas = _calcBonusFichasParaEntry(t, tipo);
     if (bonusFichas > 0) {
         novaEntry.bonusFichas = bonusFichas;
+    }
+    // FASE I.1: Buy-in PROMO — se elegível, salva fichas customizadas e marca como promo
+    const fichasPromo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
+    if (fichasPromo !== null) {
+        novaEntry.fichasOverride = fichasPromo;
+        novaEntry.isPromo = true;
     }
     t.entries.push(novaEntry);
     alocarJogadorMesa(t, jid);
@@ -21770,6 +22165,8 @@ function updateTV(idx) {
     // Calcular fichas totais corretamente com rebuys/addons + jackpots + last chance
     // ATENÇÃO: o nome correto do campo é `rebuyFichas` (rebuySimplesFichas era um typo histórico)
     const totalFichas = t.entries.reduce((s, e) => {
+        // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
+        if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -22049,6 +22446,8 @@ function _computarDadosMiniTV(t) {
         : new Set((t.entries || []).filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
     // Fichas (mesma fórmula do updateTV) — fallback robusto rebuyFichas / rebuySimplesFichas
     const totalFichas = (t.entries || []).reduce((s, e) => {
+        // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
+        if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -22693,6 +23092,591 @@ async function _cpRenderRelatorio() {
             '<div style="font-family:var(--font-mono);font-weight:700;font-size:.9rem;text-align:right;min-width:90px;">' + _cpFmt(c.valor) + '</div>' +
         '</div>';
     }).join('');
+}
+
+
+// ============================================================
+// CONTROLE DE CRÉDITO (Fase 1+2+3)
+// ============================================================
+const CRED_CATEGORIAS = {
+    vip:         { nome:'VIP',         icon:'🌟', cor:'#f59e0b', limite_default: 1000, avisa_em: 100, bloqueia_em: 999 }, // VIP: só avisa
+    regular:     { nome:'Regular',     icon:'👤', cor:'#22c55e', limite_default: 300,  avisa_em: 80,  bloqueia_em: 100 },
+    restrito:    { nome:'Restrito',    icon:'⚠️', cor:'#f59e0b', limite_default: 50,   avisa_em: 60,  bloqueia_em: 100 },
+    sem_credito: { nome:'Sem crédito', icon:'🚫', cor:'#ef4444', limite_default: 0,    avisa_em: 0,   bloqueia_em: 0   },
+};
+
+// Cache de solicitações pendentes/histórico
+let solicitacoesCredito = [];
+let _credEditandoSolicId = null;
+let _credPendingVendaCtx = null; // contexto da venda que está aguardando autorização
+
+// --- Helpers de categoria/limite ---
+function _jOnCategoriaChange() {
+    const sel = document.getElementById('j-categoria-credito');
+    const inpLim = document.getElementById('j-limite-credito');
+    if (!sel || !inpLim) return;
+    const cat = CRED_CATEGORIAS[sel.value];
+    if (cat && (!inpLim.value || Number(inpLim.value) === 0)) {
+        inpLim.value = cat.limite_default;
+    }
+    // Se "Sem crédito" → força 0
+    if (sel.value === 'sem_credito') {
+        inpLim.value = 0;
+    }
+}
+function _jOnBloqueadoChange() {
+    const cb = document.getElementById('j-bloqueado');
+    const wrap = document.getElementById('j-motivo-wrap');
+    if (wrap) wrap.style.display = (cb && cb.checked) ? '' : 'none';
+}
+
+// --- Cálculo de dívida atual do jogador ---
+function _credGetDividaJogador(jogadorId) {
+    // Reusa _getSaldoJogador se existir (saldo negativo = devendo)
+    if (typeof _getSaldoJogador === 'function') {
+        const saldo = _getSaldoJogador(jogadorId);
+        return saldo < 0 ? -saldo : 0;
+    }
+    // Fallback: calcula a partir das comandas abertas e caixa
+    let divida = 0;
+    if (typeof barComandas !== 'undefined') {
+        barComandas.filter(c => c.jogadorId === jogadorId && c.status === 'aberta').forEach(c => {
+            const total = (c.itens || []).reduce((s,i) => s + (Number(i.preco)*Number(i.qtd) || 0), 0);
+            const pago = Number(c.pago || 0);
+            divida += Math.max(0, total - pago);
+        });
+    }
+    return divida;
+}
+
+function _credGetJogador(id) {
+    return (jogadores || []).find(j => j.id === id);
+}
+
+// --- Validação principal (CORE) ---
+// Retorna: { nivel: 'ok' | 'aviso_leve' | 'aviso_forte' | 'bloqueio', mensagem, dadosUI }
+function _credValidarVenda(jogadorId, valorVenda, areaVenda) {
+    const j = _credGetJogador(jogadorId);
+    if (!j) return { nivel:'ok', mensagem:'' };
+
+    // 1) Bloqueio manual sempre vale
+    if (j.bloqueado) {
+        return {
+            nivel: 'bloqueio',
+            motivo: 'manual',
+            mensagem: 'Jogador BLOQUEADO',
+            detalhes: j.motivoBloqueio || '(sem motivo informado)',
+            jogador: j,
+            valorVenda,
+        };
+    }
+
+    // 2) Verifica se a área de venda tem controle de crédito ativo nas preferências
+    const cfgAtivo = _credConfigAtivaPara(areaVenda);
+    if (!cfgAtivo) {
+        // Calcula mesmo assim pra retornar avisos visuais, mas nunca bloqueia
+        const limite = Number(j.limiteCredito) || 0;
+        if (limite <= 0) return { nivel:'ok', mensagem:'', jogador:j };
+        const divida = _credGetDividaJogador(jogadorId);
+        const total = divida + valorVenda;
+        const pct = Math.round((total / limite) * 100);
+        if (pct >= 80) return { nivel:'aviso_forte', pct, limite, divida, total, jogador:j, valorVenda, soAviso:true };
+        if (pct >= 60) return { nivel:'aviso_leve', pct, limite, divida, total, jogador:j, valorVenda, soAviso:true };
+        return { nivel:'ok', jogador:j };
+    }
+
+    // 3) Categoria "Sem crédito" → bloqueia toda venda a prazo
+    const catKey = j.categoriaCredito || 'regular';
+    const cat = CRED_CATEGORIAS[catKey] || CRED_CATEGORIAS.regular;
+    if (catKey === 'sem_credito') {
+        return {
+            nivel: 'bloqueio',
+            motivo: 'sem_credito',
+            mensagem: 'Jogador sem crédito (só à vista)',
+            detalhes: 'Categoria configurada como "Sem crédito". Toda compra deve ser paga na hora.',
+            jogador: j,
+            valorVenda,
+        };
+    }
+
+    const limite = Number(j.limiteCredito) || 0;
+    if (limite <= 0) {
+        // Sem limite cadastrado → trata como sem crédito
+        return {
+            nivel: 'bloqueio',
+            motivo: 'sem_limite',
+            mensagem: 'Jogador sem limite de crédito',
+            detalhes: 'Não há limite cadastrado. Defina um limite no cadastro ou cobre à vista.',
+            jogador: j,
+            valorVenda,
+        };
+    }
+
+    const divida = _credGetDividaJogador(jogadorId);
+    const total = divida + valorVenda;
+    const pct = Math.round((total / limite) * 100);
+
+    // Bloqueio
+    if (pct >= cat.bloqueia_em) {
+        return {
+            nivel: 'bloqueio',
+            motivo: 'limite',
+            mensagem: `Limite de crédito atingido (${pct}%)`,
+            detalhes: `Dívida atual: ${formatMoney(divida)} · Esta venda: ${formatMoney(valorVenda)} · Total: ${formatMoney(total)} · Limite: ${formatMoney(limite)}`,
+            pct, limite, divida, total, jogador:j, valorVenda,
+        };
+    }
+    // Aviso forte
+    if (pct >= 80) {
+        return {
+            nivel: 'aviso_forte',
+            mensagem: `Atenção: este jogador vai usar ${pct}% do limite`,
+            pct, limite, divida, total, jogador:j, valorVenda,
+        };
+    }
+    // Aviso leve
+    if (pct >= cat.avisa_em) {
+        return {
+            nivel: 'aviso_leve',
+            pct, limite, divida, total, jogador:j, valorVenda,
+        };
+    }
+    return { nivel: 'ok', pct, limite, divida, total, jogador:j };
+}
+
+function _credConfigAtivaPara(area) {
+    if (!config || !config.credito) return true; // default: ativo
+    const map = {
+        'buyin':   config.credito.aplicaBuyin   !== false,
+        'cash':    config.credito.aplicaCash    !== false,
+        'bar':     config.credito.aplicaBar     !== false,
+        'jackpot': config.credito.aplicaJackpot !== false,
+    };
+    return map[area] !== false;
+}
+
+// --- Mostra modal de validação (aviso/bloqueio) ---
+// onConfirm: callback chamado se usuário confirma (em caso de aviso) ou se autorização aprovada
+// onCancel: callback se desistir
+function _credMostrarModalValidacao(res, onConfirm, onCancel) {
+    if (!res || res.nivel === 'ok') { onConfirm && onConfirm(); return; }
+
+    if (res.nivel === 'aviso_leve') {
+        // Avisos leves: só toast, não bloqueia
+        if (typeof showToast === 'function') {
+            showToast(`⚠️ ${res.jogador.nome}: ${res.pct}% do limite usado`);
+        }
+        onConfirm && onConfirm();
+        return;
+    }
+
+    const isBloqueio = res.nivel === 'bloqueio';
+    const cor = isBloqueio ? '#ef4444' : '#f59e0b';
+    const icone = isBloqueio ? '⛔' : '⚠️';
+    const titulo = isBloqueio ? (res.mensagem || 'Bloqueio de crédito') : 'Atenção ao crédito';
+
+    document.getElementById('cv-icon').textContent = icone;
+    const elTitulo = document.getElementById('cv-titulo');
+    elTitulo.textContent = titulo;
+    elTitulo.style.color = cor;
+    const overlay = document.getElementById('modal-credito-validacao');
+    overlay.querySelector('div').style.borderColor = cor;
+
+    const j = res.jogador;
+    const conteudoEl = document.getElementById('cv-conteudo');
+    conteudoEl.innerHTML = isBloqueio
+        ? `<strong>${j.nome}</strong> ${res.detalhes ? '· ' + res.detalhes : ''}`
+        : `<strong>${j.nome}</strong> está usando ${res.pct}% do limite de crédito disponível. Deseja prosseguir?`;
+
+    const detalhes = document.getElementById('cv-detalhes');
+    if (res.limite > 0) {
+        const barraPct = Math.min(100, res.pct || 0);
+        detalhes.innerHTML = `
+            <div style="display:flex;justify-content:space-between;margin-bottom:.5rem;font-size:.8rem;">
+                <span>Dívida atual: <strong>${formatMoney(res.divida || 0)}</strong></span>
+                <span>+ esta venda: <strong>${formatMoney(res.valorVenda || 0)}</strong></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:.5rem;font-size:.8rem;">
+                <span>Total ficará em: <strong>${formatMoney(res.total || 0)}</strong></span>
+                <span>Limite: <strong>${formatMoney(res.limite)}</strong></span>
+            </div>
+            <div style="height:8px;background:#1c1c1f;border-radius:4px;overflow:hidden;">
+                <div style="height:100%;width:${barraPct}%;background:${cor};transition:width .3s;"></div>
+            </div>
+            <div style="text-align:center;margin-top:.4rem;font-size:.75rem;color:${cor};font-weight:700;">${res.pct || 0}% usado</div>
+        `;
+        detalhes.style.display = 'block';
+    } else {
+        detalhes.style.display = 'none';
+    }
+
+    const acoes = document.getElementById('cv-acoes');
+    if (isBloqueio) {
+        // Mostra 3 botões: pedir autorização, pagar à vista, cancelar
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        const podeSolicitar = !isAdmin; // admin não precisa solicitar a si mesmo
+        acoes.innerHTML = `
+            ${podeSolicitar ? `<button onclick="cred_iniciarSolicitacao()" class="btn-gold" style="padding:.85rem;border-radius:.5rem;width:100%;"><i class="fa-solid fa-bell"></i> Pedir autorização ao admin</button>` : ''}
+            ${isAdmin && res.motivo !== 'manual' ? `<button onclick="cred_admin_liberarAgora()" style="padding:.85rem;border-radius:.5rem;width:100%;background:#10b981;color:#000;border:none;font-weight:700;cursor:pointer;"><i class="fa-solid fa-check"></i> Liberar (sou admin)</button>` : ''}
+            <button onclick="closeModal('modal-credito-validacao'); _credPendingVendaCtx && _credPendingVendaCtx.onCancel && _credPendingVendaCtx.onCancel();" class="btn-ghost" style="padding:.85rem;border-radius:.5rem;width:100%;">Cancelar venda</button>
+        `;
+    } else {
+        // Aviso forte: prosseguir ou cancelar
+        acoes.innerHTML = `
+            <button onclick="closeModal('modal-credito-validacao'); _credPendingVendaCtx && _credPendingVendaCtx.onConfirm && _credPendingVendaCtx.onConfirm();" class="btn-gold" style="padding:.85rem;border-radius:.5rem;width:100%;"><i class="fa-solid fa-check"></i> Prosseguir com a venda</button>
+            <button onclick="closeModal('modal-credito-validacao'); _credPendingVendaCtx && _credPendingVendaCtx.onCancel && _credPendingVendaCtx.onCancel();" class="btn-ghost" style="padding:.85rem;border-radius:.5rem;width:100%;">Cancelar</button>
+        `;
+    }
+    _credPendingVendaCtx = { res, onConfirm, onCancel };
+    openModal('modal-credito-validacao');
+}
+
+// Hook universal: chama isso antes de cada venda
+// Retorna Promise<boolean>: true = pode prosseguir, false = cancelado
+function credito_validarAntesDe(jogadorId, valorVenda, areaVenda) {
+    return new Promise(resolve => {
+        if (!jogadorId || valorVenda <= 0) return resolve(true);
+        const res = _credValidarVenda(jogadorId, valorVenda, areaVenda);
+        if (res.nivel === 'ok' || res.nivel === 'aviso_leve') {
+            if (res.nivel === 'aviso_leve' && typeof showToast === 'function') {
+                showToast(`💳 ${res.jogador.nome}: ${res.pct}% do crédito usado`);
+            }
+            return resolve(true);
+        }
+        _credMostrarModalValidacao(res,
+            () => resolve(true),
+            () => resolve(false)
+        );
+    });
+}
+
+// --- Solicitação de autorização (operador → admin) ---
+function cred_iniciarSolicitacao() {
+    closeModal('modal-credito-validacao');
+    const ctx = _credPendingVendaCtx;
+    if (!ctx) return;
+    const j = ctx.res.jogador;
+    document.getElementById('cs-info').innerHTML = `
+        <div><strong>${j.nome}</strong></div>
+        <div style="color:#71717a;margin-top:.3rem;">Limite: ${formatMoney(ctx.res.limite || 0)} · Dívida atual: ${formatMoney(ctx.res.divida || 0)}</div>
+        <div style="color:#71717a;">Esta venda: ${formatMoney(ctx.res.valorVenda || 0)}</div>
+    `;
+    document.getElementById('cs-valor-extra').value = Math.max(0, (ctx.res.total || 0) - (ctx.res.limite || 0)).toFixed(2);
+    document.getElementById('cs-motivo').value = '';
+    openModal('modal-credito-solicitar');
+}
+
+async function cred_enviarSolicitacao() {
+    const ctx = _credPendingVendaCtx;
+    if (!ctx) return;
+    const valorExtra = parseFloat(document.getElementById('cs-valor-extra').value) || 0;
+    const motivo = document.getElementById('cs-motivo').value.trim();
+    if (valorExtra <= 0) { alert('Informe o valor extra solicitado.'); return; }
+
+    const novaSolic = {
+        id: _genUuid(),
+        jogadorId: ctx.res.jogador.id,
+        jogadorNome: ctx.res.jogador.nome,
+        operadorId: (currentUser && currentUser.id) || null,
+        operadorNome: (currentUser && (currentUser.nome || currentUser.email)) || 'Operador',
+        valorVenda: ctx.res.valorVenda,
+        dividaAtual: ctx.res.divida || 0,
+        limiteAtual: ctx.res.limite || 0,
+        valorExtra,
+        motivo,
+        areaVenda: ctx.res.areaVenda || '',
+        status: 'pendente',
+        criadoEm: new Date().toISOString(),
+    };
+    solicitacoesCredito.unshift(novaSolic);
+    await _credUpsertSolicitacaoSupabase(novaSolic);
+    closeModal('modal-credito-solicitar');
+    if (typeof showToast === 'function') showToast('✅ Solicitação enviada ao admin');
+    cred_atualizarBadge();
+    // Cancela a venda atual (admin precisa aprovar e operador refazer)
+    if (ctx.onCancel) ctx.onCancel();
+}
+
+// Admin libera direto (sem precisar criar solicitação)
+function cred_admin_liberarAgora() {
+    closeModal('modal-credito-validacao');
+    const ctx = _credPendingVendaCtx;
+    if (ctx && ctx.onConfirm) ctx.onConfirm();
+}
+
+// --- Abrir solicitação pra aprovar (admin) ---
+function cred_abrirAprovacao(solicId) {
+    const s = solicitacoesCredito.find(x => x.id === solicId);
+    if (!s) return;
+    _credEditandoSolicId = solicId;
+    document.getElementById('ca-info').innerHTML = `
+        <div style="display:flex;justify-content:space-between;margin-bottom:.4rem;">
+            <span style="font-weight:700;font-size:.95rem;">${_cpEscape(s.jogadorNome)}</span>
+            <span style="font-size:.7rem;color:#71717a;">${new Date(s.criadoEm).toLocaleString('pt-BR')}</span>
+        </div>
+        <div style="font-size:.75rem;color:#71717a;margin-bottom:.6rem;">Solicitado por: ${_cpEscape(s.operadorNome || '—')}</div>
+        <div style="font-size:.8rem;line-height:1.6;">
+            Dívida atual: <strong>${formatMoney(s.dividaAtual)}</strong> · Limite: <strong>${formatMoney(s.limiteAtual)}</strong><br>
+            Venda solicitada: <strong>${formatMoney(s.valorVenda)}</strong><br>
+            Valor EXTRA pedido: <strong style="color:#f59e0b;">${formatMoney(s.valorExtra)}</strong>
+        </div>
+        ${s.motivo ? `<div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid #1e1e23;font-size:.8rem;font-style:italic;color:#a1a1aa;">"${_cpEscape(s.motivo)}"</div>` : ''}
+    `;
+    document.getElementById('ca-obs').value = '';
+    document.getElementById('ca-aumentar-limite').checked = false;
+    openModal('modal-credito-aprovar');
+}
+
+async function cred_aprovar() {
+    const s = solicitacoesCredito.find(x => x.id === _credEditandoSolicId);
+    if (!s) return;
+    s.status = 'aprovada';
+    s.observacaoAdmin = document.getElementById('ca-obs').value.trim();
+    s.resolvidoEm = new Date().toISOString();
+    s.resolvidoPorId = (currentUser && currentUser.id) || null;
+    s.resolvidoPorNome = (currentUser && (currentUser.nome || currentUser.email)) || 'Admin';
+    const aumentarLimite = document.getElementById('ca-aumentar-limite').checked;
+    if (aumentarLimite) {
+        const j = _credGetJogador(s.jogadorId);
+        if (j) {
+            const novoLimite = (Number(j.limiteCredito) || 0) + Number(s.valorExtra);
+            // Histórico
+            await _credInserirHistorico({
+                jogadorId: j.id,
+                alteradoPor: s.resolvidoPorNome,
+                limiteAntes: j.limiteCredito,
+                limiteDepois: novoLimite,
+                motivo: 'Aprovação via solicitação ' + s.id.substring(0,8),
+            });
+            j.limiteCredito = novoLimite;
+            if (typeof salvarJogadores === 'function') salvarJogadores();
+        }
+    }
+    await _credUpsertSolicitacaoSupabase(s);
+    closeModal('modal-credito-aprovar');
+    if (typeof showToast === 'function') showToast('✅ Solicitação aprovada');
+    cred_atualizarBadge();
+    renderCreditoPage();
+}
+
+async function cred_recusar() {
+    const s = solicitacoesCredito.find(x => x.id === _credEditandoSolicId);
+    if (!s) return;
+    s.status = 'recusada';
+    s.observacaoAdmin = document.getElementById('ca-obs').value.trim();
+    s.resolvidoEm = new Date().toISOString();
+    s.resolvidoPorId = (currentUser && currentUser.id) || null;
+    s.resolvidoPorNome = (currentUser && (currentUser.nome || currentUser.email)) || 'Admin';
+    await _credUpsertSolicitacaoSupabase(s);
+    closeModal('modal-credito-aprovar');
+    if (typeof showToast === 'function') showToast('❌ Solicitação recusada');
+    cred_atualizarBadge();
+    renderCreditoPage();
+}
+
+// --- Render da página de crédito ---
+function switchCreditoTab(tabId, btn) {
+    document.querySelectorAll('#page-credito .credtab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('#page-credito .tab-btn').forEach(el => el.classList.remove('active'));
+    const el = document.getElementById(tabId);
+    if (el) el.style.display = '';
+    if (btn) btn.classList.add('active');
+    if (tabId === 'cred-jogadores') renderCreditoJogadores();
+}
+
+function renderCreditoPage() {
+    cpRenderCredPendentes();
+    cpRenderCredHistorico();
+    cred_atualizarBadge();
+}
+
+function cpRenderCredPendentes() {
+    const el = document.getElementById('cred-pendentes-lista');
+    if (!el) return;
+    const pend = solicitacoesCredito.filter(s => s.status === 'pendente');
+    document.getElementById('cred-pendentes-badge').style.display = pend.length ? 'inline-block' : 'none';
+    document.getElementById('cred-pendentes-badge').textContent = pend.length;
+    if (!pend.length) {
+        el.innerHTML = '<div style="padding:2.5rem 1rem;text-align:center;color:#71717a;"><i class="fa-solid fa-check-circle" style="font-size:2rem;color:#10b981;display:block;margin-bottom:.6rem;"></i>Nenhuma solicitação pendente</div>';
+        return;
+    }
+    el.innerHTML = pend.map(s => `
+        <div style="background:#141416;border:1px solid #f59e0b;border-radius:.7rem;padding:1rem;display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center;">
+            <div>
+                <div style="font-weight:700;font-size:.95rem;margin-bottom:.2rem;">${_cpEscape(s.jogadorNome)}</div>
+                <div style="font-size:.72rem;color:#71717a;margin-bottom:.3rem;">${new Date(s.criadoEm).toLocaleString('pt-BR')} · por ${_cpEscape(s.operadorNome || '—')}</div>
+                <div style="font-size:.78rem;">Venda: <strong>${formatMoney(s.valorVenda)}</strong> · Extra pedido: <strong style="color:#f59e0b;">${formatMoney(s.valorExtra)}</strong></div>
+                ${s.motivo ? `<div style="margin-top:.3rem;font-size:.72rem;color:#a1a1aa;font-style:italic;">"${_cpEscape(s.motivo)}"</div>` : ''}
+            </div>
+            <button onclick="cred_abrirAprovacao('${s.id}')" class="btn-gold" style="padding:.6rem 1rem;border-radius:.5rem;white-space:nowrap;"><i class="fa-solid fa-gavel"></i> Analisar</button>
+        </div>
+    `).join('');
+}
+
+function cpRenderCredHistorico() {
+    const el = document.getElementById('cred-historico-lista');
+    if (!el) return;
+    const hist = solicitacoesCredito.filter(s => s.status !== 'pendente').slice(0, 50);
+    if (!hist.length) {
+        el.innerHTML = '<div style="padding:2.5rem 1rem;text-align:center;color:#71717a;">Sem histórico ainda</div>';
+        return;
+    }
+    el.innerHTML = hist.map(s => {
+        const aprovado = s.status === 'aprovada';
+        const cor = aprovado ? '#10b981' : '#ef4444';
+        const ico = aprovado ? 'fa-check' : 'fa-xmark';
+        return `
+            <div style="background:#141416;border:1px solid #1e1e23;border-radius:.7rem;padding:.85rem 1rem;display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;">
+                <div style="width:36px;height:36px;border-radius:50%;background:${cor}22;color:${cor};display:grid;place-items:center;"><i class="fa-solid ${ico}"></i></div>
+                <div>
+                    <div style="font-weight:700;font-size:.9rem;">${_cpEscape(s.jogadorNome)}</div>
+                    <div style="font-size:.7rem;color:#71717a;">${new Date(s.resolvidoEm || s.criadoEm).toLocaleString('pt-BR')} · por ${_cpEscape(s.resolvidoPorNome || '—')}</div>
+                    ${s.observacaoAdmin ? `<div style="font-size:.7rem;color:#a1a1aa;margin-top:.2rem;font-style:italic;">"${_cpEscape(s.observacaoAdmin)}"</div>` : ''}
+                </div>
+                <div style="text-align:right;font-size:.78rem;">
+                    <div style="color:${cor};font-weight:700;text-transform:uppercase;font-size:.7rem;">${aprovado ? 'Aprovada' : 'Recusada'}</div>
+                    <div style="color:#71717a;font-size:.7rem;">${formatMoney(s.valorExtra)}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderCreditoJogadores() {
+    const el = document.getElementById('cred-jogadores-lista');
+    if (!el) return;
+    const buscaEl = document.getElementById('cred-search-jogador');
+    const busca = (buscaEl ? buscaEl.value : '').toLowerCase();
+    const lista = (jogadores || [])
+        .filter(j => !busca || (j.nome||'').toLowerCase().includes(busca) || (j.apelido||'').toLowerCase().includes(busca))
+        .map(j => {
+            const divida = _credGetDividaJogador(j.id);
+            const limite = Number(j.limiteCredito) || 0;
+            const pct = limite > 0 ? Math.round((divida / limite) * 100) : 0;
+            return { j, divida, limite, pct };
+        })
+        .sort((a,b) => b.pct - a.pct);
+
+    if (!lista.length) {
+        el.innerHTML = '<div style="padding:2.5rem 1rem;text-align:center;color:#71717a;">Nenhum jogador cadastrado</div>';
+        return;
+    }
+    el.innerHTML = lista.map(({j, divida, limite, pct}) => {
+        const cat = CRED_CATEGORIAS[j.categoriaCredito || 'regular'] || CRED_CATEGORIAS.regular;
+        const cor = j.bloqueado ? '#ef4444' : (pct >= 100 ? '#ef4444' : pct >= 80 ? '#f59e0b' : pct >= 60 ? '#fbbf24' : '#10b981');
+        const barraPct = Math.min(100, pct);
+        return `
+            <div style="background:#141416;border:1px solid #1e1e23;border-radius:.6rem;padding:.85rem 1rem;display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;">
+                <div style="font-size:1.3rem;">${cat.icon}</div>
+                <div>
+                    <div style="display:flex;align-items:center;gap:.5rem;">
+                        <span style="font-weight:700;font-size:.92rem;">${_cpEscape(j.nome)}</span>
+                        ${j.bloqueado ? '<span style="background:#ef4444;color:#fff;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;">BLOQUEADO</span>' : ''}
+                    </div>
+                    <div style="font-size:.72rem;color:#71717a;margin-top:.1rem;">${cat.nome} · Limite: ${formatMoney(limite)}</div>
+                    ${limite > 0 ? `<div style="height:5px;background:#1c1c1f;border-radius:2.5px;overflow:hidden;margin-top:.4rem;"><div style="height:100%;width:${barraPct}%;background:${cor};"></div></div>` : ''}
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:.85rem;font-weight:800;color:${cor};font-family:var(--font-mono);">${formatMoney(divida)}</div>
+                    <div style="font-size:.65rem;color:#71717a;">${pct}% usado</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function cred_atualizarBadge() {
+    const pend = solicitacoesCredito.filter(s => s.status === 'pendente').length;
+    const badge = document.getElementById('nav-credito-badge');
+    if (badge) {
+        badge.textContent = pend;
+        badge.style.display = pend > 0 ? 'inline-block' : 'none';
+    }
+}
+
+// --- Persistência Supabase ---
+async function _credUpsertSolicitacaoSupabase(s) {
+    if (!window.sb || !s) return;
+    try {
+        const clubeId = (currentUser && currentUser.clube_id) || (window.sbClube && sbClube.id) || null;
+        if (!clubeId) return;
+        const row = {
+            id: s.id,
+            clube_id: clubeId,
+            jogador_id: s.jogadorId,
+            jogador_nome: s.jogadorNome,
+            operador_id: s.operadorId,
+            operador_nome: s.operadorNome,
+            valor_venda: s.valorVenda,
+            divida_atual: s.dividaAtual,
+            limite_atual: s.limiteAtual,
+            valor_extra: s.valorExtra,
+            motivo: s.motivo,
+            area_venda: s.areaVenda,
+            status: s.status,
+            observacao_admin: s.observacaoAdmin || null,
+            resolvido_em: s.resolvidoEm || null,
+            resolvido_por_id: s.resolvidoPorId || null,
+            resolvido_por_nome: s.resolvidoPorNome || null,
+        };
+        const { error } = await sb.from('solicitacoes_credito').upsert(row);
+        if (error) throw error;
+    } catch(e) {
+        console.error('[CRED] upsert solicitacao:', e);
+    }
+}
+
+async function _credInserirHistorico(h) {
+    if (!window.sb) return;
+    try {
+        const clubeId = (currentUser && currentUser.clube_id) || (window.sbClube && sbClube.id) || null;
+        if (!clubeId) return;
+        await sb.from('historico_credito').insert({
+            id: _genUuid(),
+            clube_id: clubeId,
+            jogador_id: h.jogadorId,
+            alterado_por: h.alteradoPor,
+            limite_antes: h.limiteAntes,
+            limite_depois: h.limiteDepois,
+            motivo: h.motivo,
+        });
+    } catch(e) {
+        console.error('[CRED] insert historico:', e);
+    }
+}
+
+async function cred_carregarSupabase() {
+    if (!window.sb) return;
+    try {
+        const clubeId = (currentUser && currentUser.clube_id) || (window.sbClube && sbClube.id) || null;
+        if (!clubeId) return;
+        const { data, error } = await sb.from('solicitacoes_credito')
+            .select('*').eq('clube_id', clubeId).order('criado_em', { ascending: false }).limit(200);
+        if (error) throw error;
+        solicitacoesCredito = (data || []).map(r => ({
+            id: r.id,
+            jogadorId: r.jogador_id,
+            jogadorNome: r.jogador_nome,
+            operadorId: r.operador_id,
+            operadorNome: r.operador_nome,
+            valorVenda: parseFloat(r.valor_venda) || 0,
+            dividaAtual: parseFloat(r.divida_atual) || 0,
+            limiteAtual: parseFloat(r.limite_atual) || 0,
+            valorExtra: parseFloat(r.valor_extra) || 0,
+            motivo: r.motivo || '',
+            areaVenda: r.area_venda || '',
+            status: r.status,
+            observacaoAdmin: r.observacao_admin || '',
+            criadoEm: r.criado_em,
+            resolvidoEm: r.resolvido_em,
+            resolvidoPorId: r.resolvido_por_id,
+            resolvidoPorNome: r.resolvido_por_nome,
+        }));
+        cred_atualizarBadge();
+        renderCreditoPage();
+    } catch(e) {
+        console.error('[CRED] carregar:', e);
+    }
 }
 
 
@@ -23471,6 +24455,26 @@ function _calcBonusFichasParaEntry(t, tipo) {
     if (!t.iniciadoEm) return fichasBonus;
     const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
     return (nivelAtual <= ateNivel) ? fichasBonus : 0;
+}
+
+// FASE I.1: Buy-in PROMOCIONAL (Early Bird) — preço E stack reduzidos no início
+// Aplica APENAS pra tipo='buyin'. Re-entry, rebuy e add-on não recebem promo.
+function _isBuyinPromoElegivel(t, tipo) {
+    if (!t || !t.buyinPromoAtivo) return false;
+    if (tipo !== 'buyin') return false;
+    const ateNivel = Number(t.buyinPromoAteNivel) || 0;
+    if (ateNivel <= 0) return false;
+    if (!t.iniciadoEm) return true;
+    const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
+    return nivelAtual <= ateNivel;
+}
+function _calcValorBuyinPromo(t, tipo) {
+    if (!_isBuyinPromoElegivel(t, tipo)) return null;
+    return Number(t.buyinPromoValor) || 0;
+}
+function _calcFichasBuyinPromo(t, tipo) {
+    if (!_isBuyinPromoElegivel(t, tipo)) return null;
+    return Number(t.buyinPromoFichas) || 0;
 }
 
 function getPrize(t) {
@@ -24460,7 +25464,7 @@ function renderDetalheComanda() {
     document.getElementById('cd-total').innerText = formatMoney(calcTotalComanda(c));
 }
 
-function addItemComanda() {
+async function addItemComanda() {
     if (!isBarCaixaAberto()) return showToast('🚫 Caixa fechado, abra para continuar');
     const c = barComandas.find(c => c.id === activeComandaId);
     if (!c) return showToast('⚠️ Selecione uma comanda');
@@ -24469,6 +25473,15 @@ function addItemComanda() {
     const prod   = barProdutos.find(p => p.id === prodId);
     if (!prod) return showToast('⚠️ Produto inválido');
     if (prod.estoque < qtd) return showToast(`⚠️ Estoque insuficiente (${prod.estoque} disponível)`);
+
+    // Hook de crédito: valida antes de adicionar à comanda (se comanda atrelada a jogador)
+    try {
+        const valorItem = Number(prod.valor || 0) * qtd;
+        if (c.jogadorId && valorItem > 0 && typeof credito_validarAntesDe === 'function') {
+            const ok = await credito_validarAntesDe(c.jogadorId, valorItem, 'bar');
+            if (!ok) return;
+        }
+    } catch(e) { console.warn('[CRED] bar hook:', e); }
     
     // Suspender realtime durante operação pra evitar sobrescrever dados antes do sync
     if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
@@ -25603,7 +26616,7 @@ function abrirAddJogadorCash(mesaId) {
     openModal('modal-add-cash-jogador');
 }
 
-function confirmAddCashJogador() {
+async function confirmAddCashJogador() {
     const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
     if (!m) return;
     const jid = document.getElementById('acj-jogador').value;
@@ -25612,6 +26625,14 @@ function confirmAddCashJogador() {
     if (!jid) return showToast('⚠️ Selecione um jogador');
     if (valor < m.bmin || valor > m.bmax) return showToast(`⚠️ Buy-in deve ser entre R$ ${m.bmin} e R$ ${m.bmax}`);
     if (m.jogadores.filter(j => j.status === 'ativo').length >= 9) return showToast('⚠️ Mesa cheia (9 lugares)');
+
+    // Hook de validação de crédito antes de adicionar à mesa
+    try {
+        if (typeof credito_validarAntesDe === 'function' && valor > 0) {
+            const ok = await credito_validarAntesDe(jid, valor, 'cash');
+            if (!ok) return;
+        }
+    } catch(e) { console.warn('[CRED] cash hook:', e); }
 
     // Valida contagem de fichas (obrigatória)
     const fichasEntrada = getFichasContagem('acj');
@@ -26429,10 +27450,15 @@ async function renderConfig() {
 
     // Preferências
     document.getElementById('cfg-som-on').checked       = config.preferencias.somOn;
-    document.getElementById('cfg-alerta-nivel').checked = config.preferencias.alertaNivel;
-    const acEl = document.getElementById('cfg-acerto-elim');
+    document.getElementById('cfg-alerta-nivel').checked = config.preferencias.alertaNivel;    const acEl = document.getElementById('cfg-acerto-elim');
     if (acEl) acEl.value = config.preferencias.acertoAposEliminacao || 'perguntar';
     document.getElementById('cfg-idioma').value         = config.preferencias.idioma;
+    // Controle de Crédito (Fases 1+2+3) — defaults true
+    const credCfg = (config && config.credito) || {};
+    const cbB = document.getElementById('cfg-credito-buyin');   if (cbB) cbB.checked = credCfg.aplicaBuyin   !== false;
+    const cbC = document.getElementById('cfg-credito-cash');    if (cbC) cbC.checked = credCfg.aplicaCash    !== false;
+    const cbBa = document.getElementById('cfg-credito-bar');    if (cbBa) cbBa.checked = credCfg.aplicaBar    !== false;
+    const cbJ = document.getElementById('cfg-credito-jackpot'); if (cbJ) cbJ.checked = credCfg.aplicaJackpot !== false;
     setTemaUI(config.preferencias.tema);
     setAccentUI(config.preferencias.accent);
     // Aplicar tema (caso tenha mudado em outro dispositivo)
@@ -26878,6 +27904,13 @@ function salvarPreferencias() {
         alertaNivel: document.getElementById('cfg-alerta-nivel').checked,
         acertoAposEliminacao: (document.getElementById('cfg-acerto-elim') || {}).value || 'perguntar',
         idioma:      document.getElementById('cfg-idioma').value,
+    };
+    // Controle de Crédito (Fases 1+2+3)
+    config.credito = {
+        aplicaBuyin:   document.getElementById('cfg-credito-buyin')?.checked !== false,
+        aplicaCash:    document.getElementById('cfg-credito-cash')?.checked !== false,
+        aplicaBar:     document.getElementById('cfg-credito-bar')?.checked !== false,
+        aplicaJackpot: document.getElementById('cfg-credito-jackpot')?.checked !== false,
     };
     logAudit('CONFIG_EDITA', 'Preferências editadas');
     salvarConfig();
@@ -29799,7 +30832,7 @@ function atualizarTotalJackpot() {
     `;
 }
 
-function confirmarJackpot() {
+async function confirmarJackpot() {
     const t = torneios[activeTorneioIdx];
     const jid = document.getElementById('jackpot-jogador').value;
     if (!jid) return showToast('⚠️ Selecione um jogador');
@@ -29813,6 +30846,14 @@ function confirmarJackpot() {
     // Segurança extra: verifica se jogador já comprou jackpot
     const jaComprou = (t.jackpotCompras || []).some(j => j.jogadorId === jid);
     if (jaComprou) return showToast('⚠️ Este jogador já comprou o jackpot');
+
+    // Hook de validação de crédito antes da compra de jackpot
+    try {
+        if (typeof credito_validarAntesDe === 'function' && t.jackpotValor > 0) {
+            const ok = await credito_validarAntesDe(jid, t.jackpotValor, 'jackpot');
+            if (!ok) return;
+        }
+    } catch(e) { console.warn('[CRED] jackpot hook:', e); }
 
     // Jackpot é sempre qtd = 1 (compra única)
     const qtd = 1;
@@ -34173,6 +35214,13 @@ function atualizarPassaporteUI() {
 function atualizarBonusRegistroUI() {
     var cb = document.getElementById('t-bonus-registro-ativo');
     var painel = document.getElementById('t-bonus-registro-campos');
+    if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
+}
+
+// FASE I.1: Buy-in PROMOCIONAL (Early Bird)
+function atualizarBuyinPromoUI() {
+    var cb = document.getElementById('t-buyin-promo-ativo');
+    var painel = document.getElementById('t-buyin-promo-campos');
     if (painel) painel.style.display = (cb && cb.checked) ? '' : 'none';
 }
 
