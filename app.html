@@ -2368,6 +2368,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div style="display:flex;gap:.5rem;align-items:center;">
                             <div style="display:flex;gap:.25rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.2rem;">
                                 <button id="flt-ativos" onclick="toggleFiltroTorneios('ativos')" class="flt-btn flt-active"><i class="fa-solid fa-play"></i> Em andamento</button>
+                                <button id="flt-aguardando" onclick="toggleFiltroTorneios('aguardando')" class="flt-btn"><i class="fa-solid fa-clock"></i> Aguardando</button>
                                 <button id="flt-todos" onclick="toggleFiltroTorneios('todos')" class="flt-btn">Todos</button>
                             </div>
                             <button onclick="abrirNovoTorneioComTemplates()" class="btn-gold">+ Novo Torneio</button>
@@ -19099,14 +19100,16 @@ function saveTournament() {
     abrirDetalhesTorneio(torneios.length - 1);
 }
 
-let _filtroTorneios = 'ativos'; // 'ativos' | 'todos'
+let _filtroTorneios = 'ativos'; // 'ativos' | 'aguardando' | 'todos'
 
 function toggleFiltroTorneios(modo) {
     _filtroTorneios = modo;
     const btnA = document.getElementById('flt-ativos');
+    const btnAg = document.getElementById('flt-aguardando');
     const btnT = document.getElementById('flt-todos');
-    if (btnA) btnA.classList.toggle('flt-active', modo === 'ativos');
-    if (btnT) btnT.classList.toggle('flt-active', modo === 'todos');
+    if (btnA)  btnA.classList.toggle('flt-active',  modo === 'ativos');
+    if (btnAg) btnAg.classList.toggle('flt-active', modo === 'aguardando');
+    if (btnT)  btnT.classList.toggle('flt-active',  modo === 'todos');
     renderTorneiosList();
 }
 
@@ -19121,15 +19124,36 @@ function renderTorneiosList() {
     sem.style.display = 'none';
 
     // Aplicar filtro
-    const torneiosFiltrados = _filtroTorneios === 'ativos'
-        ? torneios.filter(t => t.status === 'running' || t.status === 'paused' || t.status === 'break')
-        : torneios;
+    let torneiosFiltrados;
+    if (_filtroTorneios === 'ativos') {
+        torneiosFiltrados = torneios.filter(t => t.status === 'running' || t.status === 'paused' || t.status === 'break');
+    } else if (_filtroTorneios === 'aguardando') {
+        // Aguardando: torneio criado mas ainda não iniciado.
+        // Considera status 'waiting'/'aguardando' OU sem iniciadoEm,
+        // excluindo encerrados/finalizados.
+        torneiosFiltrados = torneios.filter(t => {
+            const s = t.status;
+            if (s === 'encerrado' || s === 'finished') return false;
+            return s === 'waiting' || s === 'aguardando' || (!t.iniciadoEm && s !== 'running' && s !== 'paused' && s !== 'break');
+        });
+    } else {
+        torneiosFiltrados = torneios;
+    }
 
     if (!torneiosFiltrados.length && _filtroTorneios === 'ativos') {
         list.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;">
             <i class="fa-solid fa-pause" style="font-size:2.5rem;margin-bottom:1rem;display:block;"></i>
             <div style="font-weight:700;">Nenhum torneio em andamento</div>
-            <div style="font-size:.8rem;margin-top:.25rem;">Clique em "Todos" para ver torneios aguardando ou finalizados</div>
+            <div style="font-size:.8rem;margin-top:.25rem;">Clique em "Aguardando" ou "Todos" para ver outros torneios</div>
+        </div>`;
+        return;
+    }
+
+    if (!torneiosFiltrados.length && _filtroTorneios === 'aguardando') {
+        list.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;">
+            <i class="fa-solid fa-clock" style="font-size:2.5rem;margin-bottom:1rem;display:block;"></i>
+            <div style="font-weight:700;">Nenhum torneio aguardando</div>
+            <div style="font-size:.8rem;margin-top:.25rem;">Crie um novo torneio ou veja todos</div>
         </div>`;
         return;
     }
