@@ -292,6 +292,43 @@
         body.layout-pokerweb.pw-layout-active #main-tv { display:none !important; }
         body.layout-pokerweb #pw-screen { display:flex !important; }
 
+        /* === PERSONALIZAÇÃO PREMIUM (logo + marca d'água + frase rodapé) === */
+        /* Marca d'água custom/galeria — fica atrás de tudo (z-index 0) */
+        #pw-watermark {
+            position:absolute; inset:0; z-index:0;
+            background-position:center; background-size:cover; background-repeat:no-repeat;
+            opacity:0; pointer-events:none;
+            transition:opacity .3s ease;
+        }
+        body.layout-pokerweb #pw-watermark.active { opacity:var(--pw-wm-opacity, 0.15); }
+
+        /* Logo do clube — canto superior esquerdo, acima de tudo (z-index 5) */
+        #pw-logo {
+            position:absolute; top:3vh; left:3vw; z-index:5;
+            max-width:14vh; max-height:14vh;
+            display:none;
+            filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));
+        }
+        body.layout-pokerweb #pw-logo.active { display:block; }
+
+        /* Frase do rodapé — centralizada na parte de baixo */
+        #pw-frase-rodape {
+            position:absolute; bottom:1.5vh; left:50%; transform:translateX(-50%);
+            z-index:3;
+            font-family:'Manrope', 'Inter', sans-serif;
+            font-size:1.5vh; font-weight:700;
+            letter-spacing:.3em;
+            color:rgba(255,255,255,.5);
+            text-transform:uppercase;
+            display:none;
+            text-align:center;
+            pointer-events:none;
+        }
+        body.layout-pokerweb #pw-frase-rodape.active { display:block; }
+
+        /* Quando há logo, dá margem extra ao título Pro Live pra não sobrepor */
+        body.layout-pokerweb.has-logo .pw-title { padding-left:16vh; }
+
         /* Pro Live screen (só visível quando layout-pokerweb) */
         #pw-screen {
             display:none; position:relative; z-index:1;
@@ -911,6 +948,13 @@
 
         <!-- PRO LIVE LAYOUT (só visível com body.layout-pokerweb) -->
         <div id="pw-screen">
+            <!-- Personalização premium: marca d'água de fundo (fica atrás, z-index 0) -->
+            <div id="pw-watermark"></div>
+            <!-- Logo do clube (canto superior esquerdo) -->
+            <img id="pw-logo" alt="Logo do clube">
+            <!-- Frase do rodapé personalizada -->
+            <div id="pw-frase-rodape"></div>
+
             <!-- Title -->
             <div class="pw-title" id="pw-title">TORNEIO</div>
             <div class="pw-title-divider"></div>
@@ -1112,6 +1156,25 @@
     
     function _aplicarZoomSalvo() {
         _aplicarSmartFit();
+    }
+
+    // === Galeria de fundos pré-prontos (espelha PROLIVE_GALERIA do app.html) ===
+    // SVGs embutidos como data-URI; sincronizar com _proliveGetGaleriaUrl no app.html.
+    function _tvGetGaleriaUrl(key) {
+        if (!key) return null;
+        var svgs = {
+            'feltro-verde': '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><defs><pattern id="p" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.6" fill="#7dd3a8" opacity="0.5"/></pattern></defs><rect width="100" height="100" fill="#0d3d2e"/><rect width="100" height="100" fill="url(#p)"/></svg>',
+            'feltro-vermelho': '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><defs><pattern id="p" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.6" fill="#fca5a5" opacity="0.5"/></pattern></defs><rect width="100" height="100" fill="#4c0f12"/><rect width="100" height="100" fill="url(#p)"/></svg>',
+            'hexagonos': '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="52"><defs><pattern id="p" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse"><polygon points="15,2 28,9 28,19 15,26 2,19 2,9" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.4"/></pattern></defs><rect width="60" height="52" fill="#18181b"/><rect width="60" height="52" fill="url(#p)"/></svg>',
+            'naipes': '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#0c0a09"/><g fill="#ffffff" opacity="0.5"><text x="20" y="35" font-size="20" font-family="serif">&#9824;</text><text x="75" y="55" font-size="16" font-family="serif">&#9829;</text><text x="30" y="85" font-size="18" font-family="serif">&#9830;</text><text x="85" y="105" font-size="20" font-family="serif">&#9827;</text></g></svg>',
+            'fichas': '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#0c0a09"/><g opacity="0.5"><circle cx="25" cy="30" r="10" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3,2"/><circle cx="70" cy="60" r="12" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3,2"/><circle cx="35" cy="80" r="8" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3,2"/></g></svg>',
+            'diagonais': '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><defs><pattern id="p" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse"><line x1="0" y1="40" x2="40" y2="0" stroke="#ffffff" stroke-width="0.5" opacity="0.4"/></pattern></defs><rect width="40" height="40" fill="#18181b"/><rect width="40" height="40" fill="url(#p)"/></svg>',
+            'concreto': '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1c1917"/><g opacity="0.5"><circle cx="40" cy="50" r="1.5" fill="#57534e"/><circle cx="120" cy="80" r="0.8" fill="#78716c"/><circle cx="170" cy="150" r="1.2" fill="#57534e"/><circle cx="80" cy="170" r="1.6" fill="#78716c"/><circle cx="30" cy="120" r="0.7" fill="#78716c"/></g></svg>',
+            'marmore': '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#0a0a0b"/><g opacity="0.55" stroke="#ffffff" stroke-width="0.5" fill="none"><path d="M 0 40 Q 50 30 100 50 T 200 40"/><path d="M 0 100 Q 70 90 140 110 T 200 95"/><path d="M 0 160 Q 60 150 130 170 T 200 165"/></g></svg>'
+        };
+        var raw = svgs[key];
+        if (!raw) return null;
+        return 'data:image/svg+xml;utf8,' + encodeURIComponent(raw);
     }
     
     function _tvZoomDelta(delta) {
@@ -1477,13 +1540,68 @@ function montarCarouselPremiacao(d) {
         const responsiveClass = (layout !== 'pokerweb') ? ' tv-responsive' : '';
         // Personalização Pro Live: fundo + cor de texto (só aplica no layout pokerweb)
         let proLiveClasses = '';
+        let hasLogoClass = '';
         if (layout === 'pokerweb') {
             const bg = d.proLiveBg || 'verde';
             const txt = d.proLiveText || 'dourado';
             proLiveClasses = ' pw-bg-' + bg + (txt !== 'dourado' ? ' pw-text-' + txt : '');
+            // Marca pra dar padding-left no título quando há logo
+            if (d.proLiveLogoUrl) hasLogoClass = ' has-logo';
         }
-        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '') + responsiveClass + proLiveClasses;
-        
+        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '') + responsiveClass + proLiveClasses + hasLogoClass;
+
+        // ===== Personalização premium (logo + marca d'água + frase rodapé) =====
+        // Só aplica se layout é pokerweb; nos outros layouts, esconde os elementos.
+        const elLogo = document.getElementById('pw-logo');
+        const elWm = document.getElementById('pw-watermark');
+        const elFrase = document.getElementById('pw-frase-rodape');
+        if (layout === 'pokerweb') {
+            // Logo
+            if (elLogo) {
+                if (d.proLiveLogoUrl) {
+                    elLogo.src = d.proLiveLogoUrl;
+                    elLogo.classList.add('active');
+                } else {
+                    elLogo.classList.remove('active');
+                    elLogo.removeAttribute('src');
+                }
+            }
+            // Marca d'água: prioridade upload custom > galeria pré-pronta > nada
+            if (elWm) {
+                let wmUrl = null;
+                if (d.proLiveBgCustomUrl) {
+                    wmUrl = d.proLiveBgCustomUrl;
+                } else if (d.proLiveBgGalleryKey) {
+                    wmUrl = _tvGetGaleriaUrl(d.proLiveBgGalleryKey);
+                }
+                if (wmUrl) {
+                    elWm.style.backgroundImage = `url('${wmUrl}')`;
+                    const op = (d.proLiveBgCustomOpacity != null) ? Number(d.proLiveBgCustomOpacity) : 0.15;
+                    document.documentElement.style.setProperty('--pw-wm-opacity', String(op));
+                    elWm.classList.add('active');
+                } else {
+                    elWm.classList.remove('active');
+                    elWm.style.backgroundImage = '';
+                }
+            }
+            // Frase do rodapé
+            if (elFrase) {
+                const f = (d.proLiveFraseRodape || '').trim();
+                if (f) {
+                    elFrase.textContent = f;
+                    elFrase.classList.add('active');
+                } else {
+                    elFrase.classList.remove('active');
+                    elFrase.textContent = '';
+                }
+            }
+        } else {
+            // Layouts não-Pro Live: esconde tudo da personalização premium
+            if (elLogo) elLogo.classList.remove('active');
+            if (elWm) elWm.classList.remove('active');
+            if (elFrase) elFrase.classList.remove('active');
+        }
+
         // Restaurar zoom salvo
         _aplicarZoomSalvo();
 

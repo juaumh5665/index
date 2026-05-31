@@ -4830,21 +4830,83 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <div id="modal-personalizar-prolive" class="modal-overlay">
-    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
             <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-palette" style="color:#a78bfa;"></i> Personalizar Pro Live</h3>
             <button onclick="closeModal('modal-personalizar-prolive')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:1.25rem;">
-            <div>
-                <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Fundo da tela</div>
-                <div id="prolive-bg-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
+            <!-- ABAS -->
+            <div style="display:flex;gap:.25rem;border-bottom:1px solid #27272a;padding-bottom:.25rem;">
+                <button id="pers-tab-cores" onclick="_persSwitchTab('cores')" class="pers-tab-btn pers-tab-active" style="padding:.5rem 1rem;background:none;border:none;color:#a78bfa;font-size:.78rem;font-weight:700;cursor:pointer;border-bottom:2px solid #a78bfa;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-droplet"></i> Cores</button>
+                <button id="pers-tab-marca" onclick="_persSwitchTab('marca')" class="pers-tab-btn" style="padding:.5rem 1rem;background:none;border:none;color:#71717a;font-size:.78rem;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-image"></i> Marca do Clube</button>
+                <button id="pers-tab-fundo" onclick="_persSwitchTab('fundo')" class="pers-tab-btn" style="padding:.5rem 1rem;background:none;border:none;color:#71717a;font-size:.78rem;font-weight:700;cursor:pointer;border-bottom:2px solid transparent;font-family:'Manrope',sans-serif;"><i class="fa-solid fa-table-cells-large"></i> Galeria de Fundos</button>
             </div>
-            <div>
-                <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Cor do texto (timer)</div>
-                <div id="prolive-text-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;"></div>
+
+            <!-- ABA 1: CORES (atual) -->
+            <div id="pers-pane-cores" class="pers-pane">
+                <div style="margin-bottom:1rem;">
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Fundo da tela</div>
+                    <div id="prolive-bg-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
+                </div>
+                <div>
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Cor do texto (timer)</div>
+                    <div id="prolive-text-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;"></div>
+                </div>
             </div>
-            <div style="font-size:.7rem;color:#71717a;line-height:1.5;">
+
+            <!-- ABA 2: MARCA DO CLUBE (logo + frase) -->
+            <div id="pers-pane-marca" class="pers-pane" style="display:none;">
+                <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Logo do clube (canto superior esquerdo)</div>
+                    <div id="pers-logo-preview" style="display:flex;align-items:center;gap:1rem;margin-bottom:.6rem;">
+                        <div id="pers-logo-thumb" style="width:80px;height:80px;background:#0a0a0b;border:1px dashed #27272a;border-radius:.5rem;display:flex;align-items:center;justify-content:center;color:#52525b;font-size:1.5rem;"><i class="fa-solid fa-image"></i></div>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:.4rem;">
+                            <input type="file" id="pers-logo-input" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none;" onchange="_persUploadLogo(this)">
+                            <button onclick="document.getElementById('pers-logo-input').click()" class="btn-ghost" style="padding:.5rem .75rem;border-radius:.4rem;font-size:.75rem;"><i class="fa-solid fa-upload"></i> Escolher arquivo</button>
+                            <button id="pers-logo-remover" onclick="_persRemoverLogo()" class="btn-ghost" style="padding:.5rem .75rem;border-radius:.4rem;font-size:.75rem;color:#ef4444;border-color:rgba(239,68,68,.3);display:none;"><i class="fa-solid fa-trash"></i> Remover</button>
+                        </div>
+                    </div>
+                    <div style="font-size:.65rem;color:#71717a;line-height:1.4;">PNG ou SVG com fundo transparente · até 500KB · 200×200px recomendado</div>
+                </div>
+
+                <div>
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Frase do rodapé</div>
+                    <input id="pers-frase-rodape" type="text" maxlength="60" placeholder="Ex: THIS IS SPARTAN" class="inp" style="font-family:'Manrope',sans-serif;letter-spacing:.1em;">
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;">Aparece centralizada no rodapé · até 60 caracteres · deixe vazio pra não mostrar</div>
+                </div>
+            </div>
+
+            <!-- ABA 3: GALERIA DE FUNDOS / MARCA D'ÁGUA -->
+            <div id="pers-pane-fundo" class="pers-pane" style="display:none;">
+                <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Escolha um fundo pré-pronto</div>
+                    <div id="pers-galeria-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
+                </div>
+
+                <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Ou faça upload de uma marca d'água própria</div>
+                    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.6rem;">
+                        <div id="pers-bgcustom-thumb" style="width:120px;height:67px;background:#0a0a0b;border:1px dashed #27272a;border-radius:.5rem;display:flex;align-items:center;justify-content:center;color:#52525b;font-size:1.2rem;background-size:cover;background-position:center;"><i class="fa-solid fa-image"></i></div>
+                        <div style="flex:1;display:flex;flex-direction:column;gap:.4rem;">
+                            <input type="file" id="pers-bgcustom-input" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="_persUploadBgCustom(this)">
+                            <button onclick="document.getElementById('pers-bgcustom-input').click()" class="btn-ghost" style="padding:.5rem .75rem;border-radius:.4rem;font-size:.75rem;"><i class="fa-solid fa-upload"></i> Escolher fundo</button>
+                            <button id="pers-bgcustom-remover" onclick="_persRemoverBgCustom()" class="btn-ghost" style="padding:.5rem .75rem;border-radius:.4rem;font-size:.75rem;color:#ef4444;border-color:rgba(239,68,68,.3);display:none;"><i class="fa-solid fa-trash"></i> Remover</button>
+                        </div>
+                    </div>
+                    <div style="font-size:.65rem;color:#71717a;line-height:1.4;">PNG ou JPEG · até 1MB · 1920×1080 recomendado · fica como marca d'água atrás do conteúdo</div>
+                </div>
+
+                <div>
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Opacidade da marca d'água</div>
+                    <div style="display:flex;align-items:center;gap:.75rem;">
+                        <input id="pers-bgcustom-opacity" type="range" min="5" max="60" value="15" style="flex:1;" oninput="_persUpdateOpacityPreview(this.value)">
+                        <span id="pers-bgcustom-opacity-label" style="font-family:var(--font-mono);font-size:.8rem;color:#d4d4d8;min-width:42px;text-align:right;">15%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="font-size:.7rem;color:#71717a;line-height:1.5;border-top:1px solid #27272a;padding-top:1rem;">
                 <i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i>
                 A personalização vale para este torneio e aparece tanto na TV aberta pelo app quanto no link público.
             </div>
@@ -4852,6 +4914,7 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
     </div>
 </div>
+
 
 <div id="modal-config-stats-tv" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;">
@@ -8289,6 +8352,16 @@ function _torneioToDb(t) {
         tv_layout: t.tvLayout || 'classico',
         tv_prolive_bg: t.tvProLiveBg || 'verde',
         tv_prolive_text: t.tvProLiveText || 'dourado',
+        // Personalização avançada (logo, marca d'água custom, galeria, frase rodapé) — premium.
+        // Empacotado num único JSON pra evitar criar 5 colunas novas no banco.
+        // Só salva se houver pelo menos um campo preenchido (mantém compatibilidade com torneios antigos).
+        tv_prolive_custom: (t.tvProLiveLogoUrl || t.tvProLiveBgCustomUrl || t.tvProLiveBgGalleryKey || t.tvProLiveFraseRodape || t.tvProLiveBgCustomOpacity != null) ? {
+            logo_url: t.tvProLiveLogoUrl || null,
+            bg_custom_url: t.tvProLiveBgCustomUrl || null,
+            bg_gallery_key: t.tvProLiveBgGalleryKey || null,
+            bg_custom_opacity: (t.tvProLiveBgCustomOpacity != null) ? Number(t.tvProLiveBgCustomOpacity) : null,
+            frase_rodape: t.tvProLiveFraseRodape || null,
+        } : null,
         tv_show_prize: t.tvShowPrize !== false,
         pw_stats_visiveis: t.pwStatsVisiveis || null,
         premiacao_proj: t.premiacaoProjetada || null,
@@ -9238,6 +9311,12 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         tvLayout: r.tv_layout || 'classico',
         tvProLiveBg: r.tv_prolive_bg || 'verde',
         tvProLiveText: r.tv_prolive_text || 'dourado',
+        // Personalização avançada (desempacota do JSON; valores ausentes ficam null/default)
+        tvProLiveLogoUrl: (r.tv_prolive_custom && r.tv_prolive_custom.logo_url) || null,
+        tvProLiveBgCustomUrl: (r.tv_prolive_custom && r.tv_prolive_custom.bg_custom_url) || null,
+        tvProLiveBgGalleryKey: (r.tv_prolive_custom && r.tv_prolive_custom.bg_gallery_key) || null,
+        tvProLiveBgCustomOpacity: (r.tv_prolive_custom && r.tv_prolive_custom.bg_custom_opacity != null) ? Number(r.tv_prolive_custom.bg_custom_opacity) : 0.15,
+        tvProLiveFraseRodape: (r.tv_prolive_custom && r.tv_prolive_custom.frase_rodape) || null,
         tvShowPrize: r.tv_show_prize !== false,
         pwStatsVisiveis: r.pw_stats_visiveis,
         premiacaoProjetada: r.premiacao_proj,
@@ -22326,6 +22405,12 @@ function updateTV(idx) {
         layout:   t.tvLayout || 'classico',
         proLiveBg: t.tvProLiveBg || 'verde',
         proLiveText: t.tvProLiveText || 'dourado',
+        // Personalização avançada (premium) — TV decide se usa (ignora quando ausente)
+        proLiveLogoUrl: t.tvProLiveLogoUrl || null,
+        proLiveBgCustomUrl: t.tvProLiveBgCustomUrl || null,
+        proLiveBgGalleryKey: t.tvProLiveBgGalleryKey || null,
+        proLiveBgCustomOpacity: (t.tvProLiveBgCustomOpacity != null) ? Number(t.tvProLiveBgCustomOpacity) : 0.15,
+        proLiveFraseRodape: t.tvProLiveFraseRodape || null,
         showPrize: t.tvShowPrize !== false,
         timer:    formatTime(t.tempoRestante || 0),
         nivel:    nivelJogo || 1,
@@ -23757,12 +23842,82 @@ const PROLIVE_TEXTS = [
     { key:'ciano',   nome:'Ciano',   cor:'#22d3ee' },
 ];
 
+// Galeria de fundos pré-prontos (marca d'água SVG embutida — sem custo de storage)
+// Cada item gera uma data-URI SVG que pode ser aplicada como background-image.
+const PROLIVE_GALERIA = [
+    { key:'feltro-verde',   nome:'Feltro Verde' },
+    { key:'feltro-vermelho',nome:'Feltro Vermelho' },
+    { key:'hexagonos',      nome:'Hexágonos' },
+    { key:'naipes',         nome:'Cartas e Naipes' },
+    { key:'fichas',         nome:'Fichas' },
+    { key:'diagonais',      nome:'Diagonais' },
+    { key:'concreto',       nome:'Concreto' },
+    { key:'marmore',        nome:'Mármore' },
+];
+
+// Gera o data-URI SVG para um item da galeria. Centralizado pra que app E tv compartilhem
+// a mesma definição via _proliveGetGaleriaUrl().
+function _proliveGetGaleriaUrl(key) {
+    const svgs = {
+        'feltro-verde': '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><defs><pattern id="p" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.6" fill="#7dd3a8" opacity="0.5"/></pattern></defs><rect width="100" height="100" fill="#0d3d2e"/><rect width="100" height="100" fill="url(#p)"/></svg>',
+        'feltro-vermelho': '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><defs><pattern id="p" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.6" fill="#fca5a5" opacity="0.5"/></pattern></defs><rect width="100" height="100" fill="#4c0f12"/><rect width="100" height="100" fill="url(#p)"/></svg>',
+        'hexagonos': '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="52"><defs><pattern id="p" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse"><polygon points="15,2 28,9 28,19 15,26 2,19 2,9" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.4"/></pattern></defs><rect width="60" height="52" fill="#18181b"/><rect width="60" height="52" fill="url(#p)"/></svg>',
+        'naipes': '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#0c0a09"/><g fill="#ffffff" opacity="0.5"><text x="20" y="35" font-size="20" font-family="serif">♠</text><text x="75" y="55" font-size="16" font-family="serif">♥</text><text x="30" y="85" font-size="18" font-family="serif">♦</text><text x="85" y="105" font-size="20" font-family="serif">♣</text></g></svg>',
+        'fichas': '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#0c0a09"/><g opacity="0.5"><circle cx="25" cy="30" r="10" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3,2"/><circle cx="70" cy="60" r="12" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3,2"/><circle cx="35" cy="80" r="8" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="3,2"/></g></svg>',
+        'diagonais': '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><defs><pattern id="p" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse"><line x1="0" y1="40" x2="40" y2="0" stroke="#ffffff" stroke-width="0.5" opacity="0.4"/></pattern></defs><rect width="40" height="40" fill="#18181b"/><rect width="40" height="40" fill="url(#p)"/></svg>',
+        'concreto': '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1c1917"/><g opacity="0.5"><circle cx="40" cy="50" r="1.5" fill="#57534e"/><circle cx="120" cy="80" r="0.8" fill="#78716c"/><circle cx="170" cy="150" r="1.2" fill="#57534e"/><circle cx="80" cy="170" r="1.6" fill="#78716c"/><circle cx="30" cy="120" r="0.7" fill="#78716c"/></g></svg>',
+        'marmore': '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#0a0a0b"/><g opacity="0.55" stroke="#ffffff" stroke-width="0.5" fill="none"><path d="M 0 40 Q 50 30 100 50 T 200 40"/><path d="M 0 100 Q 70 90 140 110 T 200 95"/><path d="M 0 160 Q 60 150 130 170 T 200 165"/></g></svg>',
+    };
+    const raw = svgs[key];
+    if (!raw) return null;
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(raw);
+}
+
+// Estado temporário do modal de personalização (uploads em pendência)
+window._persPendente = window._persPendente || {};
+
+function _persSwitchTab(tab) {
+    ['cores','marca','fundo'].forEach(t => {
+        const btn = document.getElementById('pers-tab-' + t);
+        const pane = document.getElementById('pers-pane-' + t);
+        if (btn) {
+            btn.style.color = (t === tab) ? '#a78bfa' : '#71717a';
+            btn.style.borderBottomColor = (t === tab) ? '#a78bfa' : 'transparent';
+        }
+        if (pane) pane.style.display = (t === tab) ? '' : 'none';
+    });
+}
+
 function abrirPersonalizarProLive() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
+
+    // Gate de feature premium — só clube com plano que tem 'personalizacao_tv' acessa.
+    // Em trial libera (comportamento do hasFeature).
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('personalizacao_tv')) {
+        if (typeof window.mostrarModalUpgrade === 'function') {
+            window.mostrarModalUpgrade('Personalização avançada da TV (logo, fundo, marca d\'água)');
+        } else {
+            showToast('🔒 Recurso premium — faça upgrade do plano pra personalizar a TV');
+        }
+        return;
+    }
+
     const bgAtual = t.tvProLiveBg || 'verde';
     const txtAtual = t.tvProLiveText || 'dourado';
 
+    // Snapshot dos valores atuais pra estado temporário (só persiste em "Aplicar")
+    window._persPendente = {
+        bg: bgAtual,
+        text: txtAtual,
+        logoUrl: t.tvProLiveLogoUrl || null,
+        bgCustomUrl: t.tvProLiveBgCustomUrl || null,
+        bgCustomOpacity: (t.tvProLiveBgCustomOpacity != null) ? Number(t.tvProLiveBgCustomOpacity) : 0.15,
+        galeriaKey: t.tvProLiveBgGalleryKey || null,
+        fraseRodape: t.tvProLiveFraseRodape || '',
+    };
+
+    // Renderiza grid de cores (cores existentes)
     const bgGrid = document.getElementById('prolive-bg-grid');
     if (bgGrid) {
         bgGrid.innerHTML = PROLIVE_BGS.map(b => {
@@ -23789,10 +23944,103 @@ function abrirPersonalizarProLive() {
             </button>`;
         }).join('');
     }
-    // Estado temporário de seleção
     window._proLiveBgSel = bgAtual;
     window._proLiveTextSel = txtAtual;
+
+    // Renderiza galeria de fundos pré-prontos
+    _persRenderGaleria();
+
+    // Renderiza estado do logo / bg custom / frase
+    _persRenderLogoState();
+    _persRenderBgCustomState();
+    const fraseInp = document.getElementById('pers-frase-rodape');
+    if (fraseInp) fraseInp.value = window._persPendente.fraseRodape;
+    const opSlider = document.getElementById('pers-bgcustom-opacity');
+    if (opSlider) {
+        opSlider.value = Math.round(window._persPendente.bgCustomOpacity * 100);
+        _persUpdateOpacityPreview(opSlider.value);
+    }
+
+    // Volta pra aba "Cores" como padrão
+    _persSwitchTab('cores');
+
     openModal('modal-personalizar-prolive');
+}
+
+function _persRenderGaleria() {
+    const grid = document.getElementById('pers-galeria-grid');
+    if (!grid) return;
+    const selecionada = window._persPendente.galeriaKey;
+    // Opção "Sem fundo da galeria"
+    const opcoes = [{ key: null, nome: 'Nenhum' }].concat(PROLIVE_GALERIA);
+    grid.innerHTML = opcoes.map(g => {
+        const sel = (g.key === selecionada);
+        const url = g.key ? _proliveGetGaleriaUrl(g.key) : null;
+        const bgStyle = url ? `background-image:url('${url}');background-size:cover;` : 'background:#0a0a0b;';
+        const inner = g.key ? '' : '<i class="fa-solid fa-ban" style="color:#52525b;font-size:1.2rem;display:flex;align-items:center;justify-content:center;height:100%;"></i>';
+        return `<button onclick="_persSelGaleria(${g.key ? "'"+g.key+"'" : 'null'})" data-galkey="${g.key || ''}" class="pers-gal-opt" style="
+            cursor:pointer;border-radius:.5rem;overflow:hidden;padding:0;
+            border:2px solid ${sel ? '#a78bfa' : '#27272a'};
+            box-shadow:${sel ? '0 0 0 2px rgba(167,139,250,.3)' : 'none'};">
+            <div style="height:48px;${bgStyle}">${inner}</div>
+            <div style="font-size:.65rem;color:#d4d4d8;padding:.3rem 0;text-align:center;background:#0f0f12;">${g.nome}</div>
+        </button>`;
+    }).join('');
+}
+
+function _persSelGaleria(key) {
+    window._persPendente.galeriaKey = key;
+    // Se o usuário escolhe uma galeria, limpa o upload custom (escolha exclusiva)
+    if (key) {
+        window._persPendente.bgCustomUrl = null;
+        _persRenderBgCustomState();
+    }
+    _persRenderGaleria();
+}
+
+function _persRenderLogoState() {
+    const thumb = document.getElementById('pers-logo-thumb');
+    const btnRem = document.getElementById('pers-logo-remover');
+    const url = window._persPendente.logoUrl;
+    if (thumb) {
+        if (url) {
+            thumb.innerHTML = '';
+            thumb.style.backgroundImage = `url('${url}')`;
+            thumb.style.backgroundSize = 'contain';
+            thumb.style.backgroundRepeat = 'no-repeat';
+            thumb.style.backgroundPosition = 'center';
+            thumb.style.border = '1px solid #a78bfa';
+        } else {
+            thumb.innerHTML = '<i class="fa-solid fa-image"></i>';
+            thumb.style.backgroundImage = '';
+            thumb.style.border = '1px dashed #27272a';
+        }
+    }
+    if (btnRem) btnRem.style.display = url ? 'inline-block' : 'none';
+}
+
+function _persRenderBgCustomState() {
+    const thumb = document.getElementById('pers-bgcustom-thumb');
+    const btnRem = document.getElementById('pers-bgcustom-remover');
+    const url = window._persPendente.bgCustomUrl;
+    if (thumb) {
+        if (url) {
+            thumb.innerHTML = '';
+            thumb.style.backgroundImage = `url('${url}')`;
+            thumb.style.border = '1px solid #a78bfa';
+        } else {
+            thumb.innerHTML = '<i class="fa-solid fa-image"></i>';
+            thumb.style.backgroundImage = '';
+            thumb.style.border = '1px dashed #27272a';
+        }
+    }
+    if (btnRem) btnRem.style.display = url ? 'inline-block' : 'none';
+}
+
+function _persUpdateOpacityPreview(val) {
+    window._persPendente.bgCustomOpacity = Number(val) / 100;
+    const lbl = document.getElementById('pers-bgcustom-opacity-label');
+    if (lbl) lbl.innerText = val + '%';
 }
 
 function _selProLiveBg(key) {
@@ -23815,12 +24063,147 @@ function _selProLiveText(key) {
 function salvarPersonalizarProLive() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    t.tvProLiveBg = window._proLiveBgSel || 'verde';
-    t.tvProLiveText = window._proLiveTextSel || 'dourado';
+    const p = window._persPendente || {};
+    // Aba cores
+    t.tvProLiveBg = window._proLiveBgSel || p.bg || 'verde';
+    t.tvProLiveText = window._proLiveTextSel || p.text || 'dourado';
+    // Aba marca
+    t.tvProLiveLogoUrl = p.logoUrl || null;
+    const fraseEl = document.getElementById('pers-frase-rodape');
+    t.tvProLiveFraseRodape = fraseEl ? (fraseEl.value || '').trim().slice(0, 60) : '';
+    // Aba fundo / galeria
+    t.tvProLiveBgCustomUrl = p.bgCustomUrl || null;
+    t.tvProLiveBgGalleryKey = p.galeriaKey || null;
+    t.tvProLiveBgCustomOpacity = (p.bgCustomOpacity != null) ? Number(p.bgCustomOpacity) : 0.15;
     saveData();
     updateTV(activeTorneioIdx);
     closeModal('modal-personalizar-prolive');
     showToast('🎨 Visual do Pro Live atualizado');
+}
+
+// ============================================================
+// UPLOAD DE IMAGENS (Logo + Marca d'água) — Supabase Storage
+// ============================================================
+// Bucket: 'tv-customizations' (precisa ser criado no painel do Supabase, público)
+// Estrutura: {clube_id}/{torneio_id}/{tipo}.{ext}  — tipo = 'logo' ou 'bg'
+
+const PERS_BUCKET = 'tv-customizations';
+const PERS_MAX_LOGO_BYTES = 500 * 1024;       // 500 KB
+const PERS_MAX_BG_BYTES = 1024 * 1024;        // 1 MB
+const PERS_ALLOWED_LOGO_MIME = ['image/png','image/svg+xml','image/jpeg','image/webp'];
+const PERS_ALLOWED_BG_MIME = ['image/png','image/jpeg','image/webp'];
+
+async function _persUploadArquivo(file, tipo) {
+    // tipo: 'logo' ou 'bg'
+    if (!file) return null;
+    const ehLogo = (tipo === 'logo');
+    const maxBytes = ehLogo ? PERS_MAX_LOGO_BYTES : PERS_MAX_BG_BYTES;
+    const mimes = ehLogo ? PERS_ALLOWED_LOGO_MIME : PERS_ALLOWED_BG_MIME;
+
+    if (!mimes.includes(file.type)) {
+        showToast('⚠️ Formato inválido. Use ' + (ehLogo ? 'PNG, SVG, JPEG ou WebP' : 'PNG, JPEG ou WebP'));
+        return null;
+    }
+    if (file.size > maxBytes) {
+        showToast('⚠️ Arquivo muito grande (máx ' + Math.round(maxBytes/1024) + 'KB)');
+        return null;
+    }
+
+    const t = torneios[activeTorneioIdx];
+    if (!t || !sbClube || !sbClube.id) {
+        showToast('⚠️ Não foi possível identificar o clube/torneio');
+        return null;
+    }
+
+    // Extensão a partir do MIME (mais confiável que o nome do arquivo)
+    const extMap = { 'image/png':'png','image/svg+xml':'svg','image/jpeg':'jpg','image/webp':'webp' };
+    const ext = extMap[file.type] || 'png';
+    // Path: clube_id/torneio_id/tipo.ext — torneio_id no path garante isolamento por torneio
+    // e permite uma RLS policy no Storage que confere clube_id == auth.uid()->clube_id
+    const path = `${sbClube.id}/${t.id}/${tipo}.${ext}`;
+
+    try {
+        // Upload com upsert (sobrescreve versão anterior se existir)
+        const { error: upErr } = await sb.storage.from(PERS_BUCKET).upload(path, file, {
+            upsert: true,
+            contentType: file.type,
+            cacheControl: '3600',
+        });
+        if (upErr) throw upErr;
+
+        // URL pública (bucket precisa ser público no painel do Supabase)
+        const { data: pub } = sb.storage.from(PERS_BUCKET).getPublicUrl(path);
+        let url = (pub && pub.publicUrl) || null;
+        // Cache-buster pra forçar recarga da imagem nova após upsert
+        if (url) url = url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
+        return url;
+    } catch (e) {
+        console.error('[pers-upload]', e);
+        const msg = (e.message || '').toLowerCase();
+        if (msg.includes('not found') || msg.includes('bucket')) {
+            showToast('⚠️ Bucket "tv-customizations" não está configurado no Supabase. Crie no painel e tente de novo.');
+        } else if (msg.includes('forbidden') || msg.includes('not authorized') || msg.includes('row-level')) {
+            showToast('⚠️ Sem permissão pra subir arquivo. Verifique as RLS policies do bucket.');
+        } else {
+            showToast('⚠️ ' + (e.message || 'Erro ao subir arquivo'));
+        }
+        return null;
+    }
+}
+
+async function _persUploadLogo(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    input.value = ''; // permite re-selecionar mesmo arquivo
+    const url = await _persUploadArquivo(file, 'logo');
+    if (url) {
+        window._persPendente.logoUrl = url;
+        _persRenderLogoState();
+        showToast('✓ Logo carregado');
+    }
+}
+
+async function _persUploadBgCustom(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    input.value = '';
+    const url = await _persUploadArquivo(file, 'bg');
+    if (url) {
+        window._persPendente.bgCustomUrl = url;
+        window._persPendente.galeriaKey = null; // upload custom prevalece sobre galeria
+        _persRenderBgCustomState();
+        _persRenderGaleria();
+        showToast('✓ Fundo carregado');
+    }
+}
+
+async function _persRemoverLogo() {
+    if (!confirm('Remover logo do clube desta TV?')) return;
+    const t = torneios[activeTorneioIdx];
+    if (!t || !sbClube) return;
+    // Tenta remover do storage (não bloqueia se falhar)
+    try {
+        const prefix = `${sbClube.id}/${t.id}/`;
+        const { data: files } = await sb.storage.from(PERS_BUCKET).list(`${sbClube.id}/${t.id}`);
+        const logoFile = (files || []).find(f => f.name.startsWith('logo.'));
+        if (logoFile) await sb.storage.from(PERS_BUCKET).remove([prefix + logoFile.name]);
+    } catch (e) { console.warn('[pers] remover logo no storage:', e.message); }
+    window._persPendente.logoUrl = null;
+    _persRenderLogoState();
+}
+
+async function _persRemoverBgCustom() {
+    if (!confirm('Remover marca d\'água customizada desta TV?')) return;
+    const t = torneios[activeTorneioIdx];
+    if (!t || !sbClube) return;
+    try {
+        const prefix = `${sbClube.id}/${t.id}/`;
+        const { data: files } = await sb.storage.from(PERS_BUCKET).list(`${sbClube.id}/${t.id}`);
+        const bgFile = (files || []).find(f => f.name.startsWith('bg.'));
+        if (bgFile) await sb.storage.from(PERS_BUCKET).remove([prefix + bgFile.name]);
+    } catch (e) { console.warn('[pers] remover bg no storage:', e.message); }
+    window._persPendente.bgCustomUrl = null;
+    _persRenderBgCustomState();
 }
 
 // ============================================================
