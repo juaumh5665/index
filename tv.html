@@ -293,14 +293,29 @@
         body.layout-pokerweb #pw-screen { display:flex !important; }
 
         /* === PERSONALIZAÇÃO PREMIUM (logo + marca d'água + frase rodapé) === */
-        /* Marca d'água custom/galeria — fica atrás de tudo (z-index 0) */
+        /* Marca d'água custom/galeria — fica atrás de tudo (z-index 0).
+           Estratégia visual:
+           - background-size:contain (não estoura o tamanho original — evita "VIP gigante")
+           - filter:blur leve (suaviza bordas, reduz competição com o texto)
+           - opacity controlada pelo usuário (5-40%) */
         #pw-watermark {
             position:absolute; inset:0; z-index:0;
-            background-position:center; background-size:cover; background-repeat:no-repeat;
+            background-position:center; background-size:contain; background-repeat:no-repeat;
             opacity:0; pointer-events:none;
             transition:opacity .3s ease;
+            filter:blur(2px);
         }
         body.layout-pokerweb #pw-watermark.active { opacity:var(--pw-wm-opacity, 0.15); }
+
+        /* Vinheta escura sobre a marca d'água — escurece o centro (onde fica o timer)
+           para garantir contraste do texto. Z-index 1: acima da marca d'água, abaixo do conteúdo (z-index 2+).
+           Só aparece quando há marca d'água ativa. */
+        body.layout-pokerweb.has-watermark #pw-screen::before {
+            content:'';
+            position:absolute; inset:0; z-index:1;
+            background:radial-gradient(ellipse at center, rgba(0,0,0,.35) 0%, rgba(0,0,0,.15) 60%, rgba(0,0,0,0) 100%);
+            pointer-events:none;
+        }
 
         /* Logo do clube — canto superior esquerdo, acima de tudo (z-index 5) */
         #pw-logo {
@@ -1546,14 +1561,17 @@ function montarCarouselPremiacao(d) {
         // Personalização Pro Live: fundo + cor de texto (só aplica no layout pokerweb)
         let proLiveClasses = '';
         let hasLogoClass = '';
+        let hasWatermarkClass = '';
         if (layout === 'pokerweb') {
             const bg = d.proLiveBg || 'verde';
             const txt = d.proLiveText || 'dourado';
             proLiveClasses = ' pw-bg-' + bg + (txt !== 'dourado' ? ' pw-text-' + txt : '');
             // Marca pra dar padding-left no título quando há logo
             if (d.proLiveLogoUrl) hasLogoClass = ' has-logo';
+            // Marca pra ativar vinheta escura quando há marca d'água (preserva leitura do texto)
+            if (d.proLiveBgCustomUrl || d.proLiveBgGalleryKey) hasWatermarkClass = ' has-watermark';
         }
-        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '') + responsiveClass + proLiveClasses + hasLogoClass;
+        document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '') + responsiveClass + proLiveClasses + hasLogoClass + hasWatermarkClass;
 
         // ===== Personalização premium (logo + marca d'água + frase rodapé) =====
         // Só aplica se layout é pokerweb; nos outros layouts, esconde os elementos.
