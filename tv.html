@@ -295,15 +295,17 @@
         /* === PERSONALIZAÇÃO PREMIUM (logo + marca d'água + frase rodapé) === */
         /* Marca d'água custom/galeria — fica atrás de tudo (z-index 0).
            Estratégia visual:
-           - background-size:contain (não estoura o tamanho original — evita "VIP gigante")
-           - filter:blur leve (suaviza bordas, reduz competição com o texto)
-           - opacity controlada pelo usuário (5-40%) */
+           - background-size:contain limitado a 75% (logo ocupa boa parte da tela mas não estoura)
+           - blur quase imperceptível (suaviza bordas pixelizadas)
+           - vinheta escura central preserva legibilidade do texto */
         #pw-watermark {
             position:absolute; inset:0; z-index:0;
-            background-position:center; background-size:contain; background-repeat:no-repeat;
+            background-position:center center;
+            background-size:75% auto;
+            background-repeat:no-repeat;
             opacity:0; pointer-events:none;
             transition:opacity .3s ease;
-            filter:blur(2px);
+            filter:blur(0.5px);
         }
         body.layout-pokerweb #pw-watermark.active { opacity:var(--pw-wm-opacity, 0.15); }
 
