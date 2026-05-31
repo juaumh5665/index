@@ -24151,15 +24151,107 @@ async function _persUploadArquivo(file, tipo) {
     }
 }
 
+// Analisa os 4 cantos da imagem pra detectar se tem fundo preto/escuro sólido
+// (que vai aparecer como "quadrado escuro" ao redor da logo na TV).
+// Retorna: { temFundoEscuro: bool, temFundoBranco: bool, transparente: bool, motivo: string }
+async function _persAnalisarFundo(file) {
+    // SVGs não passam por análise de pixel (são vetoriais, fundo é transparente por design)
+    if (file.type === 'image/svg+xml') {
+        return { temFundoEscuro: false, temFundoBranco: false, transparente: true, motivo: 'svg' };
+    }
+    return new Promise((resolve) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => { img.src = e.target.result; };
+        reader.onerror = () => resolve({ temFundoEscuro: false, transparente: false, motivo: 'erro' });
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                // Trabalha numa versão pequena (mais rápido)
+                const W = 64;
+                canvas.width = W; canvas.height = W;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return resolve({ temFundoEscuro: false, transparente: false, motivo: 'sem-canvas' });
+                ctx.drawImage(img, 0, 0, W, W);
+                // Pega pixels dos 4 cantos (regiões 5x5)
+                const cantos = [
+                    ctx.getImageData(0, 0, 5, 5).data,
+                    ctx.getImageData(W-5, 0, 5, 5).data,
+                    ctx.getImageData(0, W-5, 5, 5).data,
+                    ctx.getImageData(W-5, W-5, 5, 5).data,
+                ];
+                let totalAlpha = 0, totalLuma = 0, totalAlphaZero = 0, totalPx = 0;
+                cantos.forEach(data => {
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+                        totalAlpha += a;
+                        totalLuma += (0.299*r + 0.587*g + 0.114*b);
+                        if (a < 30) totalAlphaZero++;
+                        totalPx++;
+                    }
+                });
+                const avgAlpha = totalAlpha / totalPx;
+                const avgLuma = totalLuma / totalPx;
+                const pctTransparente = totalAlphaZero / totalPx;
+                // Heurísticas:
+                // - Se ≥80% dos pixels dos cantos têm alpha<30 → fundo realmente transparente (bom)
+                // - Se avgAlpha>200 (quase opaco) E avgLuma<50 (muito escuro) → fundo preto sólido
+                // - Se avgAlpha>200 E avgLuma>200 → fundo branco sólido
+                const transparente = pctTransparente >= 0.8;
+                const temFundoEscuro = !transparente && avgAlpha > 200 && avgLuma < 50;
+                const temFundoBranco = !transparente && avgAlpha > 200 && avgLuma > 200;
+                let motivo = 'ok';
+                if (transparente) motivo = 'transparente';
+                else if (temFundoEscuro) motivo = 'fundo-escuro';
+                else if (temFundoBranco) motivo = 'fundo-branco';
+                resolve({ temFundoEscuro, temFundoBranco, transparente, motivo });
+            } catch (e) {
+                console.warn('[pers] análise fundo falhou:', e.message);
+                resolve({ temFundoEscuro: false, transparente: false, motivo: 'erro' });
+            }
+        };
+        img.onerror = () => resolve({ temFundoEscuro: false, transparente: false, motivo: 'erro' });
+        reader.readAsDataURL(file);
+    });
+}
+
 async function _persUploadLogo(input) {
     const file = input.files && input.files[0];
     if (!file) return;
     input.value = ''; // permite re-selecionar mesmo arquivo
+
+    // Análise prévia: detecta fundo escuro/branco que vai aparecer como quadrado ao redor da logo.
+    // Não BLOQUEIA upload — só avisa o usuário, e segue.
+    // Na TV, o mix-blend-mode:screen já neutraliza fundo PRETO automaticamente,
+    // mas o aviso ajuda o usuário a entender o resultado e a subir uma imagem melhor da próxima vez.
+    const analise = await _persAnalisarFundo(file);
+    if (analise.temFundoEscuro) {
+        const continuar = confirm(
+            '⚠️ Detectamos que sua imagem tem FUNDO PRETO/ESCURO sólido.\n\n' +
+            'Pra melhor resultado na TV, recomendamos uma logo em PNG com fundo realmente TRANSPARENTE ' +
+            '(você pode usar ferramentas como remove.bg pra isso).\n\n' +
+            'Nosso sistema já remove automaticamente o preto puro na exibição da TV, mas o resultado ' +
+            'fica melhor com transparência real.\n\n' +
+            'Quer continuar com essa imagem mesmo assim?'
+        );
+        if (!continuar) return;
+    } else if (analise.temFundoBranco) {
+        const continuar = confirm(
+            '⚠️ Sua imagem tem FUNDO BRANCO sólido.\n\n' +
+            'Isso vai aparecer como um quadrado branco grande atrás da logo na TV. ' +
+            'Recomendamos PNG com fundo transparente.\n\n' +
+            'Quer continuar mesmo assim?'
+        );
+        if (!continuar) return;
+    }
+
     const url = await _persUploadArquivo(file, 'logo');
     if (url) {
         window._persPendente.logoUrl = url;
         _persRenderLogoState();
-        showToast('✓ Logo carregado');
+        if (analise.transparente) showToast('✓ Logo carregado (fundo transparente detectado)');
+        else if (analise.temFundoEscuro) showToast('✓ Logo carregado (preto será neutralizado na TV)');
+        else showToast('✓ Logo carregado');
     }
 }
 
@@ -24167,6 +24259,21 @@ async function _persUploadBgCustom(input) {
     const file = input.files && input.files[0];
     if (!file) return;
     input.value = '';
+
+    // Análise: marca d'água com fundo escuro fica ok porque combina com fundo Pro Live escuro,
+    // mas com fundo BRANCO sólido fica um quadrado branco enorme no centro da TV — bem ruim.
+    const analise = await _persAnalisarFundo(file);
+    if (analise.temFundoBranco) {
+        const continuar = confirm(
+            '⚠️ Sua imagem de fundo tem FUNDO BRANCO sólido.\n\n' +
+            'Como marca d\'água sobre o fundo escuro do Pro Live, isso vai aparecer como uma área ' +
+            'clara grande no centro da TV.\n\n' +
+            'Pra melhor resultado, recomendamos imagens com fundo escuro ou transparente.\n\n' +
+            'Quer continuar mesmo assim?'
+        );
+        if (!continuar) return;
+    }
+
     const url = await _persUploadArquivo(file, 'bg');
     if (url) {
         window._persPendente.bgCustomUrl = url;
