@@ -305,9 +305,10 @@
         /* Logo do clube — canto superior esquerdo, acima de tudo (z-index 5) */
         #pw-logo {
             position:absolute; top:3vh; left:3vw; z-index:5;
-            max-width:14vh; max-height:14vh;
+            max-width:12vh; max-height:12vh;
             display:none;
             filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));
+            object-fit:contain;
         }
         body.layout-pokerweb #pw-logo.active { display:block; }
 
@@ -326,8 +327,12 @@
         }
         body.layout-pokerweb #pw-frase-rodape.active { display:block; }
 
-        /* Quando há logo, dá margem extra ao título Pro Live pra não sobrepor */
-        body.layout-pokerweb.has-logo .pw-title { padding-left:16vh; }
+        /* Quando há logo, dá espaço pro título E pra coluna esquerda (Nível/Jogadores/Média)
+           não ficarem cobertos pela logo. A logo ocupa até 12vh × 12vh no canto sup. esq. */
+        body.layout-pokerweb.has-logo .pw-title { padding-left:14vh; }
+        body.layout-pokerweb.has-logo .pw-col-left { padding-top:14vh; }
+        /* Pra manter simetria visual e o conteúdo central alinhado, descemos a coluna direita também */
+        body.layout-pokerweb.has-logo .pw-col-right { padding-top:14vh; }
 
         /* Pro Live screen (só visível quando layout-pokerweb) */
         #pw-screen {
@@ -2150,7 +2155,7 @@ function montarCarouselPremiacao(d) {
         const ids = rodando.map(t => t.id);
         const { data: extras, error: errExtras } = await sb
           .from('torneios')
-          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_prolive_bg, tv_prolive_text, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor')
+          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_prolive_bg, tv_prolive_text, tv_prolive_custom, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor')
           .in('id', ids);
         
         if (!errExtras && Array.isArray(extras)) {
@@ -2164,6 +2169,8 @@ function montarCarouselPremiacao(d) {
               if (ext.tv_layout != null) t.tv_layout = ext.tv_layout;
               if (ext.tv_prolive_bg != null) t.tv_prolive_bg = ext.tv_prolive_bg;
               if (ext.tv_prolive_text != null) t.tv_prolive_text = ext.tv_prolive_text;
+              // Personalização premium (logo, marca d'água, galeria, frase) — JSON pode ser null
+              t.tv_prolive_custom = ext.tv_prolive_custom || null;
               if (ext.tv_show_prize != null) t.tv_show_prize = ext.tv_show_prize;
               // 🆕 Fichas e valores — só sobrescreve se RPC não retornou
               // (preserva valor do RPC se já vier, evita race con. com cache)
@@ -2675,12 +2682,19 @@ function montarCarouselPremiacao(d) {
     const totalNiveisJogo = blinds.filter(b => !b.isBreak).length;
     
     // Construir payload IDÊNTICO ao do updateTV() do app
+    const cust = t.tv_prolive_custom || {};
     const payload = {
       tournamentName: t.nome,
       tipo: t.tipo,
       layout: t.tv_layout || 'classico',
       proLiveBg: t.tv_prolive_bg || 'verde',
       proLiveText: t.tv_prolive_text || 'dourado',
+      // Personalização premium (TV pública lê do Supabase via select periódico/realtime)
+      proLiveLogoUrl: cust.logo_url || null,
+      proLiveBgCustomUrl: cust.bg_custom_url || null,
+      proLiveBgGalleryKey: cust.bg_gallery_key || null,
+      proLiveBgCustomOpacity: (cust.bg_custom_opacity != null) ? Number(cust.bg_custom_opacity) : 0.15,
+      proLiveFraseRodape: cust.frase_rodape || null,
       showPrize: t.tv_show_prize !== false,
       timer: timer,
       nivel: nivelJogo || 1,
