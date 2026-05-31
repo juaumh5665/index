@@ -24215,26 +24215,103 @@ async function _persAnalisarFundo(file) {
     });
 }
 
+// Processa a imagem no Canvas removendo pixels pretos/quase-pretos (alpha=0).
+// Gera um novo arquivo PNG com transparência real, mantendo o nome/tipo do original.
+// - threshold: soma RGB abaixo desse valor vira transparente total (default 30)
+// - fadeRange: pixels entre threshold e (threshold+fadeRange) ficam com alpha parcial
+//   pra evitar bordas duras/pixelizadas entre transparente e opaco
+async function _persRemoverFundoPreto(file, threshold = 30, fadeRange = 30) {
+    // SVG não passa pelo Canvas (preserva vetor)
+    if (file.type === 'image/svg+xml') return file;
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => { img.src = e.target.result; };
+        reader.onerror = () => reject(new Error('Falha ao ler imagem'));
+        img.onerror = () => reject(new Error('Falha ao carregar imagem'));
+        img.onload = () => {
+            try {
+                // Limita tamanho máximo pra evitar canvas gigante e arquivo final pesado
+                const MAX_DIM = 1024;
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (w > MAX_DIM || h > MAX_DIM) {
+                    const scale = Math.min(MAX_DIM / w, MAX_DIM / h);
+                    w = Math.round(w * scale);
+                    h = Math.round(h * scale);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject(new Error('Canvas não disponível'));
+                ctx.drawImage(img, 0, 0, w, h);
+
+                // Lê pixels e ajusta alpha dos escuros
+                const imgData = ctx.getImageData(0, 0, w, h);
+                const data = imgData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i+1], b = data[i+2];
+                    const soma = r + g + b; // 0 = preto puro, 765 = branco puro
+                    if (soma <= threshold) {
+                        // Preto/quase-preto → totalmente transparente
+                        data[i+3] = 0;
+                    } else if (soma <= threshold + fadeRange) {
+                        // Zona de transição → alpha proporcional pra borda suave
+                        const ratio = (soma - threshold) / fadeRange; // 0..1
+                        data[i+3] = Math.round(data[i+3] * ratio);
+                    }
+                    // Acima do threshold: alpha original (não mexe)
+                }
+                ctx.putImageData(imgData, 0, 0);
+
+                // Sempre exporta como PNG (mantém transparência; JPEG não suporta alpha)
+                canvas.toBlob((blob) => {
+                    if (!blob) return reject(new Error('Canvas.toBlob falhou'));
+                    // Cria um File novo com nome adequado, mantendo a "cara" de upload
+                    const novoNome = (file.name || 'logo').replace(/\.(jpe?g|webp|png)$/i, '') + '-transparente.png';
+                    const novoFile = new File([blob], novoNome, { type: 'image/png' });
+                    resolve(novoFile);
+                }, 'image/png');
+            } catch (e) {
+                reject(e);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 async function _persUploadLogo(input) {
     const file = input.files && input.files[0];
     if (!file) return;
     input.value = ''; // permite re-selecionar mesmo arquivo
 
-    // Análise prévia: detecta fundo escuro/branco que vai aparecer como quadrado ao redor da logo.
-    // Não BLOQUEIA upload — só avisa o usuário, e segue.
-    // Na TV, o mix-blend-mode:screen já neutraliza fundo PRETO automaticamente,
-    // mas o aviso ajuda o usuário a entender o resultado e a subir uma imagem melhor da próxima vez.
+    // Análise prévia: detecta fundo escuro/branco da imagem (4 cantos).
     const analise = await _persAnalisarFundo(file);
+
+    let arquivoFinal = file;
+    let fundoFoiRemovido = false;
+
     if (analise.temFundoEscuro) {
-        const continuar = confirm(
-            '⚠️ Detectamos que sua imagem tem FUNDO PRETO/ESCURO sólido.\n\n' +
-            'Pra melhor resultado na TV, recomendamos uma logo em PNG com fundo realmente TRANSPARENTE ' +
-            '(você pode usar ferramentas como remove.bg pra isso).\n\n' +
-            'Nosso sistema já remove automaticamente o preto puro na exibição da TV, mas o resultado ' +
-            'fica melhor com transparência real.\n\n' +
-            'Quer continuar com essa imagem mesmo assim?'
+        // OFERECE remoção automática via Canvas — gera PNG com transparência REAL.
+        // (Diferente do mix-blend-mode da TV, que falha sobre fundos escuros do Pro Live.)
+        const aceitar = confirm(
+            '🎨 Detectamos que sua imagem tem FUNDO PRETO/ESCURO sólido.\n\n' +
+            'Posso REMOVER o fundo automaticamente pra você? A logo vai ficar com transparência real, ' +
+            'aparecendo "flutuando" sobre o fundo da TV (sem quadrado preto ao redor).\n\n' +
+            '✅ Recomendado pra esse tipo de imagem.\n\n' +
+            'Clique OK pra remover automaticamente, ou Cancelar pra subir a imagem original.'
         );
-        if (!continuar) return;
+        if (aceitar) {
+            try {
+                showToast('⏳ Processando imagem...');
+                arquivoFinal = await _persRemoverFundoPreto(file);
+                fundoFoiRemovido = true;
+            } catch (e) {
+                console.warn('[pers] remoção de fundo falhou:', e);
+                showToast('⚠️ Falha ao processar — subindo imagem original');
+                arquivoFinal = file;
+            }
+        }
     } else if (analise.temFundoBranco) {
         const continuar = confirm(
             '⚠️ Sua imagem tem FUNDO BRANCO sólido.\n\n' +
@@ -24245,13 +24322,13 @@ async function _persUploadLogo(input) {
         if (!continuar) return;
     }
 
-    const url = await _persUploadArquivo(file, 'logo');
+    const url = await _persUploadArquivo(arquivoFinal, 'logo');
     if (url) {
         window._persPendente.logoUrl = url;
         _persRenderLogoState();
-        if (analise.transparente) showToast('✓ Logo carregado (fundo transparente detectado)');
-        else if (analise.temFundoEscuro) showToast('✓ Logo carregado (preto será neutralizado na TV)');
-        else showToast('✓ Logo carregado');
+        if (fundoFoiRemovido) showToast('✓ Logo carregada com fundo removido');
+        else if (analise.transparente) showToast('✓ Logo carregada (fundo transparente)');
+        else showToast('✓ Logo carregada');
     }
 }
 
@@ -24260,10 +24337,33 @@ async function _persUploadBgCustom(input) {
     if (!file) return;
     input.value = '';
 
-    // Análise: marca d'água com fundo escuro fica ok porque combina com fundo Pro Live escuro,
-    // mas com fundo BRANCO sólido fica um quadrado branco enorme no centro da TV — bem ruim.
+    // Análise: marca d'água com fundo escuro/preto fica com "quadrado escuro" no centro da TV.
+    // Marca d'água com fundo BRANCO fica ainda pior (claro sobre escuro).
     const analise = await _persAnalisarFundo(file);
-    if (analise.temFundoBranco) {
+
+    let arquivoFinal = file;
+    let fundoFoiRemovido = false;
+
+    if (analise.temFundoEscuro) {
+        const aceitar = confirm(
+            '🎨 Detectamos que sua imagem tem FUNDO PRETO/ESCURO sólido.\n\n' +
+            'Posso REMOVER o fundo automaticamente? Sem isso, vai aparecer um "quadrado" mais escuro ' +
+            'no centro da TV ao redor da marca.\n\n' +
+            '✅ Recomendado.\n\n' +
+            'OK pra remover, Cancelar pra subir como está.'
+        );
+        if (aceitar) {
+            try {
+                showToast('⏳ Processando imagem...');
+                arquivoFinal = await _persRemoverFundoPreto(file);
+                fundoFoiRemovido = true;
+            } catch (e) {
+                console.warn('[pers] remoção falhou:', e);
+                showToast('⚠️ Falha ao processar — subindo imagem original');
+                arquivoFinal = file;
+            }
+        }
+    } else if (analise.temFundoBranco) {
         const continuar = confirm(
             '⚠️ Sua imagem de fundo tem FUNDO BRANCO sólido.\n\n' +
             'Como marca d\'água sobre o fundo escuro do Pro Live, isso vai aparecer como uma área ' +
@@ -24274,13 +24374,14 @@ async function _persUploadBgCustom(input) {
         if (!continuar) return;
     }
 
-    const url = await _persUploadArquivo(file, 'bg');
+    const url = await _persUploadArquivo(arquivoFinal, 'bg');
     if (url) {
         window._persPendente.bgCustomUrl = url;
         window._persPendente.galeriaKey = null; // upload custom prevalece sobre galeria
         _persRenderBgCustomState();
         _persRenderGaleria();
-        showToast('✓ Fundo carregado');
+        if (fundoFoiRemovido) showToast('✓ Fundo carregado com transparência');
+        else showToast('✓ Fundo carregado');
     }
 }
 
