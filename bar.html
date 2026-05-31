@@ -957,13 +957,61 @@ function todayStartIso() {
     // No iOS, o PWA standalone tem localStorage separado do Safari normal.
     // Se chegou aqui sem token, provavelmente é primeira abertura do PWA instalado.
     if (ehStandalone) {
+      // Em vez de travar o operador, mostramos um formulário pra colar o link de convite.
+      // Assim ele não precisa desinstalar o app — basta pedir o link ao admin e colar aqui.
       $('clubeLabel').innerHTML =
         '⚠️ <strong>Primeiro acesso pelo app</strong><br>' +
         '<span style="font-size:.85em;color:#a3a3a3;">' +
-        'Abra o link de convite no navegador uma vez,<br>' +
-        'faça login, e <em>depois</em> adicione à tela inicial.<br><br>' +
-        'Peça um link novo ao administrador do clube.' +
+        'Cole abaixo o link de convite enviado pelo administrador,<br>' +
+        'ou abra o link no Safari primeiro.' +
         '</span>';
+
+      // Esconde os campos de email/senha enquanto não tem token
+      const inpEmail = $('inpEmail'); if (inpEmail) inpEmail.style.display = 'none';
+      const inpSenha = $('inpSenha'); if (inpSenha) inpSenha.style.display = 'none';
+      const labels = document.querySelectorAll('.login-card label');
+      labels.forEach(l => l.style.display = 'none');
+      const erroLog = $('erroLogin'); if (erroLog) erroLog.style.display = 'none';
+
+      // Cria input de link + botão de salvar (dinâmico, não polui o HTML)
+      const btnLog = $('btnLogin');
+      if (btnLog && !document.getElementById('inpLinkConvite')) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem;';
+        wrap.innerHTML =
+          '<label style="font-size:.75rem;color:#a3a3a3;text-transform:uppercase;letter-spacing:.05em;">Link do convite</label>' +
+          '<input type="url" id="inpLinkConvite" placeholder="https://stackos.com.br/bar.html?t=..." ' +
+          'style="background:#0f1014;border:1px solid #27272a;color:#fafafa;padding:.85rem 1rem;border-radius:.6rem;font-size:.95rem;width:100%;">' +
+          '<div style="font-size:.7rem;color:#71717a;line-height:1.4;">' +
+          '💡 Peça o link ao admin (WhatsApp, e-mail). Cole aqui e clique em "Continuar".' +
+          '</div>';
+        btnLog.parentNode.insertBefore(wrap, btnLog);
+
+        btnLog.textContent = 'Continuar';
+        btnLog.disabled = false;
+        // Substitui o handler de login pelo handler de salvar link
+        btnLog.addEventListener('click', function handlerLink(ev) {
+          ev.preventDefault();
+          const link = ($('inpLinkConvite').value || '').trim();
+          if (!link) {
+            return mostraErroLogin('Cole o link de convite recebido do admin');
+          }
+          let tokenExtraido = null;
+          try {
+            const u = new URL(link);
+            tokenExtraido = u.searchParams.get('t');
+          } catch(_) {
+            // Talvez tenha colado só o token (sem URL). Aceita também.
+            if (/^[a-f0-9]{16,}$/i.test(link)) tokenExtraido = link;
+          }
+          if (!tokenExtraido) {
+            return mostraErroLogin('Link inválido. Verifique e tente novamente.');
+          }
+          localStorage.setItem('stackbar_token', tokenExtraido);
+          // Recarrega o app — agora vai ter o token no localStorage
+          location.reload();
+        });
+      }
     } else {
       $('clubeLabel').innerHTML =
         '⚠️ <strong>Link inválido</strong> — peça um link novo ao admin.';
