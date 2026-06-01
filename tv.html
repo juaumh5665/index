@@ -1625,6 +1625,7 @@ function montarCarouselPremiacao(d) {
         const bs = document.getElementById('break-screen');
         if (!bs) return;
         if (!d.isBreak) { bs.classList.remove('show'); return; }
+        console.log('[BREAK] ATIVANDO break-screen. d.clubeId:', d.clubeId, 'd.isBreak:', d.isBreak, 'pubState.clubeId:', (typeof pubState !== 'undefined' ? pubState.clubeId : 'N/A'));
         bs.classList.add('show');
         // Timer: só atualiza no POPUP — na TV pública, tickLocalTimer cuida (break-timer está no array)
         if (!window._ehTvPublica) {
@@ -1685,30 +1686,49 @@ function montarCarouselPremiacao(d) {
     async function _bsAtualizarPatrocinadores(clubeId) {
         const wrap = document.getElementById('bs-patrocinadores-wrap');
         const track = document.getElementById('bs-patrocinadores-track');
-        if (!wrap || !track) return;
+        console.log('[BS-PATR] _bsAtualizarPatrocinadores chamada. clubeId:', clubeId, 'wrap?', !!wrap, 'track?', !!track);
+        if (!wrap || !track) {
+            console.warn('[BS-PATR] ❌ Elemento DOM não encontrado. wrap:', !!wrap, 'track:', !!track);
+            return;
+        }
 
         // Fallback robusto: se não recebeu clubeId no payload, tenta pegar do pubState
         // (caso da TV pública, onde o break é montado localmente sem reler o app)
         if (!clubeId && typeof pubState !== 'undefined' && pubState && pubState.clubeId) {
             clubeId = pubState.clubeId;
+            console.log('[BS-PATR] Usando clubeId do pubState (fallback):', clubeId);
         }
-        if (!clubeId) { wrap.style.display = 'none'; return; }
+        if (!clubeId) {
+            console.warn('[BS-PATR] ❌ Sem clubeId. Escondendo wrap.');
+            wrap.style.display = 'none';
+            return;
+        }
 
         // Se cache válido pra este clube, só renderiza
         const cache = window._bsPatrocinadoresCache;
         if (cache.clubeId === clubeId && Array.isArray(cache.lista)) {
+            console.log('[BS-PATR] Usando cache. Lista:', cache.lista.length);
             return _bsRenderCarrossel(cache.lista);
         }
 
         // Busca do Supabase
         try {
-            if (typeof sb === 'undefined' || !sb || !sb.from) { wrap.style.display = 'none'; return; }
+            if (typeof sb === 'undefined' || !sb || !sb.from) {
+                console.warn('[BS-PATR] ❌ Supabase (sb) não disponível.');
+                wrap.style.display = 'none';
+                return;
+            }
+            console.log('[BS-PATR] Buscando patrocinadores do clube:', clubeId);
             const { data, error } = await sb.from('patrocinadores')
                 .select('id, nome, logo_url, ordem, ativo')
                 .eq('clube_id', clubeId)
                 .eq('ativo', true)
                 .order('ordem', { ascending: true });
-            if (error) throw error;
+            if (error) {
+                console.error('[BS-PATR] ❌ Erro Supabase:', error);
+                throw error;
+            }
+            console.log('[BS-PATR] ✅ Resposta:', data?.length, 'patrocinadores ativos:', data);
             window._bsPatrocinadoresCache = { clubeId, lista: data || [] };
             _bsRenderCarrossel(data || []);
         } catch (e) {
@@ -1720,8 +1740,13 @@ function montarCarouselPremiacao(d) {
     function _bsRenderCarrossel(lista) {
         const wrap = document.getElementById('bs-patrocinadores-wrap');
         const track = document.getElementById('bs-patrocinadores-track');
+        console.log('[BS-PATR] _bsRenderCarrossel chamada. lista:', lista?.length);
         if (!wrap || !track) return;
-        if (!lista || !lista.length) { wrap.style.display = 'none'; return; }
+        if (!lista || !lista.length) {
+            console.log('[BS-PATR] Lista vazia, escondendo wrap.');
+            wrap.style.display = 'none';
+            return;
+        }
 
         // Duplica a lista pra criar loop infinito (anima -50%, que é exatamente 1 ciclo).
         // A velocidade depende da QTDE de patrocinadores (mais logos = mais lento, pra ler tudo).
@@ -1738,6 +1763,7 @@ function montarCarouselPremiacao(d) {
         track.style.animationDuration = dur + 's';
 
         wrap.style.display = 'flex';
+        console.log('[BS-PATR] ✅ Carrossel renderizado com', lista.length, 'itens. Wrap visível.');
     }
 
     // Invalida cache quando algo muda (chamado pelo Realtime)
