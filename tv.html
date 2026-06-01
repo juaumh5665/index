@@ -373,7 +373,7 @@
             color: #f5d572;
             letter-spacing: .04em;
             margin-bottom: .25rem;
-            text-shadow: 0 0 12px rgba(245,213,114,.25), 0 2px 4px rgba(0,0,0,.4);
+            text-shadow: 0 0 calc(48px * var(--pw-glow-destaques, .25)) rgba(245,213,114, calc(var(--pw-glow-destaques, .25) * .8)), 0 2px 4px rgba(0,0,0,.4);
         }
         .pw-title-divider {
             height:2px;
@@ -421,6 +421,7 @@
             font-family: 'Manrope', sans-serif;
             letter-spacing: -.01em;
             line-height: 1;
+            text-shadow: 0 0 calc(30px * var(--pw-glow-info, .25)) rgba(245,213,114, calc(var(--pw-glow-info, .25) * .7));
         }
 
         /* Center column: Timer + Blinds - centralizado verticalmente */
@@ -449,8 +450,8 @@
             letter-spacing: -.03em;
             line-height: .9;
             text-shadow:
-                0 0 15px rgba(245,213,114,.3),
-                0 0 30px rgba(245,213,114,.12),
+                0 0 calc(60px * var(--pw-glow-destaques, .25)) rgba(245,213,114, calc(var(--pw-glow-destaques, .25) * 1.0)),
+                0 0 calc(120px * var(--pw-glow-destaques, .25)) rgba(245,213,114, calc(var(--pw-glow-destaques, .25) * .5)),
                 0 4px 8px rgba(0,0,0,.4);
             margin-bottom: .3rem;
         }
@@ -476,7 +477,7 @@
             font-family: var(--font-mono);
             font-feature-settings: var(--font-mono-features);
             text-shadow:
-                0 0 15px rgba(245,213,114,.12),
+                0 0 calc(60px * var(--pw-glow-destaques, .25)) rgba(245,213,114, calc(var(--pw-glow-destaques, .25) * .5)),
                 0 2px 8px rgba(0,0,0,.5);
             letter-spacing: -.02em;
             line-height: 1;
@@ -556,7 +557,7 @@
             text-transform: uppercase;
             letter-spacing: .2em;
             margin-bottom: .4rem;
-            text-shadow: 0 0 15px rgba(245,213,114,.5);
+            text-shadow: 0 0 calc(40px * var(--pw-glow-info, .25)) rgba(245,213,114, calc(var(--pw-glow-info, .25) * 1.2));
         }
         .pw-prize-carousel-header i { color: #f5d572; }
 
@@ -629,7 +630,7 @@
             font-size: clamp(1rem, 1.4vw, 1.35rem);
             color: #f5d572;
             font-weight: 800;
-            text-shadow: 0 0 18px rgba(245,213,114,.5);
+            text-shadow: 0 0 calc(45px * var(--pw-glow-info, .25)) rgba(245,213,114, calc(var(--pw-glow-info, .25) * 1.2));
             letter-spacing: -.005em;
         }
         /* 🎫 Badge dourada da Vaga — Pro Live */
@@ -645,7 +646,7 @@
             border-radius: .35rem;
             margin-left: .55rem;
             letter-spacing: .04em;
-            text-shadow: 0 0 12px rgba(245,213,114,.5);
+            text-shadow: 0 0 calc(30px * var(--pw-glow-info, .25)) rgba(245,213,114, calc(var(--pw-glow-info, .25) * 1.2));
             box-shadow: 0 0 16px rgba(245,213,114,.2), inset 0 0 8px rgba(245,213,114,.1);
             white-space: nowrap;
             text-transform: uppercase;
@@ -897,7 +898,7 @@
             border-radius: .3rem;
             margin-left: .5rem;
             letter-spacing: .04em;
-            text-shadow: 0 0 10px rgba(245,213,114,.4);
+            text-shadow: 0 0 calc(25px * var(--pw-glow-info, .25)) rgba(245,213,114, calc(var(--pw-glow-info, .25) * 1.0));
             white-space: nowrap;
             text-transform: uppercase;
         }
@@ -1584,6 +1585,12 @@ function montarCarouselPremiacao(d) {
         const elWm = document.getElementById('pw-watermark');
         const elFrase = document.getElementById('pw-frase-rodape');
         if (layout === 'pokerweb') {
+            // Intensidade do brilho (glow) — destaques e informações controlados separadamente.
+            // Valor 0-1 (0% = sem brilho, 1.0 = brilho máximo). Default 0.25 (discreto).
+            const glowDestaques = (d.proLiveGlowDestaques != null) ? Number(d.proLiveGlowDestaques) : 0.25;
+            const glowInfo = (d.proLiveGlowInfo != null) ? Number(d.proLiveGlowInfo) : 0.25;
+            document.documentElement.style.setProperty('--pw-glow-destaques', String(glowDestaques));
+            document.documentElement.style.setProperty('--pw-glow-info', String(glowInfo));
             // Logo
             if (elLogo) {
                 if (d.proLiveLogoUrl) {
@@ -2718,6 +2725,8 @@ function montarCarouselPremiacao(d) {
       proLiveBgGalleryKey: cust.bg_gallery_key || null,
       proLiveBgCustomOpacity: (cust.bg_custom_opacity != null) ? Number(cust.bg_custom_opacity) : 0.15,
       proLiveFraseRodape: cust.frase_rodape || null,
+      proLiveGlowDestaques: (cust.glow_destaques != null) ? Number(cust.glow_destaques) : 0.25,
+      proLiveGlowInfo: (cust.glow_info != null) ? Number(cust.glow_info) : 0.25,
       showPrize: t.tv_show_prize !== false,
       timer: timer,
       nivel: nivelJogo || 1,
