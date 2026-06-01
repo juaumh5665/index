@@ -2855,6 +2855,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <button class="tab-btn"        id="cfgtab-btn-importar"    onclick="switchConfigTab('cfg-importar', this); resetarImportJogadores();"><i class="fa-solid fa-file-import"></i> Importar Jogadores</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
                     <button class="tab-btn"        id="cfgtab-btn-tv"          onclick="switchConfigTab('cfg-tv', this); renderConfigTV();"><i class="fa-solid fa-tv"></i> TV Pública</button>
+                    <button class="tab-btn"        id="cfgtab-btn-patrocinadores" onclick="switchConfigTab('cfg-patrocinadores', this); renderConfigPatrocinadores();"><i class="fa-solid fa-handshake"></i> Patrocinadores</button>
                 </div>
 
                 <!-- ABA: CLUBE -->
@@ -3388,6 +3389,43 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <strong>Segurança:</strong> Esta URL é privada e contém um token de acesso. Não compartilhe publicamente. Se vazar, click em "Regenerar URL" para criar uma nova.
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- ABA: PATROCINADORES -->
+                <div id="cfg-patrocinadores" class="configtab-content" style="display:none;">
+                    <div style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <h2 style="font-size:1.4rem;font-weight:800;color:#fff;margin-bottom:.3rem;">Patrocinadores do Clube</h2>
+                            <p style="color:#71717a;font-size:.85rem;line-height:1.5;max-width:640px;">
+                                Cadastre os patrocinadores oficiais do clube. As logos aparecem em carrossel na tela de Break (intervalo) da TV pública, gerando exposição para os seus parceiros.
+                            </p>
+                        </div>
+                        <button onclick="abrirModalPatrocinador()" id="btn-novo-patrocinador" class="btn-gold" style="padding:.65rem 1.1rem;font-size:.85rem;border-radius:.5rem;white-space:nowrap;">
+                            <i class="fa-solid fa-plus"></i> Novo Patrocinador
+                        </button>
+                    </div>
+
+                    <!-- Gate premium (mostrado quando feature não está liberada) -->
+                    <div id="patrocinadores-premium-gate" style="display:none;background:linear-gradient(135deg, rgba(167,139,250,.08), rgba(167,139,250,.02));border:1px solid rgba(167,139,250,.25);border-radius:.85rem;padding:1.5rem;margin-bottom:1rem;">
+                        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+                            <i class="fa-solid fa-crown" style="font-size:2rem;color:#a78bfa;"></i>
+                            <div style="flex:1;min-width:240px;">
+                                <div style="font-weight:700;color:#fff;margin-bottom:.25rem;">Feature Premium</div>
+                                <div style="font-size:.8rem;color:#a1a1aa;">Os patrocinadores aparecem na TV apenas para clubes com plano premium ativo. Faça upgrade para liberar.</div>
+                            </div>
+                            <button onclick="mostrarModalUpgrade && mostrarModalUpgrade('Patrocinadores na TV')" class="btn-gold" style="padding:.55rem 1rem;font-size:.8rem;border-radius:.5rem;"><i class="fa-solid fa-arrow-up"></i> Fazer Upgrade</button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de patrocinadores -->
+                    <div id="patrocinadores-lista" style="display:flex;flex-direction:column;gap:.6rem;"></div>
+
+                    <!-- Estado vazio -->
+                    <div id="patrocinadores-vazio" style="display:none;text-align:center;padding:3rem 1rem;color:#52525b;">
+                        <i class="fa-solid fa-handshake" style="font-size:3rem;color:#27272a;margin-bottom:1rem;display:block;"></i>
+                        <div style="font-size:.95rem;color:#71717a;margin-bottom:.4rem;">Nenhum patrocinador cadastrado ainda</div>
+                        <div style="font-size:.8rem;color:#52525b;">Clique em "Novo Patrocinador" pra começar</div>
                     </div>
                 </div>
 
@@ -4826,6 +4864,41 @@ document.addEventListener('DOMContentLoaded', function(){
         <button class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;font-weight:700;" onclick="cpSalvarConta()">
             <i class="fa-solid fa-check"></i> Salvar Conta
         </button>
+    </div>
+</div>
+
+<!-- MODAL: CADASTRO/EDIÇÃO DE PATROCINADOR -->
+<div id="modal-patrocinador" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-handshake" style="color:#a78bfa;"></i> <span id="patrocinador-modal-titulo">Novo Patrocinador</span></h3>
+            <button onclick="fecharModalPatrocinador()" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <input type="hidden" id="patrocinador-id">
+        <div style="display:flex;flex-direction:column;gap:1.1rem;">
+            <div>
+                <label style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem;">Nome do patrocinador *</label>
+                <input id="patrocinador-nome" type="text" maxlength="60" placeholder="Ex: Construtora Aliança" class="inp">
+                <div style="font-size:.65rem;color:#71717a;margin-top:.3rem;">Aparece como tooltip e ajuda na identificação</div>
+            </div>
+
+            <div>
+                <label style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.4rem;">Logo do patrocinador *</label>
+                <div style="display:flex;align-items:center;gap:1rem;">
+                    <div id="patrocinador-logo-thumb" style="width:100px;height:100px;background:#0a0a0b;border:1px dashed #27272a;border-radius:.5rem;display:flex;align-items:center;justify-content:center;color:#52525b;font-size:1.8rem;flex-shrink:0;background-size:contain;background-repeat:no-repeat;background-position:center;"><i class="fa-solid fa-image"></i></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:.4rem;">
+                        <input type="file" id="patrocinador-logo-input" accept="image/png,image/svg+xml,image/jpeg,image/webp" style="display:none;" onchange="_patrocinadorUploadLogo(this)">
+                        <button onclick="document.getElementById('patrocinador-logo-input').click()" class="btn-ghost" style="padding:.5rem .75rem;border-radius:.4rem;font-size:.75rem;"><i class="fa-solid fa-upload"></i> Escolher arquivo</button>
+                        <div style="font-size:.65rem;color:#71717a;line-height:1.4;">PNG, SVG, JPG ou WebP · até 500KB · 400×200px recomendado · fundo transparente fica melhor</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:.6rem;margin-top:.5rem;">
+                <button onclick="fecharModalPatrocinador()" class="btn-ghost" style="flex:1;padding:.75rem;border-radius:.55rem;">Cancelar</button>
+                <button onclick="salvarPatrocinador()" id="btn-salvar-patrocinador" class="btn-gold" style="flex:1;padding:.75rem;border-radius:.55rem;font-weight:700;">Salvar</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -22434,6 +22507,7 @@ function updateTV(idx) {
         tournamentName: t.nome,
         tipo:     t.tipo,
         layout:   t.tvLayout || 'classico',
+        clubeId:  (sbClube && sbClube.id) || null, // pra carregar patrocinadores no break
         proLiveBg: t.tvProLiveBg || 'verde',
         proLiveText: t.tvProLiveText || 'dourado',
         // Personalização avançada (premium) — TV decide se usa (ignora quando ausente)
@@ -24340,6 +24414,268 @@ async function _persRemoverFundoPreto(file, threshold = 30, fadeRange = 30) {
         };
         reader.readAsDataURL(file);
     });
+}
+
+// ============================================================
+// PATROCINADORES DO CLUBE — gerenciamento (CRUD + render)
+// ============================================================
+// Patrocinadores são por CLUBE (não por torneio). Aparecem como
+// carrossel infinito na tela de Break (intervalo) do Pro Live.
+// Feature premium: mesmo gate da personalização TV (hasFeature('personalizacao_tv')).
+// ============================================================
+
+// Cache local — populado quando entra na aba e atualizado por mutations
+window._patrocinadoresCache = window._patrocinadoresCache || [];
+window._patrocinadorEdit = null; // estado do modal: {id, logoUrlPendente}
+
+async function renderConfigPatrocinadores() {
+    const wrap = document.getElementById('patrocinadores-lista');
+    const vazio = document.getElementById('patrocinadores-vazio');
+    const gate = document.getElementById('patrocinadores-premium-gate');
+    const btnNovo = document.getElementById('btn-novo-patrocinador');
+    if (!wrap) return;
+
+    // Gate premium: oculta lista/botão se não tem a feature
+    const temPremium = (typeof window.hasFeature === 'function') ? window.hasFeature('personalizacao_tv') : true;
+    if (gate) gate.style.display = temPremium ? 'none' : '';
+    if (btnNovo) btnNovo.style.display = temPremium ? '' : 'none';
+    if (!temPremium) {
+        wrap.innerHTML = '';
+        if (vazio) vazio.style.display = 'none';
+        return;
+    }
+
+    wrap.innerHTML = '<div style="color:#71717a;font-size:.85rem;text-align:center;padding:1.5rem;">Carregando patrocinadores...</div>';
+    try {
+        const { data, error } = await sb.from('patrocinadores')
+            .select('*')
+            .order('ordem', { ascending: true })
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        window._patrocinadoresCache = data || [];
+    } catch (e) {
+        console.error('[patrocinadores] carga:', e);
+        wrap.innerHTML = `<div style="color:#ef4444;font-size:.8rem;padding:1rem;background:rgba(239,68,68,.08);border-radius:.5rem;">⚠️ Erro ao carregar patrocinadores: ${e.message || e}</div>`;
+        return;
+    }
+
+    const lista = window._patrocinadoresCache;
+    if (!lista.length) {
+        wrap.innerHTML = '';
+        if (vazio) vazio.style.display = '';
+        return;
+    }
+    if (vazio) vazio.style.display = 'none';
+
+    wrap.innerHTML = lista.map(p => `
+        <div class="stat-card" style="display:flex;align-items:center;gap:1rem;padding:.85rem 1rem;flex-wrap:wrap;">
+            <div style="width:64px;height:64px;background:#0a0a0b;border:1px solid #27272a;border-radius:.5rem;flex-shrink:0;background-image:url('${(p.logo_url || '').replace(/'/g,"\\'")}');background-size:contain;background-repeat:no-repeat;background-position:center;"></div>
+            <div style="flex:1;min-width:160px;">
+                <div style="font-weight:700;color:#fff;font-size:.92rem;">${_escapeHtml(p.nome || 'Sem nome')}</div>
+                <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">${p.ativo ? '<span style="color:#22c55e;">● Ativo</span>' : '<span style="color:#71717a;">● Inativo</span>'} · Ordem: ${p.ordem || 0}</div>
+            </div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+                <button onclick="togglePatrocinadorAtivo('${p.id}')" class="btn-ghost" style="padding:.4rem .7rem;font-size:.7rem;border-radius:.4rem;" title="${p.ativo ? 'Desativar' : 'Ativar'}">
+                    <i class="fa-solid fa-${p.ativo ? 'eye-slash' : 'eye'}"></i>
+                </button>
+                <button onclick="abrirModalPatrocinador('${p.id}')" class="btn-ghost" style="padding:.4rem .7rem;font-size:.7rem;border-radius:.4rem;" title="Editar">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button onclick="excluirPatrocinador('${p.id}')" class="btn-ghost" style="padding:.4rem .7rem;font-size:.7rem;border-radius:.4rem;color:#ef4444;border-color:rgba(239,68,68,.3);" title="Excluir">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function _escapeHtml(s) {
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function abrirModalPatrocinador(id) {
+    // Gate premium
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('personalizacao_tv')) {
+        if (typeof window.mostrarModalUpgrade === 'function') return window.mostrarModalUpgrade('Patrocinadores na TV');
+        return showToast('🔒 Recurso premium — faça upgrade');
+    }
+
+    const tituloEl = document.getElementById('patrocinador-modal-titulo');
+    const nomeInp = document.getElementById('patrocinador-nome');
+    const idHidden = document.getElementById('patrocinador-id');
+    const thumb = document.getElementById('patrocinador-logo-thumb');
+
+    if (id) {
+        // Editar existente
+        const p = (window._patrocinadoresCache || []).find(x => x.id === id);
+        if (!p) return showToast('Patrocinador não encontrado');
+        window._patrocinadorEdit = { id: p.id, logoUrlPendente: p.logo_url || null };
+        if (tituloEl) tituloEl.innerText = 'Editar Patrocinador';
+        if (nomeInp) nomeInp.value = p.nome || '';
+        if (idHidden) idHidden.value = p.id;
+        if (thumb) {
+            if (p.logo_url) {
+                thumb.style.backgroundImage = `url('${p.logo_url}')`;
+                thumb.innerHTML = '';
+            } else {
+                thumb.style.backgroundImage = '';
+                thumb.innerHTML = '<i class="fa-solid fa-image"></i>';
+            }
+        }
+    } else {
+        // Novo
+        window._patrocinadorEdit = { id: null, logoUrlPendente: null };
+        if (tituloEl) tituloEl.innerText = 'Novo Patrocinador';
+        if (nomeInp) nomeInp.value = '';
+        if (idHidden) idHidden.value = '';
+        if (thumb) {
+            thumb.style.backgroundImage = '';
+            thumb.innerHTML = '<i class="fa-solid fa-image"></i>';
+        }
+    }
+    openModal('modal-patrocinador');
+    setTimeout(() => { if (nomeInp) nomeInp.focus(); }, 150);
+}
+
+function fecharModalPatrocinador() {
+    window._patrocinadorEdit = null;
+    closeModal('modal-patrocinador');
+}
+
+async function _patrocinadorUploadLogo(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    input.value = '';
+    if (!sbClube || !sbClube.id) return showToast('⚠️ Clube não identificado');
+
+    // Validação
+    const MAX = 500 * 1024;
+    const TIPOS = ['image/png','image/svg+xml','image/jpeg','image/webp'];
+    if (!TIPOS.includes(file.type)) return showToast('⚠️ Formato inválido (PNG, SVG, JPG, WebP)');
+    if (file.size > MAX) return showToast('⚠️ Arquivo muito grande (máx 500KB)');
+
+    // Mesma análise de fundo preto da personalização Pro Live
+    let arquivoFinal = file;
+    try {
+        const analise = await _persAnalisarFundo(file);
+        if (analise.temFundoEscuro) {
+            const aceitar = confirm(
+                '🎨 Detectamos FUNDO PRETO/ESCURO sólido nesta logo.\n\n' +
+                'Posso remover automaticamente pra ficar com transparência real? Recomendado.\n\n' +
+                'OK pra remover, Cancelar pra subir como está.'
+            );
+            if (aceitar) {
+                showToast('⏳ Processando imagem...');
+                arquivoFinal = await _persRemoverFundoPreto(file);
+            }
+        }
+    } catch (e) { console.warn('[patrocinador] análise/processamento:', e); }
+
+    // Upload no bucket tv-customizations, path: {clube_id}/patrocinadores/{timestamp}.{ext}
+    const extMap = { 'image/png':'png','image/svg+xml':'svg','image/jpeg':'jpg','image/webp':'webp' };
+    const ext = extMap[arquivoFinal.type] || 'png';
+    const ts = Date.now();
+    const path = `${sbClube.id}/patrocinadores/${ts}.${ext}`;
+    try {
+        const { error: upErr } = await sb.storage.from('tv-customizations').upload(path, arquivoFinal, {
+            upsert: true, contentType: arquivoFinal.type, cacheControl: '3600',
+        });
+        if (upErr) throw upErr;
+        const { data: pub } = sb.storage.from('tv-customizations').getPublicUrl(path);
+        let url = (pub && pub.publicUrl) || null;
+        if (url) url = url + (url.includes('?') ? '&' : '?') + 'v=' + ts;
+        window._patrocinadorEdit.logoUrlPendente = url;
+
+        const thumb = document.getElementById('patrocinador-logo-thumb');
+        if (thumb && url) {
+            thumb.style.backgroundImage = `url('${url}')`;
+            thumb.innerHTML = '';
+        }
+        showToast('✓ Logo carregada');
+    } catch (e) {
+        console.error('[patrocinador] upload:', e);
+        showToast('⚠️ ' + (e.message || 'Erro ao subir arquivo'));
+    }
+}
+
+async function salvarPatrocinador() {
+    const nome = (document.getElementById('patrocinador-nome')?.value || '').trim();
+    const id = document.getElementById('patrocinador-id')?.value || '';
+    const logoUrl = window._patrocinadorEdit && window._patrocinadorEdit.logoUrlPendente;
+
+    if (!nome) return showToast('⚠️ Informe o nome do patrocinador');
+    if (!logoUrl) return showToast('⚠️ Faça upload da logo');
+
+    const btn = document.getElementById('btn-salvar-patrocinador');
+    if (btn) { btn.disabled = true; btn.innerText = 'Salvando...'; }
+    try {
+        if (id) {
+            // Update
+            const { error } = await sb.from('patrocinadores').update({
+                nome, logo_url: logoUrl, updated_at: new Date().toISOString(),
+            }).eq('id', id);
+            if (error) throw error;
+            showToast('✓ Patrocinador atualizado');
+        } else {
+            // Insert — calcula próxima ordem
+            const lista = window._patrocinadoresCache || [];
+            const proxOrdem = lista.length ? Math.max(...lista.map(x => x.ordem || 0)) + 1 : 1;
+            const { error } = await sb.from('patrocinadores').insert({
+                clube_id: sbClube.id, nome, logo_url: logoUrl, ordem: proxOrdem, ativo: true,
+            });
+            if (error) throw error;
+            showToast('✓ Patrocinador cadastrado');
+        }
+        fecharModalPatrocinador();
+        renderConfigPatrocinadores();
+    } catch (e) {
+        console.error('[patrocinador] save:', e);
+        showToast('⚠️ ' + (e.message || 'Erro ao salvar'));
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = 'Salvar'; }
+    }
+}
+
+async function togglePatrocinadorAtivo(id) {
+    const p = (window._patrocinadoresCache || []).find(x => x.id === id);
+    if (!p) return;
+    try {
+        const { error } = await sb.from('patrocinadores').update({
+            ativo: !p.ativo, updated_at: new Date().toISOString(),
+        }).eq('id', id);
+        if (error) throw error;
+        showToast(p.ativo ? 'Patrocinador desativado' : 'Patrocinador ativado');
+        renderConfigPatrocinadores();
+    } catch (e) {
+        console.error('[patrocinador] toggle:', e);
+        showToast('⚠️ ' + (e.message || 'Erro'));
+    }
+}
+
+async function excluirPatrocinador(id) {
+    const p = (window._patrocinadoresCache || []).find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`Excluir o patrocinador "${p.nome}"?\n\nA logo também será removida.`)) return;
+
+    try {
+        // Remove a logo do Storage (silencioso se falhar)
+        if (p.logo_url && sbClube && sbClube.id) {
+            try {
+                // Extrai o path do bucket a partir da URL pública
+                const m = p.logo_url.match(/tv-customizations\/(.+?)(\?|$)/);
+                if (m && m[1]) {
+                    await sb.storage.from('tv-customizations').remove([m[1]]);
+                }
+            } catch (e) { console.warn('[patrocinador] remover do storage:', e.message); }
+        }
+        const { error } = await sb.from('patrocinadores').delete().eq('id', id);
+        if (error) throw error;
+        showToast('✓ Patrocinador excluído');
+        renderConfigPatrocinadores();
+    } catch (e) {
+        console.error('[patrocinador] delete:', e);
+        showToast('⚠️ ' + (e.message || 'Erro ao excluir'));
+    }
 }
 
 async function _persUploadLogo(input) {

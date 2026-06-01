@@ -848,6 +848,107 @@
         .bs-proxnivel-label{font-size:.75rem;color:#f59e0b;text-transform:uppercase;letter-spacing:.2em;font-weight:700;margin-bottom:.4rem;text-align:center;}
         .bs-proxnivel-blinds{font-family:var(--font-mono);font-size:clamp(1.5rem, 2.5vw, 2.2rem);color:#fff;font-weight:700;text-align:center;}
 
+        /* === PATROCINADORES — Carrossel infinito horizontal === */
+        /* Wrapper: faixa inferior fixa, ocupa largura da tela */
+        #bs-patrocinadores-wrap {
+            position:absolute;
+            bottom:5vh;
+            left:0; right:0;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:.75rem;
+            z-index:2;
+        }
+        .bs-patrocinadores-label {
+            font-size: clamp(.65rem, .85vw, .9rem);
+            color: rgba(245,213,114,.7);
+            text-transform: uppercase;
+            letter-spacing: .25em;
+            font-weight: 700;
+            text-align: center;
+        }
+        .bs-patrocinadores-carousel {
+            width: 96vw;
+            max-width: 100%;
+            overflow: hidden;
+            position: relative;
+            /* Fade nas bordas pra dar efeito de aparecimento/sumiço suave */
+            mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+        }
+        .bs-patrocinadores-track {
+            display: flex;
+            gap: 2vw;
+            width: max-content;
+            animation: bs-scroll var(--bs-scroll-duration, 30s) linear infinite;
+            will-change: transform;
+        }
+        @keyframes bs-scroll {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-50%); } /* duplicamos itens; -50% = um ciclo completo */
+        }
+        .bs-patrocinador-item {
+            flex-shrink: 0;
+            width: clamp(110px, 13vw, 180px);
+            height: clamp(70px, 8vw, 110px);
+            background: rgba(0,0,0,.4);
+            border: 1px solid rgba(245,213,114,.18);
+            border-radius: .65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: .8rem 1rem;
+            backdrop-filter: blur(4px);
+        }
+        .bs-patrocinador-item img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* Frase do rodapé na tela de break (reutiliza a do Pro Live) */
+        .bs-frase-rodape {
+            position: absolute;
+            bottom: 1.5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Manrope', 'Inter', sans-serif;
+            font-size: 1.5vh;
+            font-weight: 700;
+            letter-spacing: .3em;
+            color: rgba(245,213,114,.5);
+            text-transform: uppercase;
+            text-align: center;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        /* Marca d'água do break — reusa a mesma do Pro Live mas com escala/posição própria.
+           Se o clube configurou personalização no torneio, aparece também na tela de break. */
+        #break-screen #bs-watermark {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background-position: center center;
+            background-size: 75% auto;
+            background-repeat: no-repeat;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .3s ease;
+            filter: blur(0.5px);
+        }
+        #break-screen.has-watermark #bs-watermark { opacity: var(--bs-wm-opacity, 0.15); }
+        /* Vinheta escura sobre a marca d'água do break */
+        #break-screen.has-watermark::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,.45) 0%, rgba(0,0,0,.2) 60%, rgba(0,0,0,0) 100%);
+            pointer-events: none;
+        }
+
         .bar-bg{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
         .bar-fill{height:6px;background:currentColor;border-radius:3px;transition:width .5s linear;}
 
@@ -997,6 +1098,8 @@
 
         <!-- BREAK OVERLAY - com logo do clube + contagem regressiva -->
         <div id="break-screen">
+            <!-- Marca d'água custom/galeria (reutiliza configuração do Pro Live do torneio) -->
+            <div id="bs-watermark"></div>
             <img id="bs-logo" class="bs-logo" style="display:none;" alt="">
             <div id="bs-clube-nome" class="bs-clube-nome"></div>
             <div class="bs-label-cima">Intervalo</div>
@@ -1007,6 +1110,17 @@
                 <div class="bs-proxnivel-label">Próximo nível</div>
                 <div id="bs-proxnivel-blinds" class="bs-proxnivel-blinds">—</div>
             </div>
+
+            <!-- Patrocinadores: faixa inferior com carrossel infinito horizontal -->
+            <div id="bs-patrocinadores-wrap" style="display:none;">
+                <div class="bs-patrocinadores-label">Patrocinadores Oficiais</div>
+                <div class="bs-patrocinadores-carousel">
+                    <div id="bs-patrocinadores-track" class="bs-patrocinadores-track"></div>
+                </div>
+            </div>
+
+            <!-- Frase do rodapé personalizada (reutiliza a do Pro Live) -->
+            <div id="bs-frase-rodape" class="bs-frase-rodape" style="display:none;"></div>
         </div>
 
         <!-- PRO LIVE LAYOUT (só visível com body.layout-pokerweb) -->
@@ -1533,7 +1647,96 @@ function montarCarouselPremiacao(d) {
                 document.getElementById('bs-proxnivel-blinds').innerText = d.nextBlinds;
             } else wrap.style.display = 'none';
         }
+
+        // === Marca d'água + frase rodapé: reusa as configs do Pro Live do torneio ===
+        const wm = document.getElementById('bs-watermark');
+        if (wm) {
+            let wmUrl = null;
+            if (d.proLiveBgCustomUrl) wmUrl = d.proLiveBgCustomUrl;
+            else if (d.proLiveBgGalleryKey && typeof _tvGetGaleriaUrl === 'function') wmUrl = _tvGetGaleriaUrl(d.proLiveBgGalleryKey);
+            if (wmUrl) {
+                wm.style.backgroundImage = `url('${wmUrl}')`;
+                const op = (d.proLiveBgCustomOpacity != null) ? Number(d.proLiveBgCustomOpacity) : 0.15;
+                document.documentElement.style.setProperty('--bs-wm-opacity', String(op));
+                bs.classList.add('has-watermark');
+            } else {
+                wm.style.backgroundImage = '';
+                bs.classList.remove('has-watermark');
+            }
+        }
+        // Frase do rodapé (reusa do Pro Live)
+        const elFrase = document.getElementById('bs-frase-rodape');
+        if (elFrase) {
+            const f = (d.proLiveFraseRodape || '').trim();
+            if (f) { elFrase.textContent = f; elFrase.style.display = 'block'; }
+            else { elFrase.textContent = ''; elFrase.style.display = 'none'; }
+        }
+
+        // === Patrocinadores: carrega + renderiza carrossel ===
+        _bsAtualizarPatrocinadores(d.clubeId);
         } catch (e) { console.error('atualizarBreakScreen erro:', e); }
+    }
+
+    // === Patrocinadores na tela de Break ===
+    // Cache na sessão da TV pra não bater no banco a cada break.
+    // Realtime invalida o cache quando há mudança.
+    window._bsPatrocinadoresCache = window._bsPatrocinadoresCache || { clubeId: null, lista: null };
+
+    async function _bsAtualizarPatrocinadores(clubeId) {
+        const wrap = document.getElementById('bs-patrocinadores-wrap');
+        const track = document.getElementById('bs-patrocinadores-track');
+        if (!wrap || !track) return;
+        if (!clubeId) { wrap.style.display = 'none'; return; }
+
+        // Se cache válido pra este clube, só renderiza
+        const cache = window._bsPatrocinadoresCache;
+        if (cache.clubeId === clubeId && Array.isArray(cache.lista)) {
+            return _bsRenderCarrossel(cache.lista);
+        }
+
+        // Busca do Supabase
+        try {
+            if (typeof sb === 'undefined' || !sb || !sb.from) { wrap.style.display = 'none'; return; }
+            const { data, error } = await sb.from('patrocinadores')
+                .select('id, nome, logo_url, ordem, ativo')
+                .eq('clube_id', clubeId)
+                .eq('ativo', true)
+                .order('ordem', { ascending: true });
+            if (error) throw error;
+            window._bsPatrocinadoresCache = { clubeId, lista: data || [] };
+            _bsRenderCarrossel(data || []);
+        } catch (e) {
+            console.warn('[bs-patrocinadores]', e.message || e);
+            wrap.style.display = 'none';
+        }
+    }
+
+    function _bsRenderCarrossel(lista) {
+        const wrap = document.getElementById('bs-patrocinadores-wrap');
+        const track = document.getElementById('bs-patrocinadores-track');
+        if (!wrap || !track) return;
+        if (!lista || !lista.length) { wrap.style.display = 'none'; return; }
+
+        // Duplica a lista pra criar loop infinito (anima -50%, que é exatamente 1 ciclo).
+        // A velocidade depende da QTDE de patrocinadores (mais logos = mais lento, pra ler tudo).
+        const itensHTML = lista.map(p => `
+            <div class="bs-patrocinador-item" title="${(p.nome || '').replace(/"/g,'&quot;')}">
+                <img src="${p.logo_url || ''}" alt="${(p.nome || '').replace(/"/g,'&quot;')}" loading="lazy">
+            </div>
+        `).join('');
+        track.innerHTML = itensHTML + itensHTML; // duplicado pro loop
+
+        // Velocidade: 5s por logo (mínimo 20s pra ficar suave mesmo com 1-2 logos)
+        const dur = Math.max(20, lista.length * 5);
+        track.style.setProperty('--bs-scroll-duration', dur + 's');
+        track.style.animationDuration = dur + 's';
+
+        wrap.style.display = 'flex';
+    }
+
+    // Invalida cache quando algo muda (chamado pelo Realtime)
+    function _bsInvalidarCachePatrocinadores() {
+        window._bsPatrocinadoresCache = { clubeId: null, lista: null };
     }
 
     // Modo kiosk helpers
@@ -2395,6 +2598,15 @@ function montarCarouselPremiacao(d) {
       .on('postgres_changes', { 
         event: '*', schema: 'public', table: 'torneio_eliminados' 
       }, () => agendarReload())
+      .on('postgres_changes', {
+        // Patrocinadores: invalida cache e re-renderiza carrossel se o break estiver visível.
+        // Não precisa de reload completo da TV (não muda dados do torneio).
+        event: '*', schema: 'public', table: 'patrocinadores',
+        filter: `clube_id=eq.${pubState.clubeId}`
+      }, () => {
+        if (typeof _bsInvalidarCachePatrocinadores === 'function') _bsInvalidarCachePatrocinadores();
+        if (typeof _bsAtualizarPatrocinadores === 'function') _bsAtualizarPatrocinadores(pubState.clubeId);
+      })
       .subscribe((status) => {
         console.log('[TV PUBLIC] realtime:', status);
       });
@@ -2754,6 +2966,7 @@ function montarCarouselPremiacao(d) {
       tournamentName: t.nome,
       tipo: t.tipo,
       layout: t.tv_layout || 'classico',
+      clubeId: pubState.clubeId, // necessário pra carregar patrocinadores do clube no break
       proLiveBg: t.tv_prolive_bg || 'verde',
       proLiveText: t.tv_prolive_text || 'dourado',
       // Personalização premium (TV pública lê do Supabase via select periódico/realtime)
