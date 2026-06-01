@@ -1686,6 +1686,12 @@ function montarCarouselPremiacao(d) {
         const wrap = document.getElementById('bs-patrocinadores-wrap');
         const track = document.getElementById('bs-patrocinadores-track');
         if (!wrap || !track) return;
+
+        // Fallback robusto: se não recebeu clubeId no payload, tenta pegar do pubState
+        // (caso da TV pública, onde o break é montado localmente sem reler o app)
+        if (!clubeId && typeof pubState !== 'undefined' && pubState && pubState.clubeId) {
+            clubeId = pubState.clubeId;
+        }
         if (!clubeId) { wrap.style.display = 'none'; return; }
 
         // Se cache válido pra este clube, só renderiza
