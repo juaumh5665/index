@@ -1724,18 +1724,23 @@ function montarCarouselPremiacao(d) {
                 return;
             }
             console.log('[BS-PATR] Buscando patrocinadores do clube:', clubeId);
+            // OBS: o wrapper customizado de Supabase na TV pública (window.supabase) suporta
+            // apenas .select().eq()/.in()/.limit(). Não tem .order(), então ordenamos no client.
             const { data, error } = await sbClient.from('patrocinadores')
                 .select('id, nome, logo_url, ordem, ativo')
                 .eq('clube_id', clubeId)
-                .eq('ativo', true)
-                .order('ordem', { ascending: true });
+                .eq('ativo', true);
             if (error) {
                 console.error('[BS-PATR] ❌ Erro Supabase:', error);
                 throw error;
             }
-            console.log('[BS-PATR] ✅ Resposta:', data?.length, 'patrocinadores ativos:', data);
-            window._bsPatrocinadoresCache = { clubeId, lista: data || [] };
-            _bsRenderCarrossel(data || []);
+            // Ordena no client por ordem ASC (wrapper não tem .order())
+            const lista = Array.isArray(data) ? data.slice().sort(function(a, b) {
+                return (a.ordem || 0) - (b.ordem || 0);
+            }) : [];
+            console.log('[BS-PATR] ✅ Resposta:', lista.length, 'patrocinadores ativos:', lista);
+            window._bsPatrocinadoresCache = { clubeId, lista: lista };
+            _bsRenderCarrossel(lista);
         } catch (e) {
             console.warn('[bs-patrocinadores]', e.message || e);
             wrap.style.display = 'none';
