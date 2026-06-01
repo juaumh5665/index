@@ -25584,7 +25584,12 @@ function getStaff(t) {
 function getStaffCascata(t) {
     if (!_staffCascataAtivo(t)) return 0;
     const brutoComRake = _getBrutoParaRake(t);
-    const sobra = brutoComRake - getRake(t);
+    // Base da cascata = bruto - rake - staff fixo
+    // Quando ambos staffs estão ativos, a cascata respeita o fixo: pega 3% do que
+    // sobrou após rake E fixo, e não só após rake. (Decisão de regra do clube.)
+    // Se só cascata está ativa (sem fixo), getStaffFixo retorna 0 e o comportamento
+    // é idêntico ao legado.
+    const sobra = brutoComRake - getRake(t) - getStaffFixo(t);
     return sobra * ((Number(t.staffPct) || 0) / 100);
 }
 
