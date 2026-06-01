@@ -1834,22 +1834,36 @@ function montarCarouselPremiacao(d) {
             return;
         }
 
-        // Duplica a lista pra criar loop infinito (anima -50%, que é exatamente 1 ciclo).
-        // A velocidade depende da QTDE de patrocinadores (mais logos = mais lento, pra ler tudo).
-        const itensHTML = lista.map(p => `
+        // === Loop infinito sem buracos ===
+        // O CSS anima translateX de 0 → -50% (anda exatamente metade do track).
+        // Pra parecer contínuo, o track DUPLICADO precisa ter largura >= 2x a viewport.
+        // Com poucos patrocinadores (ex: 3), duplicar dá ~6 itens — pode sobrar tela
+        // se cada item é pequeno. Solução: repetir a lista quantas vezes for necessário
+        // ANTES de duplicar, garantindo que cada metade já enche a tela toda.
+        const larguraItemEstimada = 200; // largura aprox por card+gap (px)
+        const viewport = window.innerWidth || 1920;
+        // Quantas vezes a lista cabe na viewport (com folga de 20%)
+        const minRepeticoes = Math.max(1, Math.ceil((viewport * 1.2) / (lista.length * larguraItemEstimada)));
+        // Lista repetida o suficiente pra encher uma metade do track
+        const listaExpandida = [];
+        for (let i = 0; i < minRepeticoes; i++) listaExpandida.push(...lista);
+
+        const itensHTML = listaExpandida.map(p => `
             <div class="bs-patrocinador-item" title="${(p.nome || '').replace(/"/g,'&quot;')}">
                 <img src="${p.logo_url || ''}" alt="${(p.nome || '').replace(/"/g,'&quot;')}" loading="lazy">
             </div>
         `).join('');
-        track.innerHTML = itensHTML + itensHTML; // duplicado pro loop
+        // Duplica o conjunto expandido pra animar translateX(-50%) sem buraco
+        track.innerHTML = itensHTML + itensHTML;
 
-        // Velocidade: 5s por logo (mínimo 20s pra ficar suave mesmo com 1-2 logos)
-        const dur = Math.max(20, lista.length * 5);
+        // Velocidade proporcional ao tamanho do track expandido (mais conteúdo = mais devagar
+        // pra a velocidade VISUAL ficar constante independente da qtde de patrocinadores)
+        const dur = Math.max(20, listaExpandida.length * 4);
         track.style.setProperty('--bs-scroll-duration', dur + 's');
         track.style.animationDuration = dur + 's';
 
         wrap.style.display = 'flex';
-        console.log('[BS-PATR] ✅ Carrossel renderizado com', lista.length, 'itens. Wrap visível.');
+        console.log('[BS-PATR] ✅ Carrossel renderizado:', lista.length, 'itens × ' + minRepeticoes + ' repetições × 2 (loop) = ' + (listaExpandida.length * 2) + ' DOMs. Dur:', dur + 's');
     }
 
     // Invalida cache quando algo muda (chamado pelo Realtime)
