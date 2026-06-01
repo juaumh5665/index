@@ -22403,6 +22403,14 @@ function updateTV(idx) {
             idx = idxReal;
         }
     }
+
+    // Se cache de patrocinadores está vazio e ainda não tentou carregar, dispara carga
+    // assíncrona. Não bloqueia o updateTV — a próxima chamada (em 1s) já terá os dados.
+    if ((!window._tvPatrocinadoresAtivos || window._tvPatrocinadoresAtivos.length === 0)
+        && !window._tvPatrocinadoresAtivosCarregadoEm
+        && typeof _carregarPatrocinadoresAtivosParaTv === 'function') {
+        _carregarPatrocinadoresAtivosParaTv();
+    }
     
     const t     = torneios[idx];
     if (!t) return;
