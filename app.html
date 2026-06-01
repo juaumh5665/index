@@ -6014,8 +6014,8 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que buy-in, re-entry e rebuy podem ser registrados" onchange="t2AtualizarStatusTravas()">
                             </div>
                             <div>
-                                <label class="inp-label">Add-on até nível</label>
-                                <input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que add-on pode ser registrado" onchange="t2AtualizarStatusTravas()">
+                                <label class="inp-label">Add-on disponível no intervalo (até nível)</label>
+                                <input id="t-addon-nivel" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que add-on pode ser registrado (a abertura é no break marcado como Intervalo de Compras)" onchange="t2AtualizarStatusTravas()">
                             </div>
                         </div>
                     </div>
@@ -20192,8 +20192,10 @@ function renderTabFinanceiro() {
     linhas.push({ label: 'Total Bruto', sub: '<span style="color:#52525b;">(entra no rake)</span>', val: formatMoney(bruto), tipo: 'total-bruto' });
     linhas.push({ label: `Rake (${t.rake || 0}%)`, sub: '', val: formatMoney(rakeVal), tipo: 'rake' });
     
-    if (staffPct > 0) {
-        linhas.push({ label: `Staff (${staffPct}% em cascata)`, sub: 'Dealers + Floor', val: formatMoney(staffVal), tipo: 'staff' });
+    if (staffPct > 0 && _staffCascataAtivo(t)) {
+        // Mostra apenas o valor da CASCATA (não soma o fixo, que vai na linha de baixo)
+        const cascataVal = (typeof getStaffCascata === 'function') ? getStaffCascata(t) : staffVal;
+        linhas.push({ label: `Staff (${staffPct}% em cascata)`, sub: 'Dealers + Floor', val: formatMoney(cascataVal), tipo: 'staff' });
     }
 
     // Staff FIXO (modo fixo): também mostra no resumo financeiro pra não sumir a informação.
@@ -20723,6 +20725,55 @@ function _torneioTemBreakDeCompras(t) {
 
 function _tipoBloqueadoPorTrava(t, tipo) {
     if (!t) return { bloqueado: false, motivo: '' };
+    
+    // CORREÇÃO: Add-on tem regra especial — só liberado DURANTE o intervalo de compras.
+    // Antes do torneio iniciar, ou no início do torneio (antes de chegar no break), bloqueia.
+    // Isso vale ANTES do early-return de "torneio não iniciado" abaixo, porque add-on
+    // não deve aparecer livremente em status=aguardando.
+    if (tipo === 'addon') {
+        // Torneio com break marcado como "intervalo de compras" → add-on só no break
+        if (_torneioTemBreakDeCompras(t)) {
+            // Não iniciou? Bloqueia (mensagem amigável)
+            if (!t.iniciadoEm) {
+                return {
+                    bloqueado: true,
+                    motivo: 'Add-on só estará disponível no intervalo de compras (após o torneio iniciar)'
+                };
+            }
+            // Iniciado mas NÃO está na janela de break especial → bloqueia
+            if (!_emJanelaBreakEspecial(t)) {
+                // Mensagem amigável: descobre o nível em que abre
+                const blinds = t.blinds || [];
+                let nivelAntesDoBreak = null;
+                let jogadosAteAqui = 0;
+                for (let i = 0; i < blinds.length; i++) {
+                    const b = blinds[i];
+                    if (!b) continue;
+                    if (b.isBreak && (b.breakDeCompras || b.break_de_compras)) {
+                        nivelAntesDoBreak = jogadosAteAqui;
+                        break;
+                    }
+                    if (!b.isBreak) jogadosAteAqui++;
+                }
+                return {
+                    bloqueado: true,
+                    motivo: nivelAntesDoBreak != null
+                        ? `Add-on disponível no intervalo (após o nível ${nivelAntesDoBreak})`
+                        : 'Add-on disponível apenas no intervalo de compras configurado'
+                };
+            }
+            // Está na janela do break → libera, segue o fluxo normal
+        }
+        // Fallback (torneios sem intervalo marcado): se não iniciou, bloqueia também
+        // (regra: add-on é fenômeno de meio de torneio, não de pré-jogo)
+        if (!t.iniciadoEm) {
+            return {
+                bloqueado: true,
+                motivo: 'Add-on só estará disponível após o torneio iniciar'
+            };
+        }
+        // Iniciado, sem break marcado → cai no fallback antigo (max nível) lá em baixo
+    }
     
     // BUG FIX: trava deve valer SEMPRE que o torneio já começou (rodando OU pausado).
     // Só não vale antes de iniciar (iniciadoEm null = nem começou ainda)
@@ -21923,6 +21974,13 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     });
     showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}`);
 
+    // Lembrete de Jackpot pendente: combo tem buy-in? Se sim, dispara
+    // (mesma regra do single — só pra primeira entrada do jogador)
+    try {
+        const temBuyin = (entriesCriadas || []).some(e => e && e.tipo === 'buyin');
+        if (temBuyin) _lembreteJackpotPosCompra(t, jid, 'buyin');
+    } catch(e) { console.warn('[combo] lembrete jackpot:', e); }
+
     // Comprovante consolidado (uma única impressão pro combo)
     if (t.imprimirComprovanteCompra) {
         setTimeout(() => {
@@ -22175,6 +22233,9 @@ function _registrarEntradaImpl() {
 
     const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
     showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}`);
+
+    // Lembrete de Jackpot pendente (só dispara em buy-in, e se jogador ainda não tem jackpot)
+    _lembreteJackpotPosCompra(t, jid, tipo);
 
     // FASE E: oferecer impressão de comprovante (se torneio configurado pra isso)
     if (t.imprimirComprovanteCompra) {
@@ -25887,6 +25948,66 @@ function showToast(msg) {
     t.innerText = msg;
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Toast com botão de ação clicável.
+// msg: texto principal · labelBtn: texto do botão · onClick: callback · durMs: duração (default 8s).
+// Cria um toast dinâmico embaixo do toast padrão pra não conflitar.
+function showToastAction(msg, labelBtn, onClick, durMs) {
+    durMs = durMs || 8000;
+    const ID = '_toast_action_dyn';
+    // Remove anterior se existir (evita empilhamento)
+    const old = document.getElementById(ID);
+    if (old) old.remove();
+    const t = document.createElement('div');
+    t.id = ID;
+    t.style.cssText = `
+        position:fixed;bottom:5.2rem;right:2rem;
+        background:#18181b;color:#fff;padding:.9rem 1.1rem;border-radius:.75rem;
+        border:1px solid #a78bfa;font-size:.85rem;z-index:9999;
+        box-shadow:0 8px 30px rgba(0,0,0,.5);
+        display:flex;align-items:center;gap:.85rem;max-width:420px;
+        opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;
+    `;
+    const span = document.createElement('span');
+    span.style.cssText = 'flex:1;line-height:1.35;';
+    span.innerText = msg;
+    const btn = document.createElement('button');
+    btn.innerText = labelBtn || 'OK';
+    btn.style.cssText = `
+        background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;
+        border:none;padding:.5rem .85rem;border-radius:.5rem;
+        font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;
+        font-family:'Manrope',sans-serif;
+    `;
+    const close = document.createElement('button');
+    close.innerHTML = '&times;';
+    close.title = 'Fechar';
+    close.style.cssText = `
+        background:none;border:none;color:#71717a;font-size:1.2rem;
+        cursor:pointer;line-height:1;padding:0 .3rem;
+    `;
+    close.onclick = () => { t.remove(); };
+    btn.onclick = () => {
+        try { if (typeof onClick === 'function') onClick(); }
+        catch(e) { console.warn('[toastAction] onClick:', e); }
+        t.remove();
+    };
+    t.appendChild(span); t.appendChild(btn); t.appendChild(close);
+    document.body.appendChild(t);
+    // Anima entrada
+    requestAnimationFrame(() => {
+        t.style.opacity = '1';
+        t.style.transform = 'translateY(0)';
+    });
+    // Auto-remove após timeout
+    setTimeout(() => {
+        if (document.body.contains(t)) {
+            t.style.opacity = '0';
+            t.style.transform = 'translateY(8px)';
+            setTimeout(() => t.remove(), 250);
+        }
+    }, durMs);
 }
 
 // ============================================================
@@ -31980,6 +32101,52 @@ function abrirRankingCompleto(rankId) {
 // ============================================================
 // JACKPOT
 // ============================================================
+
+// Lembrete pós buy-in: se torneio tem jackpot ativo e o jogador ainda
+// não comprou jackpot neste torneio, mostra um toast com botão pra
+// registrar o jackpot rapidamente. Reusa abrirJackpot() — não duplica lógica.
+// Não dispara em rebuy/addon (só no primeiro buy-in do jogador).
+function _lembreteJackpotPosCompra(t, jid, tipoAcao) {
+    try {
+        if (!t || !jid) return;
+        // Só dispara em buy-in (primeira entrada do jogador no torneio)
+        if (tipoAcao !== 'buyin') return;
+        // Torneio precisa ter jackpot configurado
+        if (!t.jackpotValor || !t.jackpotFichas) return;
+        if (Number(t.jackpotValor) <= 0 || Number(t.jackpotFichas) <= 0) return;
+        // Jogador já comprou? Não relembra
+        const jaComprou = (t.jackpotCompras || []).some(j => j.jogadorId === jid);
+        if (jaComprou) return;
+        // Compras encerradas? Não relembra (não faz sentido oferecer algo bloqueado)
+        if (t.compras_encerradas === true || t.comprasEncerradas === true) return;
+
+        const nome = (typeof getJogadorNome === 'function') ? getJogadorNome(jid) : 'Jogador';
+        const valor = formatMoney(Number(t.jackpotValor));
+        const fichas = Number(t.jackpotFichas).toLocaleString('pt-BR');
+        const idx = torneios.indexOf(t);
+
+        // Toast clicável: tenta usar showToastAction se disponível, senão usa showToast
+        // com timeout maior e fallback de window.confirm.
+        const msg = `🎰 Jackpot ativo — registrar pra ${nome}? (${valor} → ${fichas} fichas)`;
+        if (typeof showToastAction === 'function') {
+            showToastAction(msg, 'Registrar →', () => abrirJackpot(idx), 10000);
+        } else {
+            // Fallback robusto: usa setTimeout pra não conflitar com o toast do buy-in,
+            // e mostra um confirm() — operador pode aceitar ou descartar.
+            setTimeout(() => {
+                if (typeof showToast === 'function') showToast(msg);
+                setTimeout(() => {
+                    if (confirm(`Registrar Jackpot pra ${nome} agora?\n\nValor: ${valor}\nFichas extras: ${fichas}`)) {
+                        abrirJackpot(idx);
+                    }
+                }, 400);
+            }, 600);
+        }
+    } catch (e) {
+        console.warn('[jackpot-lembrete] falha não-crítica:', e.message || e);
+    }
+}
+
 function abrirJackpot(idx) {
     const t = torneios[idx];
     if (!t || !t.jackpotValor || !t.jackpotFichas) return showToast('⚠️ Torneio sem jackpot configurado');
