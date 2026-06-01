@@ -823,12 +823,22 @@
             color: var(--gold);
         }
 
-        /* BREAK SCREEN - beautiful with logo */
-        #break-screen{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;flex-direction:column;
+        /* BREAK SCREEN - layout vertical organizado (não usa absolute pra elementos do fluxo) */
+        #break-screen{
+            display:none;
+            position:fixed; inset:0; z-index:100;
+            flex-direction:column;
+            align-items:center;
+            justify-content:flex-start;     /* alinha do topo pra baixo */
+            padding: 3vh 2vw 8vh;            /* espaço pra logo no topo + frase no rodapé */
+            gap: 1.2vh;                       /* espaçamento natural entre elementos */
+            overflow: hidden;
             background: radial-gradient(ellipse at center, #2a0505 0%, #0a0000 70%);
             color: #fff;
         }
-        #break-screen::before{content:'';position:absolute;inset:0;
+        #break-screen::before{
+            content:'';
+            position:absolute; inset:0;
             background:
                 repeating-linear-gradient(45deg, rgba(239,68,68,.02) 0 2px, transparent 2px 20px),
                 radial-gradient(circle at 20% 30%, rgba(239,68,68,.15), transparent 60%),
@@ -836,35 +846,95 @@
             pointer-events:none;
         }
         #break-screen.show{display:flex;}
-        #break-screen > * { position: relative; z-index: 1; }
+        #break-screen > * { position: relative; z-index: 2; }
 
-        .bs-logo{max-height:140px;max-width:280px;margin-bottom:1.5rem;filter:drop-shadow(0 4px 20px rgba(245,158,11,.4));}
-        .bs-clube-nome{font-size:clamp(1.2rem, 2.5vw, 2rem);font-weight:800;color:#f59e0b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2rem;text-shadow:0 0 30px rgba(245,158,11,.4);}
-        .bs-label-cima{font-size:clamp(.9rem, 1.4vw, 1.3rem);color:#f59e0b;letter-spacing:.4em;text-transform:uppercase;margin-bottom:.5rem;font-weight:700;opacity:.8;}
-        .bs-break-text{font-size:clamp(5rem, 11vw, 11rem);font-weight:800;color:#ef4444;line-height:1;letter-spacing:-.05em;text-shadow: 0 0 60px rgba(239,68,68,.5), 0 4px 10px rgba(0,0,0,.4);}
-        .bs-timer{font-family:var(--font-mono);font-size:clamp(3.5rem, 7vw, 7rem);color:#fff;margin-top:1rem;font-weight:700;text-shadow:0 0 40px rgba(255,255,255,.3);}
-        .bs-label-baixo{font-size:clamp(1rem, 1.5vw, 1.4rem);color:#a1a1aa;margin-top:1rem;text-transform:uppercase;letter-spacing:.35em;font-weight:600;}
-        .bs-proxnivel{margin-top:2.5rem;padding:1rem 2rem;background:rgba(255,255,255,.05);border:1px solid rgba(245,158,11,.25);border-radius:1rem;backdrop-filter:blur(10px);}
-        .bs-proxnivel-label{font-size:.75rem;color:#f59e0b;text-transform:uppercase;letter-spacing:.2em;font-weight:700;margin-bottom:.4rem;text-align:center;}
-        .bs-proxnivel-blinds{font-family:var(--font-mono);font-size:clamp(1.5rem, 2.5vw, 2.2rem);color:#fff;font-weight:700;text-align:center;}
+        /* Logo: maior, no topo */
+        .bs-logo{
+            max-height: 16vh;
+            max-width: 30vw;
+            margin-bottom: .5rem;
+            filter: drop-shadow(0 4px 20px rgba(245,158,11,.4));
+        }
+        .bs-clube-nome{
+            font-size:clamp(1rem, 2vw, 1.8rem);
+            font-weight:800;
+            color:#f59e0b;
+            letter-spacing:.1em;
+            text-transform:uppercase;
+            text-shadow:0 0 30px rgba(245,158,11,.4);
+        }
+        .bs-label-cima{
+            font-size:clamp(.8rem, 1.2vw, 1.1rem);
+            color:#f59e0b;
+            letter-spacing:.4em;
+            text-transform:uppercase;
+            font-weight:700;
+            opacity:.85;
+        }
+        .bs-break-text{
+            font-size:clamp(4rem, 10vw, 9rem);
+            font-weight:800;
+            color:#ef4444;
+            line-height:1;
+            letter-spacing:-.05em;
+            text-shadow: 0 0 60px rgba(239,68,68,.5), 0 4px 10px rgba(0,0,0,.4);
+        }
+        .bs-timer{
+            font-family:var(--font-mono);
+            font-size:clamp(3rem, 6.5vw, 6.5rem);
+            color:#fff;
+            font-weight:700;
+            text-shadow:0 0 40px rgba(255,255,255,.3);
+            line-height:1;
+        }
+        .bs-label-baixo{
+            font-size:clamp(.85rem, 1.3vw, 1.2rem);
+            color:#a1a1aa;
+            text-transform:uppercase;
+            letter-spacing:.35em;
+            font-weight:600;
+        }
+        .bs-proxnivel{
+            padding:.85rem 2rem;
+            background:rgba(255,255,255,.05);
+            border:1px solid rgba(245,158,11,.3);
+            border-radius:.85rem;
+            backdrop-filter:blur(10px);
+        }
+        .bs-proxnivel-label{
+            font-size:.7rem;
+            color:#f59e0b;
+            text-transform:uppercase;
+            letter-spacing:.2em;
+            font-weight:700;
+            margin-bottom:.3rem;
+            text-align:center;
+        }
+        .bs-proxnivel-blinds{
+            font-family:var(--font-mono);
+            font-size:clamp(1.3rem, 2.2vw, 2rem);
+            color:#fff;
+            font-weight:700;
+            text-align:center;
+        }
 
         /* === PATROCINADORES — Carrossel infinito horizontal === */
-        /* Wrapper: faixa inferior fixa, ocupa largura da tela */
+        /* Fica no fluxo normal: margin-top:auto empurra pro final da coluna,
+           deixando espaço pra frase do rodapé logo abaixo. */
         #bs-patrocinadores-wrap {
-            position:absolute;
-            bottom:5vh;
-            left:0; right:0;
             display:flex;
             flex-direction:column;
             align-items:center;
-            gap:.75rem;
-            z-index:2;
+            gap:.85rem;
+            width:100%;
+            margin-top:auto;     /* empurra pro final da coluna flex */
+            padding-bottom:.5rem;
         }
         .bs-patrocinadores-label {
-            font-size: clamp(.65rem, .85vw, .9rem);
-            color: rgba(245,213,114,.7);
+            font-size: clamp(.7rem, .9vw, 1rem);
+            color: rgba(245,213,114,.85);
             text-transform: uppercase;
-            letter-spacing: .25em;
+            letter-spacing: .3em;
             font-weight: 700;
             text-align: center;
         }
@@ -873,33 +943,33 @@
             max-width: 100%;
             overflow: hidden;
             position: relative;
-            /* Fade nas bordas pra dar efeito de aparecimento/sumiço suave */
             mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
             -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
         }
         .bs-patrocinadores-track {
             display: flex;
-            gap: 2vw;
+            gap: 1.5vw;
             width: max-content;
             animation: bs-scroll var(--bs-scroll-duration, 30s) linear infinite;
             will-change: transform;
         }
         @keyframes bs-scroll {
             from { transform: translateX(0); }
-            to   { transform: translateX(-50%); } /* duplicamos itens; -50% = um ciclo completo */
+            to   { transform: translateX(-50%); }
         }
         .bs-patrocinador-item {
             flex-shrink: 0;
-            width: clamp(110px, 13vw, 180px);
-            height: clamp(70px, 8vw, 110px);
-            background: rgba(0,0,0,.4);
-            border: 1px solid rgba(245,213,114,.18);
-            border-radius: .65rem;
+            width: clamp(130px, 14vw, 200px);
+            height: clamp(80px, 9vw, 130px);
+            background: rgba(0,0,0,.55);
+            border: 1px solid rgba(245,213,114,.25);
+            border-radius: .75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: .8rem 1rem;
+            padding: .8rem 1.2rem;
             backdrop-filter: blur(4px);
+            box-shadow: 0 4px 20px rgba(0,0,0,.4);
         }
         .bs-patrocinador-item img {
             max-width: 100%;
@@ -907,21 +977,16 @@
             object-fit: contain;
         }
 
-        /* Frase do rodapé na tela de break (reutiliza a do Pro Live) */
+        /* Frase do rodapé na tela de break (no fluxo natural, abaixo dos patrocinadores) */
         .bs-frase-rodape {
-            position: absolute;
-            bottom: 1.5vh;
-            left: 50%;
-            transform: translateX(-50%);
             font-family: 'Manrope', 'Inter', sans-serif;
-            font-size: 1.5vh;
+            font-size: clamp(.8rem, 1.1vw, 1.1rem);
             font-weight: 700;
-            letter-spacing: .3em;
-            color: rgba(245,213,114,.5);
+            letter-spacing: .35em;
+            color: rgba(245,213,114,.6);
             text-transform: uppercase;
             text-align: center;
-            z-index: 3;
-            pointer-events: none;
+            margin-top: .3rem;
         }
 
         /* Marca d'água do break — reusa a mesma do Pro Live mas com escala/posição própria.
