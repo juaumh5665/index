@@ -1625,7 +1625,7 @@ function montarCarouselPremiacao(d) {
         const bs = document.getElementById('break-screen');
         if (!bs) return;
         if (!d.isBreak) { bs.classList.remove('show'); return; }
-        console.log('[BREAK] ATIVANDO break-screen. d.clubeId:', d.clubeId, 'd.isBreak:', d.isBreak, 'pubState.clubeId:', (typeof pubState !== 'undefined' ? pubState.clubeId : 'N/A'));
+        console.log('[BREAK] ATIVANDO break-screen. d.clubeId:', d.clubeId, 'd.isBreak:', d.isBreak, 'window.pubState?.clubeId:', (window.pubState && window.pubState.clubeId) || 'N/A');
         bs.classList.add('show');
         // Timer: só atualiza no POPUP — na TV pública, tickLocalTimer cuida (break-timer está no array)
         if (!window._ehTvPublica) {
@@ -1693,10 +1693,12 @@ function montarCarouselPremiacao(d) {
         }
 
         // Fallback robusto: se não recebeu clubeId no payload, tenta pegar do pubState
-        // (caso da TV pública, onde o break é montado localmente sem reler o app)
-        if (!clubeId && typeof pubState !== 'undefined' && pubState && pubState.clubeId) {
-            clubeId = pubState.clubeId;
-            console.log('[BS-PATR] Usando clubeId do pubState (fallback):', clubeId);
+        // (caso da TV pública, onde o break é montado localmente sem reler o app).
+        // pubState está em outro bloco <script>, então acessamos via window.pubState.
+        const ps = (typeof window !== 'undefined') ? window.pubState : null;
+        if (!clubeId && ps && ps.clubeId) {
+            clubeId = ps.clubeId;
+            console.log('[BS-PATR] Usando clubeId do window.pubState (fallback):', clubeId);
         }
         if (!clubeId) {
             console.warn('[BS-PATR] ❌ Sem clubeId. Escondendo wrap.');
@@ -1711,15 +1713,18 @@ function montarCarouselPremiacao(d) {
             return _bsRenderCarrossel(cache.lista);
         }
 
-        // Busca do Supabase
+        // Busca do Supabase. O cliente 'sb' é declarado em outro bloco <script>
+        // (TV pública), exposto via window.sb. No popup (TV aberta pelo app),
+        // window.sb também existe via app.html.
+        const sbClient = (typeof window !== 'undefined') ? window.sb : null;
         try {
-            if (typeof sb === 'undefined' || !sb || !sb.from) {
-                console.warn('[BS-PATR] ❌ Supabase (sb) não disponível.');
+            if (!sbClient || !sbClient.from) {
+                console.warn('[BS-PATR] ❌ Supabase (window.sb) não disponível.');
                 wrap.style.display = 'none';
                 return;
             }
             console.log('[BS-PATR] Buscando patrocinadores do clube:', clubeId);
-            const { data, error } = await sb.from('patrocinadores')
+            const { data, error } = await sbClient.from('patrocinadores')
                 .select('id, nome, logo_url, ordem, ativo')
                 .eq('clube_id', clubeId)
                 .eq('ativo', true)
@@ -2194,6 +2199,9 @@ function montarCarouselPremiacao(d) {
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
+  // Expõe no window pra ser acessível por funções de outros blocos <script>
+  // (ex: _bsAtualizarPatrocinadores em script anterior).
+  window.sb = sb;
   
   // Aplicar fonte dos números (configurada no app)
   const _FONT_MAP_TV = {
@@ -2229,6 +2237,9 @@ function montarCarouselPremiacao(d) {
     // Drift entre relógio servidor e cliente (ms)
     serverDriftMs: 0,
   };
+  // Expõe no window pra que funções de outros blocos <script> possam ler
+  // (ex: _bsAtualizarPatrocinadores precisa de pubState.clubeId quando d.clubeId vier vazio).
+  window.pubState = pubState;
   
   // Calcula tempo restante REAL usando tempo_alvo (timestamp absoluto)
   // Sincroniza perfeitamente entre app e TV pública
