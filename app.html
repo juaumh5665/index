@@ -6136,23 +6136,23 @@ document.addEventListener('DOMContentLoaded', function(){
                         <span class="t2-status" id="t2-status-staff" style="color:#52525b;font-size:.7rem;">Percentual 0%</span>
                     </div>
                     <div class="t2-coll-body">
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
+                            <i class="fa-solid fa-circle-info" style="color:#38bdf8;"></i>
+                            Pode ativar <strong>uma ou as duas</strong> modalidades de staff em paralelo. Cascata sai do prize; fixo é receita do clube por ação.
+                        </div>
                         <div style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.65rem;">
                             <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
-                                <input type="radio" name="t-staff-modo" value="nenhum" id="t-staff-modo-nenhum" onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;">
-                                <span>Nenhum staff</span>
+                                <input type="checkbox" id="t-staff-cascata-ativo" onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;width:16px;height:16px;">
+                                <span><strong>Cascata</strong> — Percentual sobre pós-rake (sai do prize, vai pros dealers)</span>
                             </label>
                             <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
-                                <input type="radio" name="t-staff-modo" value="percentual" id="t-staff-modo-percentual" checked onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;">
-                                <span>Percentual sobre pós-rake (cascata)</span>
-                            </label>
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);">
-                                <input type="radio" name="t-staff-modo" value="fixo" id="t-staff-modo-fixo" onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;">
-                                <span>Valor fixo em R$ por ação</span>
+                                <input type="checkbox" id="t-staff-fixo-ativo" onchange="atualizarStaffModoUI();t2AtualizarStatusStaff()" style="accent-color:#38bdf8;width:16px;height:16px;">
+                                <span><strong>Fixo</strong> — Valor em R$ por ação (receita do clube, paralelo ao prize)</span>
                             </label>
                         </div>
 
-                        <!-- Painel: Percentual -->
-                        <div id="t-staff-painel-percentual">
+                        <!-- Painel: Cascata -->
+                        <div id="t-staff-painel-percentual" style="display:none;">
                             <label class="inp-label">Staff % (sobre o que sobrou depois do rake)</label>
                             <input id="t-staff-pct" type="number" step="0.5" min="0" max="50" value="0" class="inp" placeholder="0 = sem staff" onchange="t2AtualizarStatusStaff()">
                             <div style="font-size:.68rem;color:#71717a;margin-top:.45rem;line-height:1.45;">
@@ -8393,6 +8393,8 @@ function _torneioToDb(t) {
         staff_valor: t.staffValor || 0,
         staff_pct: t.staffPct || 0,
         staff_modo: t.staffModo || null,
+        staff_cascata_ativo: !!t.staffCascataAtivo,
+        staff_fixo_ativo: !!t.staffFixoAtivo,
         staff_fixo_valor: t.staffFixoValor || 0,
         staff_fixo_acoes: t.staffFixoAcoes ? { ...t.staffFixoAcoes, __adicional_v2: !!t.staffFixoAdicionalV2 } : (t.staffFixoAdicionalV2 ? { __adicional_v2: true } : null),
         staff_fixo_modo: t.staffFixoModo || 'embutido',
@@ -9347,6 +9349,10 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         staffValor: parseFloat(r.staff_valor || 0),
         staffPct: parseFloat(r.staff_pct || 0),
         staffModo: r.staff_modo || null,
+        // Novos flags independentes — migração automática de torneios antigos
+        // Se a coluna nova não existe (torneios antigos), null/undefined → infere do staffModo legado
+        staffCascataAtivo: (r.staff_cascata_ativo === true) ? true : (r.staff_cascata_ativo === false ? false : (r.staff_modo === 'percentual')),
+        staffFixoAtivo:    (r.staff_fixo_ativo    === true) ? true : (r.staff_fixo_ativo    === false ? false : (r.staff_modo === 'fixo')),
         staffFixoValor: parseFloat(r.staff_fixo_valor || 0),
         staffFixoAcoes: (() => {
             const raw = r.staff_fixo_acoes;
@@ -13301,7 +13307,7 @@ function gerarComprovanteCompra(t, dados) {
     // - 'embutido' (default): NÃO mostra no comprovante (já está dentro do preço)
     // - 'adicional' (legado e V2): mostra como linha separada e SOMA no total
     // Lê e.staff (snapshot da entry) — assim reimpressões ficam corretas mesmo se a config mudou.
-    const eligivelStaff = (_resolverStaffModo(t) === 'fixo' && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0));
+    const eligivelStaff = (_staffFixoAtivo(t) && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0));
     const fixoModo = t.staffFixoModo || 'embutido';
     const staffFixoMostrar = eligivelStaff && fixoModo === 'adicional' ? (Number(e.staff) || Number(t.staffFixoValor) || 0) : 0;
 
@@ -13390,7 +13396,7 @@ function gerarComprovanteCompra(t, dados) {
 // Verifica se um tipo de entry é elegível pro staff fixo.
 // Parâmetro `valorEntry` (opcional): se for 0 e for buy-in, respeita t.staffFixoCobrarFree
 function _isTipoStaffFixoElegivel(t, tipo, valorEntry) {
-    if (!t || _resolverStaffModo(t) !== 'fixo') return false;
+    if (!t || !_staffFixoAtivo(t)) return false;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
     if (tipo === 'last_chance') return !!acoes.last_chance;
     const key = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
@@ -15304,6 +15310,27 @@ function _aplicarConfigTorneio(cfg) {
     set('t-buyin-promo-valor', cfg.buyinPromoValor);
     set('t-buyin-promo-fichas', cfg.buyinPromoFichas);
     set('t-buyin-promo-ate-nivel', cfg.buyinPromoAteNivel);
+
+    // Aplica modo de Staff (cascata e/ou fixo) — compatível com templates antigos
+    set('t-staff-pct', cfg.staffPct);
+    const cbCascataT = document.getElementById('t-staff-cascata-ativo');
+    const cbFixoT    = document.getElementById('t-staff-fixo-ativo');
+    if (cbCascataT && cbFixoT) {
+        // Prioridade: flags novos > staffModo legado > staffPct
+        if (cfg.staffCascataAtivo !== undefined) {
+            cbCascataT.checked = !!cfg.staffCascataAtivo;
+        } else {
+            cbCascataT.checked = (cfg.staffModo === 'percentual') || ((Number(cfg.staffPct) || 0) > 0 && !cfg.staffModo);
+        }
+        if (cfg.staffFixoAtivo !== undefined) {
+            cbFixoT.checked = !!cfg.staffFixoAtivo;
+        } else {
+            cbFixoT.checked = (cfg.staffModo === 'fixo');
+        }
+        if (typeof atualizarStaffModoUI === 'function') atualizarStaffModoUI();
+        if (typeof t2AtualizarStatusStaff === 'function') t2AtualizarStatusStaff();
+    }
+    set('t-staff-fixo-valor', cfg.staffFixoValor);
 
     // Aplica blinds
     if (cfg.blinds && cfg.blinds.length && typeof blindStructure !== 'undefined') {
@@ -19214,7 +19241,19 @@ function saveTournament() {
         addonValor:   parseFloat(document.getElementById('t-addon-valor').value) || 0,
         staffValor:   0, // legado - não usado mais (compat)
         staffPct:     parseFloat(document.getElementById('t-staff-pct').value) || 0,
-        staffModo:    (document.querySelector('input[name="t-staff-modo"]:checked')?.value) || 'percentual',
+        // NOVO MODELO: cada modalidade independente
+        staffCascataAtivo: document.getElementById('t-staff-cascata-ativo')?.checked || false,
+        staffFixoAtivo:    document.getElementById('t-staff-fixo-ativo')?.checked || false,
+        // Compat: staffModo derivado pra torneios antigos continuarem funcionando
+        // - se só cascata: 'percentual' | se só fixo: 'fixo' | se ambos: 'fixo' (priorizando)
+        // - se nenhum: 'nenhum'
+        staffModo: (function() {
+            const c = document.getElementById('t-staff-cascata-ativo')?.checked;
+            const f = document.getElementById('t-staff-fixo-ativo')?.checked;
+            if (!c && !f) return 'nenhum';
+            if (f) return 'fixo'; // se fixo ativo (com ou sem cascata), prioriza pra compat
+            return 'percentual';
+        })(),
         staffFixoValor: parseFloat(document.getElementById('t-staff-fixo-valor')?.value) || 0,
         staffFixoModo: (document.querySelector('input[name="t-staff-fixo-modo"]:checked')?.value) || 'embutido',
         staffFixoCobrarFree: document.getElementById('t-staff-fixo-cobrar-free')?.checked || false,
@@ -19520,19 +19559,32 @@ function updateModalTorneio() {
     document.getElementById('mt-prize').innerText   = formatMoney(prize);
     document.getElementById('mt-rake-val').innerText = formatMoney(rake);
     
-    // LOTE 3: Card staff (visível em modo percentual OU fixo, desde que produza valor)
+    // Card staff (visível em modo cascata, fixo OU ambos, desde que produza valor)
     const staffCard = document.getElementById('mt-staff-card');
     if (staffCard) {
-        const staffModoAtual = _resolverStaffModo(t);
-        const staffVal = getStaff(t);
-        if (staffModoAtual !== 'nenhum' && staffVal > 0) {
+        const ativaC = _staffCascataAtivo(t);
+        const ativaF = _staffFixoAtivo(t);
+        const valC = getStaffCascata(t);
+        const valF = getStaffFixo(t);
+        const total = valC + valF;
+        if ((ativaC || ativaF) && total > 0) {
             staffCard.style.display = 'block';
-            document.getElementById('mt-staff-val').innerText = formatMoney(staffVal);
+            document.getElementById('mt-staff-val').innerText = formatMoney(total);
             const staffDesc = document.getElementById('mt-staff-desc');
             if (staffDesc) {
-                if (staffModoAtual === 'fixo') {
+                if (ativaC && ativaF) {
+                    // Ambos ativos — mostra linhas separadas
+                    const pct = Number(t.staffPct) || 0;
                     const v = Number(t.staffFixoValor) || 0;
-                    const qtd = (v > 0) ? Math.round(staffVal / v) : 0;
+                    const qtd = (v > 0) ? Math.round(valF / v) : 0;
+                    staffDesc.innerHTML =
+                        `<div style="display:flex;flex-direction:column;gap:.15rem;">` +
+                            `<div>Cascata ${pct}%: <strong>${formatMoney(valC)}</strong> → dealers</div>` +
+                            `<div>Fixo ${formatMoney(v)} × ${qtd} ${qtd === 1 ? 'ação' : 'ações'}: <strong>${formatMoney(valF)}</strong> → clube</div>` +
+                        `</div>`;
+                } else if (ativaF) {
+                    const v = Number(t.staffFixoValor) || 0;
+                    const qtd = (v > 0) ? Math.round(valF / v) : 0;
                     staffDesc.innerText = `${formatMoney(v)} fixo × ${qtd} ${qtd === 1 ? 'ação' : 'ações'}`;
                 } else {
                     const pct = Number(t.staffPct) || 0;
@@ -20146,7 +20198,7 @@ function renderTabFinanceiro() {
 
     // Staff FIXO (modo fixo): também mostra no resumo financeiro pra não sumir a informação.
     // Em embutido sai de dentro do preço; em adicional/V2 é cobrado por ação. Em ambos vai pra equipe.
-    if (_resolverStaffModo(t) === 'fixo') {
+    if (_staffFixoAtivo(t)) {
         const staffFixoTotal = (typeof _getStaffFixoTotal === 'function') ? _getStaffFixoTotal(t) : 0;
         if (staffFixoTotal > 0) {
             const fm = t.staffFixoModo || 'embutido';
@@ -21478,7 +21530,7 @@ function atualizarResumoEntrada() {
         else if (tipo === 'last_chance')   v = Number(t.lastChanceValor || t.last_chance_valor) || 0;
         // FASE G: Em embutido + cobrarFree, buy-in free vira valor do staff (R$ 10)
         if (tipo === 'buyin' && v === 0
-            && _resolverStaffModo(t) === 'fixo'
+            && _staffFixoAtivo(t)
             && (t.staffFixoModo || 'embutido') === 'embutido'
             && t.staffFixoCobrarFree) {
             v = Number(t.staffFixoValor) || 0;
@@ -21491,7 +21543,7 @@ function atualizarResumoEntrada() {
     //   - Legado: cliente paga base + staff (somado ao total).
     //   - V2: cliente paga só base (staff já dentro). Mostra a quebra, mas NÃO soma no total.
     const isV2Resumo = _isStaffFixoAdicionalV2(t);
-    if (_resolverStaffModo(t) === 'fixo' && (t.staffFixoModo || 'embutido') === 'adicional') {
+    if (_staffFixoAtivo(t) && (t.staffFixoModo || 'embutido') === 'adicional') {
         const valorStaff = Number(t.staffFixoValor) || 0;
         acoes.forEach(tp => {
             // Buy-in free: respeita config cobrarFree
@@ -21711,7 +21763,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
 
         // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
         if (tipo === 'buyin' && valorBase === 0
-            && _resolverStaffModo(t) === 'fixo'
+            && _staffFixoAtivo(t)
             && (t.staffFixoModo || 'embutido') === 'embutido'
             && t.staffFixoCobrarFree) {
             valorBase = Number(t.staffFixoValor) || 0;
@@ -21734,7 +21786,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
 
         // FASE G: Staff fixo no modo "adicional" — cobra por ação (legado E V2)
         const isAdicionalV2Combo = _isStaffFixoAdicionalV2(t);
-        const isAdicionalLegadoCombo = _resolverStaffModo(t) === 'fixo'
+        const isAdicionalLegadoCombo = _staffFixoAtivo(t)
             && (t.staffFixoModo || 'embutido') === 'adicional'
             && !isAdicionalV2Combo;
         let staffNessaEntry = 0;
@@ -21957,7 +22009,7 @@ function _registrarEntradaImpl() {
     // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
     // (cliente paga R$ 10 que já tem staff embutido — não cobra staff extra por fora)
     if (tipo === 'buyin' && valorBase === 0
-        && _resolverStaffModo(t) === 'fixo'
+        && _staffFixoAtivo(t)
         && (t.staffFixoModo || 'embutido') === 'embutido'
         && t.staffFixoCobrarFree) {
         valorBase = Number(t.staffFixoValor) || 0;
@@ -21984,7 +22036,7 @@ function _registrarEntradaImpl() {
     //     comprovante mostra "Buy-in + Staff fixo").
     let staffCobrado = 0;
     const isAdicionalV2 = _isStaffFixoAdicionalV2(t);
-    const isAdicionalLegado = _resolverStaffModo(t) === 'fixo'
+    const isAdicionalLegado = _staffFixoAtivo(t)
         && (t.staffFixoModo || 'embutido') === 'adicional'
         && !isAdicionalV2;
     if ((isAdicionalLegado || isAdicionalV2) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
@@ -25370,8 +25422,8 @@ function getRake(t) {
     // FASE G: modo do staff fixo afeta como o rake é calculado
     // - 'embutido' (default): preço de tabela JÁ inclui staff. Desconta staff ANTES do rake.
     // - 'adicional': staff vem somado por fora. Bruto não inclui staff. Rake direto sobre o bruto.
-    const modo = _resolverStaffModo(t);
-    if (modo === 'fixo') {
+    // OBS: comportamento independente de cascata estar ativo (cascata calcula a partir de pós-rake)
+    if (_staffFixoAtivo(t)) {
         const fixoModo = t.staffFixoModo || 'embutido';
         if (fixoModo === 'embutido') {
             const staffFixo = _getStaffFixoTotal(t);
@@ -25381,7 +25433,7 @@ function getRake(t) {
         // 'adicional': staff é por fora, bruto não inclui staff → rake sobre bruto cheio
         return bruto * ((Number(t.rake) || 0) / 100);
     }
-    // Modos antigos (nenhum/percentual): comportamento original (sem dedução)
+    // Sem staff fixo: rake direto sobre bruto (comportamento original)
     return bruto * ((Number(t.rake) || 0) / 100);
 }
 
@@ -25394,13 +25446,33 @@ function _resolverStaffModo(t) {
     return (Number(t.staffPct) || 0) > 0 ? 'percentual' : 'nenhum';
 }
 
+// === Helpers de staff INDEPENDENTE (cascata + fixo simultâneos) ===
+// Cada um pode estar ativo independentemente. Permite combinar as duas modalidades.
+// Mantém compatibilidade com torneios antigos (staffModo legado).
+function _staffCascataAtivo(t) {
+    if (!t) return false;
+    // Modelo novo: flag explícita
+    if (t.staffCascataAtivo === true) return true;
+    if (t.staffCascataAtivo === false) return false;
+    // Modelo legado: staffModo === 'percentual' OU staffPct > 0 sem staffModo
+    return _resolverStaffModo(t) === 'percentual';
+}
+function _staffFixoAtivo(t) {
+    if (!t) return false;
+    // Modelo novo: flag explícita
+    if (t.staffFixoAtivo === true) return true;
+    if (t.staffFixoAtivo === false) return false;
+    // Modelo legado: staffModo === 'fixo'
+    return _staffFixoAtivo(t);
+}
+
 // Detecta se o torneio usa staff fixo "adicional transparente" V2.
 // Nessa versão: cliente paga só o preço base, o staff sai DE DENTRO desse preço
 // (igual embutido contabilmente), e o comprovante mostra a quebra "Buy-in + Staff".
 // Torneios antigos sem a flag mantêm o comportamento legado (cliente paga base + staff por fora).
 function _isStaffFixoAdicionalV2(t) {
     if (!t) return false;
-    if (_resolverStaffModo(t) !== 'fixo') return false;
+    if (!_staffFixoAtivo(t)) return false;
     if ((t.staffFixoModo || 'embutido') !== 'adicional') return false;
     return !!t.staffFixoAdicionalV2;
 }
@@ -25448,7 +25520,7 @@ function _resolverNivelMaxBuyinFree(t) {
 // Conta ações elegíveis × valor fixo. Só conta tipos que o clube marcou.
 // Usa o mesmo critério de last_chance do _getBrutoParaRake (opt-in respeitado).
 function _getStaffFixoTotal(t) {
-    if (!t || _resolverStaffModo(t) !== 'fixo') return 0;
+    if (!t || !_staffFixoAtivo(t)) return 0;
     const valor = Number(t.staffFixoValor) || 0;
     if (valor <= 0) return 0;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
@@ -25476,7 +25548,7 @@ function _getStaffFixoTotal(t) {
 // NÃO toca em getRake/getPrize/getStaff (cálculos internos continuam corretos).
 function _getStaffFixoEmbutidoPorTipo(t) {
     const zero = { buyin: 0, reentry: 0, rebuys: 0, addon: 0, last_chance: 0, total: 0 };
-    if (!t || _resolverStaffModo(t) !== 'fixo') return zero;
+    if (!t || !_staffFixoAtivo(t)) return zero;
     const fixoModo = t.staffFixoModo || 'embutido';
     if (fixoModo !== 'embutido') return zero; // só desconta se for embutido
     const valor = Number(t.staffFixoValor) || 0;
@@ -25505,13 +25577,21 @@ function _getStaffFixoEmbutidoPorTipo(t) {
 }
 
 function getStaff(t) {
-    const modo = _resolverStaffModo(t);
-    if (modo === 'nenhum') return 0;
-    if (modo === 'fixo')   return _getStaffFixoTotal(t);
-    // 'percentual' (comportamento histórico): % EM CASCATA sobre o que sobrou DEPOIS do rake do clube
+    return getStaffCascata(t) + getStaffFixo(t);
+}
+
+// Staff cascata (% sobre pós-rake) — vai pros dealers, sai do prize
+function getStaffCascata(t) {
+    if (!_staffCascataAtivo(t)) return 0;
     const brutoComRake = _getBrutoParaRake(t);
     const sobra = brutoComRake - getRake(t);
     return sobra * ((Number(t.staffPct) || 0) / 100);
+}
+
+// Staff fixo (R$ por ação) — vai pro clube, NÃO sai do prize (despesa separada)
+function getStaffFixo(t) {
+    if (!_staffFixoAtivo(t)) return 0;
+    return _getStaffFixoTotal(t);
 }
 
 // === PASSAPORTE (produto opcional vendido junto com ações) ===
@@ -25589,18 +25669,30 @@ function _calcFichasBuyinPromo(t, tipo) {
 }
 
 function getPrize(t) {
-    // Prize = (Bruto_comRake - Rake - Staff) + Bruto_semRake
+    // Prize = (Bruto_comRake - Rake - Staff_que_sai_do_prize) + Bruto_semRake
+    // Regras:
+    //   - Staff CASCATA (% pós-rake) → SAI do prize (vai pros dealers)
+    //   - Staff FIXO (R$/ação) → NÃO sai do prize (é receita do clube paralela)
+    //   - V2 adicional: em torneios novos modo "adicional V2", staff fixo nem entra no bruto
+    //     (e.valor vem sem staff), então não há nada a subtrair.
     // FASE V2: Em modo "adicional V2" (torneios novos), o staff fixo NÃO é subtraído aqui
     // porque ele já foi separado do bruto na hora de gravar a entry (e.valor vem sem staff).
     // Subtrair staff de novo seria dupla dedução. Em embutido/legado/percentual mantém a subtração.
     const brutoComRake = _getBrutoParaRake(t);
     const brutoSemRake = _getBrutoSemRake(t);
     const rake = getRake(t);
-    let staff = getStaff(t);
-    if (_isStaffFixoAdicionalV2(t)) {
-        staff = 0; // V2: e.valor já não inclui staff
+    // ⚠️ STAFF DO PRIZE = APENAS CASCATA. Staff fixo não sai do prize (vai pro clube).
+    let staffDoPrize = getStaffCascata(t);
+    // Manter compat: se for torneio LEGADO sem cascata mas com staff fixo "embutido",
+    // o staff fixo foi cobrado dentro do buy-in. O bruto inclui ele. Por isso historicamente
+    // descontava no prize. NÃO mexer aqui pra não regredir esses torneios.
+    if (_staffFixoAtivo(t) && !_isStaffFixoAdicionalV2(t)) {
+        // staffFixoModo === 'embutido' OU 'adicional' legado:
+        // o staff fixo está dentro do bruto (foi cobrado do jogador). Precisa descontar.
+        staffDoPrize += getStaffFixo(t);
     }
-    const liquido = (brutoComRake - rake - staff) + brutoSemRake;
+    // _isStaffFixoAdicionalV2: bruto já vem sem staff, não desconta nada.
+    const liquido = (brutoComRake - rake - staffDoPrize) + brutoSemRake;
     
     if (t.tipo === 'knockout') {
         // 100% em bounties, nada no prize pool final
@@ -36308,11 +36400,12 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
      ============================================================ -->
 <script>
 function atualizarStaffModoUI() {
-    var modo = document.querySelector('input[name="t-staff-modo"]:checked')?.value || 'percentual';
+    var cbCascata = document.getElementById('t-staff-cascata-ativo');
+    var cbFixo    = document.getElementById('t-staff-fixo-ativo');
     var painelPct  = document.getElementById('t-staff-painel-percentual');
     var painelFixo = document.getElementById('t-staff-painel-fixo');
-    if (painelPct)  painelPct.style.display  = (modo === 'percentual') ? '' : 'none';
-    if (painelFixo) painelFixo.style.display = (modo === 'fixo') ? '' : 'none';
+    if (painelPct)  painelPct.style.display  = (cbCascata && cbCascata.checked) ? '' : 'none';
+    if (painelFixo) painelFixo.style.display = (cbFixo && cbFixo.checked) ? '' : 'none';
 }
 
 function atualizarPassaporteUI() {
@@ -36538,23 +36631,24 @@ function atualizarComprovanteUI() {
   window.t2AtualizarStatusStaff = function () {
     const elStatus = document.getElementById('t2-status-staff');
     if (!elStatus) return;
-    const modoNenhum = (document.getElementById('t-staff-modo-nenhum') || {}).checked;
-    const modoPct = (document.getElementById('t-staff-modo-percentual') || {}).checked;
-    const modoFixo = (document.getElementById('t-staff-modo-fixo') || {}).checked;
-    if (modoNenhum) {
+    const cascataAtiva = (document.getElementById('t-staff-cascata-ativo') || {}).checked;
+    const fixoAtivo    = (document.getElementById('t-staff-fixo-ativo')    || {}).checked;
+    if (!cascataAtiva && !fixoAtivo) {
       elStatus.textContent = 'Nenhum staff';
       elStatus.classList.remove('t2-active');
-    } else if (modoPct) {
-      const pct = parseFloat((document.getElementById('t-staff-pct') || {}).value || 0);
-      elStatus.textContent = pct > 0 ? 'Percentual ' + pct + '%' : 'Percentual 0%';
-      if (pct > 0) elStatus.classList.add('t2-active');
-      else elStatus.classList.remove('t2-active');
-    } else if (modoFixo) {
-      const fixo = parseFloat((document.getElementById('t-staff-fixo-valor') || {}).value || 0);
-      elStatus.textContent = fixo > 0 ? 'Fixo R$ ' + fixo + '/ação' : 'Fixo R$ 0';
-      if (fixo > 0) elStatus.classList.add('t2-active');
-      else elStatus.classList.remove('t2-active');
+      return;
     }
+    const partes = [];
+    if (cascataAtiva) {
+      const pct = parseFloat((document.getElementById('t-staff-pct') || {}).value || 0);
+      partes.push('Cascata ' + (pct || 0) + '%');
+    }
+    if (fixoAtivo) {
+      const fixo = parseFloat((document.getElementById('t-staff-fixo-valor') || {}).value || 0);
+      partes.push('Fixo R$ ' + (fixo || 0) + '/ação');
+    }
+    elStatus.textContent = partes.join(' + ');
+    elStatus.classList.add('t2-active');
   };
 
   // ─── Status: Comprovantes ──────────────────────────────────────
