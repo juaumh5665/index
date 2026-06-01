@@ -1674,7 +1674,9 @@ function montarCarouselPremiacao(d) {
         }
 
         // === Patrocinadores: carrega + renderiza carrossel ===
-        _bsAtualizarPatrocinadores(d.clubeId);
+        // Se d.patrocinadores veio no payload (TV popup, vindo do app), usa direto.
+        // Senão, busca do Supabase via wrapper (TV pública).
+        _bsAtualizarPatrocinadores(d.clubeId, d.patrocinadores);
         } catch (e) { console.error('atualizarBreakScreen erro:', e); }
     }
 
@@ -1683,15 +1685,25 @@ function montarCarouselPremiacao(d) {
     // Realtime invalida o cache quando há mudança.
     window._bsPatrocinadoresCache = window._bsPatrocinadoresCache || { clubeId: null, lista: null };
 
-    async function _bsAtualizarPatrocinadores(clubeId) {
+    async function _bsAtualizarPatrocinadores(clubeId, listaDoPayload) {
         const wrap = document.getElementById('bs-patrocinadores-wrap');
         const track = document.getElementById('bs-patrocinadores-track');
-        console.log('[BS-PATR] _bsAtualizarPatrocinadores chamada. clubeId:', clubeId, 'wrap?', !!wrap, 'track?', !!track);
+        console.log('[BS-PATR] _bsAtualizarPatrocinadores chamada. clubeId:', clubeId, 'lista payload?', listaDoPayload && listaDoPayload.length, 'wrap?', !!wrap, 'track?', !!track);
         if (!wrap || !track) {
             console.warn('[BS-PATR] ❌ Elemento DOM não encontrado. wrap:', !!wrap, 'track:', !!track);
             return;
         }
 
+        // CAMINHO 1 (popup): se o payload veio com a lista pronta, usa direto.
+        // Isso é o normal pra TV aberta pelo app (postMessage) — o popup não tem
+        // acesso ao Supabase, então o app já manda os patrocinadores ativos.
+        if (Array.isArray(listaDoPayload)) {
+            console.log('[BS-PATR] Usando lista vinda do payload (popup):', listaDoPayload.length);
+            _bsRenderCarrossel(listaDoPayload);
+            return;
+        }
+
+        // CAMINHO 2 (TV pública): sem lista no payload, busca direto do Supabase.
         // Fallback robusto: se não recebeu clubeId no payload, tenta pegar do pubState
         // (caso da TV pública, onde o break é montado localmente sem reler o app).
         // pubState está em outro bloco <script>, então acessamos via window.pubState.
@@ -1714,8 +1726,7 @@ function montarCarouselPremiacao(d) {
         }
 
         // Busca do Supabase. O cliente 'sb' é declarado em outro bloco <script>
-        // (TV pública), exposto via window.sb. No popup (TV aberta pelo app),
-        // window.sb também existe via app.html.
+        // (TV pública), exposto via window.sb.
         const sbClient = (typeof window !== 'undefined') ? window.sb : null;
         try {
             if (!sbClient || !sbClient.from) {

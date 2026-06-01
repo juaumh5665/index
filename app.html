@@ -9305,6 +9305,11 @@ async function carregarEstadoDoSupabase() {
             if (_clubeId) await _carregarRankings(_clubeId);
         } catch(e) { console.warn('[RANKINGS] erro carregar:', e); }
 
+        // Carrega lista de patrocinadores ativos pra TV popup
+        try {
+            await _carregarPatrocinadoresAtivosParaTv();
+        } catch(e) { console.warn('[patrocinadores] carga inicial:', e); }
+
         console.log(`✅ Estado carregado do Supabase: ${torneios.length} torneios, ${cashMesas?.length||0} mesas, ${barProdutos.length} produtos, ${barComandas.length} comandas`);
     } catch (e) {
         console.error('Carregar estado falhou:', e);
@@ -22518,6 +22523,9 @@ function updateTV(idx) {
         proLiveFraseRodape: t.tvProLiveFraseRodape || null,
         proLiveGlowDestaques: (t.tvProLiveGlowDestaques != null) ? Number(t.tvProLiveGlowDestaques) : 0.25,
         proLiveGlowInfo: (t.tvProLiveGlowInfo != null) ? Number(t.tvProLiveGlowInfo) : 0.25,
+        // Patrocinadores ativos do clube — o popup não tem acesso ao Supabase,
+        // então mandamos a lista já filtrada pra ele renderizar no carrossel do break.
+        patrocinadores: window._tvPatrocinadoresAtivos || [],
         showPrize: t.tvShowPrize !== false,
         timer:    formatTime(t.tempoRestante || 0),
         nivel:    nivelJogo || 1,
@@ -24428,6 +24436,34 @@ async function _persRemoverFundoPreto(file, threshold = 30, fadeRange = 30) {
 window._patrocinadoresCache = window._patrocinadoresCache || [];
 window._patrocinadorEdit = null; // estado do modal: {id, logoUrlPendente}
 
+// ============================================================
+// Cache global de patrocinadores ATIVOS pra TV popup (postMessage)
+// O popup não tem acesso direto ao Supabase, então o app:
+//   1. Carrega aqui a lista de patrocinadores ativos do clube
+//   2. Envia o cache no payload do postMessage a cada updateTV
+//   3. Recarrega quando algo muda (CRUD) ou a cada 5min de fallback
+// ============================================================
+window._tvPatrocinadoresAtivos = window._tvPatrocinadoresAtivos || [];
+window._tvPatrocinadoresAtivosCarregadoEm = 0;
+
+async function _carregarPatrocinadoresAtivosParaTv() {
+    if (!sb || !sbClube || !sbClube.id) return;
+    try {
+        const { data, error } = await sb.from('patrocinadores')
+            .select('id, nome, logo_url, ordem, ativo')
+            .eq('clube_id', sbClube.id)
+            .eq('ativo', true)
+            .order('ordem', { ascending: true });
+        if (error) throw error;
+        window._tvPatrocinadoresAtivos = (data || []).map(p => ({
+            id: p.id, nome: p.nome, logo_url: p.logo_url, ordem: p.ordem
+        }));
+        window._tvPatrocinadoresAtivosCarregadoEm = Date.now();
+    } catch (e) {
+        console.warn('[app] erro carregar patrocinadores p/ TV:', e.message || e);
+    }
+}
+
 async function renderConfigPatrocinadores() {
     const wrap = document.getElementById('patrocinadores-lista');
     const vazio = document.getElementById('patrocinadores-vazio');
@@ -24628,6 +24664,7 @@ async function salvarPatrocinador() {
         }
         fecharModalPatrocinador();
         renderConfigPatrocinadores();
+        _carregarPatrocinadoresAtivosParaTv(); // Atualiza cache da TV popup
     } catch (e) {
         console.error('[patrocinador] save:', e);
         showToast('⚠️ ' + (e.message || 'Erro ao salvar'));
@@ -24646,6 +24683,7 @@ async function togglePatrocinadorAtivo(id) {
         if (error) throw error;
         showToast(p.ativo ? 'Patrocinador desativado' : 'Patrocinador ativado');
         renderConfigPatrocinadores();
+        _carregarPatrocinadoresAtivosParaTv();
     } catch (e) {
         console.error('[patrocinador] toggle:', e);
         showToast('⚠️ ' + (e.message || 'Erro'));
@@ -24672,6 +24710,7 @@ async function excluirPatrocinador(id) {
         if (error) throw error;
         showToast('✓ Patrocinador excluído');
         renderConfigPatrocinadores();
+        _carregarPatrocinadoresAtivosParaTv();
     } catch (e) {
         console.error('[patrocinador] delete:', e);
         showToast('⚠️ ' + (e.message || 'Erro ao excluir'));
