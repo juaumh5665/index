@@ -6214,7 +6214,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div class="t2-coll-body">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
                             <div><label class="inp-label">Valor R$</label><input id="t-jackpot-valor" type="number" value="0" class="inp" placeholder="0 = sem jackpot" onchange="t2AtualizarStatusJackpot()"></div>
-                            <div><label class="inp-label">Fichas entregues</label><input id="t-jackpot-fichas" type="number" value="0" class="inp"></div>
+                            <div><label class="inp-label">Fichas entregues</label><input id="t-jackpot-fichas" type="number" value="0" class="inp" onchange="t2AtualizarStatusJackpot()"></div>
                         </div>
                         <div style="margin-top:.55rem;">
                             <label class="inp-label">Rake sobre Jackpot</label>
@@ -6328,7 +6328,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         </label>
 
                         <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;font-size:.82rem;padding:.5rem .65rem;border-radius:.4rem;background:rgba(168,85,247,.04);margin-bottom:.4rem;">
-                            <input type="checkbox" id="t-imprimir-jackpot" onchange="atualizarComprovanteUI();t2AtualizarStatusPrint()" style="width:16px;height:16px;cursor:pointer;accent-color:#a855f7;">
+                            <input type="checkbox" id="t-imprimir-jackpot" onchange="this.dataset.autoMarcado='1';atualizarComprovanteUI();t2AtualizarStatusPrint()" style="width:16px;height:16px;cursor:pointer;accent-color:#a855f7;">
                             <span><strong>Comprovante de jackpot</strong> <span style="font-size:.65rem;color:#71717a;">(compra avulsa de jackpot)</span></span>
                         </label>
 
@@ -37128,9 +37128,25 @@ function atualizarComprovanteUI() {
     if (valor > 0 && fichas > 0) {
       elStatus.textContent = 'R$ ' + valor + ' → ' + fichas.toLocaleString('pt-BR') + ' fichas';
       elStatus.classList.add('t2-active');
+
+      // Auto-marca o checkbox "Imprimir comprovante de jackpot" na PRIMEIRA vez que
+      // o jackpot fica válido (valor > 0 E fichas > 0). Evita que o operador esqueça.
+      // Só faz isso UMA vez por configuração — depois, se o operador desmarcar, respeita.
+      const cb = document.getElementById('t-imprimir-jackpot');
+      if (cb && !cb.dataset.autoMarcado) {
+        cb.checked = true;
+        cb.dataset.autoMarcado = '1';
+        // Dispara handlers que dependem do estado (UI/status)
+        if (typeof window.atualizarComprovanteUI === 'function') window.atualizarComprovanteUI();
+        if (typeof window.t2AtualizarStatusPrint === 'function') window.t2AtualizarStatusPrint();
+      }
     } else {
       elStatus.textContent = 'Sem jackpot';
       elStatus.classList.remove('t2-active');
+      // Reseta a flag pra que se o usuário desabilitar e habilitar o jackpot de novo,
+      // o auto-mark funcione na próxima vez.
+      const cb = document.getElementById('t-imprimir-jackpot');
+      if (cb) delete cb.dataset.autoMarcado;
     }
   };
 
