@@ -3144,7 +3144,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
 
                     <!-- Impressão Térmica do Clube -->
-                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
+                    <div class="stat-card" id="impressao-termica-section" style="padding:1.5rem;margin-top:1rem;">
                         <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-print"></i> Impressão Térmica</div>
                         <div style="font-size:.75rem;color:#71717a;margin-bottom:1.25rem;">Configura como os comprovantes de compra/jackpot são impressos. Estas configs valem pra todos os torneios do clube.</div>
 
@@ -3179,6 +3179,20 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
 
                         <button onclick="salvarConfigImpressao()" class="btn-gold" style="padding:.7rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Configurações de Impressão</button>
+                    </div>
+                    <!-- Placeholder pra quando feature_impressao_termica estiver OFF (preenchido por JS) -->
+                    <div id="impressao-termica-locked" style="display:none;padding:1.5rem;margin-top:1rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);border-radius:.6rem;">
+                        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+                            <i class="fa-solid fa-print" style="color:#06b6d4;font-size:1.1rem;"></i>
+                            <div style="font-size:.85rem;font-weight:800;color:#fff;">Impressão Térmica <span style="background:linear-gradient(135deg,#f5d572 0%,#d4a82e 100%);color:#0a0a0b;font-size:.62rem;padding:.12em .5em;border-radius:.35em;font-weight:800;letter-spacing:.08em;margin-left:.4rem;vertical-align:middle;">PRO</span></div>
+                        </div>
+                        <div style="font-size:.75rem;color:#a1a1aa;margin-bottom:.85rem;line-height:1.5;">
+                            Imprima comprovantes de compras, jackpots, fechamentos de torneio/dia e comandas
+                            do bar diretamente em impressora térmica 58mm ou 80mm. Disponível nos planos Premium e Pro.
+                        </div>
+                        <button onclick="if(typeof mostrarModalUpgrade==='function')mostrarModalUpgrade('Impressão Térmica de comprovantes e fechamentos')" class="btn-gold" style="padding:.55rem 1rem;border-radius:.5rem;font-size:.78rem;">
+                            <i class="fa-solid fa-arrow-up"></i> Fazer Upgrade
+                        </button>
                     </div>
                 </div>
 
@@ -13270,6 +13284,18 @@ function renderSegurancaStats() {
 // SISTEMA DE IMPRESSÃO TÉRMICA
 // ============================================================
 function abrirPreviewImpressao(titulo, conteudo) {
+    // Gate central: todas as funções de impressão (imprimirComprovante*, imprimirFechamento*,
+    // imprimirComanda, imprimirRecibo*, imprimirExtrato*) passam por aqui antes de mostrar
+    // o modal de preview. Se o clube não tem feature_impressao_termica, bloqueia tudo
+    // em um único ponto. Não impede o cliente de fazer download/export por outros caminhos.
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('impressao_termica')) {
+        if (typeof window.mostrarModalUpgrade === 'function') {
+            window.mostrarModalUpgrade('Impressão Térmica de comprovantes e fechamentos');
+        } else if (typeof showToast === 'function') {
+            showToast('🔒 Impressão térmica — disponível no plano Premium');
+        }
+        return;
+    }
     document.getElementById('print-title').textContent = titulo;
     document.getElementById('print-target').textContent = conteudo;
     document.getElementById('print-preview-modal').classList.add('show');
@@ -13856,6 +13882,12 @@ function _reimprimirLancamento(kind, refId) {
 // FASE E: modal pequeno perguntando se quer imprimir comprovante
 // opcoes = { titulo, descricao, onConfirm, onCancel? }
 function _abrirModalPromptImpressao(opcoes) {
+    // Gate: se não tem feature de impressão, não mostra nem o prompt.
+    // Resultado: a compra/operação é finalizada normalmente, só não oferece imprimir.
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('impressao_termica')) {
+        if (opcoes && opcoes.onCancel) opcoes.onCancel();
+        return;
+    }
     const existing = document.getElementById('modal-prompt-impressao');
     if (existing) existing.remove();
 
@@ -29172,6 +29204,15 @@ function renderConfigTorneios() {
     if (cbCnpj) cbCnpj.checked = sbClube.impressao_cnpj !== false; // default true
     if (cbEnd)  cbEnd.checked  = sbClube.impressao_endereco !== false; // default true
     if (cbTel)  cbTel.checked  = !!sbClube.impressao_telefone; // default false
+
+    // Gate: alterna entre seção real e placeholder "locked" baseado na feature
+    const secReal = document.getElementById('impressao-termica-section');
+    const secLocked = document.getElementById('impressao-termica-locked');
+    if (secReal && secLocked) {
+        const liberado = (typeof window.hasFeature === 'function') ? window.hasFeature('impressao_termica') : true;
+        secReal.style.display = liberado ? '' : 'none';
+        secLocked.style.display = liberado ? 'none' : '';
+    }
 }
 
 // FASE E: Salva configurações de impressão térmica do clube
