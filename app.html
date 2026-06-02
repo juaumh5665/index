@@ -19154,6 +19154,10 @@ function toggleBreakDeCompras(indice) {
     blindStructure[indice].breakDeCompras = novoValor;
     renderBlindsInputs();
     _atualizarResumoTorneio();
+    // Atualiza status na barra (remove/coloca o ⚠️ "Falta marcar intervalo" se aplicável)
+    if (typeof window.t2AtualizarStatusRebuy === 'function') {
+        try { window.t2AtualizarStatusRebuy(); } catch(_) {}
+    }
     
     if (typeof showToast === 'function') {
         showToast(novoValor 
@@ -19195,12 +19199,18 @@ function addBlindRow() {
 function addIntervaloRow() {
     blindStructure.push({ isBreak: true, tempo: 10, sb: 0, bb: 0, ante: 0 });
     renderBlindsInputs();
+    if (typeof window.t2AtualizarStatusRebuy === 'function') {
+        try { window.t2AtualizarStatusRebuy(); } catch(_) {}
+    }
 }
 
 function removeBlindRow(i) {
     if (blindStructure.length <= 2) return showToast('⚠️ Mínimo 2 níveis');
     blindStructure.splice(i, 1);
     renderBlindsInputs();
+    if (typeof window.t2AtualizarStatusRebuy === 'function') {
+        try { window.t2AtualizarStatusRebuy(); } catch(_) {}
+    }
 }
 
 // ============================================================
@@ -19436,6 +19446,31 @@ function saveTournament() {
             showToast('⚠️ Torneio com Buy-in FREE precisa do nível máximo configurado');
             document.getElementById('t-buyin-free-ate-nivel')?.focus();
             return;
+        }
+    }
+
+    // VALIDAÇÃO EDUCATIVA: Add-on configurado mas sem intervalo de compras marcado.
+    // Sem isso, o add-on nunca será liberado durante o torneio — bug recorrente de UX.
+    // Mostra confirm pra forçar reflexão sem bloquear (operador pode ter um motivo).
+    const addonValor = parseFloat(document.getElementById('t-addon-valor')?.value) || 0;
+    if (addonValor > 0 && Array.isArray(window.blindStructure)) {
+        const temBreakCompras = window.blindStructure.some(b =>
+            b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true)
+        );
+        if (!temBreakCompras) {
+            const msg = '⚠️ Atenção:\n\n' +
+                'Este torneio tem Add-on configurado (R$ ' + addonValor.toFixed(2) + '), ' +
+                'mas nenhum intervalo está marcado como "Intervalo de Compras".\n\n' +
+                'Sem isso, o Add-on não será liberado automaticamente durante o torneio. ' +
+                'O operador terá que abrir o período manualmente.\n\n' +
+                'Deseja criar mesmo assim?\n\n' +
+                '• OK = Criar do jeito que está\n' +
+                '• Cancelar = Voltar e marcar o intervalo';
+            if (!confirm(msg)) {
+                // Operador escolheu voltar pra ajustar.
+                showToast('💡 Marque um break na estrutura como "Intervalo de Compras"');
+                return;
+            }
         }
     }
 
@@ -37076,6 +37111,22 @@ function atualizarComprovanteUI() {
       elStatus.textContent = parts.join(' · ');
       elStatus.classList.add('t2-active');
     }
+    // Aviso de intervalo de compras: se Add-on > 0, verifica se algum break
+    // da estrutura está marcado como intervalo de compras. Se não, mostra alerta
+    // discreto na barra de status (educacional, não bloqueia nada).
+    try {
+      if (addon > 0 && Array.isArray(window.blindStructure)) {
+        const temBreakCompras = window.blindStructure.some(b => b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true));
+        if (!temBreakCompras) {
+          elStatus.textContent += ' · ⚠️ Falta marcar intervalo';
+          elStatus.style.color = '#fbbf24';
+        } else {
+          elStatus.style.color = '';
+        }
+      } else {
+        elStatus.style.color = '';
+      }
+    } catch(_) { /* silencioso — não bloqueia render */ }
   };
 
   // ─── Status: Travas de Nível ───────────────────────────────────
