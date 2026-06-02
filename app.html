@@ -19463,7 +19463,13 @@ function saveTournament() {
             const v = parseFloat(document.getElementById('t-buyin').value);
             return (isNaN(v) || v < 0) ? 100 : v; // permite 0 (buy-in free) mas não NaN/negativo
         })(),
-        rake:         parseFloat(document.getElementById('t-rake').value)   || 20,
+        rake: (function() {
+            // CORREÇÃO: o padrão `|| 20` quebra quando user digita 0 (porque 0 é falsy).
+            // Aqui aceitamos 0 explicitamente (torneio sem rake) e só usamos 20 quando o
+            // input está vazio ou inválido. Mesmo padrão usado em t-buyin acima.
+            const v = parseFloat(document.getElementById('t-rake').value);
+            return (isNaN(v) || v < 0) ? 20 : v;
+        })(),
         taxaAdm:      parseFloat(document.getElementById('t-taxa-adm')?.value) || 0,
         buyinFreeAteNivel: (function() {
             const v = parseInt(document.getElementById('t-buyin-free-ate-nivel')?.value);
@@ -29570,8 +29576,16 @@ function salvarPreferencias() {
 // --- TORNEIOS DEFAULTS ---
 function salvarConfigTorneios() {
     config.torneios = {
-        buyin:       parseFloat(document.getElementById('cfg-torn-buyin').value)   || 100,
-        rake:        parseFloat(document.getElementById('cfg-torn-rake').value)    || 20,
+        buyin: (function() {
+            // Aceita 0 (buy-in free como padrão do clube). Só usa default 100 se vazio/inválido.
+            const v = parseFloat(document.getElementById('cfg-torn-buyin').value);
+            return (isNaN(v) || v < 0) ? 100 : v;
+        })(),
+        rake: (function() {
+            // Aceita 0 (torneio sem rake como padrão do clube). Só usa default 20 se vazio/inválido.
+            const v = parseFloat(document.getElementById('cfg-torn-rake').value);
+            return (isNaN(v) || v < 0) ? 20 : v;
+        })(),
         stack:       parseInt(document.getElementById('cfg-torn-stack').value)     || 20000,
         tempoNivel:  parseInt(document.getElementById('cfg-torn-tempo').value)     || 15,
         reentryAte:  parseInt(document.getElementById('cfg-torn-reentry').value)   || 0,
