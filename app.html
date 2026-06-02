@@ -756,6 +756,61 @@
         .btn-danger { background: transparent; color: #ef4444; border: 1px solid #3f1515; border-radius: .6rem; padding: .5rem 1rem; cursor: pointer; transition: all .15s; font-family: 'Manrope', sans-serif; font-size: .8rem; }
         .btn-danger:hover { background: #3f1515; }
 
+        /* ===== Padrão reutilizável: botão com gate de feature =====
+           Use junto com data-feature="nome_da_feature" no botão.
+           A função _aplicarGatesVisuais() adiciona a classe .is-locked
+           se a feature não estiver liberada no plano atual.
+           Visual: badge "PRO" dourado ao lado do texto + opacidade levemente reduzida.
+           Comportamento: ainda clicável (intercepta pra abrir modal de upgrade). */
+        .feature-gated.is-locked {
+            position: relative;
+            opacity: .85;
+            transition: opacity .15s, filter .15s;
+        }
+        .feature-gated.is-locked:hover {
+            opacity: 1;
+        }
+        .feature-gated.is-locked::after {
+            content: 'PRO';
+            display: inline-block;
+            margin-left: .5em;
+            padding: .12em .5em;
+            font-size: .65em;
+            font-weight: 800;
+            font-family: 'Manrope', sans-serif;
+            color: #0a0a0b;
+            background: linear-gradient(135deg, #f5d572 0%, #d4a82e 100%);
+            border-radius: .35em;
+            letter-spacing: .08em;
+            vertical-align: middle;
+            line-height: 1;
+            box-shadow: 0 1px 4px rgba(245, 213, 114, .25);
+            position: relative;
+            top: -1px;
+        }
+        /* Tooltip custom no hover do botão locked */
+        .feature-gated.is-locked[data-feature-tooltip] {
+            position: relative;
+        }
+        .feature-gated.is-locked[data-feature-tooltip]:hover::before {
+            content: attr(data-feature-tooltip);
+            position: absolute;
+            bottom: calc(100% + .4em);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #18181b;
+            color: #fff;
+            padding: .45em .75em;
+            border-radius: .4em;
+            font-size: .7rem;
+            font-weight: 600;
+            white-space: nowrap;
+            z-index: 10000;
+            border: 1px solid #3f3f46;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,.4);
+        }
+
         /* Input base */
         .inp { background: #18181b; border: 1px solid #27272a; border-radius: .6rem; padding: .75rem 1rem; color: #e4e4e7; outline: none; font-family: 'Manrope', sans-serif; font-size: .9rem; width: 100%; }
         .inp:focus { border-color: var(--gold); }
@@ -6376,7 +6431,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <button onclick="abrirConfigStatsTV()" id="btn-config-stats-tv" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;" title="Configurar stats do layout Pro Live">
                         <i class="fa-solid fa-sliders"></i>
                     </button>
-                    <button onclick="abrirPersonalizarProLive()" id="btn-personalizar-prolive" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;display:none;color:#a78bfa;" title="Personalizar fundo e cores do Pro Live">
+                    <button onclick="abrirPersonalizarProLive()" id="btn-personalizar-prolive" class="btn-ghost feature-gated" data-feature="personalizacao_tv" data-feature-label="Personalização avançada da TV (logo, fundo, marca d'água)" style="font-size:.7rem;padding:.3rem .55rem;display:none;color:#a78bfa;" title="Personalizar fundo e cores do Pro Live">
                         <i class="fa-solid fa-palette"></i>
                     </button>
                     <button onclick="abrirPremiacaoProjetada()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .55rem;color:var(--gold);" title="Premiação projetada (payout)">
@@ -16306,6 +16361,58 @@ window.hasFeature = function(name) {
     return !!plano[key];
 };
 
+// ============================================================
+// Padrão reutilizável: gate visual em botões/elementos.
+// Como usar: marcar o elemento com class="feature-gated" e data-feature="nome".
+// Opcional: data-feature-label="texto amigável" pra mostrar no modal de upgrade.
+//
+//   <button class="feature-gated" data-feature="personalizacao_tv"
+//           data-feature-label="Personalização avançada da TV">
+//     Personalizar TV
+//   </button>
+//
+// Chamar _aplicarGatesVisuais() depois de mudanças no plano ou ao mostrar elementos.
+// Tudo idempotente: pode chamar várias vezes sem problemas.
+// ============================================================
+window._aplicarGatesVisuais = function(rootEl) {
+    const root = rootEl || document;
+    const els = root.querySelectorAll('.feature-gated[data-feature]');
+    els.forEach(el => {
+        const feat = el.getAttribute('data-feature');
+        if (!feat) return;
+        const liberado = window.hasFeature(feat);
+        if (liberado) {
+            // Libera: remove a classe locked e o tooltip
+            el.classList.remove('is-locked');
+            el.removeAttribute('data-feature-tooltip');
+            // Restaura onclick original se a gente tinha trocado
+            if (el.__originalOnclick !== undefined) {
+                el.onclick = el.__originalOnclick;
+                delete el.__originalOnclick;
+            }
+        } else {
+            // Bloqueia: adiciona a classe locked e tooltip
+            el.classList.add('is-locked');
+            const label = el.getAttribute('data-feature-label') || el.textContent.trim();
+            el.setAttribute('data-feature-tooltip', '🔒 Recurso disponível no plano Pro');
+            // Intercepta o clique: salva o original e redireciona pra modal de upgrade
+            if (el.__originalOnclick === undefined) {
+                el.__originalOnclick = el.onclick;
+            }
+            el.onclick = function(ev) {
+                if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+                if (typeof window.mostrarModalUpgrade === 'function') {
+                    window.mostrarModalUpgrade(label);
+                } else if (typeof showToast === 'function') {
+                    showToast('🔒 ' + label + ' — disponível no plano Pro');
+                }
+                return false;
+            };
+        }
+    });
+};
+
+
 // Se a página requer uma feature, retorna o nome dela. Senão retorna null.
 function _featureRequiredFor(page) {
     return FEATURE_REQUIREMENTS[page] || null;
@@ -16549,6 +16656,12 @@ async function carregarAssinaturaAtual() {
         
         _assinaturaAtual = assinaturaRes.data || null;
         _planosCache = planosRes.data || [];
+        
+        // Reaplica gates visuais (badge PRO em features bloqueadas) após carregar o cache.
+        // Idempotente — pode rodar várias vezes.
+        if (typeof window._aplicarGatesVisuais === 'function') {
+            try { window._aplicarGatesVisuais(); } catch(e) { console.warn('[gates] aplicar:', e); }
+        }
         
         // Verificar bloqueio
         const clube = clubeRes.data;
@@ -23044,6 +23157,8 @@ function onLayoutChange() {
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     const btnPers = document.getElementById('btn-personalizar-prolive');
     if (btnPers) btnPers.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
+    // Reaplica gate visual (badge PRO + tooltip) — idempotente
+    if (typeof window._aplicarGatesVisuais === 'function') window._aplicarGatesVisuais();
     showToast('🎨 Layout TV: ' + t.tvLayout);
 }
 
@@ -23075,6 +23190,8 @@ function syncTVControls() {
     if (btnStats) btnStats.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
     const btnPers = document.getElementById('btn-personalizar-prolive');
     if (btnPers) btnPers.style.display = (t.tvLayout === 'pokerweb') ? 'inline-block' : 'none';
+    // Reaplica gate visual (badge PRO + tooltip) caso o plano não tenha personalizacao_tv
+    if (typeof window._aplicarGatesVisuais === 'function') window._aplicarGatesVisuais();
     // Aplica visual do tema TV no card do timer (preview ao abrir o modal)
     window._lastMiniTvRender = Date.now(); // marca a renderização inicial
     renderMiniTVPreview(t.tvLayout || 'classico');
