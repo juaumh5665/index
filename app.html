@@ -3421,7 +3421,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <!-- ABA: TV PÚBLICA -->
                 <div id="cfg-tv" class="configtab-content" style="display:none;">
                     <div style="max-width:780px;">
-                        <div class="stat-card" style="padding:2rem;">
+                        <div class="stat-card" id="tv-publica-section" style="padding:2rem;">
                             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem;">
                                 <i class="fa-solid fa-tv" style="color:var(--gold);font-size:1.25rem;"></i>
                                 <div>
@@ -3471,6 +3471,25 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <i class="fa-solid fa-shield-halved" style="margin-right:.4rem;"></i>
                                 <strong>Segurança:</strong> Esta URL é privada e contém um token de acesso. Não compartilhe publicamente. Se vazar, click em "Regenerar URL" para criar uma nova.
                             </div>
+                        </div>
+                        <!-- Placeholder PRO pra quando feature_multi_tv (TV Pública) está OFF -->
+                        <div id="tv-publica-locked" class="stat-card" style="display:none;padding:2rem;background:rgba(168,85,247,.06);border-color:rgba(168,85,247,.25);">
+                            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.85rem;">
+                                <i class="fa-solid fa-tv" style="color:#a78bfa;font-size:1.4rem;"></i>
+                                <div>
+                                    <div style="font-size:1.05rem;font-weight:800;color:#fff;">TV Pública <span style="background:linear-gradient(135deg,#f5d572 0%,#d4a82e 100%);color:#0a0a0b;font-size:.62rem;padding:.12em .5em;border-radius:.35em;font-weight:800;letter-spacing:.08em;margin-left:.4rem;vertical-align:middle;">PRO</span></div>
+                                    <div style="font-size:.75rem;color:#a1a1aa;margin-top:.25rem;">URL pública compartilhável pra exibir torneios em Smart TVs, Chromecast e telas externas</div>
+                                </div>
+                            </div>
+                            <div style="font-size:.8rem;color:#a1a1aa;line-height:1.6;margin-bottom:1.25rem;">
+                                Disponibilize sua TV em qualquer dispositivo via link público em tempo real.
+                                Sem esta feature, você ainda pode usar a <strong>TV via popup</strong> (botão "Abrir TV" no torneio) — ela funciona dentro do navegador local.
+                                <br><br>
+                                Disponível nos planos Premium e Pro.
+                            </div>
+                            <button onclick="if(typeof mostrarModalUpgrade==='function')mostrarModalUpgrade('TV Pública (link compartilhável)')" class="btn-gold" style="padding:.6rem 1.1rem;border-radius:.5rem;font-size:.8rem;">
+                                <i class="fa-solid fa-arrow-up"></i> Fazer Upgrade
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -7824,6 +7843,17 @@ let _syncEmAndamento = false;
 let _tvSlugCache = null;
 
 async function renderConfigTV() {
+    // Gate: alterna entre seção real e placeholder "locked" baseado na feature.
+    // Sem feature, nem geramos slug nem chamamos a RPC — pra não gerar tráfego desnecessário.
+    const secReal = document.getElementById('tv-publica-section');
+    const secLocked = document.getElementById('tv-publica-locked');
+    const liberado = (typeof window.hasFeature === 'function') ? window.hasFeature('multi_tv') : true;
+    if (secReal && secLocked) {
+        secReal.style.display = liberado ? '' : 'none';
+        secLocked.style.display = liberado ? 'none' : '';
+    }
+    if (!liberado) return; // sem feature, não precisa gerar slug nem nada
+
     const urlInput = document.getElementById('cfg-tv-url');
     if (!urlInput) return;
     urlInput.value = 'Carregando...';
@@ -7857,7 +7887,20 @@ async function renderConfigTV() {
     }
 }
 
+// Helper interno: verifica feature de TV pública e mostra modal de upgrade se OFF.
+// Retorna true se pode prosseguir, false se foi bloqueado (caller deve abortar).
+function _gateTvPublicaOk() {
+    if (typeof window.hasFeature !== 'function' || window.hasFeature('multi_tv')) return true;
+    if (typeof window.mostrarModalUpgrade === 'function') {
+        window.mostrarModalUpgrade('TV Pública (link compartilhável)');
+    } else if (typeof showToast === 'function') {
+        showToast('🔒 TV Pública — disponível no plano Premium');
+    }
+    return false;
+}
+
 async function copiarUrlTV() {
+    if (!_gateTvPublicaOk()) return;
     const input = document.getElementById('cfg-tv-url');
     if (!input || !input.value || input.value.startsWith('Erro') || input.value === 'Carregando...') {
         alert('URL ainda não está disponível. Tente recarregar a página.');
@@ -7889,6 +7932,7 @@ async function copiarUrlTV() {
 
 // Copia URL legacy (versão ultra-compatível com TVs antigas)
 async function copiarUrlTVLegacy() {
+    if (!_gateTvPublicaOk()) return;
     const input = document.getElementById('cfg-tv-url');
     if (!input || !input.value || input.value.startsWith('Erro')) {
         alert('URL ainda não está disponível. Aguarde o carregamento.');
@@ -7906,6 +7950,7 @@ async function copiarUrlTVLegacy() {
 }
 
 async function regenerarTokenTV(silencioso = false) {
+    if (!_gateTvPublicaOk()) return null;
     if (!silencioso) {
         const ok = confirm(
             '⚠️ ATENÇÃO: Regenerar URL vai INVALIDAR a URL atual.\n\n' +
@@ -7943,6 +7988,7 @@ async function regenerarTokenTV(silencioso = false) {
 }
 
 function abrirTVNovaAba() {
+    if (!_gateTvPublicaOk()) return;
     const url = document.getElementById('cfg-tv-url')?.value;
     if (!url || url.startsWith('Erro') || url === 'Carregando...') {
         alert('URL ainda não está disponível.');
@@ -16997,7 +17043,7 @@ function _renderCardsPlanoNoModalExpirado() {
         if (p.feature_relatorios_avancados) features.push('📈 Relatórios avançados');
         if (p.feature_stackclock) features.push('⏱ StackClock (Dealer App)');
         if (p.feature_stackbar) features.push('🍻 StackBar (Bar App)');
-        if (p.feature_multi_tv) features.push('📺 Multi-TV');
+        if (p.feature_multi_tv) features.push('📺 TV Pública');
         if (p.feature_templates_torneio) features.push('📋 Templates de torneio');
         if (p.feature_suporte_prioritario) features.push('🛟 Suporte prioritário');
         if (p.feature_api) features.push('🔌 API');
@@ -17165,7 +17211,7 @@ function renderPlanosGrid() {
         if (p.feature_templates_torneio) features.push('✓ Templates de torneio');
         if (p.feature_impressao_termica) features.push('✓ Impressão térmica');
         if (p.feature_multi_clube) features.push('✓ Multi-clube');
-        if (p.feature_multi_tv) features.push('✓ Múltiplas TVs');
+        if (p.feature_multi_tv) features.push('✓ TV Pública (link compartilhável)');
         if (p.feature_backup_automatico) features.push('✓ Backup automático');
         if (p.feature_suporte_prioritario) features.push('✓ Suporte prioritário');
         if (p.feature_api) features.push('✓ API');
@@ -18075,7 +18121,7 @@ async function adminCarregarPlanos() {
             if (p.feature_templates_torneio) features.push('Templates');
             if (p.feature_impressao_termica) features.push('Impressão');
             if (p.feature_multi_clube) features.push('Multi-clube');
-            if (p.feature_multi_tv) features.push('Multi-TV');
+            if (p.feature_multi_tv) features.push('TV Pública');
             if (p.feature_backup_automatico) features.push('Backup Auto');
             if (p.feature_suporte_prioritario) features.push('Suporte+');
             if (p.feature_api) features.push('API');
@@ -18231,7 +18277,7 @@ function adminAbrirModalPlano(planoId) {
                     {key:'feature_templates_torneio', label:'Templates de Torneio'},
                     {key:'feature_impressao_termica', label:'Impressão Térmica'},
                     {key:'feature_multi_clube', label:'Multi-clube'},
-                    {key:'feature_multi_tv', label:'Múltiplas TVs'},
+                    {key:'feature_multi_tv', label:'TV Pública (link compartilhável)'},
                     {key:'feature_backup_automatico', label:'Backup Automático'},
                     {key:'feature_suporte_prioritario', label:'Suporte Prioritário'},
                     {key:'feature_api', label:'Acesso à API'},
