@@ -6495,6 +6495,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <!-- Tabs -->
         <div style="padding:.75rem 1.5rem 0;border-bottom:1px solid #1e1e23;display:flex;gap:.25rem;flex-shrink:0;flex-wrap:wrap;">
             <button class="tab-btn active" onclick="switchTab('tab-controle', this)">Controle</button>
+            <button class="tab-btn" onclick="switchTab('tab-info', this)"><i class="fa-solid fa-circle-info"></i> Info</button>
             <button class="tab-btn" onclick="switchTab('tab-jogadores', this)">Jogadores</button>
             <button class="tab-btn" onclick="switchTab('tab-mesas', this)">Mesas</button>
             <button class="tab-btn" onclick="switchTab('tab-financeiro', this)">Financeiro</button>
@@ -6705,6 +6706,12 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- TAB: INFO (somente leitura — configurações do torneio) -->
+            <div id="tab-info" class="tab-content" style="display:none;">
+                <!-- Container preenchido por renderTabInfo() -->
+                <div id="tab-info-content" style="padding:.5rem 0;"></div>
             </div>
 
             <!-- TAB: JOGADORES -->
@@ -18881,6 +18888,7 @@ function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).style.display = 'block';
     btn.classList.add('active');
+    if (tabId === 'tab-info')      renderTabInfo();
     if (tabId === 'tab-jogadores') renderTabJogadores();
     if (tabId === 'tab-mesas')     renderTabMesas();
     if (tabId === 'tab-financeiro') renderTabFinanceiro();
@@ -20472,6 +20480,160 @@ function renderTabMesas() {
         </div>
         `;
     }).join('');
+}
+
+// ============================================================
+// Renderiza a aba "Info" — somente leitura, com todas as configs do torneio.
+// É puramente visual; nenhum dado é alterado aqui. Não toca cálculo financeiro.
+// ============================================================
+function renderTabInfo() {
+    const t = torneios[activeTorneioIdx];
+    const el = document.getElementById('tab-info-content');
+    if (!el || !t) return;
+
+    // Helpers de formatação
+    const fmtBRL = v => 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ',');
+    const fmtNum = v => (Number(v) || 0).toLocaleString('pt-BR');
+    const naoCfg = '<span style="color:#52525b;font-size:.9rem;">—</span>';
+
+    // Render de 1 card. Se val for null, mostra o "—".
+    function card(opts) {
+        const sub = opts.sub ? '<div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">' + opts.sub + '</div>' : '';
+        const valColor = opts.valColor || '#fafafa';
+        const val = (opts.val == null || opts.val === '')
+            ? naoCfg
+            : '<div style="font-size:1.05rem;font-weight:700;color:' + valColor + ';">' + opts.val + '</div>';
+        return '<div style="background:#0f0f12;border:1px solid #27272a;border-radius:.5rem;padding:.85rem;">' +
+            '<div style="font-size:.62rem;color:#71717a;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.35rem;font-weight:700;">' + opts.lab + '</div>' +
+            val + sub +
+            '</div>';
+    }
+
+    function secao(titulo, cards) {
+        return '<h3 style="margin:0 0 .75rem;font-size:.7rem;color:#71717a;letter-spacing:.05em;font-weight:700;text-transform:uppercase;">' + titulo + '</h3>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem;margin-bottom:1.5rem;">' +
+                cards.join('') +
+            '</div>';
+    }
+
+    // === Coleta de dados (somente leitura) ===
+    const buyin = Number(t.buyin) || 0;
+    const buyinSub = buyin === 0
+        ? ('FREE até N' + (t.buyinFreeAteNivel || '—'))
+        : (Number(t.taxaAdm) > 0 ? ('+ Taxa adm ' + fmtBRL(t.taxaAdm)) : '');
+    const stack = Number(t.stack) || 0;
+    let bigBlind = 0;
+    try {
+        const primeiro = (t.blinds || []).find(b => !b.isBreak);
+        if (primeiro) bigBlind = Number(primeiro.bb) || 0;
+    } catch(_) {}
+    const stackEmBB = (bigBlind > 0) ? (Math.round(stack / bigBlind) + ' BB') : '';
+
+    // === Seção: Financeiro ===
+    const financeiro = secao('Financeiro', [
+        card({ lab: 'Buy-in', val: fmtBRL(buyin), valColor: '#f5d572', sub: buyinSub }),
+        card({ lab: 'Rake', val: (Number(t.rake) || 0) + '%' }),
+        card({ lab: 'Stack inicial', val: fmtNum(stack), sub: stackEmBB }),
+        card({ lab: 'Tempo de nível', val: (Number(t.tempoNivel) || 15) + ' min' }),
+    ]);
+
+    // === Seção: Rebuy · Add-on · Last Chance ===
+    const rbSimples = Number(t.rebuySimples) || 0;
+    const rbDuplo = Number(t.rebuyDuplo) || 0;
+    const addonV = Number(t.addonValor) || 0;
+    const addonF = Number(t.addonFichas) || 0;
+    const lcV = Number(t.lastChanceValor) || 0;
+    const lcF = Number(t.lastChanceFichas) || 0;
+
+    const rebuyAddon = secao('Rebuy · Add-on', [
+        card({
+            lab: 'Rebuy simples',
+            val: rbSimples > 0 ? fmtBRL(rbSimples) : null,
+            sub: rbSimples > 0 ? ('+ ' + fmtNum(t.rebuySimplesFichas || 0) + ' fichas') : null,
+        }),
+        card({
+            lab: 'Rebuy duplo',
+            val: rbDuplo > 0 ? fmtBRL(rbDuplo) : null,
+            sub: rbDuplo > 0 ? ('+ ' + fmtNum(t.rebuyDuploFichas || 0) + ' fichas') : null,
+        }),
+        card({
+            lab: 'Add-on',
+            val: (addonV > 0 || addonF > 0) ? (addonV > 0 ? fmtBRL(addonV) : 'Grátis') : null,
+            valColor: '#22c55e',
+            sub: (addonV > 0 || addonF > 0) ? ('+ ' + fmtNum(addonF) + ' fichas') : null,
+        }),
+        card({
+            lab: 'Last Chance',
+            val: lcV > 0 ? fmtBRL(lcV) : null,
+            sub: lcV > 0 ? ('+ ' + fmtNum(lcF) + ' fichas') : null,
+        }),
+    ]);
+
+    // === Seção: Jackpot · Staff · Passaporte ===
+    const jpV = Number(t.jackpotValor) || 0;
+    const jpF = Number(t.jackpotFichas) || 0;
+    const staffPct = Number(t.staffPct) || 0;
+    const staffFx = Number(t.staffFixoValor) || 0;
+    const ppV = Number(t.passaporteValor) || 0;
+
+    const extras = secao('Jackpot · Staff · Passaporte', [
+        card({
+            lab: 'Jackpot',
+            val: (jpV > 0 && jpF > 0) ? fmtBRL(jpV) : null,
+            valColor: '#a78bfa',
+            sub: (jpV > 0 && jpF > 0) ? ('+ ' + fmtNum(jpF) + ' fichas') : null,
+        }),
+        card({
+            lab: 'Staff %',
+            val: staffPct > 0 ? (staffPct + '%') : null,
+            sub: staffPct > 0 ? (t.staffCascataAtivo ? 'Cascata' : 'Direto') : null,
+        }),
+        card({
+            lab: 'Staff fixo',
+            val: staffFx > 0 ? fmtBRL(staffFx) : null,
+            sub: staffFx > 0 ? (t.staffFixoModo === 'embutido' ? 'Embutido' : 'Adicional') : null,
+        }),
+        card({
+            lab: 'Passaporte',
+            val: ppV > 0 ? fmtBRL(ppV) : null,
+            sub: ppV > 0 ? ('+ ' + fmtNum(t.passaporteFichas || 0) + ' fichas') : null,
+        }),
+    ]);
+
+    // === Seção: Travas e Breaks ===
+    const totalBreaks = (t.blinds || []).filter(b => b.isBreak).length;
+    const breakCompras = (t.blinds || []).find(b => b.isBreak && (b.breakDeCompras || b.break_de_compras));
+    const subBreaks = (addonV > 0 && !breakCompras)
+        ? '<span style="color:#fbbf24;">⚠️ Nenhum marcado como compras</span>'
+        : (breakCompras ? '<span style="color:#22c55e;">✓ Intervalo de compras marcado</span>' : null);
+
+    const travasBreaks = secao('Travas · Breaks', [
+        card({
+            lab: 'Entradas até nível',
+            val: (Number(t.reentryAte) || 0) > 0 ? ('N' + t.reentryAte) : 'Sem trava',
+        }),
+        card({
+            lab: 'Add-on até nível',
+            val: (Number(t.addonAte) || 0) > 0 ? ('N' + t.addonAte) : 'Sem trava',
+        }),
+        card({
+            lab: 'Total de breaks',
+            val: totalBreaks,
+            sub: subBreaks,
+        }),
+        card({
+            lab: 'Total de níveis',
+            val: (t.blinds || []).filter(b => !b.isBreak).length,
+        }),
+    ]);
+
+    // === Rodapé informativo ===
+    const rodape = '<div style="margin-top:.5rem;padding:.75rem;background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.2);border-radius:.5rem;font-size:.75rem;color:#a1a1aa;line-height:1.55;">' +
+        '<i class="fa-solid fa-circle-info" style="color:#a78bfa;margin-right:.4rem;"></i>' +
+        'Esta tela é <strong>somente leitura</strong>. Valores financeiros (R$ e fichas) não podem ser alterados após a criação do torneio.' +
+        '</div>';
+
+    el.innerHTML = financeiro + rebuyAddon + extras + travasBreaks + rodape;
 }
 
 function renderTabFinanceiro() {
