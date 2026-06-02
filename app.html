@@ -19453,8 +19453,8 @@ function saveTournament() {
     // Sem isso, o add-on nunca será liberado durante o torneio — bug recorrente de UX.
     // Mostra confirm pra forçar reflexão sem bloquear (operador pode ter um motivo).
     const addonValor = parseFloat(document.getElementById('t-addon-valor')?.value) || 0;
-    if (addonValor > 0 && Array.isArray(window.blindStructure)) {
-        const temBreakCompras = window.blindStructure.some(b =>
+    if (addonValor > 0 && typeof blindStructure !== 'undefined' && Array.isArray(blindStructure)) {
+        const temBreakCompras = blindStructure.some(b =>
             b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true)
         );
         if (!temBreakCompras) {
@@ -37115,8 +37115,10 @@ function atualizarComprovanteUI() {
     // da estrutura está marcado como intervalo de compras. Se não, mostra alerta
     // discreto na barra de status (educacional, não bloqueia nada).
     try {
-      if (addon > 0 && Array.isArray(window.blindStructure)) {
-        const temBreakCompras = window.blindStructure.some(b => b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true));
+      // Acessa via globalThis: `let blindStructure` global é acessível assim em qq escopo.
+      const bs = (typeof blindStructure !== 'undefined') ? blindStructure : null;
+      if (addon > 0 && Array.isArray(bs)) {
+        const temBreakCompras = bs.some(b => b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true));
         if (!temBreakCompras) {
           elStatus.textContent += ' · ⚠️ Falta marcar intervalo';
           elStatus.style.color = '#fbbf24';
