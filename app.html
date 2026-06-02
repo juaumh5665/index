@@ -5794,7 +5794,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;">
                 <div id="template-list-v2" style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1;"></div>
-                <button onclick="abrirSalvarTemplate()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .6rem;color:#22c55e;flex-shrink:0;" title="Salvar configurações atuais como template">
+                <button onclick="abrirSalvarTemplate()" class="btn-ghost feature-gated" data-feature="templates_torneio" data-feature-label="Salvar templates personalizados de torneio" style="font-size:.7rem;padding:.3rem .6rem;color:#22c55e;flex-shrink:0;" title="Salvar configurações atuais como template">
                     <i class="fa-solid fa-floppy-disk"></i> Salvar template
                 </button>
             </div>
@@ -15423,12 +15423,29 @@ function _aplicarConfigTorneio(cfg) {
 }
 
 function abrirSalvarTemplate() {
+    // Gate defensivo: caso alguém burle o front, ainda checa aqui
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('templates_torneio')) {
+        if (typeof window.mostrarModalUpgrade === 'function') {
+            window.mostrarModalUpgrade('Salvar templates personalizados de torneio');
+        } else {
+            showToast('🔒 Salvar templates — disponível no plano Premium');
+        }
+        return;
+    }
     document.getElementById('tmpl-nome').value = '';
     document.getElementById('tmpl-desc').value = '';
     openModal('modal-salvar-template');
 }
 
 function salvarTemplate() {
+    // Gate defensivo (deveria ser bloqueado em abrirSalvarTemplate, mas garantimos aqui)
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('templates_torneio')) {
+        closeModal('modal-salvar-template');
+        if (typeof window.mostrarModalUpgrade === 'function') {
+            window.mostrarModalUpgrade('Salvar templates personalizados de torneio');
+        }
+        return;
+    }
     const nome = document.getElementById('tmpl-nome').value.trim();
     if (!nome) return showToast('⚠️ Dê um nome ao template');
 
@@ -15507,19 +15524,28 @@ function renderTemplatesBar() {
     `;
     
     // 3) Separador visual se tiver templates do cliente
-    if (torneioTemplates.length) {
+    // Gate: templates personalizados só aparecem se o plano tem a feature.
+    // Templates nativos (acima) continuam visíveis pra todos os planos.
+    const _temFeatureTpl = (typeof window.hasFeature !== 'function') || window.hasFeature('templates_torneio');
+    if (torneioTemplates.length && _temFeatureTpl) {
         html += '<span style="color:#3f3f46;font-size:.85rem;margin:0 .15rem;">|</span>';
     }
     
-    // 4) Templates DO CLIENTE
-    html += torneioTemplates.map(t => `
-        <div style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.2rem .35rem .2rem .65rem;font-size:.7rem;">
-            <button onclick="aplicarTemplate(${t.id})" style="background:none;border:none;color:var(--gold);font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;padding:0;font-size:.7rem;" title="${esc(t.descricao || '')}">${esc(t.nome)}</button>
-            <button onclick="deletarTemplate(${t.id})" style="background:none;border:none;color:#52525b;cursor:pointer;padding:0 .2rem;font-size:.65rem;" title="Excluir" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-times"></i></button>
-        </div>
-    `).join('');
+    // 4) Templates DO CLIENTE — só renderiza se tem a feature
+    if (_temFeatureTpl) {
+        html += torneioTemplates.map(t => `
+            <div style="display:inline-flex;align-items:center;gap:.3rem;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.2rem .35rem .2rem .65rem;font-size:.7rem;">
+                <button onclick="aplicarTemplate(${t.id})" style="background:none;border:none;color:var(--gold);font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;padding:0;font-size:.7rem;" title="${esc(t.descricao || '')}">${esc(t.nome)}</button>
+                <button onclick="deletarTemplate(${t.id})" style="background:none;border:none;color:#52525b;cursor:pointer;padding:0 .2rem;font-size:.65rem;" title="Excluir" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#52525b'"><i class="fa-solid fa-times"></i></button>
+            </div>
+        `).join('');
+    }
     
     list.innerHTML = html;
+    // Reaplica gate visual no botão "Salvar template" (badge PRO) após a barra renderizar
+    if (typeof window._aplicarGatesVisuais === 'function') {
+        try { window._aplicarGatesVisuais(); } catch(_) {}
+    }
 }
 
 // Helper de escape (caso não exista global)
