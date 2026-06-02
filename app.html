@@ -6485,6 +6485,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         <i class="fa-solid fa-trophy"></i>
                     </button>
                 </div>
+                <button onclick="abrirEditarTorneio(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;color:#a78bfa;border-color:rgba(167,139,250,.3);" title="Editar torneio (travas, breaks, impressão)"><i class="fa-solid fa-gear"></i> Editar</button>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
                 <button onclick="copiarLinkRanking()" class="btn-ghost" style="font-size:.8rem;" title="Copiar link público do ranking"><i class="fa-solid fa-share-nodes"></i> Copiar Link</button>
                 <button onclick="compartilharWhatsApp()" class="btn-ghost" style="font-size:.8rem;color:#25d366;border-color:rgba(37,211,102,.3);" title="Compartilhar no WhatsApp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
@@ -19777,7 +19778,10 @@ function renderTorneiosList() {
                         <span style="font-size:.75rem;color:#52525b;">${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].isBreak) ? `Intervalo` : `Nível ${_nivelHumano(t)} &bull; ${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].sb) || 0}/${(t.blinds[t.nivelAtual] && t.blinds[t.nivelAtual].bb) || 0}`}</span>
                     </div>
                 </div>
-                <button onclick="abrirDetalhesTorneio(${i})" class="btn-gold" style="font-size:.85rem;">Abrir <i class="fa-solid fa-arrow-right"></i></button>
+                <div style="display:flex;gap:.4rem;align-items:center;">
+                    <button onclick="event.stopPropagation();abrirEditarTorneio(${i})" class="btn-ghost" style="font-size:.75rem;padding:.4rem .65rem;color:#a78bfa;border-color:rgba(167,139,250,.3);" title="Editar (travas, breaks, impressão)"><i class="fa-solid fa-gear"></i></button>
+                    <button onclick="abrirDetalhesTorneio(${i})" class="btn-gold" style="font-size:.85rem;">Abrir <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
             </div>
             <div style="padding:1rem 2rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;border-bottom:1px solid #1e1e23;">
                 <div><div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Entradas</div><div style="font-size:1.25rem;font-weight:800;margin-top:.2rem;">${t.entries.length}</div></div>
@@ -20481,6 +20485,364 @@ function renderTabMesas() {
         `;
     }).join('');
 }
+
+// ============================================================
+// MODAL: Editar Torneio (engrenagem ⚙️)
+// ============================================================
+// Permite editar APENAS campos que não afetam cálculos financeiros:
+//   - Geral: nome
+//   - Travas de nível: até qual nível libera buy-in/re-entry/rebuy/add-on/etc
+//   - Breaks: adicionar/remover, mudar tempo, marcar como intervalo de compras
+//   - Impressão: flags de comprovante
+//
+// NUNCA edita:
+//   - Buy-in, Rake, Taxa adm, Staff %, Staff fixo, Add-on R$, Rebuy R$
+//   - Fichas de qualquer compra
+//   - Stack inicial, sb/bb/ante de blinds
+//
+// Compatível com torneios em andamento (com entries registradas) — mostra aviso.
+// ============================================================
+
+// Estado interno do modal de edição (não persiste — só usado durante a edição)
+let _editTorneioIdx = -1;
+let _editBlinds = []; // cópia de trabalho dos blinds (clonada do torneio)
+
+function abrirEditarTorneio(idx) {
+    const t = torneios[idx];
+    if (!t) { showToast('⚠️ Torneio não encontrado'); return; }
+
+    _editTorneioIdx = idx;
+    _editBlinds = JSON.parse(JSON.stringify(t.blinds || [])); // clone profundo
+
+    // Remove modal anterior se existir
+    const antigo = document.getElementById('modal-editar-torneio');
+    if (antigo) antigo.remove();
+
+    const temEntries = (t.entries && t.entries.length > 0);
+    const statusLabel = temEntries ? 'Em andamento' : 'Aguardando início';
+    const statusColor = temEntries ? '#22c55e' : '#fbbf24';
+
+    const avisoEntries = temEntries ? (
+        '<div style="margin:0 1.5rem 0;padding:.65rem .85rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.25);border-radius:.5rem;font-size:.75rem;color:#86efac;display:flex;align-items:center;gap:.5rem;">' +
+            '<i class="fa-solid fa-circle-info"></i>' +
+            'Torneio em andamento — alguns campos podem ser limitados pra não afetar entradas já registradas.' +
+        '</div>'
+    ) : '';
+
+    const html =
+'<div id="modal-editar-torneio" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);">' +
+    '<div style="background:#18181b;border:1px solid #27272a;border-radius:.85rem;width:92%;max-width:640px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);">' +
+        // Header
+        '<div style="padding:1.25rem 1.5rem;border-bottom:1px solid #27272a;display:flex;align-items:center;gap:.8rem;position:sticky;top:0;background:#18181b;z-index:2;">' +
+            '<div style="width:38px;height:38px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:.5rem;display:flex;align-items:center;justify-content:center;color:#a78bfa;font-size:1.05rem;">' +
+                '<i class="fa-solid fa-gear"></i>' +
+            '</div>' +
+            '<div style="flex:1;">' +
+                '<h2 style="margin:0;font-size:1.05rem;font-weight:700;color:#fafafa;">Editar torneio</h2>' +
+                '<div style="font-size:.75rem;color:#71717a;margin-top:.15rem;">' + esc(t.nome || 'Torneio') + ' · <span style="color:' + statusColor + ';">' + statusLabel + '</span></div>' +
+            '</div>' +
+            '<button onclick="_fecharEditarTorneio()" style="background:none;border:none;color:#71717a;font-size:1.5rem;cursor:pointer;padding:.2rem .6rem;">×</button>' +
+        '</div>' +
+
+        avisoEntries +
+
+        // Body
+        '<div style="padding:1rem 1.5rem;">' +
+            // Setor: Geral
+            '<div class="edit-coll" id="edit-coll-geral">' +
+                '<div class="edit-coll-head" onclick="_editToggleColl(\'geral\')">' +
+                    '<div style="display:flex;align-items:center;gap:.5rem;"><span class="edit-chev">▶</span><i class="fa-solid fa-info-circle" style="color:#71717a;font-size:.8rem;"></i><span>Geral</span></div>' +
+                    '<span class="edit-coll-status" style="color:#71717a;font-size:.7rem;">Nome do torneio</span>' +
+                '</div>' +
+                '<div class="edit-coll-body">' +
+                    '<label class="inp-label">Nome do torneio</label>' +
+                    '<input id="edit-nome" class="inp" value="' + esc(t.nome || '') + '">' +
+                '</div>' +
+            '</div>' +
+
+            // Setor: Travas
+            '<div class="edit-coll edit-coll-open" id="edit-coll-travas">' +
+                '<div class="edit-coll-head" onclick="_editToggleColl(\'travas\')">' +
+                    '<div style="display:flex;align-items:center;gap:.5rem;"><span class="edit-chev">▶</span><i class="fa-solid fa-lock" style="color:#71717a;font-size:.8rem;"></i><span>Travas de nível</span></div>' +
+                    '<span class="edit-coll-status" style="color:#22c55e;font-size:.7rem;">Limites de compra</span>' +
+                '</div>' +
+                '<div class="edit-coll-body">' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">' +
+                        '<div>' +
+                            '<label class="inp-label">Entradas até nível</label>' +
+                            '<input id="edit-reentry-ate" class="inp" type="number" min="0" value="' + (Number(t.reentryAte) || 0) + '">' +
+                            '<div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Buy-in, re-entry, rebuy</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="inp-label">Add-on até nível</label>' +
+                            '<input id="edit-addon-ate" class="inp" type="number" min="0" value="' + (Number(t.addonAte) || 0) + '">' +
+                            '<div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">0 = sem trava</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            // Setor: Breaks
+            '<div class="edit-coll edit-coll-open" id="edit-coll-breaks">' +
+                '<div class="edit-coll-head" onclick="_editToggleColl(\'breaks\')">' +
+                    '<div style="display:flex;align-items:center;gap:.5rem;"><span class="edit-chev">▶</span><i class="fa-solid fa-pause" style="color:#71717a;font-size:.8rem;"></i><span>Breaks (intervalos)</span></div>' +
+                    '<span class="edit-coll-status" id="edit-status-breaks" style="color:#71717a;font-size:.7rem;"></span>' +
+                '</div>' +
+                '<div class="edit-coll-body">' +
+                    '<div style="font-size:.7rem;color:#71717a;margin-bottom:.6rem;line-height:1.4;">' +
+                        'Marque um break com a ⭐ pra que Add-on/Last Chance sejam liberados nele.' +
+                    '</div>' +
+                    '<div id="edit-breaks-list"></div>' +
+                    '<button type="button" onclick="_editAddBreak()" style="margin-top:.5rem;background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.3);padding:.4rem .75rem;border-radius:.4rem;font-size:.75rem;cursor:pointer;font-family:inherit;">' +
+                        '<i class="fa-solid fa-plus"></i> Adicionar break' +
+                    '</button>' +
+                '</div>' +
+            '</div>' +
+
+            // Setor: Impressão
+            '<div class="edit-coll" id="edit-coll-print">' +
+                '<div class="edit-coll-head" onclick="_editToggleColl(\'print\')">' +
+                    '<div style="display:flex;align-items:center;gap:.5rem;"><span class="edit-chev">▶</span><i class="fa-solid fa-print" style="color:#71717a;font-size:.8rem;"></i><span>Impressão de comprovantes</span></div>' +
+                    '<span class="edit-coll-status" style="color:#71717a;font-size:.7rem;">Flags de comprovante</span>' +
+                '</div>' +
+                '<div class="edit-coll-body">' +
+                    '<label style="display:flex;align-items:center;gap:.5rem;padding:.45rem 0;font-size:.82rem;cursor:pointer;">' +
+                        '<input type="checkbox" id="edit-imp-compra"' + (t.imprimirComprovanteCompra ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:#f5d572;">' +
+                        'Comprovante de buy-in / rebuy / add-on' +
+                    '</label>' +
+                    '<label style="display:flex;align-items:center;gap:.5rem;padding:.45rem 0;font-size:.82rem;cursor:pointer;">' +
+                        '<input type="checkbox" id="edit-imp-jackpot"' + (t.imprimirComprovanteJackpot ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:#f5d572;">' +
+                        'Comprovante de jackpot' +
+                    '</label>' +
+                    '<label style="display:flex;align-items:center;gap:.5rem;padding:.45rem 0;font-size:.82rem;cursor:pointer;">' +
+                        '<input type="checkbox" id="edit-imp-assinatura"' + (t.comprovanteAssinatura !== false ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:#f5d572;">' +
+                        'Incluir linha de assinatura no comprovante' +
+                    '</label>' +
+                '</div>' +
+            '</div>' +
+
+            // Aviso de não-editáveis
+            '<div style="margin-top:1rem;padding:.75rem;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:.5rem;">' +
+                '<div style="font-size:.72rem;color:#ef4444;font-weight:700;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">' +
+                    '<i class="fa-solid fa-lock"></i> Não editável após criar' +
+                '</div>' +
+                '<div style="font-size:.72rem;color:#71717a;line-height:1.5;">' +
+                    'Valores financeiros e fichas: <strong style="color:#a1a1aa;">Buy-in R$ ' + (Number(t.buyin)||0).toFixed(2).replace('.',',') + ', Rake ' + (Number(t.rake)||0) + '%</strong>' +
+                    (Number(t.taxaAdm) > 0 ? ', Taxa adm R$ ' + Number(t.taxaAdm).toFixed(2).replace('.',',') : '') +
+                    (Number(t.addonValor) > 0 ? ', Add-on R$ ' + Number(t.addonValor).toFixed(2).replace('.',',') : '') +
+                    '. Pra alterar, seria necessário criar um novo torneio.' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+
+        // Footer
+        '<div style="padding:1rem 1.5rem;border-top:1px solid #27272a;display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:#18181b;">' +
+            '<button onclick="_fecharEditarTorneio()" style="background:transparent;color:#71717a;border:1px solid #27272a;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-size:.8rem;font-family:inherit;">Cancelar</button>' +
+            '<button onclick="_salvarEditarTorneio()" class="btn-gold" style="padding:.6rem 1.2rem;font-size:.85rem;font-weight:700;">Salvar alterações</button>' +
+        '</div>' +
+    '</div>' +
+'</div>';
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    // Adiciona o CSS dos colapsáveis (uma vez só)
+    if (!document.getElementById('edit-torneio-css')) {
+        const style = document.createElement('style');
+        style.id = 'edit-torneio-css';
+        style.textContent =
+            '.edit-coll{background:#131316;border:1px solid #27272a;border-radius:.55rem;margin-bottom:.6rem;overflow:hidden;}' +
+            '.edit-coll-head{padding:.75rem .9rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;font-size:.85rem;color:#e4e4e7;}' +
+            '.edit-coll-head:hover{background:#1a1a1e;}' +
+            '.edit-chev{color:#71717a;transition:transform .15s;font-size:.7rem;display:inline-block;}' +
+            '.edit-coll-open .edit-chev{transform:rotate(90deg);color:#f5d572;}' +
+            '.edit-coll-body{display:none;padding:.9rem;border-top:1px solid #27272a;background:#0f0f12;}' +
+            '.edit-coll-open .edit-coll-body{display:block;}' +
+            '.edit-break-row{background:#0a0a0b;border:1px solid #27272a;border-radius:.4rem;padding:.55rem .7rem;margin-bottom:.4rem;display:flex;align-items:center;gap:.6rem;}' +
+            '.edit-break-row.compras{border-color:rgba(245,213,114,.4);background:rgba(245,213,114,.04);}' +
+            '.edit-break-row .level{color:#71717a;font-size:.7rem;min-width:48px;}' +
+            '.edit-break-row .label{flex:1;font-size:.8rem;color:#e4e4e7;}' +
+            '.edit-break-row .tempo-inp{width:55px;padding:.35rem;background:#18181b;border:1px solid #27272a;border-radius:.35rem;color:#fafafa;text-align:center;font-size:.8rem;font-family:inherit;}' +
+            '.edit-break-row .star-btn{background:none;border:none;cursor:pointer;padding:.3rem;color:#71717a;font-size:.9rem;transition:color .15s;}' +
+            '.edit-break-row .star-btn.active{color:#f5d572;}' +
+            '.edit-break-row .star-btn:hover{color:#f5d572;}' +
+            '.edit-break-row .del-btn{background:none;border:none;cursor:pointer;padding:.3rem;color:#71717a;font-size:.85rem;}' +
+            '.edit-break-row .del-btn:hover{color:#ef4444;}';
+        document.head.appendChild(style);
+    }
+
+    _editRenderBreaks();
+}
+
+// Toggle setor colapsável
+function _editToggleColl(key) {
+    const sec = document.getElementById('edit-coll-' + key);
+    if (sec) sec.classList.toggle('edit-coll-open');
+}
+
+// Renderiza a lista de breaks do estado interno _editBlinds
+function _editRenderBreaks() {
+    const cont = document.getElementById('edit-breaks-list');
+    if (!cont) return;
+
+    // Conta nível humano (ignora breaks na contagem)
+    let nivelHumano = 0;
+    const rows = _editBlinds.map((b, idx) => {
+        if (!b.isBreak) {
+            nivelHumano++;
+            return null;
+        }
+        const ehCompras = !!(b.breakDeCompras || b.break_de_compras);
+        return '<div class="edit-break-row' + (ehCompras ? ' compras' : '') + '">' +
+            '<span class="level">Após N' + nivelHumano + '</span>' +
+            '<span class="label">Intervalo</span>' +
+            '<input class="tempo-inp" type="number" min="1" value="' + (Number(b.tempo) || 10) + '" onchange="_editChangeTempo(' + idx + ', this.value)">' +
+            '<span style="color:#71717a;font-size:.7rem;">min</span>' +
+            '<button type="button" class="star-btn' + (ehCompras ? ' active' : '') + '" onclick="_editToggleCompras(' + idx + ')" title="Marcar como intervalo de compras">' +
+                '<i class="fa-solid fa-star"></i>' +
+            '</button>' +
+            '<button type="button" class="del-btn" onclick="_editRemoveBreak(' + idx + ')" title="Remover este break">' +
+                '<i class="fa-solid fa-times"></i>' +
+            '</button>' +
+        '</div>';
+    }).filter(Boolean).join('');
+
+    cont.innerHTML = rows || '<div style="color:#71717a;font-size:.75rem;padding:.5rem 0;font-style:italic;">Nenhum break configurado. Clique em "Adicionar break" abaixo.</div>';
+
+    // Atualiza o status do setor
+    const statusEl = document.getElementById('edit-status-breaks');
+    if (statusEl) {
+        const total = _editBlinds.filter(b => b.isBreak).length;
+        const comCompras = _editBlinds.some(b => b.isBreak && (b.breakDeCompras || b.break_de_compras));
+        if (total === 0) {
+            statusEl.textContent = 'Sem breaks';
+            statusEl.style.color = '#71717a';
+        } else if (!comCompras) {
+            statusEl.innerHTML = '⚠️ Falta marcar intervalo de compras';
+            statusEl.style.color = '#fbbf24';
+        } else {
+            statusEl.innerHTML = '✓ ' + total + ' break' + (total > 1 ? 's' : '') + ' · compras marcado';
+            statusEl.style.color = '#22c55e';
+        }
+    }
+}
+
+function _editChangeTempo(idx, valor) {
+    const n = parseInt(valor);
+    if (isNaN(n) || n <= 0) return;
+    if (_editBlinds[idx]) _editBlinds[idx].tempo = n;
+}
+
+function _editToggleCompras(idx) {
+    if (!_editBlinds[idx] || !_editBlinds[idx].isBreak) return;
+    const novoValor = !(_editBlinds[idx].breakDeCompras || _editBlinds[idx].break_de_compras);
+    // Garantir unicidade: só 1 break pode ser de compras
+    if (novoValor) {
+        _editBlinds.forEach((b, i) => {
+            if (b.isBreak && i !== idx) {
+                b.breakDeCompras = false;
+                delete b.break_de_compras;
+            }
+        });
+    }
+    _editBlinds[idx].breakDeCompras = novoValor;
+    delete _editBlinds[idx].break_de_compras;
+    _editRenderBreaks();
+}
+
+function _editRemoveBreak(idx) {
+    if (!_editBlinds[idx] || !_editBlinds[idx].isBreak) return;
+    _editBlinds.splice(idx, 1);
+    _editRenderBreaks();
+}
+
+function _editAddBreak() {
+    // Adiciona um break NO FINAL da estrutura — operador pode reorganizar (futuro: drag).
+    // Por enquanto, fica no final. Já vem com tempo 10min e SEM marcação de compras.
+    _editBlinds.push({ isBreak: true, tempo: 10, sb: 0, bb: 0, ante: 0 });
+    _editRenderBreaks();
+}
+
+function _fecharEditarTorneio() {
+    const m = document.getElementById('modal-editar-torneio');
+    if (m) m.remove();
+    _editTorneioIdx = -1;
+    _editBlinds = [];
+}
+
+async function _salvarEditarTorneio() {
+    const t = torneios[_editTorneioIdx];
+    if (!t) { _fecharEditarTorneio(); return; }
+
+    // === Coleta dos valores editados ===
+    const novoNome = (document.getElementById('edit-nome').value || '').trim() || t.nome;
+    const novoReentry = parseInt(document.getElementById('edit-reentry-ate').value);
+    const novoAddonAte = parseInt(document.getElementById('edit-addon-ate').value);
+    const impCompra = document.getElementById('edit-imp-compra').checked;
+    const impJackpot = document.getElementById('edit-imp-jackpot').checked;
+    const impAssin = document.getElementById('edit-imp-assinatura').checked;
+
+    // === Aplica no objeto JS (memória) ===
+    t.nome = novoNome;
+    t.reentryAte = (isNaN(novoReentry) || novoReentry < 0) ? (t.reentryAte || 0) : novoReentry;
+    t.addonAte = (isNaN(novoAddonAte) || novoAddonAte < 0) ? (t.addonAte || 0) : novoAddonAte;
+    t.imprimirComprovanteCompra = impCompra;
+    t.imprimirComprovanteJackpot = impJackpot;
+    t.comprovanteAssinatura = impAssin;
+    t.blinds = JSON.parse(JSON.stringify(_editBlinds));
+
+    // === Persiste em localStorage ===
+    try { saveData(); } catch(e) { console.warn('[edit] saveData falhou:', e); }
+
+    // === Sincroniza com Supabase (só campos confirmados como existentes) ===
+    if (typeof sb !== 'undefined' && sbClube && t.id) {
+        try {
+            const payload = {
+                nome: t.nome,
+                reentry_ate: t.reentryAte,
+                blinds: t.blinds,
+                imprimir_comprovante_compra: t.imprimirComprovanteCompra,
+                imprimir_comprovante_jackpot: t.imprimirComprovanteJackpot,
+                comprovante_assinatura: t.comprovanteAssinatura,
+            };
+            await sb.from('torneios').update(payload).eq('id', t.id);
+        } catch(e) {
+            console.warn('[edit] sync supabase falhou:', e);
+            // Continua mesmo se Supabase falhar — localStorage mantém o estado
+        }
+    }
+
+    // === Audit log ===
+    if (typeof logAudit === 'function') {
+        try {
+            logAudit('TORNEIO_EDITA', 'Editado: ' + t.nome, {
+                torneioId: t.id,
+                campos: ['nome', 'reentryAte', 'addonAte', 'blinds', 'flagsImpressao'],
+            });
+        } catch(_) {}
+    }
+
+    // === Atualiza UI ===
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    if (typeof renderTorneiosList === 'function') renderTorneiosList();
+    // Atualiza a aba Info se estiver visível
+    if (typeof renderTabInfo === 'function') {
+        try { renderTabInfo(); } catch(_) {}
+    }
+
+    showToast('✅ Torneio "' + t.nome + '" atualizado');
+    _fecharEditarTorneio();
+}
+
+// Expor pra HTML inline
+window.abrirEditarTorneio = abrirEditarTorneio;
+window._fecharEditarTorneio = _fecharEditarTorneio;
+window._salvarEditarTorneio = _salvarEditarTorneio;
+window._editToggleColl = _editToggleColl;
+window._editChangeTempo = _editChangeTempo;
+window._editToggleCompras = _editToggleCompras;
+window._editRemoveBreak = _editRemoveBreak;
+window._editAddBreak = _editAddBreak;
+
 
 // ============================================================
 // Renderiza a aba "Info" — somente leitura, com todas as configs do torneio.
