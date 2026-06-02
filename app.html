@@ -19434,6 +19434,58 @@ document.addEventListener('input', (e) => {
     }
 });
 
+// ============================================================
+// Modal de aviso: Add-on configurado sem Intervalo de Compras marcado
+// ============================================================
+// Usado pelo saveTournament. Centralizado na tela, z-index alto pra ficar
+// acima do modal Novo Torneio v2 (que continua aberto por trás).
+function _mostrarAvisoIntervaloCompras(addonValor) {
+    // Remove modal anterior se existir (evita duplicados)
+    const antigo = document.getElementById('modal-aviso-intervalo');
+    if (antigo) antigo.remove();
+
+    const valorFormatado = 'R$ ' + addonValor.toFixed(2).replace('.', ',');
+    const html = `
+    <div id="modal-aviso-intervalo" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);">
+        <div style="background:#18181b;border:1px solid #3f3f46;border-radius:.75rem;padding:1.75rem;max-width:440px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:#fbbf24;font-size:1.4rem;"></i>
+                <div style="font-size:1.05rem;font-weight:700;color:#fafafa;">Falta marcar o Intervalo</div>
+            </div>
+            <div style="font-size:.85rem;color:#d4d4d8;line-height:1.5;margin-bottom:1.25rem;">
+                Add-on <strong style="color:#fbbf24;">${valorFormatado}</strong> configurado,
+                mas nenhum intervalo está marcado como <strong>Compras</strong>.
+                <br><br>
+                Sem isso, o Add-on não vai liberar sozinho — o operador terá que abrir manualmente.
+            </div>
+            <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+                <button onclick="_fecharAvisoIntervalo(false)" class="btn-gold" style="padding:.6rem 1.1rem;font-size:.85rem;font-weight:700;">
+                    Voltar e marcar
+                </button>
+                <button onclick="_fecharAvisoIntervalo(true)" style="padding:.6rem 1rem;font-size:.8rem;background:transparent;border:1px solid #3f3f46;color:#a1a1aa;border-radius:.5rem;cursor:pointer;">
+                    Criar assim mesmo
+                </button>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+// Callback dos botões do modal de aviso. Se prosseguir=true, chama saveTournament()
+// pulando a validação (via flag _pularAvisoIntervalo).
+function _fecharAvisoIntervalo(prosseguir) {
+    const modal = document.getElementById('modal-aviso-intervalo');
+    if (modal) modal.remove();
+    if (prosseguir) {
+        // Marca a flag e chama saveTournament de novo. A próxima execução pulará a validação.
+        window._pularAvisoIntervalo = true;
+        try { saveTournament(); } finally { window._pularAvisoIntervalo = false; }
+    } else {
+        showToast('💡 Marque um break na estrutura como "Intervalo de Compras"');
+    }
+}
+window._fecharAvisoIntervalo = _fecharAvisoIntervalo;
+
 function saveTournament() {
     const nome = document.getElementById('t-nome').value.trim() || 'Torneio StackOS';
     const tempoNivel = parseInt(document.getElementById('t-tempo').value) || 15;
@@ -19451,26 +19503,15 @@ function saveTournament() {
 
     // VALIDAÇÃO EDUCATIVA: Add-on configurado mas sem intervalo de compras marcado.
     // Sem isso, o add-on nunca será liberado durante o torneio — bug recorrente de UX.
-    // Mostra confirm pra forçar reflexão sem bloquear (operador pode ter um motivo).
+    // Modal custom centralizado, acima do modal Novo Torneio v2.
     const addonValor = parseFloat(document.getElementById('t-addon-valor')?.value) || 0;
-    if (addonValor > 0 && typeof blindStructure !== 'undefined' && Array.isArray(blindStructure)) {
+    if (!window._pularAvisoIntervalo && addonValor > 0 && typeof blindStructure !== 'undefined' && Array.isArray(blindStructure)) {
         const temBreakCompras = blindStructure.some(b =>
             b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true)
         );
         if (!temBreakCompras) {
-            const msg = '⚠️ Atenção:\n\n' +
-                'Este torneio tem Add-on configurado (R$ ' + addonValor.toFixed(2) + '), ' +
-                'mas nenhum intervalo está marcado como "Intervalo de Compras".\n\n' +
-                'Sem isso, o Add-on não será liberado automaticamente durante o torneio. ' +
-                'O operador terá que abrir o período manualmente.\n\n' +
-                'Deseja criar mesmo assim?\n\n' +
-                '• OK = Criar do jeito que está\n' +
-                '• Cancelar = Voltar e marcar o intervalo';
-            if (!confirm(msg)) {
-                // Operador escolheu voltar pra ajustar.
-                showToast('💡 Marque um break na estrutura como "Intervalo de Compras"');
-                return;
-            }
+            _mostrarAvisoIntervaloCompras(addonValor);
+            return; // o modal cuida do fluxo: chama saveTournament() de novo via window._continuarSemIntervalo
         }
     }
 
