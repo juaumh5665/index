@@ -3267,7 +3267,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div id="cfg-audit-stats" style="margin-top:1rem;padding:.75rem;background:#0f0f12;border-radius:.5rem;font-size:.8rem;color:#71717a;"></div>
                     </div>
 
-                    <div class="stat-card" style="padding:1.5rem;">
+                    <div class="stat-card" id="backup-automatico-section" data-feature="backup_automatico" style="padding:1.5rem;">
                         <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-floppy-disk"></i> Backups Automáticos</div>
                         <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;">O sistema cria backups automaticamente a cada 30 minutos. Você pode restaurar um estado anterior em caso de problemas.</div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
@@ -3275,6 +3275,20 @@ document.addEventListener('DOMContentLoaded', function(){
                             <button onclick="fazerBackupAutomatico();showToast('💾 Backup criado')" class="btn-ghost" style="padding:.85rem;border-radius:.5rem;"><i class="fa-solid fa-floppy-disk"></i> Backup Agora</button>
                         </div>
                         <div id="cfg-backup-stats" style="margin-top:1rem;padding:.75rem;background:#0f0f12;border-radius:.5rem;font-size:.8rem;color:#71717a;"></div>
+                    </div>
+                    <!-- Placeholder pra quando feature_backup_automatico estiver OFF (preenchido por JS) -->
+                    <div id="backup-automatico-locked" style="display:none;padding:1.5rem;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:.6rem;">
+                        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
+                            <i class="fa-solid fa-crown" style="color:#a78bfa;font-size:1.1rem;"></i>
+                            <div style="font-size:.85rem;font-weight:800;color:#fff;">Backups Automáticos <span style="background:linear-gradient(135deg,#f5d572 0%,#d4a82e 100%);color:#0a0a0b;font-size:.62rem;padding:.12em .5em;border-radius:.35em;font-weight:800;letter-spacing:.08em;margin-left:.4rem;vertical-align:middle;">PRO</span></div>
+                        </div>
+                        <div style="font-size:.75rem;color:#a1a1aa;margin-bottom:.85rem;line-height:1.5;">
+                            Backups automáticos a cada 30 minutos com restauração de um clique.
+                            Disponível nos planos Premium e Pro.
+                        </div>
+                        <button onclick="if(typeof mostrarModalUpgrade==='function')mostrarModalUpgrade('Backups Automáticos a cada 30 minutos')" class="btn-gold" style="padding:.55rem 1rem;border-radius:.5rem;font-size:.78rem;">
+                            <i class="fa-solid fa-arrow-up"></i> Fazer Upgrade
+                        </button>
                     </div>
                 </div>
 
@@ -13018,6 +13032,12 @@ function fazerBackupAutomatico() {
 
 function iniciarBackupAutomatico() {
     if (_backupTimer) clearInterval(_backupTimer);
+    // Gate: feature de backup automático. Sem ela, não inicia o timer nem o backup inicial.
+    // O usuário ainda tem export/import manual via aba Backup (não bloqueado).
+    if (typeof window.hasFeature === 'function' && !window.hasFeature('backup_automatico')) {
+        console.log('[BACKUP] Backup automático desabilitado: plano não inclui feature_backup_automatico');
+        return;
+    }
     // Backup a cada 30 minutos
     _backupTimer = setInterval(fazerBackupAutomatico, 30 * 60 * 1000);
     // Faz um backup logo ao iniciar (após 1 min de uso)
@@ -13234,6 +13254,14 @@ function renderSegurancaStats() {
                 <div style="display:flex;justify-content:space-between;"><span>Próximo backup em:</span><strong style="color:#e4e4e7;">~30 min</strong></div>
             `;
         }
+    }
+    // Gate: alterna entre seção real e placeholder "locked" baseado na feature
+    const secReal = document.getElementById('backup-automatico-section');
+    const secLocked = document.getElementById('backup-automatico-locked');
+    if (secReal && secLocked) {
+        const liberado = (typeof window.hasFeature === 'function') ? window.hasFeature('backup_automatico') : true;
+        secReal.style.display = liberado ? '' : 'none';
+        secLocked.style.display = liberado ? 'none' : '';
     }
 }
 
