@@ -5576,11 +5576,12 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="display:flex;flex-direction:column;gap:1rem;">
             <div><label class="inp-label">Nome da Mesa *</label><input id="cm-nome" class="inp" placeholder="Ex: Mesa 1 NL 1/2"></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                <div><label class="inp-label">Small Blind R$</label><input id="cm-sb" type="number" step="0.5" min="0" value="1" class="inp"></div>
-                <div><label class="inp-label">Big Blind R$</label><input id="cm-bb" type="number" step="0.5" min="0" value="2" class="inp"></div>
                 <div><label class="inp-label">Buy-in Mín R$</label><input id="cm-bmin" type="number" step="1" min="0" value="50" class="inp"></div>
                 <div><label class="inp-label">Buy-in Máx R$</label><input id="cm-bmax" type="number" step="1" min="0" value="200" class="inp"></div>
             </div>
+            <!-- SB/BB: removidos do cadastro do cash, mas mantidos como hidden pra compat com mesas antigas e código de upload/download -->
+            <input type="hidden" id="cm-sb" value="0">
+            <input type="hidden" id="cm-bb" value="0">
             <!-- Rake escondido (não usado em cash atualmente, mas mantido pra eventual uso futuro) -->
             <div style="display:none;">
                 <label class="inp-label">Rake % (por buy-in/recompra)</label>
@@ -5671,6 +5672,39 @@ document.addEventListener('DOMContentLoaded', function(){
             <div id="enc-fichas-wrap"></div>
             <div id="enc-confere" style="padding:1rem;border-radius:.6rem;"></div>
             <button onclick="confirmarEncerrarMesa()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Encerramento</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: LANÇAR RAKE DO DEALER -->
+<div id="modal-rake-dealer" class="modal-overlay">
+    <div style="background:#111113;border:1px solid var(--gold);border-radius:1.25rem;padding:1.5rem;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-coins" style="color:var(--gold);"></i> Lançar Rake do Dealer</h3>
+            <button onclick="closeModal('modal-rake-dealer')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div id="rkd-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;font-size:.8rem;color:#a1a1aa;"></div>
+
+        <div style="margin-bottom:.85rem;">
+            <label class="inp-label">Dealer</label>
+            <input type="text" id="rkd-dealer-nome" class="inp" list="rkd-dealer-sugestoes" placeholder="Nome do dealer" autocomplete="off">
+            <datalist id="rkd-dealer-sugestoes"></datalist>
+            <div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Sugere funcionários cadastrados, mas aceita qualquer nome</div>
+        </div>
+
+        <div style="margin-bottom:.85rem;">
+            <label class="inp-label">Valor arrecadado (R$) *</label>
+            <input type="number" step="0.01" min="0" id="rkd-valor" class="inp" placeholder="Ex: 150,00">
+        </div>
+
+        <div style="margin-bottom:1rem;">
+            <label class="inp-label">Observação (opcional)</label>
+            <input type="text" id="rkd-observacao" class="inp" placeholder="Ex: turno 22h–02h" maxlength="80">
+        </div>
+
+        <div style="display:flex;gap:.5rem;">
+            <button onclick="closeModal('modal-rake-dealer')" class="btn-ghost" style="flex:1;padding:.75rem;border-radius:.5rem;">Cancelar</button>
+            <button onclick="confirmarLancarRakeDealer()" class="btn-gold" style="flex:2;padding:.75rem;border-radius:.5rem;"><i class="fa-solid fa-check"></i> Lançar</button>
         </div>
     </div>
 </div>
@@ -8614,8 +8648,8 @@ function _cashToDb(m) {
         id: m.id,
         clube_id: sbClube ? sbClube.id : null,
         nome: m.nome || 'Mesa',
-        sb: m.sb || 1,
-        bb: m.bb || 2,
+        sb: m.sb || 0,
+        bb: m.bb || 0,
         bmin: m.bmin || 0,
         bmax: m.bmax || 0,
         rake_pct: m.rakePct || 0,
@@ -8628,6 +8662,7 @@ function _cashToDb(m) {
         abertura_ts: m.aberturaTs ? new Date(m.aberturaTs).toISOString() : new Date().toISOString(),
         fechamento_ts: m.fechamentoTs ? new Date(m.fechamentoTs).toISOString() : null,
         operador: m.operador || null,
+        rake_lancamentos: Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [],
     };
 }
 
@@ -9635,6 +9670,7 @@ function _cashFromDb(r) {
         aberturaTs: aberturaMs,   abertoEm: aberturaMs,
         fechamentoTs: fechamentoMs, fechadoEm: fechamentoMs,
         operador: r.operador,
+        rakeLancamentos: Array.isArray(r.rake_lancamentos) ? r.rake_lancamentos : [],
         jogadores: jogadoresExistentes,  // ← preservar
         sessoes: sessoesExistentes,        // ← preservar
     };
@@ -13789,6 +13825,64 @@ function imprimirComprovanteJackpot(t, dados) {
     }
     abrirPreviewImpressao('Comprovante de Jackpot', txt);
     logAudit && logAudit('IMPRESSAO', `Comprovante de jackpot impresso · ${dados.jogadorNome || '—'}`);
+}
+
+// =====================================================================
+// COMPROVANTE DE COMPRA — CASH GAME (térmico, com assinatura)
+// =====================================================================
+// dados = { mesa, jogadorNome, valor, ts?, viaLabel? }
+function gerarComprovanteCompraCash(dados) {
+    if (!dados || !dados.mesa) return '';
+    const col = _printColWidth();
+    const m = dados.mesa;
+    const valor = Number(dados.valor) || 0;
+    const ts = dados.ts || Date.now();
+
+    let txt = _printHeaderCfg();
+    txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
+    txt += _printCenter('CASH GAME', col) + '\n';
+    if (dados.viaLabel) txt += _printCenter(dados.viaLabel, col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += 'Mesa: ' + (m.nome || '—').substring(0, col - 6) + '\n';
+    const dt = new Date(ts);
+    txt += 'Data: ' + dt.toLocaleString('pt-BR') + '\n';
+    if (currentUser && currentUser.nome) {
+        txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
+    }
+    txt += _printLine('-', col) + '\n';
+    txt += _printCenter('JOGADOR', col) + '\n';
+    txt += _printCenter((dados.jogadorNome || '—').toUpperCase().substring(0, col), col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += '\n';
+    txt += _printCenter('VALOR DA COMPRA', col) + '\n';
+    txt += _printCenter(formatMoney(valor), col) + '\n';
+    txt += '\n';
+    txt += _printLine('-', col) + '\n';
+    txt += _printCenter('Fichas em valor equivalente', col) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    // Linha de assinatura (sempre presente)
+    txt += '\n\n';
+    txt += _printCenter('_'.repeat(Math.min(col - 4, 26)), col) + '\n';
+    txt += _printCenter('Assinatura do jogador', col) + '\n';
+
+    txt += '\n' + _printFooter();
+    return txt;
+}
+
+function imprimirComprovanteCompraCash(dados) {
+    if (!dados || !dados.mesa) return;
+    const vias = Math.max(1, Math.min(3, Number((config && config.cash && config.cash.comprovanteVias) || 1)));
+    const labels = vias === 1 ? [null] : (vias === 2 ? ['VIA DO JOGADOR', 'VIA DO CLUBE'] : ['VIA DO JOGADOR', 'VIA DO CLUBE', '3a VIA']);
+    let txt = '';
+    for (let i = 0; i < vias; i++) {
+        if (i > 0) txt += '\n\n' + _printLine('=', _printColWidth()) + '\n\n';
+        txt += gerarComprovanteCompraCash({ ...dados, viaLabel: labels[i] });
+    }
+    abrirPreviewImpressao('Comprovante de Compra (Cash)', txt);
+    logAudit && logAudit('IMPRESSAO', `Comprovante de cash impresso · ${dados.jogadorNome || '—'} · ${formatMoney(Number(dados.valor) || 0)}`);
 }
 
 // ============================================================
@@ -28695,12 +28789,13 @@ function renderCashMesas() {
                     <div style="font-size:1rem;font-weight:800;">${m.nome}</div>
                     <div style="display:flex;gap:.75rem;align-items:center;margin-top:.35rem;">
                         <span class="tag tag-running">Ativa</span>
-                        <span style="font-size:.75rem;color:#52525b;">Blinds R$ ${m.sb}/${m.bb} &bull; Buy-in R$ ${m.bmin}–${m.bmax}</span>
+                        <span style="font-size:.75rem;color:#52525b;">Buy-in R$ ${m.bmin}–${m.bmax}</span>
                         <span style="font-size:.75rem;color:#71717a;font-family:var(--font-mono);"><i class="fa-regular fa-clock"></i> ${tempoAberto}</span>
                     </div>
                 </div>
-                <div style="display:flex;gap:.5rem;">
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                     <button onclick="abrirAddJogadorCash('${m.id}')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Jogador</button>
+                    <button onclick="abrirLancarRakeDealer('${m.id}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--gold);font-size:.8rem;padding:.5rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;" title="Registrar rake arrecadado pelo dealer"><i class="fa-solid fa-coins"></i> Rake Dealer</button>
                     <button onclick="encerrarMesaCash('${m.id}')" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;" title="Encerrar mesa"><i class="fa-solid fa-stop"></i> Encerrar</button>
                 </div>
             </div>
@@ -28741,6 +28836,37 @@ function renderCashMesas() {
                     </div>
                 </div>
             </div>
+
+            ${(() => {
+                const lancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
+                if (lancs.length === 0) return '';
+                const totalRake = lancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+                return `
+                <div style="padding:.85rem 1.5rem;background:rgba(245,158,11,.04);border-bottom:1px solid #1e1e23;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:.4rem;">
+                            <i class="fa-solid fa-coins"></i> Rake da Mesa (Dealers)
+                        </div>
+                        <div style="font-size:.95rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">${formatMoney(totalRake)}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:.25rem;">
+                        ${lancs.slice(-3).reverse().map(l => `
+                            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.3rem .5rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
+                                <div style="display:flex;flex-direction:column;">
+                                    <span style="color:#e4e4e7;">${esc(l.dealerNome || '—')}</span>
+                                    <span style="font-size:.65rem;color:#52525b;">${new Date(l.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${l.observacao ? ' · ' + esc(l.observacao).substring(0,30) : ''}</span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:.5rem;">
+                                    <span style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">${formatMoney(l.valor)}</span>
+                                    <button onclick="removerLancRakeDealer('${m.id}','${l.id}')" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:.7rem;" title="Remover"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${lancs.length > 3 ? `<div style="font-size:.65rem;color:#52525b;text-align:center;margin-top:.15rem;">+ ${lancs.length - 3} lançamento${lancs.length-3 !== 1 ? 's' : ''} anterior${lancs.length-3 !== 1 ? 'es' : ''}</div>` : ''}
+                    </div>
+                </div>
+                `;
+            })()}
 
             <div style="padding:1rem 1.5rem;">
                 <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Jogadores na Mesa</div>
@@ -28911,6 +29037,18 @@ async function confirmAddCashJogador() {
     renderCashMesas();
     const jog = jogadores.find(j => j.id === jid);
     showToast(`👤 ${jog ? jog.nome : 'Jogador'} entrou com ${formatMoney(valor)}`);
+
+    // Comprovante térmico de compra cash
+    try {
+        if (!config.cash || config.cash.imprimirComprovante !== false) {
+            imprimirComprovanteCompraCash({
+                mesa: m,
+                jogadorNome: jog ? jog.nome : '—',
+                valor,
+                ts: agora,
+            });
+        }
+    } catch(e) { console.warn('[CASH] imprimir comprovante:', e); }
 }
 
 // --- RECOMPRA ---
@@ -28984,6 +29122,129 @@ function confirmRecompra() {
     renderCashMesas();
     const jog = jogadores.find(x => x.id === j.jogadorId);
     showToast(`🔄 Recompra de ${formatMoney(valor)} para ${jog?jog.nome:'jogador'}`);
+
+    // Comprovante térmico de compra cash (recompra)
+    try {
+        if (!config.cash || config.cash.imprimirComprovante !== false) {
+            imprimirComprovanteCompraCash({
+                mesa: m,
+                jogadorNome: jog ? jog.nome : '—',
+                valor,
+                ts: Date.now(),
+            });
+        }
+    } catch(e) { console.warn('[CASH] imprimir comprovante recompra:', e); }
+}
+
+// =====================================================================
+// RAKE DO DEALER (lançamento manual por turno do dealer)
+// =====================================================================
+let _rakeDealerCtx = null;
+
+function abrirLancarRakeDealer(mesaId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+    _rakeDealerCtx = { mesaId };
+
+    const lancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
+    const total = lancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+    document.getElementById('rkd-info').innerHTML =
+        `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<span><strong style="color:#e4e4e7;">${esc(m.nome)}</strong></span>` +
+            `<span style="font-size:.7rem;color:#71717a;">${lancs.length} lançamento${lancs.length !== 1 ? 's' : ''}</span>` +
+        `</div>` +
+        `<div style="display:flex;justify-content:space-between;margin-top:.35rem;">` +
+            `<span style="color:#71717a;">Rake acumulado:</span>` +
+            `<span style="color:var(--gold);font-weight:700;font-family:var(--font-mono);">${formatMoney(total)}</span>` +
+        `</div>`;
+
+    // Sugestões de dealer: funcionários cadastrados
+    const datalist = document.getElementById('rkd-dealer-sugestoes');
+    if (datalist) {
+        try {
+            const funcs = Array.isArray(funcionarios) ? funcionarios : [];
+            const sugestoes = funcs
+                .filter(f => f.ativo !== false && (
+                    (Array.isArray(f.funcoes) && f.funcoes.includes('dealer')) ||
+                    f.cargo === 'dealer' ||
+                    f.funcao === 'dealer' ||
+                    !f.funcoes
+                ))
+                .map(f => `<option value="${esc(f.nome)}">`)
+                .join('');
+            datalist.innerHTML = sugestoes;
+        } catch(e) {
+            datalist.innerHTML = '';
+        }
+    }
+
+    document.getElementById('rkd-dealer-nome').value = '';
+    document.getElementById('rkd-valor').value = '';
+    document.getElementById('rkd-observacao').value = '';
+    openModal('modal-rake-dealer');
+    setTimeout(() => document.getElementById('rkd-dealer-nome').focus(), 100);
+}
+
+function confirmarLancarRakeDealer() {
+    if (!_rakeDealerCtx) return;
+    const m = cashMesas.find(x => x.id === _rakeDealerCtx.mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+
+    const dealerNome = document.getElementById('rkd-dealer-nome').value.trim();
+    const valor = parseFloat(document.getElementById('rkd-valor').value) || 0;
+    const observacao = document.getElementById('rkd-observacao').value.trim();
+
+    if (!dealerNome) return showToast('⚠️ Informe o nome do dealer');
+    if (valor <= 0) return showToast('⚠️ Valor deve ser maior que zero');
+
+    if (!Array.isArray(m.rakeLancamentos)) m.rakeLancamentos = [];
+
+    const lanc = {
+        id: (typeof _genUuid === 'function' ? _genUuid() : ('rkd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8))),
+        dealerNome,
+        valor,
+        observacao: observacao || null,
+        ts: Date.now(),
+        operadorId: (currentUser && currentUser.id) || null,
+        operadorNome: (currentUser && currentUser.nome) || null,
+    };
+    m.rakeLancamentos.push(lanc);
+
+    saveData();
+
+    // Persiste no Supabase
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao salvar rake_lancamentos:', error.message);
+        }).catch(e => console.warn('[CASH] update rake dealer falhou:', e));
+    }
+
+    closeModal('modal-rake-dealer');
+    renderCashMesas();
+    showToast(`💰 Rake de ${formatMoney(valor)} registrado · ${dealerNome}`);
+    logAudit && logAudit('CASH_RAKE_DEALER', `Rake dealer: ${dealerNome} · ${formatMoney(valor)} · Mesa ${m.nome}`);
+    _rakeDealerCtx = null;
+}
+
+function removerLancRakeDealer(mesaId, lancId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m || !Array.isArray(m.rakeLancamentos)) return;
+    const lanc = m.rakeLancamentos.find(l => l.id === lancId);
+    if (!lanc) return;
+    if (!confirm(`Remover lançamento de ${formatMoney(lanc.valor)} (${lanc.dealerNome})?`)) return;
+
+    m.rakeLancamentos = m.rakeLancamentos.filter(l => l.id !== lancId);
+    saveData();
+
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos:', error.message);
+        }).catch(e => console.warn('[CASH] update remover rake:', e));
+    }
+
+    renderCashMesas();
+    showToast('🗑️ Lançamento removido');
+    logAudit && logAudit('CASH_RAKE_DEALER_REMOVE', `Removido lançamento · ${lanc.dealerNome} · ${formatMoney(lanc.valor)}`);
 }
 
 // --- RETIRAR ---
@@ -29113,7 +29374,6 @@ function renderCashHistorico() {
                     <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">
                         ${new Date(m.abertoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
                         &bull; Duração ${dur}
-                        &bull; Blinds R$ ${m.sb}/${m.bb}
                     </div>
                 </div>
                 <div style="display:flex;gap:1.5rem;">
@@ -34479,7 +34739,7 @@ function renderRelCash() {
         <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;">
             <div>
                 <div style="font-weight:700;">${m.nome} ${batTag}</div>
-                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(m.abertoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · SB/BB ${m.sb}/${m.bb}</div>
+                <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(m.abertoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
             </div>
             <span style="font-family:var(--font-mono);color:#71717a;">${m.jogadores.length} jog.</span>
             <span style="font-family:var(--font-mono);color:#71717a;">${dur}</span>
@@ -35057,12 +35317,12 @@ function exportRelTorneios() {
 
 function exportRelCash() {
     const { cashPeriodo } = getDadosPeriodo();
-    const rows = [['Abertura','Fechamento','Nome','SB/BB','Jogadores','Volume R$','Rake R$','Diferença R$','Status']];
+    const rows = [['Abertura','Fechamento','Nome','Jogadores','Volume R$','Rake R$','Diferença R$','Status']];
     cashPeriodo.forEach(m => {
         rows.push([
             new Date(m.abertoEm).toLocaleString('pt-BR'),
             m.fechadoEm ? new Date(m.fechadoEm).toLocaleString('pt-BR') : '-',
-            m.nome, `${m.sb}/${m.bb}`,
+            m.nome,
             m.jogadores.length,
             m.jogadores.reduce((s,j)=>s+j.totalInvestido,0).toFixed(2),
             getCashRake(m).toFixed(2),
@@ -36816,7 +37076,7 @@ function renderDashboard() {
                 const ativos = (m.jogadores || []).filter(j => j.status === 'ativo').length;
                 return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem .5rem;background:#0a0a0c;border-radius:.3rem;">
                     <span style="font-weight:600;">${m.nome}</span>
-                    <span style="color:#71717a;font-size:.7rem;">${ativos} jog · ${m.sb}/${m.bb}</span>
+                    <span style="color:#71717a;font-size:.7rem;">${ativos} jog</span>
                 </div>`;
             }).join('');
         }
@@ -37177,7 +37437,7 @@ function executarBuscaGlobal(query) {
                 _buscaResultados.push({
                     tipo:'cash',
                     titulo: m.nome + ' (Cash)',
-                    subtitulo: `${m.jogadores.length} jogadores · ${m.status} · SB/BB ${m.sb}/${m.bb}`,
+                    subtitulo: `${m.jogadores.length} jogadores · ${m.status}`,
                     icon:'fa-coins',
                     cor:'#22c55e',
                     acao: () => showPage('cash'),
