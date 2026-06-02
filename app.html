@@ -3640,27 +3640,114 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <!-- SUBTAB: RELATÓRIO -->
                 <div id="cash-relatorio" class="cashtab-content" style="display:none;">
-                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                    <!-- FILTROS -->
+                    <div class="stat-card" style="padding:1rem 1.25rem;margin-bottom:1.25rem;">
+                        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;">
+                            <i class="fa-solid fa-filter" style="color:var(--gold);font-size:.85rem;"></i>
+                            <span style="font-size:.7rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Filtros</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;">
+                            <div>
+                                <label class="inp-label">Período</label>
+                                <select id="cashrel-periodo" class="inp" onchange="cashrelOnPeriodoChange();renderCashRelatorio()">
+                                    <option value="hoje">Hoje</option>
+                                    <option value="7d" selected>Últimos 7 dias</option>
+                                    <option value="30d">Últimos 30 dias</option>
+                                    <option value="mes">Mês atual</option>
+                                    <option value="custom">Personalizado</option>
+                                    <option value="tudo">Tudo</option>
+                                </select>
+                            </div>
+                            <div id="cashrel-de-wrap" style="display:none;">
+                                <label class="inp-label">De</label>
+                                <input type="date" id="cashrel-de" class="inp" onchange="renderCashRelatorio()">
+                            </div>
+                            <div id="cashrel-ate-wrap" style="display:none;">
+                                <label class="inp-label">Até</label>
+                                <input type="date" id="cashrel-ate" class="inp" onchange="renderCashRelatorio()">
+                            </div>
+                            <div>
+                                <label class="inp-label">Dealer</label>
+                                <select id="cashrel-dealer" class="inp" onchange="renderCashRelatorio()">
+                                    <option value="">Todos os dealers</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="inp-label">Jogador</label>
+                                <select id="cashrel-jogador" class="inp" onchange="renderCashRelatorio()">
+                                    <option value="">Todos os jogadores</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top:.75rem;display:flex;justify-content:space-between;align-items:center;">
+                            <div id="cashrel-periodo-label" style="font-size:.72rem;color:#71717a;"></div>
+                            <button onclick="exportRelCash()" class="btn-ghost" style="font-size:.75rem;padding:.45rem 1rem;border-radius:.4rem;"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+                        </div>
+                    </div>
+
+                    <!-- MÉTRICAS PRINCIPAIS (KPIs) -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem;">
                         <div class="stat-card">
                             <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Mesas Encerradas</div>
                             <div id="cash-rel-qtd" style="font-size:2rem;font-weight:800;margin-top:.4rem;">0</div>
                         </div>
                         <div class="stat-card">
                             <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Volume Total Movimentado</div>
-                            <div id="cash-rel-volume" style="font-size:2rem;font-weight:800;margin-top:.4rem;">R$ 0,00</div>
+                            <div id="cash-rel-volume" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:#22c55e;">R$ 0,00</div>
                         </div>
                         <div class="stat-card">
-                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake Arrecadado</div>
+                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Rake Total</div>
                             <div id="cash-rel-rake" style="font-size:2rem;font-weight:800;margin-top:.4rem;color:var(--gold);">R$ 0,00</div>
+                            <div id="cash-rel-rake-breakdown" style="font-size:.65rem;color:#71717a;margin-top:.25rem;"></div>
                         </div>
                         <div class="stat-card">
                             <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Sessões de Jogadores</div>
                             <div id="cash-rel-sessoes" style="font-size:2rem;font-weight:800;margin-top:.4rem;">0</div>
+                            <div id="cash-rel-jogadores-unicos" style="font-size:.65rem;color:#71717a;margin-top:.25rem;"></div>
                         </div>
                     </div>
-                    <div class="stat-card" style="padding:1.25rem;">
-                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Ranking por Jogador</div>
+
+                    <!-- MÉTRICAS ADICIONAIS -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                        <div class="stat-card" style="padding:1rem;">
+                            <div style="font-size:.55rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Buy-in médio</div>
+                            <div id="cash-rel-buyin-medio" style="font-size:1.3rem;font-weight:800;margin-top:.3rem;color:#38bdf8;">R$ 0,00</div>
+                        </div>
+                        <div class="stat-card" style="padding:1rem;">
+                            <div style="font-size:.55rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Tempo médio mesa</div>
+                            <div id="cash-rel-tempo-medio" style="font-size:1.3rem;font-weight:800;margin-top:.3rem;color:#38bdf8;">0h 00m</div>
+                        </div>
+                        <div class="stat-card" style="padding:1rem;">
+                            <div style="font-size:.55rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Diferença de caixa</div>
+                            <div id="cash-rel-dif-caixa" style="font-size:1.3rem;font-weight:800;margin-top:.3rem;">R$ 0,00</div>
+                            <div id="cash-rel-dif-caixa-desc" style="font-size:.6rem;color:#71717a;margin-top:.1rem;"></div>
+                        </div>
+                        <div class="stat-card" style="padding:1rem;">
+                            <div style="font-size:.55rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Hora pico</div>
+                            <div id="cash-rel-hora-pico" style="font-size:1.3rem;font-weight:800;margin-top:.3rem;color:#a78bfa;">—</div>
+                            <div id="cash-rel-hora-pico-desc" style="font-size:.6rem;color:#71717a;margin-top:.1rem;"></div>
+                        </div>
+                    </div>
+
+                    <!-- RANKING JOGADORES -->
+                    <div class="stat-card" style="padding:1.25rem;margin-bottom:1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-trophy"></i> Ranking por Jogador</div>
+                            <div style="display:flex;gap:.25rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.4rem;padding:.15rem;">
+                                <button id="cashrel-rank-resultado" onclick="cashrelSetRankTipo('resultado')" class="flt-btn flt-active" style="font-size:.7rem;padding:.3rem .65rem;">Resultado</button>
+                                <button id="cashrel-rank-volume" onclick="cashrelSetRankTipo('volume')" class="flt-btn" style="font-size:.7rem;padding:.3rem .65rem;">Volume</button>
+                                <button id="cashrel-rank-frequencia" onclick="cashrelSetRankTipo('frequencia')" class="flt-btn" style="font-size:.7rem;padding:.3rem .65rem;">Frequência</button>
+                            </div>
+                        </div>
                         <div id="cash-rel-ranking" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+
+                    <!-- RANKING DEALERS (RAKE) -->
+                    <div class="stat-card" style="padding:1.25rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-coins"></i> Rake Arrecadado por Dealer</div>
+                        </div>
+                        <div id="cash-rel-dealers" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
                 </div>
             </div>
@@ -29530,83 +29617,325 @@ function renderCashHistorico() {
 }
 
 // --- RELATÓRIO ---
+// Estado do tipo de ranking exibido
+let _cashrelRankTipo = 'resultado'; // 'resultado' | 'volume' | 'frequencia'
+
+function cashrelSetRankTipo(tipo) {
+    _cashrelRankTipo = tipo;
+    ['resultado','volume','frequencia'].forEach(t => {
+        const btn = document.getElementById('cashrel-rank-' + t);
+        if (btn) btn.classList.toggle('flt-active', t === tipo);
+    });
+    renderCashRelatorio();
+}
+
+function cashrelOnPeriodoChange() {
+    const sel = document.getElementById('cashrel-periodo');
+    if (!sel) return;
+    const isCustom = sel.value === 'custom';
+    const w1 = document.getElementById('cashrel-de-wrap');
+    const w2 = document.getElementById('cashrel-ate-wrap');
+    if (w1) w1.style.display = isCustom ? '' : 'none';
+    if (w2) w2.style.display = isCustom ? '' : 'none';
+
+    // Default: se entrar em custom e não tem data, popula com últimos 7 dias
+    if (isCustom) {
+        const de = document.getElementById('cashrel-de');
+        const ate = document.getElementById('cashrel-ate');
+        if (de && !de.value) {
+            const d = new Date(); d.setDate(d.getDate() - 7);
+            de.value = d.toISOString().slice(0, 10);
+        }
+        if (ate && !ate.value) {
+            ate.value = new Date().toISOString().slice(0, 10);
+        }
+    }
+}
+
+// Calcula intervalo {de,ate} baseado no seletor de período
+function _cashrelGetIntervalo() {
+    const sel = document.getElementById('cashrel-periodo');
+    const modo = sel ? sel.value : '7d';
+    const agora = new Date();
+    let de = null, ate = null;
+
+    if (modo === 'tudo') {
+        // sem filtro
+    } else if (modo === 'hoje') {
+        de = new Date(agora); de.setHours(0,0,0,0);
+        ate = new Date(agora); ate.setHours(23,59,59,999);
+    } else if (modo === '7d') {
+        de = new Date(agora); de.setDate(de.getDate() - 7); de.setHours(0,0,0,0);
+        ate = new Date(agora); ate.setHours(23,59,59,999);
+    } else if (modo === '30d') {
+        de = new Date(agora); de.setDate(de.getDate() - 30); de.setHours(0,0,0,0);
+        ate = new Date(agora); ate.setHours(23,59,59,999);
+    } else if (modo === 'mes') {
+        de = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
+        ate = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59);
+    } else if (modo === 'custom') {
+        const deEl = document.getElementById('cashrel-de');
+        const ateEl = document.getElementById('cashrel-ate');
+        if (deEl && deEl.value) { de = new Date(deEl.value); de.setHours(0,0,0,0); }
+        if (ateEl && ateEl.value) { ate = new Date(ateEl.value); ate.setHours(23,59,59,999); }
+    }
+    return { de, ate, modo };
+}
+
+function _cashrelFormatarPeriodo(intervalo) {
+    if (intervalo.modo === 'tudo') return 'Período: todas as mesas encerradas';
+    if (!intervalo.de || !intervalo.ate) return '';
+    return `Período: ${intervalo.de.toLocaleDateString('pt-BR')} até ${intervalo.ate.toLocaleDateString('pt-BR')}`;
+}
+
+// Popula os selects de dealer e jogador (uma vez por render)
+function _cashrelPopularFiltros() {
+    const selDealer = document.getElementById('cashrel-dealer');
+    const selJog = document.getElementById('cashrel-jogador');
+    if (!selDealer || !selJog) return;
+
+    // Dealers únicos: somar das mesas encerradas + funcionários cadastrados
+    const dealersSet = new Set();
+    (cashMesas || []).forEach(m => {
+        (m.rakeLancamentos || []).forEach(l => { if (l.dealerNome) dealersSet.add(l.dealerNome); });
+    });
+    if (typeof funcionarios !== 'undefined' && Array.isArray(funcionarios)) {
+        funcionarios.forEach(f => {
+            if (f.ativo === false) return;
+            const ehDealer = (Array.isArray(f.funcoes) && f.funcoes.includes('dealer')) ||
+                             f.cargo === 'dealer' || f.funcao === 'dealer' || !f.funcoes;
+            if (ehDealer && f.nome) dealersSet.add(f.nome);
+        });
+    }
+    const dealerValor = selDealer.value;
+    selDealer.innerHTML = '<option value="">Todos os dealers</option>' +
+        [...dealersSet].sort().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    selDealer.value = dealerValor || '';
+
+    // Jogadores únicos: apenas os que já jogaram cash (têm sessão)
+    const jogIds = new Set();
+    (cashMesas || []).forEach(m => {
+        (m.jogadores || []).forEach(j => jogIds.add(j.jogadorId));
+    });
+    const jogValor = selJog.value;
+    const listaJogs = [...jogIds]
+        .map(id => jogadores.find(x => x.id === id))
+        .filter(Boolean)
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    selJog.innerHTML = '<option value="">Todos os jogadores</option>' +
+        listaJogs.map(j => `<option value="${j.id}">${esc(j.nome || '?')}</option>`).join('');
+    selJog.value = jogValor || '';
+}
+
 function renderCashRelatorio() {
-    const el_qtd     = document.getElementById('cash-rel-qtd');
-    const el_volume  = document.getElementById('cash-rel-volume');
-    const el_rake    = document.getElementById('cash-rel-rake');
-    const el_sessoes = document.getElementById('cash-rel-sessoes');
-    const el_rank    = document.getElementById('cash-rel-ranking');
-    if (!el_qtd) return;
+    const el_qtd = document.getElementById('cash-rel-qtd');
+    if (!el_qtd) return; // página não está renderizada
 
-    const encerradas = cashMesas.filter(m => m.status === 'encerrada');
-    const volume = encerradas.reduce((s, m) => s + m.jogadores.reduce((ss, j) => ss + j.totalInvestido, 0), 0);
-    const rake   = encerradas.reduce((s, m) => s + getCashRake(m), 0);
-    const sessoes = encerradas.reduce((s, m) => s + m.jogadores.length, 0);
+    _cashrelPopularFiltros();
 
-    el_qtd.innerText     = encerradas.length;
-    el_volume.innerText  = formatMoney(volume);
-    el_rake.innerText    = formatMoney(rake);
-    el_sessoes.innerText = sessoes;
+    const intervalo = _cashrelGetIntervalo();
+    const filtroDealer  = (document.getElementById('cashrel-dealer') || {}).value || '';
+    const filtroJogador = (document.getElementById('cashrel-jogador') || {}).value || '';
 
-    // Totais de bate caixa
-    let totalSobra = 0, totalQuebra = 0, mesasBatidas = 0;
-    encerradas.forEach(m => {
+    // Label do período
+    const labelEl = document.getElementById('cashrel-periodo-label');
+    if (labelEl) labelEl.textContent = _cashrelFormatarPeriodo(intervalo);
+
+    // Filtrar mesas pelo período (usa fechamentoTs/fechadoEm pra mesas encerradas)
+    const encerradasNoPeriodo = (cashMesas || []).filter(m => {
+        if (m.status !== 'encerrada') return false;
+        const ts = m.fechadoEm || m.fechamentoTs || m.abertoEm || 0;
+        if (intervalo.de && ts < intervalo.de.getTime()) return false;
+        if (intervalo.ate && ts > intervalo.ate.getTime()) return false;
+        // Filtro dealer (mesa tem que ter pelo menos um lançamento desse dealer)
+        if (filtroDealer) {
+            const lancs = m.rakeLancamentos || [];
+            if (!lancs.some(l => l.dealerNome === filtroDealer)) return false;
+        }
+        // Filtro jogador (mesa tem que ter sessão desse jogador)
+        if (filtroJogador) {
+            if (!(m.jogadores || []).some(j => j.jogadorId === filtroJogador)) return false;
+        }
+        return true;
+    });
+
+    // ─── MÉTRICAS BASE ────────────────────────────────────────
+    const volume = encerradasNoPeriodo.reduce((s, m) => {
+        return s + (m.jogadores || []).reduce((ss, j) => ss + (Number(j.totalInvestido) || 0), 0);
+    }, 0);
+
+    // Rake total = rake percentual (sistema) + rake dos lançamentos manuais (dealer)
+    let rakeSistema = 0, rakeDealer = 0;
+    encerradasNoPeriodo.forEach(m => {
+        rakeSistema += getCashRake(m);
+        rakeDealer += (m.rakeLancamentos || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+    });
+    const rakeTotal = rakeSistema + rakeDealer;
+
+    // Total de sessões
+    const totalSessoes = encerradasNoPeriodo.reduce((s, m) => s + ((m.jogadores || []).length), 0);
+
+    // Jogadores únicos
+    const jogadoresUnicos = new Set();
+    encerradasNoPeriodo.forEach(m => (m.jogadores || []).forEach(j => jogadoresUnicos.add(j.jogadorId)));
+
+    el_qtd.innerText = encerradasNoPeriodo.length;
+    document.getElementById('cash-rel-volume').innerText = formatMoney(volume);
+    document.getElementById('cash-rel-rake').innerText = formatMoney(rakeTotal);
+    const brEl = document.getElementById('cash-rel-rake-breakdown');
+    if (brEl) {
+        if (rakeSistema > 0 && rakeDealer > 0) {
+            brEl.innerHTML = `Sistema: ${formatMoney(rakeSistema)} · Dealer: ${formatMoney(rakeDealer)}`;
+        } else if (rakeDealer > 0) {
+            brEl.innerHTML = `Lançado por dealers`;
+        } else if (rakeSistema > 0) {
+            brEl.innerHTML = `Cobrado automaticamente`;
+        } else {
+            brEl.innerHTML = '';
+        }
+    }
+    document.getElementById('cash-rel-sessoes').innerText = totalSessoes;
+    const jUniEl = document.getElementById('cash-rel-jogadores-unicos');
+    if (jUniEl) jUniEl.innerText = jogadoresUnicos.size > 0 ? `${jogadoresUnicos.size} jogador${jogadoresUnicos.size !== 1 ? 'es' : ''} únicos` : '';
+
+    // ─── MÉTRICAS ADICIONAIS ──────────────────────────────────
+    // Buy-in médio (valor total comprado dividido pelo nº total de compras/recompras)
+    let totalCompras = 0, qtdCompras = 0;
+    encerradasNoPeriodo.forEach(m => {
+        (m.jogadores || []).forEach(j => {
+            (j.movimentos || []).forEach(mv => {
+                if (mv.tipo === 'buyin' || mv.tipo === 'recompra') {
+                    totalCompras += (Number(mv.valor) || 0);
+                    qtdCompras++;
+                }
+            });
+        });
+    });
+    const buyinMedio = qtdCompras > 0 ? totalCompras / qtdCompras : 0;
+    document.getElementById('cash-rel-buyin-medio').innerText = formatMoney(buyinMedio);
+
+    // Tempo médio mesa
+    let totalMs = 0;
+    encerradasNoPeriodo.forEach(m => {
+        const dur = (m.fechadoEm || m.fechamentoTs || Date.now()) - (m.abertoEm || m.aberturaTs || Date.now());
+        if (dur > 0) totalMs += dur;
+    });
+    const tempoMedioMs = encerradasNoPeriodo.length > 0 ? totalMs / encerradasNoPeriodo.length : 0;
+    document.getElementById('cash-rel-tempo-medio').innerText = (function() {
+        const h = Math.floor(tempoMedioMs / 3600000);
+        const min = Math.floor((tempoMedioMs % 3600000) / 60000);
+        return `${h}h ${String(min).padStart(2,'0')}m`;
+    })();
+
+    // Diferença de caixa total (sobra/quebra)
+    let totalSobra = 0, totalQuebra = 0, mesasBatidas = 0, mesasComBat = 0;
+    encerradasNoPeriodo.forEach(m => {
         if (typeof m.fichasDiferenca === 'number') {
+            mesasComBat++;
             if (Math.abs(m.fichasDiferenca) < 0.01) mesasBatidas++;
             else if (m.fichasDiferenca > 0) totalSobra += m.fichasDiferenca;
             else totalQuebra += Math.abs(m.fichasDiferenca);
         }
     });
-    // Inject a small summary at top of ranking area (reuse ranking element)
-    const rankEl = document.getElementById('cash-rel-ranking');
-    if (rankEl) {
-        const batInfo = encerradas.some(m => typeof m.fichasDiferenca === 'number') ? `
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #1e1e23;">
-            <div style="padding:.6rem;background:rgba(34,197,94,.08);border-radius:.4rem;text-align:center;">
-                <div style="font-size:.6rem;color:#22c55e;font-weight:700;text-transform:uppercase;">Mesas que bateram</div>
-                <div style="font-size:1.25rem;font-weight:800;color:#22c55e;margin-top:.15rem;">${mesasBatidas}</div>
-            </div>
-            <div style="padding:.6rem;background:rgba(245,158,11,.08);border-radius:.4rem;text-align:center;">
-                <div style="font-size:.6rem;color:var(--gold);font-weight:700;text-transform:uppercase;">Sobras acumuladas</div>
-                <div style="font-size:1.25rem;font-weight:800;color:var(--gold);margin-top:.15rem;">${formatMoney(totalSobra)}</div>
-            </div>
-            <div style="padding:.6rem;background:rgba(239,68,68,.08);border-radius:.4rem;text-align:center;">
-                <div style="font-size:.6rem;color:#ef4444;font-weight:700;text-transform:uppercase;">Quebras acumuladas</div>
-                <div style="font-size:1.25rem;font-weight:800;color:#ef4444;margin-top:.15rem;">${formatMoney(totalQuebra)}</div>
-            </div>
-        </div>` : '';
-        rankEl._batInfoHtml = batInfo;
+    const difLiquida = totalSobra - totalQuebra;
+    const elDif = document.getElementById('cash-rel-dif-caixa');
+    if (elDif) {
+        elDif.innerText = (difLiquida >= 0 ? '+' : '') + formatMoney(difLiquida);
+        elDif.style.color = Math.abs(difLiquida) < 0.01 ? '#22c55e' : (difLiquida > 0 ? 'var(--gold)' : '#ef4444');
+    }
+    const elDifDesc = document.getElementById('cash-rel-dif-caixa-desc');
+    if (elDifDesc) {
+        if (mesasComBat === 0) elDifDesc.innerText = 'Sem bate de caixa registrado';
+        else elDifDesc.innerText = `${mesasBatidas}/${mesasComBat} mesas bateram`;
     }
 
-    // Ranking por jogador (só de mesas encerradas)
+    // Hora pico (qual hora teve mais aberturas de mesa)
+    const horasCount = {};
+    encerradasNoPeriodo.forEach(m => {
+        const h = new Date(m.abertoEm || m.aberturaTs || Date.now()).getHours();
+        horasCount[h] = (horasCount[h] || 0) + 1;
+    });
+    const horaPicoEntry = Object.entries(horasCount).sort((a, b) => b[1] - a[1])[0];
+    const elHora = document.getElementById('cash-rel-hora-pico');
+    const elHoraDesc = document.getElementById('cash-rel-hora-pico-desc');
+    if (elHora) {
+        if (horaPicoEntry) {
+            const h = parseInt(horaPicoEntry[0]);
+            elHora.innerText = String(h).padStart(2, '0') + 'h';
+            if (elHoraDesc) elHoraDesc.innerText = `${horaPicoEntry[1]} mesa${horaPicoEntry[1] !== 1 ? 's' : ''} abertas`;
+        } else {
+            elHora.innerText = '—';
+            if (elHoraDesc) elHoraDesc.innerText = '';
+        }
+    }
+
+    // ─── RANKING JOGADORES ────────────────────────────────────
     const porJogador = {};
-    encerradas.forEach(m => {
-        m.jogadores.forEach(j => {
+    encerradasNoPeriodo.forEach(m => {
+        (m.jogadores || []).forEach(j => {
             if (!porJogador[j.jogadorId]) porJogador[j.jogadorId] = { invest: 0, saiu: 0, sessoes: 0 };
-            porJogador[j.jogadorId].invest  += j.totalInvestido;
-            porJogador[j.jogadorId].saiu    += j.saiuCom;
+            porJogador[j.jogadorId].invest  += (Number(j.totalInvestido) || 0);
+            porJogador[j.jogadorId].saiu    += (Number(j.saiuCom) || 0);
             porJogador[j.jogadorId].sessoes += 1;
         });
     });
-    const ranking = Object.entries(porJogador).map(([id, d]) => ({
-        id: parseInt(id),
+    let ranking = Object.entries(porJogador).map(([id, d]) => ({
+        id,
         resultado: d.saiu - d.invest,
         ...d,
-    })).sort((a, b) => b.resultado - a.resultado);
+    }));
+    if (_cashrelRankTipo === 'volume') {
+        ranking.sort((a, b) => b.invest - a.invest);
+    } else if (_cashrelRankTipo === 'frequencia') {
+        ranking.sort((a, b) => b.sessoes - a.sessoes);
+    } else {
+        ranking.sort((a, b) => b.resultado - a.resultado);
+    }
+    ranking = ranking.slice(0, 20); // top 20
 
-    const batPrefix = el_rank._batInfoHtml || '';
-    el_rank.innerHTML = batPrefix + (ranking.length ? ranking.map((r, i) => {
-        const jog = jogadores.find(x => x.id === r.id);
-        const positivo = r.resultado >= 0;
-        return `
-        <div style="display:grid;grid-template-columns:2rem 1fr auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border-radius:.5rem;font-size:.85rem;">
-            <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}</span>
-            <span style="font-weight:700;">${jog ? jog.nome : '?'}</span>
-            <span style="font-family:var(--font-mono);color:#71717a;font-size:.75rem;">${r.sessoes} sess${r.sessoes>1?'ões':'ão'}</span>
-            <span style="font-family:var(--font-mono);color:#71717a;font-size:.75rem;">Inv ${formatMoney(r.invest)}</span>
-            <span style="font-family:var(--font-mono);font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(r.resultado)}</span>
-        </div>`;
-    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhuma sessão encerrada ainda</div>');
+    const rankEl = document.getElementById('cash-rel-ranking');
+    if (rankEl) {
+        rankEl.innerHTML = ranking.length ? ranking.map((r, i) => {
+            const jog = jogadores.find(x => x.id === r.id);
+            const positivo = r.resultado >= 0;
+            return `
+            <div style="display:grid;grid-template-columns:2rem 1fr auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border-radius:.5rem;font-size:.85rem;">
+                <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}</span>
+                <span style="font-weight:700;">${jog ? esc(jog.nome) : '?'}</span>
+                <span style="font-family:var(--font-mono);color:#71717a;font-size:.75rem;">${r.sessoes} sess${r.sessoes>1?'ões':'ão'}</span>
+                <span style="font-family:var(--font-mono);color:#71717a;font-size:.75rem;">Inv ${formatMoney(r.invest)}</span>
+                <span style="font-family:var(--font-mono);font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(r.resultado)}</span>
+            </div>`;
+        }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;text-align:center;">Nenhuma sessão no período selecionado</div>';
+    }
+
+    // ─── RANKING DEALERS (RAKE) ───────────────────────────────
+    const porDealer = {};
+    encerradasNoPeriodo.forEach(m => {
+        (m.rakeLancamentos || []).forEach(l => {
+            const k = l.dealerNome || '—';
+            if (!porDealer[k]) porDealer[k] = { total: 0, lancs: 0, mesas: new Set() };
+            porDealer[k].total += (Number(l.valor) || 0);
+            porDealer[k].lancs += 1;
+            porDealer[k].mesas.add(m.id);
+        });
+    });
+    const dealersRank = Object.entries(porDealer)
+        .map(([nome, d]) => ({ nome, total: d.total, lancs: d.lancs, mesas: d.mesas.size }))
+        .sort((a, b) => b.total - a.total);
+
+    const dealersEl = document.getElementById('cash-rel-dealers');
+    if (dealersEl) {
+        dealersEl.innerHTML = dealersRank.length ? dealersRank.map((d, i) => `
+            <div style="display:grid;grid-template-columns:2rem 1fr auto auto auto;gap:1rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border-radius:.5rem;font-size:.85rem;">
+                <span style="font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}</span>
+                <span style="font-weight:700;">${esc(d.nome)}</span>
+                <span style="font-family:var(--font-mono);color:#71717a;font-size:.75rem;">${d.lancs} lanç.</span>
+                <span style="font-family:var(--font-mono);color:#71717a;font-size:.75rem;">${d.mesas} mesa${d.mesas !== 1 ? 's' : ''}</span>
+                <span style="font-family:var(--font-mono);font-weight:800;color:var(--gold);">${formatMoney(d.total)}</span>
+            </div>
+        `).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;text-align:center;">Nenhum lançamento de rake do dealer no período</div>';
+    }
 }
 
 // --- DURATION FORMATTER ---
