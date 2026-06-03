@@ -31913,6 +31913,7 @@ function renderPagarConta() {
     // Verifica se tem comandas abertas do jogador
     const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
     const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+    const totalItens = comandasAbertas.reduce((s, c) => s + c.itens.length, 0);
 
     if (saldo >= 0 && !comandasAbertas.length) {
         el.innerHTML = `
@@ -31927,67 +31928,169 @@ function renderPagarConta() {
     const divida = Math.max(0, -saldo);
     const totalSugerido = divida + totalComandas;
 
-    // Card de comandas abertas (se houver)
-    let comandasHtml = '';
-    if (comandasAbertas.length > 0) {
-        comandasHtml = `
-        <div style="padding:.75rem 1rem;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.25);border-radius:.6rem;margin-bottom:1rem;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem;">
-                <div>
-                    <div style="font-size:.7rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.08em;"><i class="fa-solid fa-receipt"></i> Comandas Abertas no Bar</div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">${comandasAbertas.length} comanda${comandasAbertas.length>1?'s':''} · ${comandasAbertas.reduce((s,c)=>s+c.itens.length,0)} iten${comandasAbertas.reduce((s,c)=>s+c.itens.length,0)>1?'s':''}</div>
-                </div>
-                <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;white-space:nowrap;">
-                    <input type="checkbox" id="pj-incluir-comandas" checked onchange="atualizarTotalComComandas()" style="accent-color:#f97316;">
-                    <span style="font-size:.75rem;font-weight:700;color:#f97316;">Incluir no acerto</span>
-                </label>
+    // Dados do jogador (pra cabeçalho)
+    const jogador = jogadores.find(j => j.id === pagamentoJogadorId);
+    const nomeJogador = jogador ? jogador.nome : 'Jogador';
+    const subJogador = jogador ? (jogador.telefone || jogador.celular || ('#' + pagamentoJogadorId)) : '';
+
+    // Linha de comandas (se houver)
+    const linhaComandas = comandasAbertas.length > 0 ? `
+        <div id="pj-linha-comandas" class="pj-comp-linha">
+            <div class="pj-comp-left">
+                <i class="fa-solid fa-glass-cheers" style="color:#f97316;font-size:.85rem;"></i>
+                <span class="pj-comp-label">Comandas do bar <span class="pj-comp-sub">(${comandasAbertas.length} comanda${comandasAbertas.length>1?'s':''} · ${totalItens} ${totalItens>1?'itens':'item'})</span></span>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:.4rem;border-top:1px dashed rgba(249,115,22,.2);">
-                <span style="font-size:.8rem;font-weight:700;">Total das comandas</span>
-                <span style="font-family:var(--font-mono);font-weight:800;color:#f97316;font-size:1rem;">${formatMoney(totalComandas)}</span>
-            </div>
-        </div>`;
-    }
+            <div class="pj-comp-val pj-comp-val-orange">- ${formatMoney(totalComandas)}</div>
+        </div>` : '';
+
+    // Toggle das comandas (badge laranja abaixo, só se houver)
+    const toggleComandas = comandasAbertas.length > 0 ? `
+        <label class="pj-toggle-comandas" id="pj-toggle-comandas-wrap">
+            <input type="checkbox" id="pj-incluir-comandas" checked onchange="atualizarTotalComComandas()">
+            <span>Incluir comandas no acerto</span>
+        </label>` : '';
 
     el.innerHTML = `
-        ${comandasHtml}
-        <div style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:1rem;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
-                <span style="font-size:.7rem;color:#71717a;">Saldo devedor</span>
-                <span style="font-family:var(--font-mono);font-weight:700;color:${divida>0?'#ef4444':'#71717a'};">${divida>0?'-':''}${formatMoney(divida)}</span>
-            </div>
-            ${comandasAbertas.length > 0 ? `
-            <div id="pj-linha-comandas" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
-                <span style="font-size:.7rem;color:#71717a;">+ Comandas abertas</span>
-                <span style="font-family:var(--font-mono);font-weight:700;color:#f97316;">${formatMoney(totalComandas)}</span>
-            </div>` : ''}
-            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:.4rem;border-top:1px solid #1e1e23;margin-top:.35rem;">
-                <span style="font-size:.8rem;font-weight:700;">Total a pagar</span>
-                <span id="pj-total-display" style="font-family:var(--font-mono);font-weight:800;color:#ef4444;font-size:1.5rem;">${formatMoney(totalSugerido)}</span>
+        <!-- Card do jogador -->
+        <div class="pj-card-jogador">
+            <div class="pj-card-row">
+                <i class="fa-solid fa-user-circle pj-card-icon"></i>
+                <div style="flex:1;">
+                    <div class="pj-card-nome">${esc(nomeJogador)}</div>
+                    ${subJogador ? `<div class="pj-card-sub">${esc(subJogador)}</div>` : ''}
+                </div>
             </div>
         </div>
-        
-        <!-- Splits de pagamento -->
-        <label class="inp-label" style="display:flex;justify-content:space-between;align-items:center;">
-            <span>Forma(s) de Pagamento</span>
-            <span id="pj-pp-status" style="font-size:.65rem;color:#71717a;font-weight:600;text-transform:none;letter-spacing:0;"></span>
-        </label>
-        <div id="pj-pp-lista" style="display:flex;flex-direction:column;gap:.5rem;"></div>
-        <button onclick="pjAddSplit()" style="width:100%;margin-top:.5rem;background:transparent;border:1px dashed #3f3f46;color:#a1a1aa;border-radius:.5rem;padding:.55rem;font-weight:700;font-size:.78rem;cursor:pointer;font-family:'Manrope',sans-serif;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#3f3f46';this.style.color='#a1a1aa'">
-            <i class="fa-solid fa-plus"></i> Adicionar outra forma de pagamento
-        </button>
+
+        <!-- Composição -->
+        <div class="pj-composicao">
+            <div class="pj-comp-lab">Composição</div>
+            <div class="pj-comp-linha">
+                <div class="pj-comp-left">
+                    <i class="fa-solid fa-receipt" style="color:#ef4444;font-size:.85rem;"></i>
+                    <span class="pj-comp-label">Saldo devedor${comandasAbertas.length > 0 ? ' <span class="pj-comp-sub">(buy-in/rebuy)</span>' : ''}</span>
+                </div>
+                <div class="pj-comp-val pj-comp-val-red">- ${formatMoney(divida)}</div>
+            </div>
+            ${linhaComandas}
+            <div class="pj-comp-total">
+                <span class="pj-comp-total-label">Total a pagar</span>
+                <div id="pj-total-display" class="pj-comp-total-val">${formatMoney(totalSugerido)}</div>
+            </div>
+            ${toggleComandas}
+        </div>
+
+        <!-- Valor a movimentar -->
+        <div class="pj-valor-wrap">
+            <div class="pj-valor-head">
+                <label class="pj-valor-lab">Valor a movimentar agora</label>
+                <button type="button" onclick="pjUsarSugerido()" class="pj-btn-sug">⟲ usar sugerido</button>
+            </div>
+            <div class="pj-valor-input">
+                <span class="pj-valor-rs">R$</span>
+                <input type="number" id="pj-valor-editavel" step="0.01" value="${totalSugerido.toFixed(2)}" oninput="pjOnValorEditavelChange()" onchange="pjOnValorEditavelChange()">
+            </div>
+        </div>
+
+        <!-- Métodos (modo simples — 1 método) -->
+        <div id="pj-bloco-simples" class="pj-metodos-wrap">
+            <div class="pj-metodos-head">
+                <label class="pj-valor-lab">Método</label>
+                <button type="button" onclick="pjTrocarModoMisto(true)" class="pj-btn-sug">💳 Pagamento misto (2+ formas)</button>
+            </div>
+            <div class="pj-metodos-grid" id="pj-metodos-container">
+                <button type="button" onclick="pjSelecionarMetodo('dinheiro')" data-metodo="dinheiro" class="pj-metodo-btn"><i class="fa-solid fa-money-bill-wave"></i>Dinheiro</button>
+                <button type="button" onclick="pjSelecionarMetodo('pix')" data-metodo="pix" class="pj-metodo-btn"><i class="fa-solid fa-qrcode"></i>PIX</button>
+                <button type="button" onclick="pjSelecionarMetodo('debito')" data-metodo="debito" class="pj-metodo-btn"><i class="fa-solid fa-credit-card"></i>Débito</button>
+                <button type="button" onclick="pjSelecionarMetodo('credito')" data-metodo="credito" class="pj-metodo-btn"><i class="fa-brands fa-cc-mastercard"></i>Crédito</button>
+            </div>
+        </div>
+
+        <!-- Métodos (modo misto — vários métodos) -->
+        <div id="pj-bloco-misto" class="pj-metodos-wrap" style="display:none;">
+            <div class="pj-metodos-head">
+                <label class="pj-valor-lab">Pagamento Misto</label>
+                <button type="button" onclick="pjTrocarModoMisto(false)" class="pj-btn-voltar">← voltar pra método único</button>
+            </div>
+            <div id="pj-pp-lista" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+            <button type="button" onclick="pjAddSplit()" class="pj-add-split">
+                <i class="fa-solid fa-plus"></i> Adicionar outra forma
+            </button>
+            <div id="pj-pp-status" style="font-size:.7rem;color:#71717a;font-weight:600;margin-top:.5rem;text-align:right;"></div>
+        </div>
+
         <div id="pj-pagar-aviso" style="font-size:.72rem;color:#71717a;margin-top:.5rem;text-align:center;"></div>
-        
-        <label class="inp-label" style="margin-top:1rem;">Observação</label>
-        <input id="pj-pagar-obs" class="inp" placeholder="Opcional">
-        <button onclick="confirmarPagamentoConta()" class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;margin-top:1.25rem;">
+
+        <!-- Observação -->
+        <div class="pj-obs-wrap">
+            <label class="pj-valor-lab" style="display:block;margin-bottom:.4rem;">Observação</label>
+            <input id="pj-pagar-obs" class="inp" placeholder="Opcional">
+        </div>
+
+        <!-- Confirmar -->
+        <button onclick="confirmarPagamentoConta()" class="pj-btn-confirmar">
             <i class="fa-solid fa-check"></i> Confirmar Pagamento
         </button>`;
-    
-    // Inicializa splits com 1 entrada cobrindo o total sugerido
+
+    // Injeta CSS (só uma vez)
+    if (!document.getElementById('pj-pagar-css')) {
+        const style = document.createElement('style');
+        style.id = 'pj-pagar-css';
+        style.textContent = `
+            .pj-card-jogador{background:#0a0a0c;border:1px solid #1e1e23;border-radius:.6rem;padding:.9rem 1rem;margin-bottom:1rem;}
+            .pj-card-row{display:flex;align-items:center;gap:.6rem;}
+            .pj-card-icon{font-size:1.5rem;color:#ef4444;}
+            .pj-card-nome{font-weight:700;font-size:1rem;}
+            .pj-card-sub{font-size:.72rem;color:#71717a;margin-top:.1rem;}
+
+            .pj-composicao{background:rgba(255,255,255,.02);border:1px solid #1e1e23;border-radius:.6rem;padding:1rem;margin-bottom:1rem;}
+            .pj-comp-lab{font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;}
+            .pj-comp-linha{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid #1e1e23;}
+            .pj-comp-left{display:flex;align-items:center;gap:.5rem;}
+            .pj-comp-label{font-size:.85rem;color:#a1a1aa;}
+            .pj-comp-sub{color:#52525b;font-size:.7rem;}
+            .pj-comp-val{font-size:1rem;font-weight:800;font-family:var(--font-mono);}
+            .pj-comp-val-red{color:#ef4444;}
+            .pj-comp-val-orange{color:#f97316;}
+            .pj-comp-total{display:flex;justify-content:space-between;align-items:center;padding:.6rem 0 .2rem;margin-top:.3rem;border-top:1px solid #1e1e23;}
+            .pj-comp-total-label{font-size:.85rem;font-weight:700;color:#fafafa;}
+            .pj-comp-total-val{font-size:1.15rem;font-weight:900;font-family:var(--font-mono);color:#ef4444;}
+
+            .pj-toggle-comandas{display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:.4rem;padding:.4rem .65rem;margin-top:.6rem;font-size:.72rem;color:#f97316;font-weight:700;}
+            .pj-toggle-comandas input{accent-color:#f97316;margin:0;cursor:pointer;}
+
+            .pj-valor-wrap{margin-bottom:1rem;}
+            .pj-valor-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;}
+            .pj-valor-lab{font-size:.7rem;color:#71717a;font-weight:600;text-transform:uppercase;letter-spacing:.08em;}
+            .pj-btn-sug{background:transparent;border:none;color:#a855f7;font-size:.7rem;cursor:pointer;text-decoration:underline;font-family:'Manrope',sans-serif;}
+            .pj-btn-voltar{background:transparent;border:none;color:#a1a1aa;font-size:.7rem;cursor:pointer;text-decoration:underline;font-family:'Manrope',sans-serif;}
+            .pj-valor-input{display:flex;align-items:center;gap:.4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.5rem;padding:.7rem .9rem;}
+            .pj-valor-rs{font-size:.85rem;color:#71717a;font-family:var(--font-mono);font-weight:700;}
+            .pj-valor-input input{flex:1;background:transparent;border:none;color:#fafafa;font-size:1.05rem;font-family:var(--font-mono);font-weight:700;outline:none;text-align:right;}
+
+            .pj-metodos-wrap{margin-bottom:1.25rem;}
+            .pj-metodos-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;}
+            .pj-metodos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;}
+            .pj-metodo-btn{padding:.65rem .4rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.45rem;color:#a1a1aa;font-size:.75rem;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.25rem;font-family:'Manrope',sans-serif;transition:all .15s;}
+            .pj-metodo-btn:hover{border-color:#a855f7;color:#fafafa;}
+            .pj-metodo-btn.active{border-color:#a855f7;color:#a855f7;background:rgba(168,85,247,.08);}
+            .pj-metodo-btn i{font-size:.95rem;}
+
+            .pj-add-split{width:100%;margin-top:.5rem;background:transparent;border:1px dashed #3f3f46;color:#a1a1aa;border-radius:.5rem;padding:.55rem;font-weight:700;font-size:.78rem;cursor:pointer;font-family:'Manrope',sans-serif;transition:all .15s;}
+            .pj-add-split:hover{border-color:var(--gold);color:var(--gold);}
+
+            .pj-obs-wrap{margin-bottom:1.25rem;}
+
+            .pj-btn-confirmar{width:100%;background:#22c55e;color:#0a0a0b;border:none;padding:.85rem;border-radius:.5rem;font-weight:700;font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;font-family:'Manrope',sans-serif;transition:filter .15s;}
+            .pj-btn-confirmar:hover{filter:brightness(1.1);}
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Inicializa estado
     _pjSplits = [{ valor: totalSugerido, metodo: 'dinheiro' }];
     _pjTotalSugerido = totalSugerido;
-    pjRenderSplits();
+    pjSelecionarMetodo('dinheiro'); // Marca Dinheiro como ativo
 }
 
 // Atualiza total quando toggle "incluir comandas" muda
@@ -32008,10 +32111,22 @@ function atualizarTotalComComandas() {
     // Mostra/oculta linha de comandas
     const linha = document.getElementById('pj-linha-comandas');
     if (linha) linha.style.opacity = incluir ? '1' : '.4';
+
+    // Atualiza input editável
+    const inp = document.getElementById('pj-valor-editavel');
+    if (inp) inp.value = total.toFixed(2);
     
-    // Reset splits (1 entrada com total)
-    _pjSplits = [{ valor: total, metodo: 'dinheiro' }];
-    pjRenderSplits();
+    // Reset splits (1 entrada com total) — preserva método selecionado se já tinha
+    const metodoAtual = (_pjSplits && _pjSplits[0]) ? _pjSplits[0].metodo : 'dinheiro';
+    _pjSplits = [{ valor: total, metodo: metodoAtual }];
+
+    // Se está em modo misto, re-renderiza splits; senão atualiza só os botões
+    const blocoMisto = document.getElementById('pj-bloco-misto');
+    if (blocoMisto && blocoMisto.style.display !== 'none') {
+        pjRenderSplits();
+    } else {
+        pjSelecionarMetodo(metodoAtual);
+    }
 }
 
 // ============================================================
@@ -32105,6 +32220,81 @@ function pjAtualizarStatus() {
 // Compat
 function validarValorPagamento() {
     pjAtualizarStatus();
+}
+
+// ============================================================
+// NOVAS funções de UX da aba Pagar Conta refatorada
+// ============================================================
+
+// Seleciona um método (modo simples — 1 split). Marca o botão ativo visualmente
+// e atualiza o estado interno do split.
+function pjSelecionarMetodo(metodo) {
+    if (!_pjSplits || _pjSplits.length === 0) {
+        _pjSplits = [{ valor: _pjTotalSugerido || 0, metodo: metodo }];
+    } else {
+        _pjSplits[0].metodo = metodo;
+    }
+    // Atualiza UI dos botões
+    const cont = document.getElementById('pj-metodos-container');
+    if (cont) {
+        cont.querySelectorAll('.pj-metodo-btn').forEach(btn => {
+            if (btn.getAttribute('data-metodo') === metodo) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+    pjAtualizarStatus();
+}
+
+// Botão "usar sugerido": reseta o input pro total sugerido + atualiza split
+function pjUsarSugerido() {
+    const inp = document.getElementById('pj-valor-editavel');
+    if (inp) inp.value = (_pjTotalSugerido || 0).toFixed(2);
+    if (_pjSplits && _pjSplits[0]) _pjSplits[0].valor = _pjTotalSugerido || 0;
+    pjAtualizarStatus();
+}
+
+// Input do valor editável (modo simples) mudou: atualiza o split[0]
+function pjOnValorEditavelChange() {
+    const inp = document.getElementById('pj-valor-editavel');
+    if (!inp) return;
+    const v = parseFloat(inp.value) || 0;
+    if (_pjSplits && _pjSplits[0]) _pjSplits[0].valor = v;
+    pjAtualizarStatus();
+}
+
+// Troca entre modo simples (1 método) e modo misto (vários).
+// Não destrói _pjSplits — só alterna a visibilidade dos blocos.
+function pjTrocarModoMisto(ativar) {
+    const blocoSimples = document.getElementById('pj-bloco-simples');
+    const blocoMisto = document.getElementById('pj-bloco-misto');
+    const valorWrap = document.querySelector('.pj-valor-wrap');
+    if (!blocoSimples || !blocoMisto) return;
+
+    if (ativar) {
+        // Vai pra misto: se só tem 1 split, adiciona um segundo com 0
+        blocoSimples.style.display = 'none';
+        blocoMisto.style.display = '';
+        // Esconde o valor editável simples (no modo misto, cada split tem seu input)
+        if (valorWrap) valorWrap.style.display = 'none';
+        if (_pjSplits.length === 1) {
+            // mantém o valor existente, e adiciona um split vazio
+            _pjSplits.push({ valor: 0, metodo: 'pix' });
+        }
+        pjRenderSplits();
+    } else {
+        // Volta pra simples: pega só o primeiro split, descarta o resto
+        blocoSimples.style.display = '';
+        blocoMisto.style.display = 'none';
+        if (valorWrap) valorWrap.style.display = '';
+        const primeiro = _pjSplits[0] || { valor: _pjTotalSugerido || 0, metodo: 'dinheiro' };
+        _pjSplits = [{ valor: _pjTotalSugerido || 0, metodo: primeiro.metodo }];
+        const inp = document.getElementById('pj-valor-editavel');
+        if (inp) inp.value = (_pjTotalSugerido || 0).toFixed(2);
+        pjSelecionarMetodo(primeiro.metodo);
+    }
 }
 
 function _validarValorPagamentoOLD() {
