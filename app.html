@@ -5222,11 +5222,12 @@ document.addEventListener('DOMContentLoaded', function(){
 <!-- MODAL: DETALHES CLIENTE (somente leitura) -->
 <div id="modal-detalhes-cliente" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;gap:.5rem;flex-wrap:wrap;">
             <h3 id="dc-titulo" style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-user" style="color:var(--gold);"></i> Detalhes do Cliente</h3>
-            <div style="display:flex;align-items:center;gap:.5rem;">
-                <button id="dc-btn-imprimir" onclick="imprimirExtratoCompletoJogador(_dcJogadorAtual)" class="btn-ghost" style="font-size:.75rem;padding:.35rem .75rem;color:#a78bfa;border-color:rgba(167,139,250,.3);" title="Imprimir extrato completo do jogador"><i class="fa-solid fa-print"></i> Imprimir Extrato</button>
-                <button onclick="closeModal('modal-detalhes-cliente')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <button onclick="imprimirExtratoCompletoJogador(_dcJogadorAtual, 'simplificado')" class="btn-ghost" style="font-size:.72rem;padding:.35rem .7rem;color:#22c55e;border-color:rgba(34,197,94,.3);" title="Extrato curto (resumo apenas)"><i class="fa-solid fa-print"></i> Simplificado</button>
+                <button onclick="imprimirExtratoCompletoJogador(_dcJogadorAtual, 'detalhado')" class="btn-ghost" style="font-size:.72rem;padding:.35rem .7rem;color:#a78bfa;border-color:rgba(167,139,250,.3);" title="Extrato completo (com histórico)"><i class="fa-solid fa-print"></i> Detalhado</button>
+                <button onclick="closeModal('modal-detalhes-cliente')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;margin-left:.3rem;">&times;</button>
             </div>
         </div>
         <div id="dc-info" style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:1rem;"></div>
@@ -37565,28 +37566,34 @@ function salvarBlindsAndamento() {
 // DETALHES DO CLIENTE (só leitura no relatório)
 // ============================================================
 // ============================================================
-// Imprimir Extrato Completo do Jogador (cross-módulo)
+// Imprimir Extrato do Jogador (cross-módulo)
 // ============================================================
-// Gera texto formatado pra impressão térmica (58mm=24col / 80mm=32col),
-// com resumo no topo + lista de transações.
-// Respeita o gate da feature 'impressao_termica' via abrirPreviewImpressao
-// (que já tem essa proteção centralizada).
+// Gera texto formatado pra impressão térmica (58mm=24col / 80mm=32col).
+// 2 modos:
+//   - 'detalhado'    : cabeçalho + identificação completa + resumo + histórico + assinatura
+//   - 'simplificado' : cabeçalho + identificação básica + resumo + saldo + assinatura
+//                      (sem histórico — pra economizar papel)
+// Respeita o gate da feature 'impressao_termica' via abrirPreviewImpressao.
 // ============================================================
-function gerarExtratoCompletoJogador(jid) {
+function gerarExtratoCompletoJogador(jid, modo) {
+    modo = modo || 'detalhado';
     const j = jogadores.find(x => x.id === jid);
     if (!j) return '';
     const col = _printColWidth();
     let txt = _printHeaderCfg();
 
-    // Título
-    txt += _printCenter('EXTRATO DO JOGADOR', col) + '\n';
+    // Título (varia por modo)
+    const titulo = modo === 'simplificado' ? 'EXTRATO SIMPLIFICADO' : 'EXTRATO DO JOGADOR';
+    txt += _printCenter(titulo, col) + '\n';
     txt += _printLine('=', col) + '\n';
 
-    // Identificação
+    // Identificação (no simplificado, menos linhas)
     txt += 'Nome: ' + j.nome + '\n';
-    if (j.apelido) txt += 'Apelido: ' + j.apelido + '\n';
-    if (j.whatsapp) txt += 'WhatsApp: ' + j.whatsapp + '\n';
-    if (j.cidade) txt += 'Cidade: ' + j.cidade + (j.uf ? '/' + j.uf : '') + '\n';
+    if (modo === 'detalhado') {
+        if (j.apelido) txt += 'Apelido: ' + j.apelido + '\n';
+        if (j.whatsapp) txt += 'WhatsApp: ' + j.whatsapp + '\n';
+        if (j.cidade) txt += 'Cidade: ' + j.cidade + (j.uf ? '/' + j.uf : '') + '\n';
+    }
     txt += 'Emitido: ' + new Date().toLocaleString('pt-BR') + '\n';
     txt += _printLine('=', col) + '\n';
 
@@ -37628,31 +37635,32 @@ function gerarExtratoCompletoJogador(jid) {
     txt += _printPad(saldoLabel, saldoStr, col) + '\n';
     txt += _printLine('=', col) + '\n';
 
-    // === Histórico de transações ===
-    txt += '\n' + _printCenter('HISTORICO', col) + '\n';
-    txt += _printLine('-', col) + '\n';
-
-    // Limita a 100 transações no impresso pra não sair tira de papel enorme
-    const MAX_TXS = 100;
-    const txsImpresso = txs.slice(0, MAX_TXS);
-    txsImpresso.forEach(t => {
-        const data = new Date(t.ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-        const sinal = t.valor < 0 ? '-' : '+';
-        const valor = sinal + formatMoney(Math.abs(t.valor));
-        const desc = (t.descricao || '').slice(0, col - 8); // recorta pra caber
-        txt += _printPad(data + ' ' + desc, valor, col) + '\n';
-    });
-    if (txs.length > MAX_TXS) {
+    // === Histórico (SÓ no modo detalhado) ===
+    if (modo === 'detalhado') {
+        txt += '\n' + _printCenter('HISTORICO', col) + '\n';
         txt += _printLine('-', col) + '\n';
-        txt += _printCenter('(+ ' + (txs.length - MAX_TXS) + ' transacoes anteriores)', col) + '\n';
-    }
-    txt += _printLine('=', col) + '\n';
 
-    // Saldo final repetido pra ficar claro
-    txt += '\n';
-    txt += _printPad('Total transacoes:', String(txs.length), col) + '\n';
-    txt += _printPad('Saldo atual:', formatMoney(saldo), col) + '\n';
-    txt += _printLine('=', col) + '\n';
+        const MAX_TXS = 100;
+        const txsImpresso = txs.slice(0, MAX_TXS);
+        txsImpresso.forEach(t => {
+            const data = new Date(t.ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const sinal = t.valor < 0 ? '-' : '+';
+            const valor = sinal + formatMoney(Math.abs(t.valor));
+            const desc = (t.descricao || '').slice(0, col - 8);
+            txt += _printPad(data + ' ' + desc, valor, col) + '\n';
+        });
+        if (txs.length > MAX_TXS) {
+            txt += _printLine('-', col) + '\n';
+            txt += _printCenter('(+ ' + (txs.length - MAX_TXS) + ' transacoes anteriores)', col) + '\n';
+        }
+        txt += _printLine('=', col) + '\n';
+
+        // Resumo final repetido (só no detalhado pra confirmar)
+        txt += '\n';
+        txt += _printPad('Total transacoes:', String(txs.length), col) + '\n';
+        txt += _printPad('Saldo atual:', formatMoney(saldo), col) + '\n';
+        txt += _printLine('=', col) + '\n';
+    }
 
     // Linha de assinatura
     txt += '\n\n';
@@ -37662,13 +37670,15 @@ function gerarExtratoCompletoJogador(jid) {
     return txt;
 }
 
-function imprimirExtratoCompletoJogador(jid) {
+function imprimirExtratoCompletoJogador(jid, modo) {
+    modo = modo || 'detalhado';
     const j = jogadores.find(x => x.id === jid);
     if (!j) { showToast('⚠️ Jogador não encontrado'); return; }
-    const txt = gerarExtratoCompletoJogador(jid);
-    abrirPreviewImpressao('Extrato do Jogador', txt);
+    const txt = gerarExtratoCompletoJogador(jid, modo);
+    const titulo = modo === 'simplificado' ? 'Extrato Simplificado' : 'Extrato do Jogador';
+    abrirPreviewImpressao(titulo, txt);
     if (typeof logAudit === 'function') {
-        try { logAudit('IMPRESSAO', 'Extrato impresso · ' + j.nome); } catch(_) {}
+        try { logAudit('IMPRESSAO', titulo + ' · ' + j.nome); } catch(_) {}
     }
 }
 
