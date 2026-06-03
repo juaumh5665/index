@@ -881,6 +881,11 @@
 .busca-item:hover, .busca-item.selected { border-color: var(--gold); background:#18181b; }
 .busca-item kbd { font-family:var(--font-mono); font-size:.65rem; padding:.15rem .4rem; background:#18181b; border:1px solid #27272a; border-radius:.25rem; color:#71717a; }
 
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
 @keyframes undo-shrink {
     from { width: 100%; }
     to   { width: 0%; }
@@ -7641,20 +7646,81 @@ let sbClube   = null;
 
 // Estado de conexão (online/offline)
 let dbOnline = navigator.onLine;
-window.addEventListener('online',  () => { dbOnline = true;  atualizarStatusDB(); showToast('🟢 Conexão restaurada'); });
-window.addEventListener('offline', () => { dbOnline = false; atualizarStatusDB(); showToast('🔴 Sem conexão — modo offline'); });
+window.addEventListener('online',  () => {
+    dbOnline = true;
+    atualizarStatusDB();
+    showToast('🟢 Conexão restaurada');
+    // OTIMIZAÇÃO OFFLINE: sincronizar pendências automaticamente
+    setTimeout(() => {
+        try {
+            const pendentes = _contarPendencias();
+            if (pendentes > 0) {
+                console.log(`[OFFLINE] Voltou online com ${pendentes} pendência(s) — sincronizando agora`);
+                showToast(`🔄 Sincronizando ${pendentes} alteração${pendentes !== 1 ? 'ões' : ''} pendente${pendentes !== 1 ? 's' : ''}...`);
+                if (typeof sincronizarEstado === 'function') {
+                    sincronizarEstado().then(() => {
+                        atualizarStatusDB();
+                        console.log('[OFFLINE] Sincronização pós-online concluída');
+                    }).catch(e => console.warn('[OFFLINE] Erro no sync pós-online:', e));
+                }
+            }
+        } catch(e) { console.warn('[OFFLINE] Erro ao verificar pendências:', e); }
+    }, 1500); // 1.5s pra deixar a conexão estabilizar
+});
+window.addEventListener('offline', () => {
+    dbOnline = false;
+    atualizarStatusDB();
+    showToast('🔴 Sem conexão — modo offline (suas alterações serão sincronizadas quando voltar)');
+});
+
+// Conta total de itens pendentes de sincronização no _syncQueue
+function _contarPendencias() {
+    if (typeof _syncQueue === 'undefined') return 0;
+    let total = 0;
+    Object.keys(_syncQueue).forEach(k => {
+        if (k === 'deletes') {
+            Object.keys(_syncQueue.deletes || {}).forEach(dk => {
+                total += (_syncQueue.deletes[dk] && _syncQueue.deletes[dk].size) || 0;
+            });
+        } else if (_syncQueue[k] && typeof _syncQueue[k].size === 'number') {
+            total += _syncQueue[k].size;
+        }
+    });
+    return total;
+}
 
 function atualizarStatusDB() {
     const el = document.getElementById('db-status');
     if (!el) return;
+    const pendentes = _contarPendencias();
     if (dbOnline) {
-        el.innerHTML = '<i class="fa-solid fa-circle" style="color:#22c55e;font-size:.5rem;margin-right:.25rem;"></i>Online';
-        el.style.color = '#22c55e';
+        if (pendentes > 0) {
+            // Online mas com pendências sincronizando
+            el.innerHTML = `<i class="fa-solid fa-arrows-rotate" style="color:#f59e0b;font-size:.55rem;margin-right:.25rem;animation:spin 2s linear infinite;"></i>Sincronizando (${pendentes})`;
+            el.style.color = '#f59e0b';
+            el.title = `${pendentes} alteração(ões) sendo enviada(s) ao servidor`;
+        } else {
+            el.innerHTML = '<i class="fa-solid fa-circle" style="color:#22c55e;font-size:.5rem;margin-right:.25rem;"></i>Online';
+            el.style.color = '#22c55e';
+            el.title = 'Conectado e sincronizado';
+        }
     } else {
-        el.innerHTML = '<i class="fa-solid fa-circle" style="color:#ef4444;font-size:.5rem;margin-right:.25rem;"></i>Offline';
-        el.style.color = '#ef4444';
+        if (pendentes > 0) {
+            el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" style="color:#ef4444;font-size:.6rem;margin-right:.25rem;"></i>Offline · ${pendentes} pendente${pendentes !== 1 ? 's' : ''}`;
+            el.style.color = '#ef4444';
+            el.title = `Sem conexão — ${pendentes} alteração(ões) serão sincronizadas ao voltar online`;
+        } else {
+            el.innerHTML = '<i class="fa-solid fa-circle" style="color:#ef4444;font-size:.5rem;margin-right:.25rem;"></i>Offline';
+            el.style.color = '#ef4444';
+            el.title = 'Sem conexão com o servidor';
+        }
     }
 }
+
+// Atualiza o badge periodicamente pra refletir o estado da fila
+setInterval(() => {
+    try { atualizarStatusDB(); } catch(e) { /* silencioso */ }
+}, 3000); // a cada 3s
 
 // Helper: gera UUID v4 (pra IDs novos no offline)
 function _genUuid() {
