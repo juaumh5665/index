@@ -30560,7 +30560,7 @@ function renderPainelDono() {
     });
     const torneiosAtivos = (torneios || []).filter(t => {
         const s = (t.status || '').toLowerCase();
-        return s === 'andamento' || s === 'em andamento' || s === 'ativo';
+        return s === 'running' || s === 'paused' || s === 'break';
     });
 
     let tornBruto = 0, tornRake = 0, tornEntradas = 0, tornStaff = 0;
@@ -30611,14 +30611,21 @@ function renderPainelDono() {
     }
 
     // ─── BAR ─────────────────────────────────
+    // CAMPOS REAIS: c.status === 'fechada' (NÃO 'paga'), c.total (NÃO totalValor), c.fechadoEm
     let barPago = 0, barAberto = 0;
     if (typeof barComandas !== 'undefined' && Array.isArray(barComandas)) {
         barComandas.forEach(c => {
-            const ts = c.criadaEm || c.abertaEm || c.criado_em || 0;
-            if (ts < intervalo.de || ts > intervalo.ate) return;
-            const valor = Number(c.totalValor) || (c.itens || []).reduce((s, i) => s + (Number(i.precoUnit) || 0) * (Number(i.qtd) || 0), 0);
-            if (c.status === 'paga' || c.status === 'fechada') barPago += valor;
-            else if (c.status === 'aberta') barAberto += valor;
+            const valor = Number(c.total) || 0;
+            if (c.status === 'fechada') {
+                // Comanda fechada/paga conta no período em que foi fechada
+                const ts = c.fechadoEm || c.fechado_em || 0;
+                if (ts >= intervalo.de && ts <= intervalo.ate) {
+                    barPago += valor;
+                }
+            } else if (c.status === 'aberta') {
+                // Comandas abertas: somar SEMPRE (são pendências atuais, independente de período)
+                barAberto += valor;
+            }
         });
     }
     document.getElementById('pd-bar-pago').textContent = _pdFmtCompact(barPago);
@@ -30632,26 +30639,35 @@ function renderPainelDono() {
     }
 
     // ─── CRÉDITO / RECEBÍVEIS ─────────────────────────────────
-    let credTotal = 0, credQtd = 0;
-    const credLista = [];
-    if (typeof jogadores !== 'undefined') {
-        jogadores.forEach(j => {
-            const saldoDevedor = Number(j.saldoCredito || j.saldo_credito || 0);
-            if (saldoDevedor < 0) {
-                credTotal += Math.abs(saldoDevedor);
-                credQtd++;
-                credLista.push({ nome: j.nome || '?', valor: Math.abs(saldoDevedor) });
-            }
+    // SISTEMA REAL: NÃO há "saldo devedor persistente" nos jogadores.
+    // O que mostramos: COMANDAS ABERTAS (bar) + JACKPOTS pendentes vinculados a jogadores.
+    // Esse é o valor real que o jogador "ficou devendo" e não foi pago ainda.
+    let credTotal = 0;
+    const credPorJogador = {}; // {jogadorId: valor}
+    if (typeof barComandas !== 'undefined') {
+        barComandas.forEach(c => {
+            if (c.status !== 'aberta') return;
+            const valor = Number(c.total) || 0;
+            if (valor <= 0) return;
+            const jid = c.jogadorId || null;
+            const nome = jid
+                ? ((jogadores.find(j => j.id === jid) || {}).nome || c.avulsoNome || '(sem nome)')
+                : (c.avulsoNome || '(avulso)');
+            const key = jid || ('avulso_' + nome);
+            if (!credPorJogador[key]) credPorJogador[key] = { nome, valor: 0 };
+            credPorJogador[key].valor += valor;
+            credTotal += valor;
         });
     }
+    const credLista = Object.values(credPorJogador);
     document.getElementById('pd-cred-aberto').textContent = _pdFmtCompact(credTotal);
-    document.getElementById('pd-cred-qtd').textContent = credQtd;
+    document.getElementById('pd-cred-qtd').textContent = credLista.length;
 
     const credListaEl = document.getElementById('pd-cred-lista');
     credLista.sort((a, b) => b.valor - a.valor);
     if (credLista.length > 0) {
         credListaEl.innerHTML = `
-            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">Top devedores</div>
+            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">Comandas em aberto</div>
             ${credLista.slice(0, 5).map(d => `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);padding:.5rem .7rem;border-radius:.45rem;font-size:.78rem;">
                     <span style="color:#fafafa;font-weight:700;">${esc(d.nome)}</span>
@@ -30660,17 +30676,18 @@ function renderPainelDono() {
             `).join('')}
         `;
     } else {
-        credListaEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">✅ Nenhum jogador devendo</div>';
+        credListaEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">✅ Nenhuma comanda em aberto</div>';
     }
 
     // ─── CONTAS A PAGAR ─────────────────────────────────
+    // CAMPOS REAIS: c.venc (string ISO ou null), c.status ('pago' | 'pendente'), c.pagoEm
     let cpVencido = 0, cpEmBreve = 0;
     if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
         const agora = Date.now();
         const em7dias = agora + (7 * 24 * 3600000);
         contasPagar.forEach(c => {
-            if (c.status === 'pago' || c.status === 'paga') return;
-            const venc = c.vencimentoTs || (c.vencimento ? new Date(c.vencimento).getTime() : 0);
+            if (c.status === 'pago') return;
+            const venc = c.venc ? new Date(c.venc).getTime() : 0;
             const valor = Number(c.valor) || 0;
             if (venc && venc < agora) cpVencido += valor;
             else if (venc && venc <= em7dias) cpEmBreve += valor;
@@ -30680,21 +30697,20 @@ function renderPainelDono() {
     document.getElementById('pd-cp-em-breve').textContent = _pdFmtCompact(cpEmBreve);
 
     // ─── SALDO DO PERÍODO ─────────────────────────────────
-    // Entradas (receitas): cash rake + torn rake + bar pago + cash volume (na verdade não é receita, é movimento)
-    // Pra ser conservador, "saldo do período" = TODO o RAKE arrecadado + bar pago
-    // Saídas = contas a pagar pagas no período + quebras de caixa
-    const entradas = cashRakeTotal + tornRake + barPago + tornStaff; // staff fixo é do clube
+    // Receitas confirmadas no período: rake cash + rake torneios + bar pago + staff fixo (clube)
+    // Despesas: contas a pagar PAGAS no período + quebras de caixa do cash
+    const entradas = cashRakeTotal + tornRake + barPago + tornStaff;
     let saidas = 0;
     if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
         contasPagar.forEach(c => {
-            if (c.status !== 'pago' && c.status !== 'paga') return;
-            const ts = c.pagoEm || c.paid_at || c.atualizadoEm || 0;
+            if (c.status !== 'pago') return;
+            const ts = c.pagoEm ? new Date(c.pagoEm).getTime() : 0;
             if (ts >= intervalo.de && ts <= intervalo.ate) {
                 saidas += Number(c.valor) || 0;
             }
         });
     }
-    saidas += cashQuebra; // quebras contam como perda
+    saidas += cashQuebra; // quebras de caixa contam como perda
 
     const liquido = entradas - saidas;
     document.getElementById('pd-saldo-total').textContent = (liquido >= 0 ? '' : '-') + _pdFmtCompact(Math.abs(liquido));
