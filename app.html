@@ -7630,6 +7630,39 @@ document.addEventListener('click', (e) => {
 let sbSession = null;
 let sbClube   = null;
 
+// ============================================================
+// StackBar auto-print — config + anti-duplicação
+// ============================================================
+// _stackbarConfig: cache da config do clube (carregada no boot e via realtime)
+//   { imprimir_item_auto, papeis_impressao: string[] }
+// _stackbarItensImpressos: Set de IDs já impressos nessa sessão (evita duplicar)
+// _stackbarBootTs: timestamp do boot. Eventos com payload.new.ts ANTES desse
+//   são ignorados (evita imprimir histórico inteiro num F5).
+// _stackbarMaquinaEhImpressora (localStorage): flag por dispositivo dizendo
+//   "esta máquina física tem a impressora térmica e deve receber as comandas".
+//   Default: false em todas as máquinas.
+// ============================================================
+let _stackbarConfig = { imprimir_item_auto: false, papeis_impressao: ['caixa'] };
+let _stackbarItensImpressos = new Set();
+let _stackbarBootTs = Date.now();
+
+function _stackbarMaquinaEhImpressora() {
+    try { return localStorage.getItem('stackbar_maquina_imprime') === 'true'; }
+    catch(_) { return false; }
+}
+
+function _stackbarSetMaquinaImpressora(ativo) {
+    try {
+        localStorage.setItem('stackbar_maquina_imprime', ativo ? 'true' : 'false');
+        _stackbarAtualizarBadge();
+    } catch(_) {}
+}
+
+// Exposição pública pro Painel/App StackBar poderem ler/escrever esses estados
+// quando renderizados dentro do StackOS (ou via postMessage no futuro)
+window._stackbarMaquinaEhImpressora = _stackbarMaquinaEhImpressora;
+window._stackbarSetMaquinaImpressora = _stackbarSetMaquinaImpressora;
+
 
 // ============================================================
 // DB — Camada de abstração de dados (Supabase + fallback offline)
@@ -8378,6 +8411,185 @@ function _rtRegistrarMsg(tipo) {
 // Fila de eventos pendentes (para o debounce agregar TODOS os tipos)
 let _realtimePendentes = [];
 
+// ============================================================
+// StackBar auto-print — helpers
+// ============================================================
+
+// Carrega a config do StackBar do banco (chamado no boot). Em caso de erro,
+// silencia e mantém o default seguro (auto-impressão OFF).
+async function _stackbarCarregarConfig() {
+    if (typeof sb === 'undefined' || !sbClube || !sbClube.id) return;
+    try {
+        const { data, error } = await sb.from('stackbar_config')
+            .select('imprimir_item_auto, papeis_impressao')
+            .eq('clube_id', sbClube.id)
+            .maybeSingle();
+        if (error) { console.warn('[STACKBAR] carregar config:', error); return; }
+        if (data) {
+            _stackbarConfig.imprimir_item_auto = !!data.imprimir_item_auto;
+            _stackbarConfig.papeis_impressao = Array.isArray(data.papeis_impressao)
+                ? data.papeis_impressao
+                : ['caixa'];
+            console.log('[STACKBAR] auto-impressão:', _stackbarConfig.imprimir_item_auto ? 'ATIVA' : 'inativa', '| papéis:', _stackbarConfig.papeis_impressao);
+        }
+        _stackbarAtualizarBadge();
+    } catch(e) {
+        console.warn('[STACKBAR] erro carregando config:', e);
+    }
+}
+
+// Gera o cupom CURTO de um único item (pra impressão automática).
+// Formato propositalmente compacto pra não gastar papel.
+function gerarCupomItemNovo(item, comanda) {
+    if (!item) return '';
+    const col = (typeof _printColWidth === 'function') ? _printColWidth() : 32;
+    let txt = (typeof _printHeaderCfg === 'function') ? _printHeaderCfg() : '';
+
+    // Título
+    txt += _printCenter('NOVO ITEM - BAR', col) + '\n';
+    txt += _printLine('=', col) + '\n';
+
+    // Dados da comanda
+    if (comanda) {
+        // Tenta achar o nome do jogador
+        const j = (typeof jogadores !== 'undefined' && Array.isArray(jogadores))
+            ? jogadores.find(x => x.id === comanda.jogadorId)
+            : null;
+        if (j && j.nome) txt += 'Cliente: ' + j.nome + '\n';
+        if (comanda.id) {
+            // Mostra só os últimos 6 chars do UUID pra ser legível
+            const shortId = String(comanda.id).slice(-6).toUpperCase();
+            txt += 'Comanda: #' + shortId + '\n';
+        }
+    }
+    txt += _printLine('-', col) + '\n';
+
+    // Item
+    const qtd = Number(item.qtd) || 1;
+    const preco = Number(item.valor || item.valor_unit) || 0;
+    const total = preco * qtd;
+    txt += qtd + 'x ' + (item.nome || '—') + '\n';
+    if (qtd > 1) {
+        txt += _printPad('   ' + formatMoney(preco) + ' x ' + qtd, formatMoney(total), col) + '\n';
+    } else {
+        txt += _printPad('   ' + formatMoney(preco), formatMoney(total), col) + '\n';
+    }
+    txt += _printLine('-', col) + '\n';
+    txt += _printPad('TOTAL', formatMoney(total), col) + '\n';
+    txt += _printLine('=', col) + '\n';
+
+    // Rodapé com timestamp
+    txt += '\n' + _printCenter(new Date().toLocaleString('pt-BR'), col) + '\n';
+
+    return txt;
+}
+
+// Processa o evento de INSERT em bar_comanda_itens vindo do realtime.
+// Filtros aplicados (em cascata, mais barato primeiro):
+//   1) Feature flag local OFF? sai
+//   2) Não é INSERT? sai
+//   3) Não tem payload.new? sai
+//   4) origem != 'stackbar'? sai
+//   5) Item já impresso? sai (anti-duplicação)
+//   6) Evento muito antigo (antes do boot)? sai (F5 não reimprime)
+// Se passou tudo: marca como impresso + dispara preview.
+// Atualiza o badge "🖨️ Bar ativo" no header (cria se não existir).
+// Mostra quando: feature global ON + máquina marcada + papel do user autorizado.
+function _stackbarAtualizarBadge() {
+    try {
+        let badge = document.getElementById('stackbar-badge-printer');
+        const papelUser = (currentUser && currentUser.papel) ? currentUser.papel : null;
+        const papeisAut = _stackbarConfig.papeis_impressao || ['caixa'];
+
+        const deveMostrar = _stackbarConfig.imprimir_item_auto
+                          && _stackbarMaquinaEhImpressora()
+                          && papelUser
+                          && papeisAut.includes(papelUser);
+
+        if (!deveMostrar) {
+            if (badge) badge.remove();
+            return;
+        }
+
+        // Cria badge se ainda não existe
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'stackbar-badge-printer';
+            badge.style.cssText = 'position:fixed;top:.5rem;right:.5rem;z-index:9000;' +
+                'background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.4);' +
+                'color:#c4a5fc;padding:.35rem .65rem;border-radius:.5rem;' +
+                'font-size:.7rem;font-weight:700;font-family:Manrope,sans-serif;' +
+                'pointer-events:none;backdrop-filter:blur(4px);' +
+                'display:flex;align-items:center;gap:.35rem;';
+            badge.innerHTML = '<i class="fa-solid fa-print"></i> Bar ativo';
+            document.body.appendChild(badge);
+        }
+    } catch(e) { console.warn('[STACKBAR] badge:', e); }
+}
+
+function _stackbarTalvezImprimirItem(payload) {
+    try {
+        // Filtro 1: feature global ligada?
+        if (!_stackbarConfig.imprimir_item_auto) return;
+
+        // Filtro 2: esta máquina física está marcada como "impressora do bar"?
+        if (!_stackbarMaquinaEhImpressora()) return;
+
+        // Filtro 3: o usuário logado tem papel autorizado a receber impressão?
+        const papelUser = (currentUser && currentUser.papel) ? currentUser.papel : null;
+        const papeisAut = _stackbarConfig.papeis_impressao || ['caixa'];
+        if (!papelUser || !papeisAut.includes(papelUser)) return;
+
+        // Filtro 4: é evento INSERT?
+        if (!payload || payload.eventType !== 'INSERT') return;
+        const novo = payload.new;
+        if (!novo) return;
+
+        // Filtro 5: veio do StackBar?
+        if (novo.origem !== 'stackbar') return;
+
+        // Filtro 6: anti-duplicação local
+        if (_stackbarItensImpressos.has(novo.id)) {
+            console.log('[STACKBAR] item já impresso, ignorando:', novo.id);
+            return;
+        }
+
+        // Filtro 7: anti-F5 — eventos antigos (>5s antes do boot) não disparam
+        const itemTs = novo.ts ? new Date(novo.ts).getTime() : Date.now();
+        if (itemTs < _stackbarBootTs - 5000) {
+            console.log('[STACKBAR] evento muito antigo, ignorando');
+            return;
+        }
+
+        // Passou todos os filtros: marca como impresso ANTES de gerar (race-safe)
+        _stackbarItensImpressos.add(novo.id);
+
+        // Acha a comanda pra o cabeçalho
+        const comanda = (typeof barComandas !== 'undefined' && Array.isArray(barComandas))
+            ? barComandas.find(c => c.id === novo.comanda_id)
+            : null;
+
+        // Monta o objeto item compatível com gerarCupomItemNovo
+        const item = {
+            nome: novo.nome,
+            qtd: novo.qtd,
+            valor: novo.valor_unit,
+        };
+
+        const txt = gerarCupomItemNovo(item, comanda);
+        if (typeof abrirPreviewImpressao === 'function') {
+            abrirPreviewImpressao('Novo Item (StackBar)', txt);
+        }
+
+        if (typeof logAudit === 'function') {
+            try { logAudit('IMPRESSAO', 'Auto-impressão StackBar · ' + (item.nome || '?')); } catch(_) {}
+        }
+    } catch(e) {
+        console.warn('[STACKBAR] erro na auto-impressão:', e);
+        // Erros aqui NÃO podem derrubar o realtime existente
+    }
+}
+
 function _onRealtimeEvent(tipo, payload) {
     // SUSPENSÃO: durante operações sensíveis, ignora completamente
     if (_realtimeSuspenso) {
@@ -8392,6 +8604,15 @@ function _onRealtimeEvent(tipo, payload) {
     if (_ehMudancaPropria(payload)) {
         console.log('[REALTIME] ignorando mudança própria:', tipo);
         return;
+    }
+
+    // === StackBar auto-impressão ===
+    // Antes do debounce: se for INSERT em bar_comanda_itens com origem='stackbar',
+    // tenta imprimir imediatamente (sem esperar 1.5s do debounce).
+    // A função internamente checa config + anti-duplicação + janela de tempo,
+    // e jamais derruba o realtime existente (try/catch interno).
+    if (tipo === 'comanda_item') {
+        _stackbarTalvezImprimirItem(payload);
     }
 
     // Adiciona à fila de pendentes (não substitui!)
@@ -11044,6 +11265,11 @@ async function carregarUsuarioEClube(authUser) {
     window.sbClube = sbClube;
     window.currentUser = currentUser;
     window.dispatchEvent(new CustomEvent('stackos:logged-in'));
+
+    // [STACKBAR] Carrega config de auto-impressão (fire-and-forget — não bloqueia login)
+    if (typeof _stackbarCarregarConfig === 'function') {
+        _stackbarCarregarConfig().catch(e => console.warn('[STACKBAR] config:', e));
+    }
 
     // Verifica se é super admin global (via RPC) e expõe a flag pra hasFeature() liberar tudo.
     // Pra um usuário comum do clube isso falha silenciosamente e a flag fica false.
@@ -19241,6 +19467,11 @@ function showPage(page) {
 
     if (page === 'fechamento') setTimeout(inicializarFechamento, 50);
     if (page === 'jackpot')    setTimeout(() => renderPaginaJackpot(), 50);
+
+    // [STACKBAR] Recarrega config ao entrar na página Bar (pega mudanças do painel)
+    if (page === 'bar' && typeof _stackbarCarregarConfig === 'function') {
+        _stackbarCarregarConfig().catch(_ => {});
+    }
 
     // Gate by permission (papel)
     if (currentUser && !hasAccess(page)) {
