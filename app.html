@@ -1054,6 +1054,179 @@
     h1 { font-size: 1.1rem !important; }
 }
 
+/* ============================================================
+   RESPONSIVIDADE: páginas críticas pra acesso mobile do dono
+   (Cash, Caixa, Crédito, Contas a Pagar, Relatórios)
+   Empilhamento de grids + ajustes de fonte/spacing pra celular
+   ============================================================ */
+
+/* TABLET / MOBILE INTERMEDIÁRIO (até 900px) */
+@media (max-width: 900px) {
+    /* Stat cards: 4 colunas -> 2 colunas */
+    #page-cash > div > [style*="grid-template-columns:repeat(4"],
+    #page-caixa > div > [style*="grid-template-columns:repeat(4"],
+    #page-credito > div > [style*="grid-template-columns:repeat(4"],
+    #page-contaspagar > div > [style*="grid-template-columns:repeat(4"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    /* Cards 5 colunas -> 2 */
+    [style*="grid-template-columns:repeat(5"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    /* Filtros mais compactos */
+    #cashrel-periodo, #cashrel-de, #cashrel-ate, #cashrel-dealer, #cashrel-jogador {
+        font-size: .8rem;
+    }
+}
+
+/* MOBILE (até 600px) — empilhamento agressivo */
+@media (max-width: 600px) {
+    /* Padding lateral menor pra ganhar espaço */
+    main { padding-left: .5rem !important; padding-right: .5rem !important; }
+
+    /* CASH GAME - cards e mesas */
+    #page-cash [style*="grid-template-columns:repeat(4"],
+    #page-cash [style*="grid-template-columns:repeat(5"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    /* Linha de jogadores na mesa cash: grid 5 cols vira flex vertical */
+    #page-cash [style*="grid-template-columns:1fr auto auto auto auto"] {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: .3rem !important;
+    }
+    #page-cash [style*="grid-template-columns:1fr auto auto auto auto"] > * {
+        text-align: left !important;
+        justify-content: space-between !important;
+        display: flex !important;
+    }
+    /* Botões de ação da mesa: full width */
+    #page-cash [style*="display:flex"][style*="gap:.5rem"][style*="flex-wrap:wrap"] > button {
+        flex: 1 1 auto !important;
+        min-width: 100px !important;
+    }
+    /* Header da mesa: stack vertical */
+    #page-cash [style*="grid-template-columns:1fr auto"][style*="padding:1rem"] {
+        grid-template-columns: 1fr !important;
+        gap: .5rem !important;
+    }
+    /* Filtros do relatório: 2 colunas */
+    #page-cash [style*="grid-template-columns:repeat(4,1fr)"][style*=".75rem"] {
+        grid-template-columns: 1fr 1fr !important;
+        gap: .5rem !important;
+    }
+
+    /* CAIXA */
+    #page-caixa [style*="grid-template-columns:repeat(4"],
+    #page-caixa [style*="grid-template-columns:repeat(3"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    #page-caixa [style*="grid-template-columns:1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+        gap: .5rem !important;
+    }
+
+    /* CRÉDITO */
+    #page-credito [style*="grid-template-columns:repeat(4"],
+    #page-credito [style*="grid-template-columns:repeat(3"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    /* Linhas de solicitação: stack vertical */
+    #page-credito [style*="grid-template-columns:1fr auto"] {
+        grid-template-columns: 1fr !important;
+        gap: .5rem !important;
+    }
+    #page-credito [style*="grid-template-columns:1fr auto"] > button {
+        width: 100% !important;
+    }
+
+    /* CONTAS A PAGAR */
+    #page-contaspagar [style*="grid-template-columns:repeat(4"],
+    #page-contaspagar [style*="grid-template-columns:repeat(3"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* RELATÓRIOS */
+    #page-relatorios [style*="grid-template-columns:repeat(4"],
+    #page-relatorios [style*="grid-template-columns:repeat(3"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Fontes de KPIs grandes ficam um pouco menores no mobile pra caber */
+    .stat-card [style*="font-size:2rem"],
+    .stat-card [style*="font-size:1.7rem"] {
+        font-size: 1.4rem !important;
+    }
+    .stat-card [style*="font-size:2.5rem"] {
+        font-size: 1.8rem !important;
+    }
+
+    /* Modais: ocupar quase toda a tela */
+    .modal-overlay > div[style*="max-width:480px"],
+    .modal-overlay > div[style*="max-width:520px"],
+    .modal-overlay > div[style*="max-width:600px"] {
+        max-width: 96vw !important;
+        margin: 0 .5rem !important;
+        padding: 1.25rem !important;
+    }
+
+    /* Header das páginas (título + ações) — stack */
+    #page-cash > div:first-child[style*="flex-wrap"],
+    #page-caixa > div:first-child[style*="flex-wrap"],
+    #page-credito > div:first-child[style*="flex-wrap"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    /* Ranking de jogadores no relatório cash: stack info */
+    #cash-rel-ranking > div,
+    #cash-rel-dealers > div {
+        grid-template-columns: auto 1fr !important;
+        font-size: .75rem !important;
+    }
+    #cash-rel-ranking > div > span:nth-child(n+3),
+    #cash-rel-dealers > div > span:nth-child(n+3) {
+        grid-column: 2 !important;
+        text-align: right !important;
+    }
+
+    /* Subtabs (Mesas Ativas / Histórico / Relatório) */
+    .cashtab-btn, .cred-tab-btn {
+        font-size: .75rem !important;
+        padding: .5rem .65rem !important;
+    }
+}
+
+/* MOBILE PEQUENO (até 380px - iPhone SE etc) */
+@media (max-width: 380px) {
+    main { padding-left: .35rem !important; padding-right: .35rem !important; }
+
+    /* Grids 2 colunas viram 1 nos cards principais */
+    #page-cash [style*="grid-template-columns:repeat(2"],
+    #page-caixa [style*="grid-template-columns:repeat(2"],
+    #page-credito [style*="grid-template-columns:repeat(2"],
+    #page-contaspagar [style*="grid-template-columns:repeat(2"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Fontes ainda menores */
+    .stat-card [style*="font-size:1.4rem"] {
+        font-size: 1.2rem !important;
+    }
+
+    /* Botões de ação maiores (tap target) */
+    button[onclick*="Cash"],
+    button[onclick*="Credito"],
+    button[onclick*="Caixa"] {
+        min-height: 44px;
+    }
+}
+
+/* ============================================================
+   FIM: Responsividade páginas críticas
+   ============================================================ */
+
 
 /* === FIX: Login screen inputs consistentes === */
 #login-screen input,
