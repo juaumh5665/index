@@ -14326,9 +14326,17 @@ function imprimirComanda(comanda) {
     // Itens
     if (comanda.itens && comanda.itens.length) {
         comanda.itens.forEach(item => {
-            const linha1 = (item.qtd || 1) + 'x ' + (item.produto || item.nome || '—');
+            const qtd = item.qtd || 1;
+            const linha1 = qtd + 'x ' + (item.produto || item.nome || '—');
             txt += linha1 + '\n';
-            txt += _printPad('   ' + formatMoney(item.preco || 0) + ' ea', formatMoney((item.preco || 0) * (item.qtd || 1))) + '\n';
+            // Mostra "preço unitário" apenas quando há mais de 1 (caso contrário é redundante)
+            const preco = item.preco || 0;
+            const total = preco * qtd;
+            if (qtd > 1) {
+                txt += _printPad('   ' + formatMoney(preco) + ' x ' + qtd, formatMoney(total)) + '\n';
+            } else {
+                txt += _printPad('   ' + formatMoney(preco), formatMoney(total)) + '\n';
+            }
         });
     } else {
         txt += '(sem itens)\n';
