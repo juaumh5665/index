@@ -2,13 +2,83 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="StackOS — Gestão Inteligente para Clubes de Poker. Sistema completo para torneios, cash game, bar e financeiro.">
     <meta name="theme-color" content="#F5D572">
+    <!-- ===== PWA: Progressive Web App ===== -->
+    <!-- Manifest dedicado pro StackOS app principal (não interfere com manifest.json do StackClock) -->
+    <link rel="manifest" href="/app-manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StackOS">
+    <meta name="application-name" content="StackOS">
     <link rel="icon" type="image/png" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <link rel="shortcut icon" href="/icons/icon-192.png">
     <title>StackOS — Gestão Inteligente para Clubes de Poker</title>
+    <!-- ===== PWA: Service Worker + Install Prompt ===== -->
+    <script>
+        // Registra o service worker pra cache offline (só em HTTPS / localhost)
+        // PWA do Painel do Dono / StackOS principal:
+        // - Usa /app-sw.js (arquivo dedicado, não interfere com /sw.js do StackClock)
+        // - Scope restrito a /app.html pra NÃO atropelar:
+        //     /sw.js  (StackClock, cobre / e /clock.html)
+        //     bar.html (StackBar, tem seu próprio manifest)
+        // - Só registra quando o usuário está no app.html (evita registrar em landing/clock/bar)
+        if ('serviceWorker' in navigator
+            && (location.protocol === 'https:' || location.hostname === 'localhost')
+            && (location.pathname === '/app.html' || location.pathname.endsWith('/app.html'))) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/app-sw.js', { scope: '/app.html' })
+                    .then(function(reg) {
+                        console.log('[PWA] Service Worker registrado:', reg.scope);
+                        // Detecta atualização do SW
+                        reg.addEventListener('updatefound', function() {
+                            const novo = reg.installing;
+                            if (!novo) return;
+                            novo.addEventListener('statechange', function() {
+                                if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('[PWA] Nova versão disponível — será aplicada no próximo carregamento');
+                                    window._pwaAtualizacaoDisponivel = true;
+                                }
+                            });
+                        });
+                    })
+                    .catch(function(err) { console.warn('[PWA] Falha ao registrar SW:', err); });
+            });
+        }
+
+        // Captura o evento beforeinstallprompt pra mostrar botão "Instalar app" quando relevante
+        window._pwaInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window._pwaInstallPrompt = e;
+            console.log('[PWA] App pode ser instalado');
+            // Dispara evento custom pra o app mostrar botão "Instalar"
+            try { window.dispatchEvent(new CustomEvent('pwa-instalavel')); } catch(_) {}
+        });
+
+        // Função global pra disparar a instalação (chamada por botão "Instalar app")
+        window.pwaInstalar = async function() {
+            const p = window._pwaInstallPrompt;
+            if (!p) {
+                alert('Pra instalar o StackOS:\n\n📱 No Android (Chrome): Menu > "Instalar app"\n🍎 No iPhone (Safari): Compartilhar > "Adicionar à Tela de Início"\n💻 Desktop (Chrome): ícone de instalação na barra de endereços');
+                return false;
+            }
+            p.prompt();
+            const choice = await p.userChoice;
+            console.log('[PWA] Escolha do usuário:', choice.outcome);
+            window._pwaInstallPrompt = null;
+            return choice.outcome === 'accepted';
+        };
+
+        // Detecta se já está rodando como app instalado
+        window.pwaEstaInstalado = function() {
+            return window.matchMedia('(display-mode: standalone)').matches ||
+                   window.navigator.standalone === true;
+        };
+    </script>
     <!-- ===== ERROR CAPTURE (debug) ===== -->
     <script>
         window.addEventListener('error', function(e) {
@@ -2544,6 +2614,9 @@ document.addEventListener('DOMContentLoaded', function(){
                             </div>
                             <button onclick="pdRefresh()" id="pd-btn-refresh" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:#fbbf24;border-radius:.5rem;padding:.55rem .7rem;cursor:pointer;font-weight:700;font-size:.75rem;font-family:'Manrope',sans-serif;" title="Atualizar dados">
                                 <i class="fa-solid fa-arrows-rotate" id="pd-icon-refresh"></i>
+                            </button>
+                            <button id="pd-btn-instalar" onclick="pdInstalarApp()" style="display:none;background:linear-gradient(135deg,#22c55e,#16a34a);border:1px solid rgba(34,197,94,.4);color:#fff;border-radius:.5rem;padding:.55rem .85rem;cursor:pointer;font-weight:800;font-size:.7rem;font-family:'Manrope',sans-serif;box-shadow:0 4px 12px rgba(34,197,94,.3);" title="Instalar app no celular">
+                                <i class="fa-solid fa-mobile-screen"></i> Instalar app
                             </button>
                         </div>
 
@@ -19972,7 +20045,7 @@ function showPage(page) {
         }
     }
     if (page === 'dashboard') renderDashboard();
-    if (page === 'painel-dono') { renderPainelDono(); pdIniciarAutoRefresh(); }
+    if (page === 'painel-dono') { renderPainelDono(); pdIniciarAutoRefresh(); setTimeout(_pdAtualizarBotaoInstalar, 200); }
     if (page !== 'painel-dono') pdPararAutoRefresh();
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
@@ -30595,6 +30668,31 @@ function pdRefresh() {
     renderPainelDono();
     setTimeout(() => { if (icon) icon.classList.remove('spinning'); }, 800);
 }
+
+// Instalar app (PWA)
+async function pdInstalarApp() {
+    if (typeof window.pwaInstalar === 'function') {
+        const ok = await window.pwaInstalar();
+        if (ok) {
+            showToast('🎉 StackOS instalado com sucesso!');
+            const btn = document.getElementById('pd-btn-instalar');
+            if (btn) btn.style.display = 'none';
+        }
+    }
+}
+
+// Mostrar/esconder botão "Instalar" baseado em disponibilidade
+function _pdAtualizarBotaoInstalar() {
+    const btn = document.getElementById('pd-btn-instalar');
+    if (!btn) return;
+    const jaInstalado = typeof window.pwaEstaInstalado === 'function' && window.pwaEstaInstalado();
+    const podeInstalar = !!window._pwaInstallPrompt;
+    btn.style.display = (!jaInstalado && podeInstalar) ? '' : 'none';
+}
+// Escuta evento de disponibilidade
+window.addEventListener('pwa-instalavel', () => {
+    setTimeout(_pdAtualizarBotaoInstalar, 100);
+});
 
 function pdIniciarAutoRefresh() {
     pdPararAutoRefresh();
