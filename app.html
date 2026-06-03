@@ -8289,24 +8289,67 @@ function iniciarRealtime() {
         });
 }
 
+// === DIAGNÓSTICO DE CONSUMO REALTIME ===
+// Conta mensagens recebidas por tipo nos últimos 60s. Loga no console
+// a cada minuto pra você ver onde o consumo está indo. Zero impacto em UX.
+let _rtStats = { msgs: [], inicioMinuto: Date.now() };
+function _rtRegistrarMsg(tipo) {
+    const agora = Date.now();
+    _rtStats.msgs.push({ tipo, ts: agora });
+    // Limpa msgs > 60s
+    _rtStats.msgs = _rtStats.msgs.filter(m => agora - m.ts < 60000);
+    // Loga 1x por minuto
+    if (agora - _rtStats.inicioMinuto >= 60000) {
+        const total = _rtStats.msgs.length;
+        const porTipo = {};
+        _rtStats.msgs.forEach(m => porTipo[m.tipo] = (porTipo[m.tipo] || 0) + 1);
+        const top = Object.entries(porTipo).sort((a,b) => b[1]-a[1]).map(e => `${e[0]}:${e[1]}`).join(' · ');
+        console.log(`%c[REALTIME 📊] ${total} msgs/min`, 'color:#f59e0b;font-weight:bold;', top || '(nenhuma)');
+        _rtStats.inicioMinuto = agora;
+    }
+}
+
+// Fila de eventos pendentes (para o debounce agregar TODOS os tipos)
+let _realtimePendentes = [];
+
 function _onRealtimeEvent(tipo, payload) {
     // SUSPENSÃO: durante operações sensíveis, ignora completamente
     if (_realtimeSuspenso) {
         console.log('[REALTIME] suspenso — ignorando:', tipo);
         return;
     }
-    
+
+    // DIAGNÓSTICO: contabiliza msg recebida (ANTES de qualquer filtro)
+    _rtRegistrarMsg(tipo);
+
     // ANTI-LOOP: Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
     if (_ehMudancaPropria(payload)) {
         console.log('[REALTIME] ignorando mudança própria:', tipo);
         return;
     }
-    
-    // Debounce: agrupar múltiplos eventos em uma janela de 1.5s
+
+    // Adiciona à fila de pendentes (não substitui!)
+    _realtimePendentes.push({ tipo, payload });
+
+    // Debounce: aguarda 1.5s sem novos eventos antes de processar TODOS
     if (_realtimeDebounceTimer) clearTimeout(_realtimeDebounceTimer);
     _realtimeDebounceTimer = setTimeout(() => {
         _realtimeUltimaAtualizacao = Date.now();
-        _processarMudancaRealtime(tipo, payload);
+        // Snapshot da fila e limpa pra evitar reentrada
+        const pendentes = _realtimePendentes.slice();
+        _realtimePendentes = [];
+        // Deduplica por tipo (se 5 entries chegaram, processa 1 vez só)
+        const tiposUnicos = {};
+        pendentes.forEach(p => {
+            if (!tiposUnicos[p.tipo]) tiposUnicos[p.tipo] = p; // primeiro payload daquele tipo
+        });
+        // Processa cada tipo uma vez (o reload é por tipo, então um payload já basta)
+        Object.values(tiposUnicos).forEach(p => {
+            _processarMudancaRealtime(p.tipo, p.payload);
+        });
+        if (pendentes.length > Object.keys(tiposUnicos).length) {
+            console.log(`[REALTIME] debounce agregou ${pendentes.length} eventos em ${Object.keys(tiposUnicos).length} tipos únicos`);
+        }
     }, 1500); // 1.5s — espera vários eventos seguidos antes de processar
 }
 
@@ -26314,8 +26357,44 @@ document.addEventListener('visibilitychange', () => {
         // Revalidar plano/status do clube (caso tenha mudado em outro dispositivo
         // ou tenha sido alterado pelo super admin enquanto a aba estava no background)
         _revalidarClubeAtual();
+
+        // OTIMIZAÇÃO: religar realtime ao voltar
+        // (foi pausado quando a aba escondeu pra economizar mensagens)
+        if (typeof _realtimePausadoPorVisibility !== 'undefined' && _realtimePausadoPorVisibility) {
+            _realtimePausadoPorVisibility = false;
+            console.log('[REALTIME] 👁️ aba visível — religando realtime');
+            try {
+                if (typeof iniciarRealtime === 'function' && sbClube && sbClube.id) {
+                    iniciarRealtime();
+                }
+            } catch(e) { console.warn('[REALTIME] erro ao religar:', e); }
+            // Recarrega dados pra pegar o que perdeu enquanto estava escondida
+            try {
+                if (typeof _carregarDadosClube === 'function' && sbClube && sbClube.id) {
+                    _carregarDadosClube(sbClube.id);
+                }
+            } catch(e) { console.warn('[REALTIME] erro ao recarregar dados após volta:', e); }
+        }
+    } else {
+        // OTIMIZAÇÃO: aba escondeu → desliga realtime pra economizar mensagens
+        // (quando voltar, religa e busca o estado atual)
+        // Aguarda 30s antes de desligar, pra não desligar em troca rápida de aba
+        if (typeof _realtimeDelayDesligar !== 'undefined') clearTimeout(_realtimeDelayDesligar);
+        _realtimeDelayDesligar = setTimeout(() => {
+            if (document.hidden) {
+                console.log('[REALTIME] 😴 aba oculta há 30s — pausando realtime');
+                try {
+                    if (typeof pararRealtime === 'function') pararRealtime();
+                    _realtimePausadoPorVisibility = true;
+                } catch(e) { console.warn('[REALTIME] erro ao pausar:', e); }
+            }
+        }, 30000); // 30s de tolerância antes de pausar
     }
 });
+
+// Estado global do pause por visibility
+let _realtimePausadoPorVisibility = false;
+let _realtimeDelayDesligar = null;
 
 // Helper que busca o estado atual do clube no banco e detecta mudanças.
 // Chamado: ao voltar do background, periodicamente (5min) e em pontos críticos.
