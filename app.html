@@ -886,6 +886,56 @@
     to   { transform: rotate(360deg); }
 }
 
+/* ============================================================
+   PAINEL DO DONO — Mobile-first responsivo
+   ============================================================ */
+#page-painel-dono { max-width: 720px; margin: 0 auto; padding: 0 .25rem; }
+
+.pd-per-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #a1a1aa;
+    padding: .45rem .5rem;
+    border-radius: .4rem;
+    font-size: .72rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Manrope', sans-serif;
+    transition: all .15s;
+}
+.pd-per-btn:hover { color: #fff; background: rgba(255,255,255,.05); }
+.pd-per-btn.pd-per-active {
+    background: linear-gradient(135deg,#f59e0b,#fbbf24);
+    color: #1a1a23;
+    box-shadow: 0 2px 8px rgba(245,158,11,.3);
+}
+
+.pd-atalho {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .9rem .5rem;
+    border-radius: .55rem;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: .8rem;
+    font-family: 'Manrope', sans-serif;
+    transition: all .15s;
+}
+.pd-atalho:hover { transform: translateY(-1px); filter: brightness(1.15); }
+
+#pd-icon-refresh.spinning { animation: spin 1s linear infinite; }
+
+/* Responsivo no celular (telas < 600px) */
+@media (max-width: 600px) {
+    #page-painel-dono { padding: 0; }
+    #page-painel-dono > div { padding: 1rem !important; }
+    .pd-per-btn { font-size: .65rem; padding: .4rem .3rem; }
+    .pd-atalho { font-size: .7rem; padding: .75rem .4rem; }
+}
+
 @keyframes undo-shrink {
     from { width: 100%; }
     to   { width: 0%; }
@@ -2208,6 +2258,10 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="font-size:.65rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.1em;margin-top:.2rem;">Gestão Inteligente</div>
         </div>
         <nav style="flex:1;padding:.75rem;display:flex;flex-direction:column;gap:.2rem;overflow-y:auto;">
+            <div onclick="showPage('painel-dono')" id="nav-painel-dono" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#fbbf24;background:linear-gradient(135deg,rgba(245,158,11,.08) 0%,rgba(168,85,247,.08) 100%);border:1px solid rgba(245,158,11,.2);margin-bottom:.4rem;">
+                <i class="fa-solid fa-crown nav-ico" style="width:16px;color:#fbbf24;"></i> Painel do Dono
+                <span style="margin-left:auto;font-size:.55rem;background:rgba(245,158,11,.2);color:#fbbf24;padding:.1rem .35rem;border-radius:.3rem;font-weight:800;">MOBILE</span>
+            </div>
             <div onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item nav-active" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;">
                 <i class="fa-solid fa-gauge-high nav-ico" style="width:16px;color:#a855f7;"></i> Dashboard
             </div>
@@ -2297,6 +2351,235 @@ document.addEventListener('DOMContentLoaded', function(){
         </header>
 
         <main style="flex:1;overflow:auto;padding:2rem;">
+
+            <!-- ============================================================
+                 PAINEL DO DONO — Mobile-first, leitura/consulta financeira
+                 ============================================================ -->
+            <div id="page-painel-dono" class="page-content fade-in" style="display:none;">
+                <!-- Header com gradiente premium -->
+                <div style="background:linear-gradient(135deg,#1a0f2e 0%,#2d1b3d 50%,#1a1a2e 100%);border:1px solid rgba(245,158,11,.2);border-radius:1rem;padding:1.25rem;margin-bottom:1rem;position:relative;overflow:hidden;">
+                    <div style="position:absolute;top:-30px;right:-30px;width:140px;height:140px;background:radial-gradient(circle,rgba(245,158,11,.15) 0%,transparent 70%);border-radius:50%;"></div>
+                    <div style="position:absolute;bottom:-20px;left:-20px;width:100px;height:100px;background:radial-gradient(circle,rgba(168,85,247,.12) 0%,transparent 70%);border-radius:50%;"></div>
+                    <div style="position:relative;z-index:1;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem;">
+                            <div style="display:flex;align-items:center;gap:.7rem;">
+                                <div style="width:44px;height:44px;border-radius:.7rem;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:flex;align-items:center;justify-content:center;font-size:1.4rem;box-shadow:0 4px 16px rgba(245,158,11,.4);">👑</div>
+                                <div>
+                                    <div style="font-size:.6rem;color:#fbbf24;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Painel Executivo</div>
+                                    <div style="font-size:1.15rem;font-weight:900;color:#fff;line-height:1.2;">Visão do Dono</div>
+                                </div>
+                            </div>
+                            <button onclick="pdRefresh()" id="pd-btn-refresh" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:#fbbf24;border-radius:.5rem;padding:.55rem .7rem;cursor:pointer;font-weight:700;font-size:.75rem;font-family:'Manrope',sans-serif;" title="Atualizar dados">
+                                <i class="fa-solid fa-arrows-rotate" id="pd-icon-refresh"></i>
+                            </button>
+                        </div>
+
+                        <!-- Seletor de período -->
+                        <div style="display:flex;gap:.35rem;background:rgba(0,0,0,.3);padding:.25rem;border-radius:.55rem;border:1px solid rgba(255,255,255,.05);">
+                            <button class="pd-per-btn pd-per-active" data-per="hoje" onclick="pdSetPeriodo('hoje')">Hoje</button>
+                            <button class="pd-per-btn" data-per="ontem" onclick="pdSetPeriodo('ontem')">Ontem</button>
+                            <button class="pd-per-btn" data-per="7d" onclick="pdSetPeriodo('7d')">7d</button>
+                            <button class="pd-per-btn" data-per="30d" onclick="pdSetPeriodo('30d')">30d</button>
+                            <button class="pd-per-btn" data-per="mes" onclick="pdSetPeriodo('mes')">Mês</button>
+                        </div>
+                        <div id="pd-periodo-info" style="font-size:.65rem;color:#71717a;margin-top:.55rem;text-align:right;"></div>
+                    </div>
+                </div>
+
+                <!-- KPI PRINCIPAL — Saldo do dia -->
+                <div style="background:linear-gradient(135deg,#0a2e1a 0%,#0a3a1f 100%);border:1px solid rgba(34,197,94,.3);border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;position:relative;overflow:hidden;">
+                    <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;background:radial-gradient(circle,rgba(34,197,94,.18) 0%,transparent 70%);border-radius:50%;"></div>
+                    <div style="position:relative;z-index:1;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+                            <div style="font-size:.65rem;color:#86efac;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">💰 Saldo do Período</div>
+                            <div id="pd-saldo-tendencia" style="font-size:.7rem;font-weight:700;"></div>
+                        </div>
+                        <div id="pd-saldo-total" style="font-size:2.4rem;font-weight:900;color:#22c55e;font-family:var(--font-mono);line-height:1.1;">R$ 0,00</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.85rem;">
+                            <div style="background:rgba(0,0,0,.2);border-radius:.5rem;padding:.5rem;">
+                                <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Entradas</div>
+                                <div id="pd-saldo-entradas" style="font-size:.85rem;color:#22c55e;font-weight:800;font-family:var(--font-mono);margin-top:.1rem;">R$ 0</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,.2);border-radius:.5rem;padding:.5rem;">
+                                <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Saídas</div>
+                                <div id="pd-saldo-saidas" style="font-size:.85rem;color:#ef4444;font-weight:800;font-family:var(--font-mono);margin-top:.1rem;">R$ 0</div>
+                            </div>
+                            <div style="background:rgba(0,0,0,.2);border-radius:.5rem;padding:.5rem;">
+                                <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Líquido</div>
+                                <div id="pd-saldo-liquido" style="font-size:.85rem;color:#fbbf24;font-weight:800;font-family:var(--font-mono);margin-top:.1rem;">R$ 0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CASH GAME — Bloco principal -->
+                <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;font-size:1rem;">💵</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Cash Game</div>
+                            <div id="pd-cash-status" style="font-size:.65rem;color:#71717a;">—</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.85rem;">
+                        <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Volume</div>
+                            <div id="pd-cash-volume" style="font-size:1.15rem;font-weight:900;color:#22c55e;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Rake Total</div>
+                            <div id="pd-cash-rake" style="font-size:1.15rem;font-weight:900;color:#fbbf24;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                            <div id="pd-cash-rake-detail" style="font-size:.55rem;color:#a1a1aa;margin-top:.15rem;"></div>
+                        </div>
+                        <div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Sessões</div>
+                            <div id="pd-cash-sessoes" style="font-size:1.15rem;font-weight:900;color:#60a5fa;font-family:var(--font-mono);margin-top:.2rem;">0</div>
+                        </div>
+                        <div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Diferença Caixa</div>
+                            <div id="pd-cash-dif" style="font-size:1.15rem;font-weight:900;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                    </div>
+
+                    <!-- Mesas abertas agora -->
+                    <div id="pd-mesas-abertas-wrap" style="display:none;margin-top:.55rem;padding-top:.85rem;border-top:1px solid #27272a;">
+                        <div style="font-size:.6rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;display:flex;align-items:center;gap:.35rem;">
+                            <span style="display:inline-block;width:8px;height:8px;background:#22c55e;border-radius:50%;animation:pulse-gold 2s infinite;"></span>
+                            Mesas Ativas Agora
+                        </div>
+                        <div id="pd-mesas-abertas" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+
+                <!-- TORNEIOS -->
+                <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#a855f7,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:1rem;">🏆</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Torneios</div>
+                            <div id="pd-torn-status" style="font-size:.65rem;color:#71717a;">—</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;">
+                        <div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Total Arrecadado</div>
+                            <div id="pd-torn-bruto" style="font-size:1.15rem;font-weight:900;color:#c4b5fd;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Rake Torneios</div>
+                            <div id="pd-torn-rake" style="font-size:1.15rem;font-weight:900;color:#fbbf24;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Entradas</div>
+                            <div id="pd-torn-entradas" style="font-size:1.15rem;font-weight:900;color:#60a5fa;font-family:var(--font-mono);margin-top:.2rem;">0</div>
+                        </div>
+                        <div style="background:rgba(244,114,182,.06);border:1px solid rgba(244,114,182,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Staff</div>
+                            <div id="pd-torn-staff" style="font-size:1.15rem;font-weight:900;color:#f9a8d4;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                    </div>
+                    <div id="pd-torn-andamento-wrap" style="display:none;margin-top:.85rem;padding-top:.85rem;border-top:1px solid #27272a;">
+                        <div style="font-size:.6rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;display:flex;align-items:center;gap:.35rem;">
+                            <span style="display:inline-block;width:8px;height:8px;background:#a855f7;border-radius:50%;animation:pulse-gold 2s infinite;"></span>
+                            Em Andamento
+                        </div>
+                        <div id="pd-torn-andamento" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
+                </div>
+
+                <!-- BAR -->
+                <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#f97316,#ea580c);display:flex;align-items:center;justify-content:center;font-size:1rem;">🍻</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Bar &amp; Vendas</div>
+                            <div id="pd-bar-status" style="font-size:.65rem;color:#71717a;">—</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;">
+                        <div style="background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Vendas Pagas</div>
+                            <div id="pd-bar-pago" style="font-size:1.15rem;font-weight:900;color:#fb923c;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Em Aberto</div>
+                            <div id="pd-bar-aberto" style="font-size:1.15rem;font-weight:900;color:#fbbf24;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CRÉDITO / RECEBÍVEIS — Atenção do Dono -->
+                <div style="background:linear-gradient(135deg,#2e0a1f 0%,#3d1b1b 100%);border:1px solid rgba(239,68,68,.25);border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;font-size:1rem;">⚠️</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Crédito / Recebíveis</div>
+                            <div style="font-size:.65rem;color:#71717a;">a receber dos jogadores</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">
+                        <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Total em Aberto</div>
+                            <div id="pd-cred-aberto" style="font-size:1.15rem;font-weight:900;color:#fca5a5;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Jogadores Devendo</div>
+                            <div id="pd-cred-qtd" style="font-size:1.15rem;font-weight:900;color:#fbbf24;font-family:var(--font-mono);margin-top:.2rem;">0</div>
+                        </div>
+                    </div>
+                    <div id="pd-cred-lista" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                </div>
+
+                <!-- CONTAS A PAGAR -->
+                <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;font-size:1rem;">📅</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Contas a Pagar</div>
+                            <div style="font-size:.65rem;color:#71717a;">próximos vencimentos</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">
+                        <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Vencidas</div>
+                            <div id="pd-cp-vencido" style="font-size:1.15rem;font-weight:900;color:#fca5a5;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Vence em 7 dias</div>
+                            <div id="pd-cp-em-breve" style="font-size:1.15rem;font-weight:900;color:#fbbf24;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TOP JOGADORES -->
+                <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:1rem;">⭐</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Top Jogadores</div>
+                            <div style="font-size:.65rem;color:#71717a;">no período por volume</div>
+                        </div>
+                    </div>
+                    <div id="pd-top-jogadores" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                </div>
+
+                <!-- ATALHOS RÁPIDOS -->
+                <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:1rem;">
+                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.7rem;">Atalhos</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;">
+                        <button onclick="showPage('cash')" class="pd-atalho" style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#86efac;"><i class="fa-solid fa-coins"></i> Cash Game</button>
+                        <button onclick="showPage('caixa')" class="pd-atalho" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);color:#c4b5fd;"><i class="fa-solid fa-cash-register"></i> Caixa</button>
+                        <button onclick="showPage('credito')" class="pd-atalho" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#fca5a5;"><i class="fa-solid fa-hand-holding-dollar"></i> Crédito</button>
+                        <button onclick="showPage('contaspagar')" class="pd-atalho" style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);color:#67e8f9;"><i class="fa-solid fa-file-invoice-dollar"></i> Contas</button>
+                        <button onclick="showPage('fechamento')" class="pd-atalho" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#fcd34d;"><i class="fa-solid fa-calendar-check"></i> Fechamento</button>
+                        <button onclick="showPage('relatorios')" class="pd-atalho" style="background:rgba(244,114,182,.08);border:1px solid rgba(244,114,182,.2);color:#f9a8d4;"><i class="fa-solid fa-chart-line"></i> Relatórios</button>
+                    </div>
+                </div>
+
+                <div id="pd-atualizado-em" style="font-size:.65rem;color:#52525b;text-align:center;padding:.5rem 0 1.5rem;"></div>
+            </div>
+
 
             <!-- DASHBOARD DO DIA -->
             <div id="page-dashboard" class="page-content fade-in">
@@ -7480,7 +7763,7 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','credito','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','credito','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar','painel-dono'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash','stackbar'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot','ticketsvouchers','stackbar'] },
     recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa','stackbar'] },
@@ -19350,6 +19633,7 @@ function applyPermissions() {
 
     // Hide nav items not allowed
     const navMap = {
+        'nav-painel-dono': 'painel-dono',
         'nav-dashboard': 'dashboard',
         'nav-jogadores': 'jogadores',
         'nav-torneios':  'torneios',
@@ -19515,6 +19799,8 @@ function showPage(page) {
         }
     }
     if (page === 'dashboard') renderDashboard();
+    if (page === 'painel-dono') { renderPainelDono(); pdIniciarAutoRefresh(); }
+    if (page !== 'painel-dono') pdPararAutoRefresh();
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
     if (page === 'usuarios')  renderUsuarios();
@@ -30113,6 +30399,350 @@ function _cashrelPopularFiltros() {
     selJog.innerHTML = '<option value="">Todos os jogadores</option>' +
         listaJogs.map(j => `<option value="${j.id}">${esc(j.nome || '?')}</option>`).join('');
     selJog.value = jogValor || '';
+}
+
+// =====================================================================
+// PAINEL DO DONO (mobile-first) — visão executiva do clube
+// =====================================================================
+let _pdPeriodo = 'hoje';
+let _pdAutoRefreshTimer = null;
+let _pdUltimoUpdate = null;
+
+function pdSetPeriodo(per) {
+    _pdPeriodo = per;
+    document.querySelectorAll('.pd-per-btn').forEach(b => {
+        b.classList.toggle('pd-per-active', b.dataset.per === per);
+    });
+    renderPainelDono();
+}
+
+function pdRefresh() {
+    const icon = document.getElementById('pd-icon-refresh');
+    if (icon) icon.classList.add('spinning');
+    renderPainelDono();
+    setTimeout(() => { if (icon) icon.classList.remove('spinning'); }, 800);
+}
+
+function pdIniciarAutoRefresh() {
+    pdPararAutoRefresh();
+    _pdAutoRefreshTimer = setInterval(() => {
+        // Só auto-refresh se a aba estiver visível
+        if (!document.hidden) renderPainelDono();
+    }, 30000); // 30s
+}
+
+function pdPararAutoRefresh() {
+    if (_pdAutoRefreshTimer) {
+        clearInterval(_pdAutoRefreshTimer);
+        _pdAutoRefreshTimer = null;
+    }
+}
+
+// Retorna {de, ate, label} do período selecionado
+function _pdIntervalo(per) {
+    const agora = new Date();
+    const hoje0 = new Date(agora); hoje0.setHours(0,0,0,0);
+    let de = null, ate = null, label = '';
+    if (per === 'hoje') {
+        de = hoje0.getTime();
+        ate = agora.getTime();
+        label = 'Hoje · ' + hoje0.toLocaleDateString('pt-BR');
+    } else if (per === 'ontem') {
+        const o = new Date(hoje0); o.setDate(o.getDate() - 1);
+        const o2 = new Date(o); o2.setHours(23, 59, 59, 999);
+        de = o.getTime(); ate = o2.getTime();
+        label = 'Ontem · ' + o.toLocaleDateString('pt-BR');
+    } else if (per === '7d') {
+        const o = new Date(hoje0); o.setDate(o.getDate() - 7);
+        de = o.getTime(); ate = agora.getTime();
+        label = 'Últimos 7 dias';
+    } else if (per === '30d') {
+        const o = new Date(hoje0); o.setDate(o.getDate() - 30);
+        de = o.getTime(); ate = agora.getTime();
+        label = 'Últimos 30 dias';
+    } else if (per === 'mes') {
+        const o = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
+        de = o.getTime(); ate = agora.getTime();
+        label = 'Mês de ' + agora.toLocaleDateString('pt-BR', { month: 'long' });
+    }
+    return { de, ate, label };
+}
+
+// Compactador de números pra mobile (R$ 12.5K em vez de R$ 12.500,00)
+function _pdFmtCompact(v) {
+    const n = Number(v) || 0;
+    if (Math.abs(n) >= 1000000) return 'R$ ' + (n / 1000000).toFixed(1) + 'M';
+    if (Math.abs(n) >= 10000)   return 'R$ ' + (n / 1000).toFixed(1) + 'K';
+    return formatMoney(n);
+}
+
+function renderPainelDono() {
+    const intervalo = _pdIntervalo(_pdPeriodo);
+    const infoEl = document.getElementById('pd-periodo-info');
+    if (infoEl) infoEl.textContent = intervalo.label;
+
+    // ─── CASH GAME ─────────────────────────────────
+    const cashEncerradas = (cashMesas || []).filter(m => {
+        if (m.status !== 'encerrada') return false;
+        const ts = m.fechadoEm || m.fechamentoTs || m.abertoEm || 0;
+        return ts >= intervalo.de && ts <= intervalo.ate;
+    });
+    const cashAbertas = (cashMesas || []).filter(m => m.status === 'aberta');
+
+    let cashVolume = 0, cashRakeSistema = 0, cashRakeDealer = 0;
+    let cashSessoes = 0, cashSobra = 0, cashQuebra = 0;
+    cashEncerradas.forEach(m => {
+        cashVolume += (m.jogadores || []).reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
+        cashRakeSistema += getCashRake(m);
+        cashRakeDealer += (m.rakeLancamentos || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        cashSessoes += (m.jogadores || []).length;
+        if (typeof m.fichasDiferenca === 'number') {
+            if (m.fichasDiferenca > 0) cashSobra += m.fichasDiferenca;
+            else if (m.fichasDiferenca < 0) cashQuebra += Math.abs(m.fichasDiferenca);
+        }
+    });
+    // Mesas abertas também contam pra volume "em andamento"
+    let cashAbertoVolume = 0;
+    cashAbertas.forEach(m => {
+        cashAbertoVolume += (m.jogadores || []).reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
+    });
+    const cashRakeTotal = cashRakeSistema + cashRakeDealer;
+
+    document.getElementById('pd-cash-volume').textContent = _pdFmtCompact(cashVolume + cashAbertoVolume);
+    document.getElementById('pd-cash-rake').textContent = _pdFmtCompact(cashRakeTotal);
+    const rakeDetail = document.getElementById('pd-cash-rake-detail');
+    if (cashRakeSistema > 0 && cashRakeDealer > 0) {
+        rakeDetail.textContent = `Sist ${_pdFmtCompact(cashRakeSistema)} + Dealer ${_pdFmtCompact(cashRakeDealer)}`;
+    } else { rakeDetail.textContent = ''; }
+    document.getElementById('pd-cash-sessoes').textContent = cashSessoes;
+    const dif = cashSobra - cashQuebra;
+    const difEl = document.getElementById('pd-cash-dif');
+    difEl.textContent = (dif >= 0 ? '+' : '') + _pdFmtCompact(dif);
+    difEl.style.color = Math.abs(dif) < 0.01 ? '#22c55e' : (dif > 0 ? '#fbbf24' : '#ef4444');
+
+    const cashStatusEl = document.getElementById('pd-cash-status');
+    if (cashAbertas.length > 0) {
+        cashStatusEl.innerHTML = `<span style="color:#22c55e;font-weight:700;">🟢 ${cashAbertas.length} mesa${cashAbertas.length !== 1 ? 's' : ''} ativa${cashAbertas.length !== 1 ? 's' : ''}</span> · ${cashEncerradas.length} encerrada${cashEncerradas.length !== 1 ? 's' : ''}`;
+    } else {
+        cashStatusEl.textContent = `${cashEncerradas.length} mesa${cashEncerradas.length !== 1 ? 's' : ''} encerrada${cashEncerradas.length !== 1 ? 's' : ''} no período`;
+    }
+
+    // Mesas abertas — lista
+    const mesasWrap = document.getElementById('pd-mesas-abertas-wrap');
+    const mesasEl = document.getElementById('pd-mesas-abertas');
+    if (cashAbertas.length > 0) {
+        mesasWrap.style.display = '';
+        mesasEl.innerHTML = cashAbertas.map(m => {
+            const jogadoresAtivos = (m.jogadores || []).filter(j => j.status === 'ativo').length;
+            const volumeMesa = (m.jogadores || []).reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
+            const horas = m.abertoEm ? Math.floor((Date.now() - m.abertoEm) / 3600000) : 0;
+            const mins = m.abertoEm ? Math.floor(((Date.now() - m.abertoEm) % 3600000) / 60000) : 0;
+            return `
+            <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:.55rem;padding:.7rem;display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;">
+                <div>
+                    <div style="font-weight:800;color:#fff;font-size:.85rem;">${esc(m.nome)}</div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">${jogadoresAtivos} jog · ${horas}h${String(mins).padStart(2,'0')}m</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-family:var(--font-mono);color:#22c55e;font-weight:800;font-size:.9rem;">${_pdFmtCompact(volumeMesa)}</div>
+                    <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;">Movimento</div>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        mesasWrap.style.display = 'none';
+    }
+
+    // ─── TORNEIOS ─────────────────────────────────
+    const torneiosNoPeriodo = (torneios || []).filter(t => {
+        const ts = t.criadoEm || t.criado_em || t.dataCriacao || Date.now();
+        return ts >= intervalo.de && ts <= intervalo.ate;
+    });
+    const torneiosAtivos = (torneios || []).filter(t => {
+        const s = (t.status || '').toLowerCase();
+        return s === 'andamento' || s === 'em andamento' || s === 'ativo';
+    });
+
+    let tornBruto = 0, tornRake = 0, tornEntradas = 0, tornStaff = 0;
+    torneiosNoPeriodo.forEach(t => {
+        try {
+            const bruto = (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
+            tornBruto += bruto;
+            if (typeof getRake === 'function')  tornRake += getRake(t);
+            if (typeof getStaff === 'function') tornStaff += getStaff(t);
+            tornEntradas += (t.entries || []).length;
+        } catch(e) { /* ignora torneio mal formado */ }
+    });
+
+    document.getElementById('pd-torn-bruto').textContent = _pdFmtCompact(tornBruto);
+    document.getElementById('pd-torn-rake').textContent = _pdFmtCompact(tornRake);
+    document.getElementById('pd-torn-entradas').textContent = tornEntradas;
+    document.getElementById('pd-torn-staff').textContent = _pdFmtCompact(tornStaff);
+
+    const tornStatusEl = document.getElementById('pd-torn-status');
+    if (torneiosAtivos.length > 0) {
+        tornStatusEl.innerHTML = `<span style="color:#a855f7;font-weight:700;">🟣 ${torneiosAtivos.length} em andamento</span> · ${torneiosNoPeriodo.length} no período`;
+    } else {
+        tornStatusEl.textContent = `${torneiosNoPeriodo.length} torneio${torneiosNoPeriodo.length !== 1 ? 's' : ''} no período`;
+    }
+
+    const tornAndaWrap = document.getElementById('pd-torn-andamento-wrap');
+    const tornAndaEl = document.getElementById('pd-torn-andamento');
+    if (torneiosAtivos.length > 0) {
+        tornAndaWrap.style.display = '';
+        tornAndaEl.innerHTML = torneiosAtivos.slice(0, 5).map(t => {
+            const prize = (typeof getPrize === 'function') ? getPrize(t) : 0;
+            const entriesCnt = (t.entries || []).length;
+            const nivelAtual = (t.nivelAtual !== undefined) ? (t.nivelAtual + 1) : '?';
+            return `
+            <div style="background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-radius:.55rem;padding:.7rem;display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;">
+                <div>
+                    <div style="font-weight:800;color:#fff;font-size:.85rem;">${esc(t.nome || 'Torneio')}</div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.15rem;">${entriesCnt} entradas · Nível ${nivelAtual}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-family:var(--font-mono);color:#c4b5fd;font-weight:800;font-size:.9rem;">${_pdFmtCompact(prize)}</div>
+                    <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;">Prize</div>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        tornAndaWrap.style.display = 'none';
+    }
+
+    // ─── BAR ─────────────────────────────────
+    let barPago = 0, barAberto = 0;
+    if (typeof barComandas !== 'undefined' && Array.isArray(barComandas)) {
+        barComandas.forEach(c => {
+            const ts = c.criadaEm || c.abertaEm || c.criado_em || 0;
+            if (ts < intervalo.de || ts > intervalo.ate) return;
+            const valor = Number(c.totalValor) || (c.itens || []).reduce((s, i) => s + (Number(i.precoUnit) || 0) * (Number(i.qtd) || 0), 0);
+            if (c.status === 'paga' || c.status === 'fechada') barPago += valor;
+            else if (c.status === 'aberta') barAberto += valor;
+        });
+    }
+    document.getElementById('pd-bar-pago').textContent = _pdFmtCompact(barPago);
+    document.getElementById('pd-bar-aberto').textContent = _pdFmtCompact(barAberto);
+    const barStatusEl = document.getElementById('pd-bar-status');
+    if (typeof barComandas !== 'undefined') {
+        const aberto = (barComandas || []).filter(c => c.status === 'aberta').length;
+        barStatusEl.textContent = aberto > 0 ? `${aberto} comanda${aberto !== 1 ? 's' : ''} aberta${aberto !== 1 ? 's' : ''}` : 'sem comandas abertas';
+    } else {
+        barStatusEl.textContent = '—';
+    }
+
+    // ─── CRÉDITO / RECEBÍVEIS ─────────────────────────────────
+    let credTotal = 0, credQtd = 0;
+    const credLista = [];
+    if (typeof jogadores !== 'undefined') {
+        jogadores.forEach(j => {
+            const saldoDevedor = Number(j.saldoCredito || j.saldo_credito || 0);
+            if (saldoDevedor < 0) {
+                credTotal += Math.abs(saldoDevedor);
+                credQtd++;
+                credLista.push({ nome: j.nome || '?', valor: Math.abs(saldoDevedor) });
+            }
+        });
+    }
+    document.getElementById('pd-cred-aberto').textContent = _pdFmtCompact(credTotal);
+    document.getElementById('pd-cred-qtd').textContent = credQtd;
+
+    const credListaEl = document.getElementById('pd-cred-lista');
+    credLista.sort((a, b) => b.valor - a.valor);
+    if (credLista.length > 0) {
+        credListaEl.innerHTML = `
+            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">Top devedores</div>
+            ${credLista.slice(0, 5).map(d => `
+                <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);padding:.5rem .7rem;border-radius:.45rem;font-size:.78rem;">
+                    <span style="color:#fafafa;font-weight:700;">${esc(d.nome)}</span>
+                    <span style="font-family:var(--font-mono);color:#fca5a5;font-weight:800;">${formatMoney(d.valor)}</span>
+                </div>
+            `).join('')}
+        `;
+    } else {
+        credListaEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">✅ Nenhum jogador devendo</div>';
+    }
+
+    // ─── CONTAS A PAGAR ─────────────────────────────────
+    let cpVencido = 0, cpEmBreve = 0;
+    if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
+        const agora = Date.now();
+        const em7dias = agora + (7 * 24 * 3600000);
+        contasPagar.forEach(c => {
+            if (c.status === 'pago' || c.status === 'paga') return;
+            const venc = c.vencimentoTs || (c.vencimento ? new Date(c.vencimento).getTime() : 0);
+            const valor = Number(c.valor) || 0;
+            if (venc && venc < agora) cpVencido += valor;
+            else if (venc && venc <= em7dias) cpEmBreve += valor;
+        });
+    }
+    document.getElementById('pd-cp-vencido').textContent = _pdFmtCompact(cpVencido);
+    document.getElementById('pd-cp-em-breve').textContent = _pdFmtCompact(cpEmBreve);
+
+    // ─── SALDO DO PERÍODO ─────────────────────────────────
+    // Entradas (receitas): cash rake + torn rake + bar pago + cash volume (na verdade não é receita, é movimento)
+    // Pra ser conservador, "saldo do período" = TODO o RAKE arrecadado + bar pago
+    // Saídas = contas a pagar pagas no período + quebras de caixa
+    const entradas = cashRakeTotal + tornRake + barPago + tornStaff; // staff fixo é do clube
+    let saidas = 0;
+    if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
+        contasPagar.forEach(c => {
+            if (c.status !== 'pago' && c.status !== 'paga') return;
+            const ts = c.pagoEm || c.paid_at || c.atualizadoEm || 0;
+            if (ts >= intervalo.de && ts <= intervalo.ate) {
+                saidas += Number(c.valor) || 0;
+            }
+        });
+    }
+    saidas += cashQuebra; // quebras contam como perda
+
+    const liquido = entradas - saidas;
+    document.getElementById('pd-saldo-total').textContent = (liquido >= 0 ? '' : '-') + _pdFmtCompact(Math.abs(liquido));
+    document.getElementById('pd-saldo-total').style.color = liquido >= 0 ? '#22c55e' : '#ef4444';
+    document.getElementById('pd-saldo-entradas').textContent = _pdFmtCompact(entradas);
+    document.getElementById('pd-saldo-saidas').textContent = _pdFmtCompact(saidas);
+    document.getElementById('pd-saldo-liquido').textContent = (liquido >= 0 ? '+' : '') + _pdFmtCompact(liquido);
+    document.getElementById('pd-saldo-liquido').style.color = liquido >= 0 ? '#fbbf24' : '#ef4444';
+    document.getElementById('pd-saldo-tendencia').textContent = ''; // sem comparação por ora
+
+    // ─── TOP JOGADORES ─────────────────────────────────
+    const porJogador = {};
+    cashEncerradas.forEach(m => {
+        (m.jogadores || []).forEach(j => {
+            if (!porJogador[j.jogadorId]) porJogador[j.jogadorId] = { volume: 0, resultado: 0, sessoes: 0 };
+            porJogador[j.jogadorId].volume += Number(j.totalInvestido) || 0;
+            porJogador[j.jogadorId].resultado += (Number(j.saiuCom) || 0) - (Number(j.totalInvestido) || 0);
+            porJogador[j.jogadorId].sessoes++;
+        });
+    });
+    const topJogs = Object.entries(porJogador)
+        .map(([id, d]) => ({ id, ...d }))
+        .sort((a, b) => b.volume - a.volume)
+        .slice(0, 5);
+
+    const topEl = document.getElementById('pd-top-jogadores');
+    if (topJogs.length > 0) {
+        topEl.innerHTML = topJogs.map((t, i) => {
+            const jog = jogadores.find(x => x.id === t.id);
+            const positivo = t.resultado >= 0;
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + 'º';
+            return `
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center;background:rgba(0,0,0,.25);padding:.55rem .7rem;border-radius:.45rem;">
+                <span style="font-weight:800;font-size:.85rem;">${medal}</span>
+                <div style="overflow:hidden;">
+                    <div style="font-weight:700;color:#fafafa;font-size:.8rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">${esc(jog ? jog.nome : '?')}</div>
+                    <div style="font-size:.6rem;color:#71717a;">${t.sessoes} sess · ${_pdFmtCompact(t.volume)} mov</div>
+                </div>
+                <div style="font-family:var(--font-mono);font-weight:800;font-size:.8rem;color:${positivo ? '#22c55e' : '#ef4444'};">${positivo ? '+' : ''}${_pdFmtCompact(t.resultado)}</div>
+            </div>`;
+        }).join('');
+    } else {
+        topEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">Nenhum jogador no período</div>';
+    }
+
+    // ─── Atualizado em ─────────────────────────────────
+    _pdUltimoUpdate = new Date();
+    document.getElementById('pd-atualizado-em').textContent = '🔄 Atualizado em ' + _pdUltimoUpdate.toLocaleTimeString('pt-BR');
 }
 
 function renderCashRelatorio() {
