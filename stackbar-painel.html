@@ -1033,7 +1033,7 @@ async function revogarToken() {
 async function carregarConfig() {
   const { data, error } = await sb
     .from('stackbar_config')
-    .select('*')
+    .select('clube_id, permitir_estoque_negativo, papeis_permitidos, comissao_padrao_pct, imprimir_item_auto, papeis_impressao')
     .eq('clube_id', CLUBE_ID)
     .maybeSingle();
 
@@ -1041,6 +1041,8 @@ async function carregarConfig() {
     console.error('Erro carregar config:', error);
     return;
   }
+
+  console.log('[Painel] config carregada do banco:', data);
 
   if (data) {
     CONFIG.permitir_estoque_negativo = !!data.permitir_estoque_negativo;
