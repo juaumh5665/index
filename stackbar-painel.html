@@ -698,6 +698,41 @@
           <span style="color:#52525b;font-size:12px;">(0 a 100)</span>
         </div>
       </div>
+      <!-- ⭐ AUTO-IMPRESSÃO StackOS -->
+      <div class="config-row" style="flex-direction:column;align-items:stretch;border-top:1px solid #1e1e23;padding-top:18px;margin-top:8px;">
+        <div class="config-info" style="margin-bottom:10px;">
+          <strong>🖨️ Auto-impressão no StackOS</strong>
+          <span>Quando ativo, cada item registrado na comanda manda automaticamente um cupom para a impressora térmica do bar. Funciona apenas em máquinas marcadas como "impressora do bar" abaixo.</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <span style="font-size:14px;color:#e4e4e7;font-weight:600;">Imprimir item automaticamente</span>
+          <div class="switch" id="swImprimirAuto" data-cfg="imprimir_item_auto"></div>
+        </div>
+      </div>
+
+      <div class="config-row" style="flex-direction:column;align-items:stretch;">
+        <div class="config-info">
+          <strong>Papéis autorizados a receber impressão</strong>
+          <span>Apenas usuários com esses papéis (na máquina marcada como impressora) vão receber os cupons. <strong>Recomendamos não incluir Admin</strong> para evitar impressão acidental no escritório.</span>
+        </div>
+        <div class="papeis-grid" id="papeisImpressaoGrid">
+          <!-- chips renderizados via JS -->
+        </div>
+      </div>
+
+      <!-- Esta máquina -->
+      <div class="config-row" style="flex-direction:column;align-items:stretch;background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.15);border-radius:8px;padding:14px;margin-top:6px;">
+        <div class="config-info" style="margin-bottom:10px;">
+          <strong>🖥️ Esta máquina</strong>
+          <span>Marque se esta máquina é a do bar (onde está a impressora térmica). Essa configuração fica salva apenas neste dispositivo — você precisa marcar uma vez por máquina.</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <span style="font-size:14px;color:#e4e4e7;font-weight:600;">Receber e imprimir comandas aqui</span>
+          <div class="switch" id="swMaquinaImprime"></div>
+        </div>
+        <div id="statusMaquinaImpressao" style="font-size:12px;color:#71717a;margin-top:8px;text-align:right;font-weight:600;"></div>
+      </div>
+
       <div style="margin-top:18px;">
         <button class="btn btn-success btn-large" id="btnSalvar">💾 Salvar configurações</button>
       </div>
@@ -738,7 +773,9 @@ let TOKEN_ATUAL = null;
 let CONFIG = {
   permitir_estoque_negativo: false,
   papeis_permitidos: ['admin', 'caixa'],
-  comissao_padrao_pct: 10.0
+  comissao_padrao_pct: 10.0,
+  imprimir_item_auto: false,
+  papeis_impressao: ['caixa']
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1013,6 +1050,10 @@ async function carregarConfig() {
     CONFIG.comissao_padrao_pct = data.comissao_padrao_pct != null
       ? Number(data.comissao_padrao_pct)
       : 10.0;
+    CONFIG.imprimir_item_auto = !!data.imprimir_item_auto;
+    CONFIG.papeis_impressao = Array.isArray(data.papeis_impressao)
+      ? data.papeis_impressao
+      : ['caixa'];
   } else {
     // Primeira vez: persiste o default para já permitir o admin entrar pelo bar.html
     try {
@@ -1059,6 +1100,64 @@ function renderConfig() {
       chip.classList.toggle('checked');
     });
   });
+
+  // ⭐ Switch auto-impressão
+  if ($('swImprimirAuto')) {
+    $('swImprimirAuto').classList.toggle('on', CONFIG.imprimir_item_auto);
+  }
+
+  // Chips de papéis autorizados a receber impressão
+  const gridImp = $('papeisImpressaoGrid');
+  if (gridImp) {
+    gridImp.innerHTML = PAPEIS_DISPONIVEIS.map(p => {
+      const checked = CONFIG.papeis_impressao.includes(p.id);
+      return `
+        <label class="papel-chip ${checked ? 'checked' : ''}" data-papel-imp="${p.id}">
+          <span class="check-mark"></span>
+          <span>${p.label}</span>
+        </label>
+      `;
+    }).join('');
+    gridImp.querySelectorAll('.papel-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const papel = chip.dataset.papelImp;
+        if (CONFIG.papeis_impressao.includes(papel)) {
+          CONFIG.papeis_impressao = CONFIG.papeis_impressao.filter(p => p !== papel);
+        } else {
+          CONFIG.papeis_impressao.push(papel);
+        }
+        chip.classList.toggle('checked');
+      });
+    });
+  }
+
+  // Toggle local "esta máquina é impressora" — lido do localStorage
+  renderMaquinaImpressora();
+}
+
+// ⭐ Lê/escreve o flag local de "esta máquina é a impressora do bar"
+function getMaquinaEhImpressora() {
+  try { return localStorage.getItem('stackbar_maquina_imprime') === 'true'; }
+  catch(_) { return false; }
+}
+
+function setMaquinaEhImpressora(ativo) {
+  try { localStorage.setItem('stackbar_maquina_imprime', ativo ? 'true' : 'false'); }
+  catch(_) {}
+}
+
+function renderMaquinaImpressora() {
+  const sw = $('swMaquinaImprime');
+  const status = $('statusMaquinaImpressao');
+  if (!sw) return;
+  const ativo = getMaquinaEhImpressora();
+  sw.classList.toggle('on', ativo);
+  if (status) {
+    status.textContent = ativo
+      ? '🖨️ Esta máquina está marcada como impressora do bar'
+      : 'Esta máquina NÃO recebe impressão automática';
+    status.style.color = ativo ? '#22c55e' : '#71717a';
+  }
 }
 
 async function salvarConfig() {
@@ -1076,13 +1175,20 @@ async function salvarConfig() {
     CONFIG.comissao_padrao_pct = valor;
   }
 
+  // Validação: se imprimir_item_auto está ON, pelo menos 1 papel deve estar autorizado
+  if (CONFIG.imprimir_item_auto && CONFIG.papeis_impressao.length === 0) {
+    return showToast('⚠️ Selecione pelo menos 1 papel autorizado a receber impressão', 'error');
+  }
+
   setLoading(true);
   try {
     const { data, error } = await sb.rpc('stackbar_salvar_config', {
       p_clube_id: CLUBE_ID,
       p_permitir_estoque_negativo: CONFIG.permitir_estoque_negativo,
       p_papeis_permitidos: CONFIG.papeis_permitidos,
-      p_comissao_padrao_pct: CONFIG.comissao_padrao_pct
+      p_comissao_padrao_pct: CONFIG.comissao_padrao_pct,
+      p_imprimir_item_auto: CONFIG.imprimir_item_auto,
+      p_papeis_impressao: CONFIG.papeis_impressao
     });
     if (error) throw error;
     if (!data?.ok) throw new Error('Falha ao salvar');
@@ -1271,6 +1377,28 @@ function setupListeners() {
   $('swEstoque').addEventListener('click', () => {
     CONFIG.permitir_estoque_negativo = !CONFIG.permitir_estoque_negativo;
     $('swEstoque').classList.toggle('on', CONFIG.permitir_estoque_negativo);
+  });
+
+  // ⭐ Switch auto-impressão (global do clube)
+  $('swImprimirAuto').addEventListener('click', () => {
+    CONFIG.imprimir_item_auto = !CONFIG.imprimir_item_auto;
+    $('swImprimirAuto').classList.toggle('on', CONFIG.imprimir_item_auto);
+  });
+
+  // ⭐ Switch "esta máquina é impressora" (local, persiste no localStorage)
+  $('swMaquinaImprime').addEventListener('click', () => {
+    const novoEstado = !getMaquinaEhImpressora();
+    setMaquinaEhImpressora(novoEstado);
+    // Tenta notificar o StackOS na mesma origem (se aberto na mesma máquina)
+    try {
+      if (typeof window._stackbarSetMaquinaImpressora === 'function') {
+        window._stackbarSetMaquinaImpressora(novoEstado);
+      }
+    } catch(_) {}
+    renderMaquinaImpressora();
+    showToast(novoEstado
+      ? '🖨️ Esta máquina agora recebe impressão'
+      : 'Esta máquina não recebe mais impressão', 'success');
   });
 
   // Salvar config
