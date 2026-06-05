@@ -31132,25 +31132,23 @@ let _convCampanha = {
 };
 
 // === Helper: validar se clube tem acesso premium ===
+// Usa o sistema oficial de features (window.hasFeature) controlado pelo painel super admin.
+// Em trial libera automaticamente (já tratado no hasFeature).
 function _isConvitesPremium(clube) {
-    if (!clube) return false;
-    const plano = (clube.plano || clube.plan || '').toLowerCase();
-    if (plano === 'pro' || plano === 'premium' || plano === 'enterprise') return true;
-
-    // Trial 14 dias a partir de criadoEm/criado_em/trial_inicio
-    const inicioTs = clube.trial_inicio || clube.trialInicio || clube.criadoEm || clube.criado_em || clube.created_at;
-    if (inicioTs) {
-        const inicio = new Date(inicioTs).getTime();
-        const diasPassados = (Date.now() - inicio) / (1000 * 60 * 60 * 24);
-        if (diasPassados >= 0 && diasPassados <= 14) return true;
+    // Usa o sistema oficial de features
+    if (typeof window.hasFeature === 'function') {
+        return window.hasFeature('convites_premium');
     }
-    return false;
+    // Fallback (caso hasFeature ainda nao tenha carregado)
+    return true;
 }
 
 function _convDiasRestantesTrial(clube) {
     if (!clube) return 0;
+    // Se nao esta em trial, retorna 0
+    if (clube.status !== 'trial') return 0;
     const inicioTs = clube.trial_inicio || clube.trialInicio || clube.criadoEm || clube.criado_em || clube.created_at;
-    if (!inicioTs) return 0;
+    if (!inicioTs) return 14; // Se nao tem inicio mas status=trial, presume 14
     const inicio = new Date(inicioTs).getTime();
     const diasPassados = (Date.now() - inicio) / (1000 * 60 * 60 * 24);
     return Math.max(0, Math.ceil(14 - diasPassados));
@@ -31231,14 +31229,21 @@ async function renderConvitesPage() {
         acessoEl.style.display = '';
         contentEl.style.display = 'none';
 
-        // Info sobre trial
-        const trialDias = _convDiasRestantesTrial(sbClube);
+        // Mensagem contextual
         const infoEl = document.getElementById('conv-trial-info');
         if (infoEl) {
-            if (trialDias > 0) {
-                infoEl.innerHTML = `🎁 Você ainda tem <strong style="color:#fbbf24;">${trialDias} dia${trialDias!==1?'s':''}</strong> de teste gratuito`;
+            const status = sbClube?.status || '';
+            const planoNome = sbClube?.plano || sbClube?.plano_atual || 'desconhecido';
+
+            if (status === 'trial') {
+                const trialDias = _convDiasRestantesTrial(sbClube);
+                if (trialDias > 0) {
+                    infoEl.innerHTML = `🎁 Você ainda tem <strong style="color:#fbbf24;">${trialDias} dia${trialDias!==1?'s':''}</strong> de teste gratuito. Mas o trial não inclui esta feature.`;
+                } else {
+                    infoEl.innerHTML = '⏰ Seu período de teste expirou. Faça upgrade pra continuar.';
+                }
             } else {
-                infoEl.innerHTML = '⏰ Seu período de teste expirou. Faça upgrade pra continuar.';
+                infoEl.innerHTML = `📋 Seu plano atual é <strong style="color:#fbbf24;">${planoNome}</strong>. Esta feature precisa estar ativada nos planos Pro ou Premium pelo administrador. Se você é admin, vá no painel super admin → Planos → marque "Convites Premium".`;
             }
         }
         return;
