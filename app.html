@@ -1195,6 +1195,88 @@
     }
 }
 
+/* ============================================================
+   COMPACT DESKTOP — Adapta a notebooks/laptops com tela menor
+   Threshold ≤1599px (laptops 1366-1600px)
+   Threshold ≤1279px (laptops menores ainda)
+   Desktops ≥1600px ficam INTOCADOS (igual ao layout atual)
+   ============================================================ */
+
+/* Compact Desktop: 1024-1599px (laptops modernos) */
+@media (min-width: 1024px) and (max-width: 1599px) {
+    /* Sidebar 30px mais estreita libera espaço pro conteúdo */
+    #app-sidebar:not(.mobile-open),
+    aside:not(.mobile-open),
+    .sidebar:not(.mobile-open) {
+        width: 210px !important;
+    }
+
+    /* Main com padding reduzido — ganha 24px horizontais */
+    main {
+        padding: 1.25rem !important;
+    }
+
+    /* Cards principais ficam mais compactos */
+    .stat-card { padding: 1.1rem !important; }
+    .t-card-header { padding: 1rem 1.25rem !important; }
+
+    /* Headings grandes encolhem ~12% (mantêm hierarquia) */
+    [style*="font-size:2.5rem"],
+    [style*="font-size: 2.5rem"] { font-size: 2.2rem !important; }
+    [style*="font-size:2.4rem"],
+    [style*="font-size: 2.4rem"] { font-size: 2.1rem !important; }
+    [style*="font-size:2.25rem"],
+    [style*="font-size: 2.25rem"] { font-size: 2rem !important; }
+    [style*="font-size:2.2rem"],
+    [style*="font-size: 2.2rem"] { font-size: 1.95rem !important; }
+    [style*="font-size:3.5rem"],
+    [style*="font-size: 3.5rem"] { font-size: 3rem !important; }
+    .timer-display { font-size: 3.8rem !important; }
+
+    /* Override de padding:2rem inline (96 ocorrências) — só pega shorthand,
+       padrões multi-valor tipo "padding:2rem 1rem" ficam intactos */
+    [style*="padding:2rem;"],
+    [style*="padding: 2rem;"] {
+        padding: 1.25rem !important;
+    }
+
+    /* Nav items levemente compactos */
+    .nav-item {
+        padding: .6rem .9rem !important;
+        font-size: .82rem !important;
+    }
+}
+
+/* Tight Desktop: 1024-1279px (laptops 13"-14" e Windows com escala 125%) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+    #app-sidebar:not(.mobile-open),
+    aside:not(.mobile-open),
+    .sidebar:not(.mobile-open) {
+        width: 200px !important;
+    }
+    main {
+        padding: 1rem !important;
+    }
+    .stat-card { padding: .9rem !important; }
+    .t-card-header { padding: .85rem 1rem !important; }
+
+    /* Padding 2rem → 1rem nesse range */
+    [style*="padding:2rem;"],
+    [style*="padding: 2rem;"] {
+        padding: 1rem !important;
+    }
+
+    .nav-item {
+        padding: .55rem .8rem !important;
+        font-size: .78rem !important;
+    }
+
+    /* Stat cards em grids: 3 colunas em vez de 4 quando aplicável */
+    .grid-cols-4 {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
 /* Mobile (≤767px) — colapso de grids + ajustes de modais */
 @media (max-width: 767px) {
     .grid-cols-2, .grid-cols-3, .grid-cols-4,
