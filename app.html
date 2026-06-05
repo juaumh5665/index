@@ -2612,7 +2612,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="font-size:.65rem;color:#3f3f46;text-transform:uppercase;letter-spacing:.1em;margin-top:.2rem;">Gestão Inteligente</div>
         </div>
         <nav style="flex:1;padding:.75rem;display:flex;flex-direction:column;gap:.2rem;overflow-y:auto;">
-            <div onclick="showPage('painel-dono')" id="nav-painel-dono" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#fbbf24;background:linear-gradient(135deg,rgba(245,158,11,.08) 0%,rgba(168,85,247,.08) 100%);border:1px solid rgba(245,158,11,.2);margin-bottom:.4rem;">
+            <div onclick="showPage('painel-dono')" id="nav-painel-dono" class="nav-item feature-gated" data-feature="painel_dono" data-feature-label="Painel do Dono (Mobile)" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#fbbf24;background:linear-gradient(135deg,rgba(245,158,11,.08) 0%,rgba(168,85,247,.08) 100%);border:1px solid rgba(245,158,11,.2);margin-bottom:.4rem;">
                 <i class="fa-solid fa-crown nav-ico" style="width:16px;color:#fbbf24;"></i> Painel do Dono
                 <span style="margin-left:auto;font-size:.55rem;background:rgba(245,158,11,.2);color:#fbbf24;padding:.1rem .35rem;border-radius:.3rem;font-weight:800;">MOBILE</span>
             </div>
@@ -2642,7 +2642,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <i class="fa-solid fa-credit-card nav-ico" style="width:16px;color:#ef4444;"></i> Crédito
                 <span id="nav-credito-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:.4rem;font-weight:800;">0</span>
             </div>
-            <div onclick="showPage('convites')" id="nav-convites" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
+            <div onclick="showPage('convites')" id="nav-convites" class="nav-item feature-gated" data-feature="convites_premium" data-feature-label="Convites via WhatsApp" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-bullhorn nav-ico" style="width:16px;color:#22c55e;"></i> Convites
                 <span style="margin-left:auto;font-size:.55rem;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a23;padding:.1rem .35rem;border-radius:.3rem;font-weight:800;">PRO</span>
             </div>
@@ -19820,6 +19820,8 @@ function adminAbrirModalPlano(planoId) {
                     {key:'feature_patrocinadores_tv', label:'Patrocinadores na TV'},
                     {key:'feature_stackclock', label:'StackClock (Dealer App)'},
                     {key:'feature_stackbar', label:'StackBar (Bar App)'},
+                    {key:'feature_convites_premium', label:'Convites via WhatsApp'},
+                    {key:'feature_painel_dono', label:'Painel do Dono (Mobile)'},
                 ].map(f => `<label style="display:flex;align-items:center;gap:.5rem;background:#18181b;border:1px solid #27272a;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.85rem;">
                     <input type="checkbox" id="pl-${f.key}" ${plano?.[f.key] ? 'checked' : ''} style="cursor:pointer;width:16px;height:16px;">
                     <span>${f.label}</span>
@@ -19915,6 +19917,8 @@ async function adminSalvarPlano(novo) {
             feature_patrocinadores_tv: document.getElementById('pl-feature_patrocinadores_tv').checked,
             feature_stackclock: document.getElementById('pl-feature_stackclock').checked,
             feature_stackbar: document.getElementById('pl-feature_stackbar').checked,
+            feature_convites_premium: document.getElementById('pl-feature_convites_premium').checked,
+            feature_painel_dono: document.getElementById('pl-feature_painel_dono').checked,
             ativo: document.getElementById('pl-ativo').checked,
             updated_at: new Date().toISOString(),
         };
