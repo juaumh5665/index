@@ -957,6 +957,117 @@
 }
 
 /* ============================================================
+   CONVITES PREMIUM — Tabs, chips, filtros
+   ============================================================ */
+.conv-tab-btn {
+    background: transparent;
+    color: #a1a1aa;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'Manrope', sans-serif;
+}
+.conv-tab-btn:hover { color: #fff; }
+.conv-tab-active {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24) !important;
+    color: #1a1a23 !important;
+}
+
+.conv-var-chip {
+    background: rgba(245,158,11,.1);
+    border: 1px solid rgba(245,158,11,.25);
+    color: #f59e0b;
+    padding: .2rem .5rem;
+    border-radius: 1rem;
+    font-size: .68rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font-mono, monospace);
+    transition: all .12s;
+    user-select: none;
+}
+.conv-var-chip:hover { background: rgba(245,158,11,.2); transform: translateY(-1px); }
+
+.conv-filtro-btn {
+    background: #0a0a0c;
+    border: 1px solid #27272a;
+    color: #a1a1aa;
+    padding: .55rem .65rem;
+    border-radius: .45rem;
+    font-size: .72rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Manrope', sans-serif;
+    transition: all .15s;
+    text-align: center;
+}
+.conv-filtro-btn:hover { border-color: #f59e0b; color: #fff; }
+.conv-filtro-active {
+    background: rgba(245,158,11,.1) !important;
+    border-color: #f59e0b !important;
+    color: #fbbf24 !important;
+}
+
+.conv-pl-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto auto;
+    gap: .85rem;
+    align-items: center;
+    padding: .65rem .85rem;
+    background: #0a0a0c;
+    border: 1px solid #27272a;
+    border-radius: .5rem;
+}
+.conv-pl-row.conv-sent {
+    background: rgba(34,197,94,.04);
+    border-color: rgba(34,197,94,.2);
+}
+.conv-pl-row.conv-bloqueado {
+    background: rgba(239,68,68,.04);
+    border-color: rgba(239,68,68,.2);
+    opacity: .75;
+}
+.conv-pl-row.conv-proximo {
+    border: 2px solid #f59e0b;
+    background: rgba(245,158,11,.08);
+}
+.conv-pl-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #71717a, #52525b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: .72rem;
+    color: white;
+}
+.conv-btn-enviar {
+    background: rgba(34,197,94,.1);
+    border: 1px solid rgba(34,197,94,.3);
+    color: #22c55e;
+    padding: .5rem .85rem;
+    border-radius: .4rem;
+    cursor: pointer;
+    font-size: .75rem;
+    font-weight: 700;
+    font-family: 'Manrope', sans-serif;
+    transition: all .15s;
+}
+.conv-btn-enviar:hover { background: rgba(34,197,94,.2); }
+.conv-btn-enviar:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Mobile (<= 600px): empilhar tudo */
+@media (max-width: 600px) {
+    #conv-tpl-grid { grid-template-columns: 1fr !important; }
+    #conv-camp-grid { grid-template-columns: 1fr !important; }
+    .conv-pl-row { grid-template-columns: 36px 1fr; }
+    .conv-pl-row > div:nth-child(3),
+    .conv-pl-row > div:nth-child(4) { grid-column: 1 / -1; }
+}
+
+/* ============================================================
    PAINEL DO DONO — Mobile-first responsivo
    ============================================================ */
 #page-painel-dono { max-width: 720px; margin: 0 auto; padding: 0 .25rem; }
@@ -2531,6 +2642,10 @@ document.addEventListener('DOMContentLoaded', function(){
                 <i class="fa-solid fa-credit-card nav-ico" style="width:16px;color:#ef4444;"></i> Crédito
                 <span id="nav-credito-badge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;font-size:.65rem;padding:.1rem .4rem;border-radius:.4rem;font-weight:800;">0</span>
             </div>
+            <div onclick="showPage('convites')" id="nav-convites" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
+                <i class="fa-solid fa-bullhorn nav-ico" style="width:16px;color:#22c55e;"></i> Convites
+                <span style="margin-left:auto;font-size:.55rem;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a23;padding:.1rem .35rem;border-radius:.3rem;font-weight:800;">PRO</span>
+            </div>
             <div onclick="showPage('relatorios')" id="nav-relatorios" class="nav-item" style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;">
                 <i class="fa-solid fa-chart-line nav-ico" style="width:16px;color:#06b6d4;"></i> Relatórios
             </div>
@@ -2594,6 +2709,241 @@ document.addEventListener('DOMContentLoaded', function(){
         </header>
 
         <main style="flex:1;overflow:auto;padding:2rem;">
+
+            <!-- ============================================================
+                 CONVITES PREMIUM — Envio semi-automatico via WhatsApp
+                 ============================================================ -->
+            <div id="page-convites" class="page-content fade-in" style="display:none;">
+
+                <!-- Header -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;">
+                    <div style="display:flex;align-items:center;gap:.75rem;">
+                        <div style="width:44px;height:44px;border-radius:.7rem;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:flex;align-items:center;justify-content:center;font-size:1.4rem;box-shadow:0 4px 16px rgba(245,158,11,.3);">📢</div>
+                        <div>
+                            <div style="display:flex;align-items:center;gap:.5rem;">
+                                <h1 style="font-size:1.2rem;font-weight:800;color:#fff;margin:0;">Convites</h1>
+                                <span style="background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a23;font-size:.55rem;font-weight:800;padding:.15rem .4rem;border-radius:.25rem;letter-spacing:.08em;">PRO</span>
+                            </div>
+                            <div style="font-size:.75rem;color:#71717a;">Convide jogadores com templates personalizados</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Banner de acesso negado (se nao tem plano) -->
+                <div id="conv-acesso-negado" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,.08) 0%,rgba(245,158,11,.03) 100%);border:1px solid rgba(245,158,11,.3);border-radius:1rem;padding:2rem;text-align:center;margin-bottom:1.5rem;">
+                    <div style="font-size:3rem;margin-bottom:.5rem;">🔒</div>
+                    <h2 style="font-size:1.1rem;font-weight:800;color:#fbbf24;margin-bottom:.5rem;">Convites é um recurso Premium</h2>
+                    <p style="font-size:.85rem;color:#a1a1aa;margin-bottom:1.25rem;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.5;">
+                        Disponivel nos planos <strong style="color:#fbbf24;">Pro</strong> e <strong style="color:#fbbf24;">Premium</strong>, ou durante o periodo de teste gratuito de 14 dias.
+                    </p>
+                    <div id="conv-trial-info" style="font-size:.75rem;color:#71717a;margin-bottom:1rem;"></div>
+                    <button onclick="showPage('assinatura')" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a1a23;border:none;padding:.7rem 1.5rem;border-radius:.55rem;font-weight:800;font-size:.85rem;cursor:pointer;font-family:'Manrope',sans-serif;">
+                        Conhecer planos
+                    </button>
+                </div>
+
+                <!-- Conteúdo Premium (so aparece se tiver acesso) -->
+                <div id="conv-content" style="display:none;">
+
+                    <!-- Tabs -->
+                    <div style="display:flex;gap:.25rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.55rem;padding:.25rem;margin-bottom:1.25rem;max-width:600px;">
+                        <button class="conv-tab-btn conv-tab-active" data-tab="templates" onclick="convSetTab('templates')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;font-family:'Manrope',sans-serif;">📝 Templates</button>
+                        <button class="conv-tab-btn" data-tab="campanha" onclick="convSetTab('campanha')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:#a1a1aa;font-family:'Manrope',sans-serif;">📣 Nova Campanha</button>
+                        <button class="conv-tab-btn" data-tab="historico" onclick="convSetTab('historico')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:#a1a1aa;font-family:'Manrope',sans-serif;">📊 Histórico</button>
+                        <button class="conv-tab-btn" data-tab="config" onclick="convSetTab('config')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:#a1a1aa;font-family:'Manrope',sans-serif;">⚙️ Config</button>
+                    </div>
+
+                    <!-- ABA 1: TEMPLATES -->
+                    <div id="conv-tab-templates" class="conv-tab-content">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;" id="conv-tpl-grid">
+                            <!-- Coluna 1: Editor -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                                <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;display:flex;align-items:center;gap:.4rem;">✏️ Editor de Template</div>
+
+                                <div style="margin-bottom:1rem;">
+                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Nome do template</div>
+                                    <input id="conv-tpl-nome" class="inp" placeholder="Ex: Daily Sábado VIP" style="width:100%;">
+                                </div>
+
+                                <div style="margin-bottom:1rem;">
+                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Categoria</div>
+                                    <select id="conv-tpl-categoria" class="inp" style="width:100%;">
+                                        <option value="convite">🎯 Convite</option>
+                                        <option value="last_call">🔥 Last call</option>
+                                        <option value="vip">👑 VIP exclusivo</option>
+                                        <option value="saudade">💤 Saudade</option>
+                                        <option value="novos">🆕 Boas-vindas</option>
+                                        <option value="aviso">📣 Aviso geral</option>
+                                    </select>
+                                </div>
+
+                                <div style="margin-bottom:1rem;">
+                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Mensagem</div>
+                                    <textarea id="conv-tpl-texto" class="inp" rows="8" placeholder="🎰 E aí {nome}! Hoje tem {torneio}..." oninput="convAtualizarPreview()" style="width:100%;font-family:var(--font-mono,monospace);font-size:.8rem;resize:vertical;"></textarea>
+                                    <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem;">
+                                        <span class="conv-var-chip" onclick="convInserirVar('{nome}')">{nome}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{apelido}')">{apelido}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{torneio}')">{torneio}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{data}')">{data}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{hora}')">{hora}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{buyin}')">{buyin}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{prize}')">{prize}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{clube}')">{clube}</span>
+                                        <span class="conv-var-chip" onclick="convInserirVar('{flyer}')">{flyer}</span>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex;gap:.5rem;">
+                                    <button id="conv-tpl-salvar" onclick="convSalvarTemplate()" style="flex:1;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;border:none;padding:.65rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">💾 Salvar Template</button>
+                                    <button onclick="convLimparEditor()" style="background:transparent;color:#a1a1aa;border:1px solid #27272a;padding:.65rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">Limpar</button>
+                                </div>
+                            </div>
+
+                            <!-- Coluna 2: Preview WhatsApp -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                                <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;">👁️ Preview ao vivo (WhatsApp)</div>
+                                <div style="background:#0d1418;border:1px solid #1e2833;border-radius:.75rem;padding:1rem;">
+                                    <div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.85rem;border-bottom:1px solid #1e2833;margin-bottom:1rem;">
+                                        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:.9rem;">JS</div>
+                                        <div>
+                                            <div style="font-weight:700;font-size:.85rem;color:#e4e4e7;">João Silva (exemplo)</div>
+                                            <div style="font-size:.65rem;color:#71717a;">jogador VIP</div>
+                                        </div>
+                                    </div>
+                                    <div style="background:#0a1418;padding:1rem;border-radius:.5rem;min-height:200px;">
+                                        <div style="background:#054640;border-radius:.55rem .55rem 0 .55rem;padding:.65rem .85rem;max-width:90%;margin-left:auto;">
+                                            <div id="conv-preview-texto" style="color:#e4e4e7;font-size:.82rem;line-height:1.45;white-space:pre-wrap;">Digite uma mensagem no editor pra ver o preview aqui...</div>
+                                            <div style="font-size:.55rem;color:#a1a1aa;text-align:right;margin-top:.25rem;">10:42 ✓✓</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:.5rem;padding:.65rem .85rem;font-size:.72rem;color:#86efac;margin-top:1rem;line-height:1.5;">
+                                    💡 <strong style="color:#22c55e;">Como funciona:</strong> Use as variáveis acima entre <code style="background:rgba(0,0,0,.3);padding:0 .2rem;border-radius:.2rem;">{}</code> e o sistema substituirá pelos dados reais de cada jogador no envio.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lista de templates -->
+                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+                                <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">📚 Templates cadastrados</div>
+                                <div id="conv-tpl-count" style="font-size:.7rem;color:#71717a;font-weight:700;">0 templates</div>
+                            </div>
+                            <div id="conv-tpl-lista" style="display:flex;flex-direction:column;gap:.4rem;">
+                                <!-- preenchido por JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ABA 2: NOVA CAMPANHA -->
+                    <div id="conv-tab-campanha" class="conv-tab-content" style="display:none;">
+                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;margin-bottom:1rem;">
+                            <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;">🎯 Configurar Campanha</div>
+
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:1rem;" id="conv-camp-grid">
+                                <div>
+                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Torneio (opcional)</div>
+                                    <select id="conv-camp-torneio" class="inp" onchange="convAtualizarFlyerTorneio()" style="width:100%;">
+                                        <option value="">— Sem torneio (aviso avulso) —</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Template</div>
+                                    <select id="conv-camp-template" class="inp" style="width:100%;">
+                                        <option value="">— Selecione um template —</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Filtros de jogadores -->
+                            <div style="margin-bottom:1rem;">
+                                <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.5rem;">Quem convidar</div>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem;" id="conv-camp-filtros">
+                                    <button class="conv-filtro-btn conv-filtro-active" data-filtro="ativos" onclick="convSetFiltro('ativos')">🔥 Ativos 30d</button>
+                                    <button class="conv-filtro-btn" data-filtro="vips" onclick="convSetFiltro('vips')">⭐ VIPs (10+)</button>
+                                    <button class="conv-filtro-btn" data-filtro="sumidos" onclick="convSetFiltro('sumidos')">💤 Sumidos 60d+</button>
+                                    <button class="conv-filtro-btn" data-filtro="novos" onclick="convSetFiltro('novos')">🆕 Novos &lt;30d</button>
+                                    <button class="conv-filtro-btn" data-filtro="todos" onclick="convSetFiltro('todos')">👥 Todos</button>
+                                </div>
+                            </div>
+
+                            <!-- Flyer -->
+                            <div style="background:#0a0a0c;border:1px dashed #27272a;border-radius:.55rem;padding:.85rem;">
+                                <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.5rem;">📸 Flyer da Campanha</div>
+                                <div id="conv-flyer-preview" style="display:none;background:#111113;border:1px solid #27272a;border-radius:.45rem;padding:.55rem;margin-bottom:.55rem;display:flex;align-items:center;gap:.55rem;">
+                                    <img id="conv-flyer-thumb" style="width:50px;height:50px;object-fit:cover;border-radius:.3rem;">
+                                    <div style="flex:1;min-width:0;">
+                                        <div id="conv-flyer-nome" style="font-size:.75rem;font-weight:700;color:#e4e4e7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                                        <div id="conv-flyer-meta" style="font-size:.65rem;color:#71717a;"></div>
+                                    </div>
+                                    <button onclick="convRemoverFlyer()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;padding:.35rem .65rem;border-radius:.35rem;cursor:pointer;font-size:.75rem;font-weight:700;">🗑️</button>
+                                </div>
+                                <input type="file" id="conv-flyer-input" accept="image/*" style="display:none;" onchange="convHandleFlyerUpload(this)">
+                                <button onclick="document.getElementById('conv-flyer-input').click()" id="conv-flyer-btn" style="width:100%;background:rgba(56,189,248,.06);border:1px dashed rgba(56,189,248,.3);color:#38bdf8;padding:.65rem;border-radius:.45rem;cursor:pointer;font-size:.78rem;font-weight:700;font-family:'Manrope',sans-serif;">📤 Selecionar flyer (max 5MB)</button>
+                                <label id="conv-flyer-salvar-torneio-wrap" style="display:none;margin-top:.55rem;font-size:.72rem;color:#a1a1aa;display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+                                    <input type="checkbox" id="conv-flyer-salvar-torneio" checked style="cursor:pointer;">
+                                    💾 Salvar este flyer no torneio (pra reutilizar)
+                                </label>
+                            </div>
+
+                            <button onclick="convCarregarListaCampanha()" style="margin-top:1rem;width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:.75rem;border-radius:.55rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.9rem;">
+                                🎯 Carregar lista de jogadores
+                            </button>
+                        </div>
+
+                        <!-- Lista de jogadores pra enviar -->
+                        <div id="conv-camp-lista-wrap" style="display:none;background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+                                <div>
+                                    <div style="font-size:.9rem;font-weight:800;color:#fff;" id="conv-camp-lista-titulo">Jogadores</div>
+                                    <div style="font-size:.7rem;color:#71717a;" id="conv-camp-lista-meta"></div>
+                                </div>
+                                <div style="display:flex;gap:.5rem;">
+                                    <button onclick="convIniciarEnvioSequencial()" id="conv-btn-sequencial" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.8rem;">🚀 Iniciar Envio Sequencial</button>
+                                </div>
+                            </div>
+
+                            <div id="conv-camp-lista" style="display:flex;flex-direction:column;gap:.4rem;">
+                                <!-- preenchido por JS -->
+                            </div>
+
+                            <!-- Barra de progresso (fixa) -->
+                            <div id="conv-progress-bar" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid #1e1e23;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:#71717a;margin-bottom:.35rem;">
+                                    <span id="conv-progress-texto">0 enviados</span>
+                                    <span id="conv-progress-pct">0%</span>
+                                </div>
+                                <div style="height:6px;background:#27272a;border-radius:3px;overflow:hidden;">
+                                    <div id="conv-progress-fill" style="height:100%;background:linear-gradient(90deg,#22c55e,#16a34a);width:0%;transition:width .3s;"></div>
+                                </div>
+                                <div style="display:flex;gap:.5rem;margin-top:.65rem;">
+                                    <button onclick="convPausarEnvio()" id="conv-btn-pausar" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:.5rem .85rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;">⏸️ Pausar</button>
+                                    <button onclick="convFinalizarEnvio()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.5rem .85rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;">❌ Finalizar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ABA 3: HISTÓRICO (Sessão 2) -->
+                    <div id="conv-tab-historico" class="conv-tab-content" style="display:none;">
+                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:2rem;text-align:center;">
+                            <div style="font-size:2rem;margin-bottom:.5rem;">📊</div>
+                            <h3 style="font-size:.95rem;font-weight:800;color:#fff;margin-bottom:.5rem;">Histórico & Analytics</h3>
+                            <p style="font-size:.78rem;color:#71717a;line-height:1.5;max-width:380px;margin:0 auto;">Esta aba estará disponivel na próxima atualização. Vai mostrar métricas de envio, taxa de resposta, template mais eficaz e export CSV.</p>
+                        </div>
+                    </div>
+
+                    <!-- ABA 4: CONFIG (Sessão 2) -->
+                    <div id="conv-tab-config" class="conv-tab-content" style="display:none;">
+                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:2rem;text-align:center;">
+                            <div style="font-size:2rem;margin-bottom:.5rem;">⚙️</div>
+                            <h3 style="font-size:.95rem;font-weight:800;color:#fff;margin-bottom:.5rem;">Configurações</h3>
+                            <p style="font-size:.78rem;color:#71717a;line-height:1.5;max-width:380px;margin:0 auto;">Anti-cansaço, cooldown, horário respeitoso, opt-out e assinatura — disponíveis na próxima atualização.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
 
             <!-- ============================================================
                  PAINEL DO DONO — Mobile-first, leitura/consulta financeira
@@ -8009,10 +8359,10 @@ let activeCashContext = { mesaId: null, jogadorId: null };
 // PERMISSIONS MATRIX
 // ============================================================
 const ROLES = {
-    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','credito','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar','painel-dono'] },
+    admin:    { label: 'Administrador', icon: '👑', color: '#f59e0b', pages: ['dashboard','jogadores','torneios','cash','bar','caixa','contaspagar','credito','convites','fechamento','jackpot','ticketsvouchers','usuarios','funcionarios','config','relatorios','assinatura','stackclock','stackbar','painel-dono'] },
     dealer:   { label: 'Dealer',        icon: '🃏', color: '#22c55e', pages: ['dashboard','torneios','cash','stackbar'] },
     caixa:    { label: 'Caixa',         icon: '💰', color: '#a78bfa', pages: ['dashboard','bar','caixa','fechamento','jackpot','ticketsvouchers','stackbar'] },
-    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa','stackbar'] },
+    recepcao: { label: 'Recepção',      icon: '📋', color: '#06b6d4', pages: ['dashboard','jogadores','torneios','caixa','convites','stackbar'] },
 };
 
 // Seed admin padrão + limpeza de dados corrompidos
@@ -19895,6 +20245,9 @@ function applyPermissions() {
         'nav-fechamento':'fechamento',
         'nav-jackpot':   'jackpot',
         'nav-relatorios':'relatorios',
+        'nav-credito':   'credito',
+        'nav-convites':  'convites',
+        'nav-contaspagar':'contaspagar',
     };
     Object.entries(navMap).forEach(([navId, page]) => {
         const el = document.getElementById(navId);
@@ -20046,6 +20399,7 @@ function showPage(page) {
     }
     if (page === 'dashboard') renderDashboard();
     if (page === 'painel-dono') { renderPainelDono(); pdIniciarAutoRefresh(); setTimeout(_pdAtualizarBotaoInstalar, 200); }
+    if (page === 'convites') { renderConvitesPage(); }
     if (page !== 'painel-dono') pdPararAutoRefresh();
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
@@ -30745,6 +31099,787 @@ function _pdFmtCompact(v) {
     if (Math.abs(n) >= 1000000) return 'R$ ' + (n / 1000000).toFixed(1) + 'M';
     if (Math.abs(n) >= 10000)   return 'R$ ' + (n / 1000).toFixed(1) + 'K';
     return formatMoney(n);
+}
+
+// =====================================================================
+// CONVITES PREMIUM — Helpers + estado global
+// =====================================================================
+let conviteTemplates = [];
+let conviteEnvios = [];
+let conviteOptout = new Set(); // jogador_ids que pediram opt-out
+let conviteConfig = {
+    max_semana: 2,
+    cooldown_dias: 30,
+    horario_inicio: 9,
+    horario_fim: 22,
+    assinatura: ''
+};
+
+// Estado da campanha em execução
+let _convCampanha = {
+    tab: 'templates',
+    filtro: 'ativos',
+    torneioId: null,
+    templateId: null,
+    flyerFile: null,
+    flyerUrl: null,
+    flyerNome: null,
+    salvarNoTorneio: true,
+    listaJogadores: [], // [{jogador, valido, motivoBloqueio, enviado, ts}]
+    indiceAtual: -1,
+    enviando: false,
+    editandoTemplateId: null
+};
+
+// === Helper: validar se clube tem acesso premium ===
+function _isConvitesPremium(clube) {
+    if (!clube) return false;
+    const plano = (clube.plano || clube.plan || '').toLowerCase();
+    if (plano === 'pro' || plano === 'premium' || plano === 'enterprise') return true;
+
+    // Trial 14 dias a partir de criadoEm/criado_em/trial_inicio
+    const inicioTs = clube.trial_inicio || clube.trialInicio || clube.criadoEm || clube.criado_em || clube.created_at;
+    if (inicioTs) {
+        const inicio = new Date(inicioTs).getTime();
+        const diasPassados = (Date.now() - inicio) / (1000 * 60 * 60 * 24);
+        if (diasPassados >= 0 && diasPassados <= 14) return true;
+    }
+    return false;
+}
+
+function _convDiasRestantesTrial(clube) {
+    if (!clube) return 0;
+    const inicioTs = clube.trial_inicio || clube.trialInicio || clube.criadoEm || clube.criado_em || clube.created_at;
+    if (!inicioTs) return 0;
+    const inicio = new Date(inicioTs).getTime();
+    const diasPassados = (Date.now() - inicio) / (1000 * 60 * 60 * 24);
+    return Math.max(0, Math.ceil(14 - diasPassados));
+}
+
+// === Helper: validar e formatar WhatsApp pra E.164 (formato wa.me) ===
+// Retorna { valido, numero, formatado } — usa só pra ENVIO, não muda o cadastro
+function _normalizarWhatsappE164(whatsappRaw) {
+    if (!whatsappRaw) return { valido: false, motivo: 'Sem número cadastrado' };
+    // Remove tudo exceto dígitos
+    let n = String(whatsappRaw).replace(/\D/g, '');
+    if (!n) return { valido: false, motivo: 'Número vazio' };
+
+    // Se começa com 55 e tem 12+ dígitos, ok
+    // Se começa com 0, remove (DDD com 0)
+    if (n.startsWith('0') && n.length > 10) n = n.substring(1);
+
+    // Se tem 10 ou 11 dígitos (DDD + numero brasileiro), prefixa 55
+    if (n.length === 10 || n.length === 11) {
+        n = '55' + n;
+    }
+
+    // Validações finais
+    if (n.length < 12) return { valido: false, motivo: 'Número muito curto' };
+    if (n.length > 15) return { valido: false, motivo: 'Número muito longo' };
+
+    // Se começa com 55 mas DDD inválido (00-10, 19, 20...), rejeita
+    if (n.startsWith('55')) {
+        const ddd = parseInt(n.substring(2, 4));
+        const dddsValidos = [11,12,13,14,15,16,17,18,19,21,22,24,27,28,31,32,33,34,35,37,38,41,42,43,44,45,46,47,48,49,51,53,54,55,61,62,63,64,65,66,67,68,69,71,73,74,75,77,79,81,82,83,84,85,86,87,88,89,91,92,93,94,95,96,97,98,99];
+        if (!dddsValidos.includes(ddd)) return { valido: false, motivo: 'DDD inválido' };
+    }
+
+    return {
+        valido: true,
+        numero: n,
+        formatado: '+' + n
+    };
+}
+
+// === Helper: substituir variáveis no template ===
+function _convAplicarVariaveis(texto, jogador, torneio, clube, flyerUrl) {
+    if (!texto) return '';
+    let r = texto;
+    const j = jogador || {};
+    const t = torneio || {};
+    const c = clube || sbClube || {};
+
+    const dataT = t.dataHora ? new Date(t.dataHora) : null;
+    const dataStr = dataT ? dataT.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'2-digit' }) : '';
+    const horaStr = dataT ? dataT.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+    const buyinV = (t.buyin || t.valorBuyin || 0);
+    const prizeV = (typeof getPrize === 'function' && t.id) ? getPrize(t) : (t.prizePool || 0);
+
+    r = r.replace(/\{nome\}/g, j.nome || 'jogador');
+    r = r.replace(/\{apelido\}/g, j.apelido || j.nome || '');
+    r = r.replace(/\{torneio\}/g, t.nome || 'torneio');
+    r = r.replace(/\{data\}/g, dataStr);
+    r = r.replace(/\{hora\}/g, horaStr);
+    r = r.replace(/\{buyin\}/g, buyinV ? formatMoney(buyinV) : 'R$ 0');
+    r = r.replace(/\{prize\}/g, prizeV ? formatMoney(prizeV) : 'R$ 0');
+    r = r.replace(/\{clube\}/g, c.nome || c.name || 'o clube');
+    r = r.replace(/\{flyer\}/g, flyerUrl || '');
+
+    return r;
+}
+
+// =====================================================================
+// CONVITES — Render principal + gate de plano
+// =====================================================================
+async function renderConvitesPage() {
+    const acessoEl = document.getElementById('conv-acesso-negado');
+    const contentEl = document.getElementById('conv-content');
+    if (!acessoEl || !contentEl) return;
+
+    const temAcesso = _isConvitesPremium(sbClube);
+    if (!temAcesso) {
+        acessoEl.style.display = '';
+        contentEl.style.display = 'none';
+
+        // Info sobre trial
+        const trialDias = _convDiasRestantesTrial(sbClube);
+        const infoEl = document.getElementById('conv-trial-info');
+        if (infoEl) {
+            if (trialDias > 0) {
+                infoEl.innerHTML = `🎁 Você ainda tem <strong style="color:#fbbf24;">${trialDias} dia${trialDias!==1?'s':''}</strong> de teste gratuito`;
+            } else {
+                infoEl.innerHTML = '⏰ Seu período de teste expirou. Faça upgrade pra continuar.';
+            }
+        }
+        return;
+    }
+
+    acessoEl.style.display = 'none';
+    contentEl.style.display = '';
+
+    // Carrega dados
+    await convCarregarTemplates();
+    await convCarregarOptout();
+    convPopularTorneios();
+    convRenderListaTemplates();
+    convAtualizarPreview();
+}
+
+function convSetTab(tab) {
+    _convCampanha.tab = tab;
+    document.querySelectorAll('.conv-tab-btn').forEach(b => {
+        const isActive = b.dataset.tab === tab;
+        b.classList.toggle('conv-tab-active', isActive);
+        if (isActive) {
+            b.style.background = '';
+            b.style.color = '';
+        } else {
+            b.style.background = 'transparent';
+            b.style.color = '#a1a1aa';
+        }
+    });
+    document.querySelectorAll('.conv-tab-content').forEach(c => c.style.display = 'none');
+    const tabEl = document.getElementById('conv-tab-' + tab);
+    if (tabEl) tabEl.style.display = '';
+
+    // Quando troca pra "campanha", popular torneios e templates
+    if (tab === 'campanha') {
+        convPopularTorneios();
+        convPopularTemplatesSelect();
+    }
+}
+
+// =====================================================================
+// TEMPLATES — CRUD
+// =====================================================================
+async function convCarregarTemplates() {
+    if (!sb || !sbClube) { conviteTemplates = []; return; }
+    try {
+        const { data, error } = await sb.from('convite_templates')
+            .select('*')
+            .eq('clube_id', sbClube.id)
+            .order('criado_em', { ascending: false });
+        if (error) { console.warn('[Convites] erro ao carregar templates:', error); return; }
+        conviteTemplates = data || [];
+
+        // Se nao tem nenhum, criar templates pre-prontos
+        if (conviteTemplates.length === 0) {
+            await convSeedTemplates();
+        }
+    } catch (e) { console.warn('[Convites] erro:', e); }
+}
+
+async function convSeedTemplates() {
+    const seed = [
+        {
+            nome: '🎯 Convite básico Daily',
+            categoria: 'convite',
+            texto: '🎰 E aí {nome}!\n\nHoje tem {torneio} no {clube}!\n\n📅 {data} às {hora}\n💰 Buy-in: {buyin}\n🏆 Garantido: {prize}\n\n{flyer}\n\nConfirma presença?'
+        },
+        {
+            nome: '🔥 Last call',
+            categoria: 'last_call',
+            texto: '🔥 {nome}, começa em 30 minutos!\n\n{torneio} - {hora}\nBuy-in: {buyin}\n\nVem correndo!'
+        },
+        {
+            nome: '👑 VIP exclusivo',
+            categoria: 'vip',
+            texto: '{nome}, vaga reservada pra você no torneio especial de hoje!\n\n🏆 {torneio}\n📅 {data} às {hora}\n💎 Premiação: {prize}\n\nContamos com sua presença!'
+        },
+        {
+            nome: '💤 Cadê você?',
+            categoria: 'saudade',
+            texto: 'Oi {nome}, faz tempo que não te vejo aqui no {clube}!\n\nVai ter {torneio} {data} às {hora}, que tal voltar pra jogar?\n\nBuy-in: {buyin}\n\nTô esperando! 🤝'
+        },
+        {
+            nome: '🆕 Boas-vindas',
+            categoria: 'novos',
+            texto: '👋 Olá {nome}, bem-vindo ao {clube}!\n\nPra começar, que tal participar do nosso próximo torneio?\n\n🎰 {torneio}\n📅 {data} às {hora}\n💰 Buy-in: {buyin}\n\nQualquer dúvida, é só chamar!'
+        }
+    ];
+    for (const t of seed) {
+        try {
+            const { data, error } = await sb.from('convite_templates').insert({
+                clube_id: sbClube.id,
+                nome: t.nome,
+                categoria: t.categoria,
+                texto: t.texto,
+                ativo: true
+            }).select().single();
+            if (!error && data) conviteTemplates.unshift(data);
+        } catch (e) { console.warn('[Convites] erro ao seedar:', e); }
+    }
+}
+
+function convInserirVar(varStr) {
+    const ta = document.getElementById('conv-tpl-texto');
+    if (!ta) return;
+    const start = ta.selectionStart || 0;
+    const end = ta.selectionEnd || 0;
+    const v = ta.value;
+    ta.value = v.substring(0, start) + varStr + v.substring(end);
+    ta.focus();
+    ta.setSelectionRange(start + varStr.length, start + varStr.length);
+    convAtualizarPreview();
+}
+
+function convAtualizarPreview() {
+    const texto = (document.getElementById('conv-tpl-texto') || {}).value || '';
+    const preview = document.getElementById('conv-preview-texto');
+    if (!preview) return;
+    if (!texto.trim()) {
+        preview.textContent = 'Digite uma mensagem no editor pra ver o preview aqui...';
+        preview.style.color = '#71717a';
+        return;
+    }
+    // Aplica vars com dados de exemplo
+    const exemplo = {
+        nome: 'João',
+        apelido: 'JJ',
+    };
+    const torneioExemplo = {
+        nome: 'Daily 100K',
+        dataHora: new Date(Date.now() + 86400000).toISOString(),
+        buyin: 80,
+        prizePool: 5000
+    };
+    const clubeExemplo = sbClube || { nome: 'Seu Clube' };
+    const r = _convAplicarVariaveis(texto, exemplo, torneioExemplo, clubeExemplo, '');
+    preview.textContent = r;
+    preview.style.color = '#e4e4e7';
+}
+
+async function convSalvarTemplate() {
+    const nome = (document.getElementById('conv-tpl-nome').value || '').trim();
+    const categoria = document.getElementById('conv-tpl-categoria').value;
+    const texto = (document.getElementById('conv-tpl-texto').value || '').trim();
+    if (!nome) { showToast('⚠️ Dê um nome ao template'); return; }
+    if (!texto) { showToast('⚠️ Escreva a mensagem'); return; }
+
+    const btn = document.getElementById('conv-tpl-salvar');
+    if (btn) { btn.disabled = true; btn.textContent = '💾 Salvando...'; }
+
+    try {
+        if (_convCampanha.editandoTemplateId) {
+            // UPDATE
+            const { data, error } = await sb.from('convite_templates')
+                .update({ nome, categoria, texto, atualizado_em: new Date().toISOString() })
+                .eq('id', _convCampanha.editandoTemplateId)
+                .select().single();
+            if (error) throw error;
+            const idx = conviteTemplates.findIndex(t => t.id === data.id);
+            if (idx >= 0) conviteTemplates[idx] = data;
+            showToast('✅ Template atualizado');
+        } else {
+            // INSERT
+            const { data, error } = await sb.from('convite_templates').insert({
+                clube_id: sbClube.id,
+                nome, categoria, texto, ativo: true
+            }).select().single();
+            if (error) throw error;
+            conviteTemplates.unshift(data);
+            showToast('✅ Template criado');
+        }
+        convLimparEditor();
+        convRenderListaTemplates();
+    } catch (e) {
+        console.error('[Convites] erro salvar:', e);
+        showToast('❌ Erro ao salvar template');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar Template'; }
+    }
+}
+
+function convLimparEditor() {
+    document.getElementById('conv-tpl-nome').value = '';
+    document.getElementById('conv-tpl-categoria').value = 'convite';
+    document.getElementById('conv-tpl-texto').value = '';
+    _convCampanha.editandoTemplateId = null;
+    document.getElementById('conv-tpl-salvar').textContent = '💾 Salvar Template';
+    convAtualizarPreview();
+}
+
+function convEditarTemplate(id) {
+    const t = conviteTemplates.find(x => x.id === id);
+    if (!t) return;
+    _convCampanha.editandoTemplateId = id;
+    document.getElementById('conv-tpl-nome').value = t.nome;
+    document.getElementById('conv-tpl-categoria').value = t.categoria || 'convite';
+    document.getElementById('conv-tpl-texto').value = t.texto;
+    document.getElementById('conv-tpl-salvar').textContent = '💾 Atualizar Template';
+    convAtualizarPreview();
+    // Scroll pro editor
+    document.getElementById('conv-tpl-nome').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function convExcluirTemplate(id) {
+    const t = conviteTemplates.find(x => x.id === id);
+    if (!t) return;
+    if (!confirm(`Excluir template "${t.nome}"?`)) return;
+    try {
+        const { error } = await sb.from('convite_templates').delete().eq('id', id);
+        if (error) throw error;
+        conviteTemplates = conviteTemplates.filter(x => x.id !== id);
+        convRenderListaTemplates();
+        showToast('🗑️ Template excluído');
+    } catch (e) {
+        console.error('[Convites] erro excluir:', e);
+        showToast('❌ Erro ao excluir');
+    }
+}
+
+function convRenderListaTemplates() {
+    const lista = document.getElementById('conv-tpl-lista');
+    const count = document.getElementById('conv-tpl-count');
+    if (!lista) return;
+
+    count.textContent = `${conviteTemplates.length} template${conviteTemplates.length !== 1 ? 's' : ''}`;
+
+    if (conviteTemplates.length === 0) {
+        lista.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#71717a;font-size:.8rem;">Nenhum template cadastrado ainda. Crie o primeiro acima!</div>';
+        return;
+    }
+
+    const catIcon = { convite:'🎯', last_call:'🔥', vip:'👑', saudade:'💤', novos:'🆕', aviso:'📣' };
+    const catColor = { convite:'rgba(34,197,94,.1)', last_call:'rgba(239,68,68,.1)', vip:'rgba(245,158,11,.1)', saudade:'rgba(168,85,247,.1)', novos:'rgba(56,189,248,.1)', aviso:'rgba(161,161,170,.1)' };
+
+    lista.innerHTML = conviteTemplates.map(t => {
+        const preview = (t.texto || '').replace(/\n/g, ' ').substring(0, 80);
+        return `
+        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:.85rem;align-items:center;padding:.65rem .85rem;background:#0a0a0c;border:1px solid #27272a;border-radius:.55rem;">
+            <div style="width:36px;height:36px;border-radius:.4rem;background:${catColor[t.categoria]||'rgba(161,161,170,.1)'};display:flex;align-items:center;justify-content:center;font-size:1rem;">${catIcon[t.categoria]||'📝'}</div>
+            <div style="min-width:0;">
+                <div style="font-weight:700;font-size:.85rem;color:#e4e4e7;">${esc(t.nome)}</div>
+                <div style="font-size:.65rem;color:#71717a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(preview)}${preview.length >= 80 ? '...' : ''}</div>
+            </div>
+            <div style="display:flex;gap:.3rem;">
+                <button onclick="convEditarTemplate('${t.id}')" style="background:transparent;border:1px solid #27272a;color:#a1a1aa;width:32px;height:32px;border-radius:.35rem;cursor:pointer;font-size:.8rem;">✏️</button>
+                <button onclick="convExcluirTemplate('${t.id}')" style="background:transparent;border:1px solid #27272a;color:#ef4444;width:32px;height:32px;border-radius:.35rem;cursor:pointer;font-size:.8rem;">🗑️</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// =====================================================================
+// CAMPANHA — Filtros + Lista
+// =====================================================================
+function convSetFiltro(filtro) {
+    _convCampanha.filtro = filtro;
+    document.querySelectorAll('.conv-filtro-btn').forEach(b => {
+        b.classList.toggle('conv-filtro-active', b.dataset.filtro === filtro);
+    });
+}
+
+function convPopularTorneios() {
+    const sel = document.getElementById('conv-camp-torneio');
+    if (!sel) return;
+    const opcoes = ['<option value="">— Sem torneio (aviso avulso) —</option>'];
+    (torneios || []).forEach(t => {
+        const status = (t.status || '').toLowerCase();
+        const isAtivo = status === 'running' || status === 'paused' || status === 'break' || status === 'waiting' || !status;
+        if (isAtivo) {
+            const data = t.dataHora ? new Date(t.dataHora).toLocaleDateString('pt-BR') : '';
+            opcoes.push(`<option value="${t.id}">${esc(t.nome || 'Torneio')} ${data ? '· '+data : ''}</option>`);
+        }
+    });
+    sel.innerHTML = opcoes.join('');
+}
+
+function convPopularTemplatesSelect() {
+    const sel = document.getElementById('conv-camp-template');
+    if (!sel) return;
+    const opts = ['<option value="">— Selecione um template —</option>'];
+    conviteTemplates.forEach(t => {
+        opts.push(`<option value="${t.id}">${esc(t.nome)}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+}
+
+function convAtualizarFlyerTorneio() {
+    const torneioId = document.getElementById('conv-camp-torneio').value;
+    _convCampanha.torneioId = torneioId || null;
+    // Mostrar checkbox de salvar no torneio só se tem torneio escolhido
+    const wrap = document.getElementById('conv-flyer-salvar-torneio-wrap');
+    if (wrap) wrap.style.display = torneioId ? 'flex' : 'none';
+
+    // Se torneio já tem flyer salvo, pré-carrega
+    if (torneioId) {
+        const t = (torneios || []).find(x => x.id === torneioId);
+        if (t && t.flyer_url) {
+            _convCampanha.flyerUrl = t.flyer_url;
+            _convCampanha.flyerNome = 'flyer-do-torneio.jpg';
+            _convAtualizarFlyerUI();
+        }
+    }
+}
+
+function _convAtualizarFlyerUI() {
+    const preview = document.getElementById('conv-flyer-preview');
+    const btn = document.getElementById('conv-flyer-btn');
+    if (!preview || !btn) return;
+    if (_convCampanha.flyerUrl) {
+        preview.style.display = 'flex';
+        document.getElementById('conv-flyer-thumb').src = _convCampanha.flyerUrl;
+        document.getElementById('conv-flyer-nome').textContent = _convCampanha.flyerNome || 'flyer.jpg';
+        document.getElementById('conv-flyer-meta').textContent = _convCampanha.flyerFile
+            ? `${(_convCampanha.flyerFile.size/1024).toFixed(0)} KB`
+            : 'já no servidor';
+        btn.textContent = '🔄 Trocar flyer';
+    } else {
+        preview.style.display = 'none';
+        btn.textContent = '📤 Selecionar flyer (max 5MB)';
+    }
+}
+
+async function convHandleFlyerUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('❌ Flyer maior que 5MB. Comprima a imagem.');
+        return;
+    }
+    if (!file.type.startsWith('image/')) {
+        showToast('❌ Selecione uma imagem');
+        return;
+    }
+
+    // Compressão simples via canvas (max 1080px na maior dim)
+    try {
+        const compressed = await _convComprimirImagem(file);
+        _convCampanha.flyerFile = compressed;
+        _convCampanha.flyerNome = file.name;
+        _convCampanha.flyerUrl = URL.createObjectURL(compressed);
+        _convAtualizarFlyerUI();
+        showToast(`📸 Flyer carregado (${(compressed.size/1024).toFixed(0)} KB)`);
+    } catch (e) {
+        console.error('[Convites] erro flyer:', e);
+        showToast('❌ Erro ao processar flyer');
+    }
+}
+
+async function _convComprimirImagem(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            const maxDim = 1080;
+            let w = img.width, h = img.height;
+            if (Math.max(w, h) > maxDim) {
+                const scale = maxDim / Math.max(w, h);
+                w = Math.round(w * scale);
+                h = Math.round(h * scale);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            canvas.toBlob((blob) => {
+                if (!blob) return reject(new Error('Falha ao comprimir'));
+                resolve(blob);
+            }, 'image/jpeg', 0.85);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagem inválida')); };
+        img.src = url;
+    });
+}
+
+function convRemoverFlyer() {
+    if (_convCampanha.flyerUrl && _convCampanha.flyerUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(_convCampanha.flyerUrl);
+    }
+    _convCampanha.flyerFile = null;
+    _convCampanha.flyerUrl = null;
+    _convCampanha.flyerNome = null;
+    document.getElementById('conv-flyer-input').value = '';
+    _convAtualizarFlyerUI();
+}
+
+async function _convUploadFlyerSupabase() {
+    if (!_convCampanha.flyerFile) return _convCampanha.flyerUrl || null;
+    try {
+        const ext = (_convCampanha.flyerNome || 'flyer.jpg').split('.').pop().toLowerCase();
+        const safeExt = ['jpg','jpeg','png','webp','gif'].includes(ext) ? ext : 'jpg';
+        const tornDir = _convCampanha.torneioId || 'avulsos';
+        const uniqId = Math.random().toString(36).substring(2, 10) + Date.now();
+        const path = `${sbClube.id}/${tornDir}/${uniqId}.${safeExt}`;
+
+        const { error } = await sb.storage.from('convite-flyers').upload(path, _convCampanha.flyerFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: _convCampanha.flyerFile.type || 'image/jpeg'
+        });
+        if (error) throw error;
+
+        const { data } = sb.storage.from('convite-flyers').getPublicUrl(path);
+        const publicUrl = data.publicUrl;
+
+        // Se marcou "salvar no torneio", atualiza torneio
+        if (_convCampanha.torneioId && document.getElementById('conv-flyer-salvar-torneio').checked) {
+            try {
+                await sb.from('torneios').update({ flyer_url: publicUrl }).eq('id', _convCampanha.torneioId);
+                const t = (torneios || []).find(x => x.id === _convCampanha.torneioId);
+                if (t) t.flyer_url = publicUrl;
+            } catch(e) { console.warn('[Convites] erro salvar flyer no torneio:', e); }
+        }
+
+        return publicUrl;
+    } catch (e) {
+        console.error('[Convites] erro upload flyer:', e);
+        showToast('❌ Erro ao subir flyer');
+        return null;
+    }
+}
+
+// =====================================================================
+// CAMPANHA — Filtrar e gerar lista de jogadores
+// =====================================================================
+function _convFiltrarJogadores(filtro) {
+    const agora = Date.now();
+    const d30 = agora - 30*86400000;
+    const d60 = agora - 60*86400000;
+    const d90 = agora - 90*86400000;
+
+    return (jogadores || []).filter(j => {
+        if (!j || j.bloqueado) return false;
+        if (conviteOptout.has(j.id)) return false; // opt-out
+
+        const ultimaVisita = j.ultimaVisita || j.ultima_visita || j.criadoEm || 0;
+        const tsUltima = ultimaVisita ? new Date(ultimaVisita).getTime() : 0;
+        const torneiosCnt = j.qtdTorneios || j.qtd_torneios || 0;
+        const cadastroTs = j.criadoEm ? new Date(j.criadoEm).getTime() : 0;
+
+        switch(filtro) {
+            case 'ativos':  return tsUltima >= d30;
+            case 'vips':    return torneiosCnt >= 10;
+            case 'sumidos': return tsUltima < d60 && tsUltima >= d90;
+            case 'novos':   return cadastroTs >= d30;
+            case 'todos':   return true;
+            default: return true;
+        }
+    });
+}
+
+async function convCarregarOptout() {
+    if (!sb || !sbClube) return;
+    try {
+        const { data, error } = await sb.from('convite_optout')
+            .select('jogador_id')
+            .eq('clube_id', sbClube.id);
+        if (error) { console.warn('[Convites] erro optout:', error); return; }
+        conviteOptout = new Set((data || []).map(d => d.jogador_id));
+    } catch (e) { console.warn('[Convites] erro:', e); }
+}
+
+function convCarregarListaCampanha() {
+    const torneioId = document.getElementById('conv-camp-torneio').value;
+    const templateId = document.getElementById('conv-camp-template').value;
+
+    if (!templateId) { showToast('⚠️ Selecione um template'); return; }
+
+    _convCampanha.torneioId = torneioId || null;
+    _convCampanha.templateId = templateId;
+
+    const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
+
+    if (filtrados.length === 0) {
+        showToast('⚠️ Nenhum jogador encontrado com esse filtro');
+        return;
+    }
+
+    // Validar WhatsApp de cada um
+    _convCampanha.listaJogadores = filtrados.map(j => {
+        const val = _normalizarWhatsappE164(j.whatsapp);
+        return {
+            jogador: j,
+            valido: val.valido,
+            numero: val.numero || null,
+            motivoBloqueio: val.valido ? null : val.motivo,
+            enviado: false,
+            ts: null
+        };
+    });
+
+    document.getElementById('conv-camp-lista-wrap').style.display = '';
+    convRenderListaCampanha();
+}
+
+function convRenderListaCampanha() {
+    const lista = document.getElementById('conv-camp-lista');
+    const meta = document.getElementById('conv-camp-lista-meta');
+    if (!lista) return;
+
+    const total = _convCampanha.listaJogadores.length;
+    const validos = _convCampanha.listaJogadores.filter(p => p.valido).length;
+    const enviados = _convCampanha.listaJogadores.filter(p => p.enviado).length;
+    const bloqueados = total - validos;
+
+    meta.innerHTML = `<strong style="color:#22c55e;">${validos}</strong> com WhatsApp válido${bloqueados > 0 ? ` · <strong style="color:#ef4444;">${bloqueados}</strong> bloqueados (sem número ou inválido)` : ''} · <strong style="color:#fbbf24;">${enviados}</strong> enviados`;
+
+    const torneio = _convCampanha.torneioId ? (torneios || []).find(t => t.id === _convCampanha.torneioId) : null;
+
+    lista.innerHTML = _convCampanha.listaJogadores.map((p, idx) => {
+        const j = p.jogador;
+        const isProximo = (idx === _convCampanha.indiceAtual + 1) && _convCampanha.enviando;
+        const cls = p.enviado ? 'conv-sent' : (!p.valido ? 'conv-bloqueado' : (isProximo ? 'conv-proximo' : ''));
+
+        const iniciais = (j.nome || '?').split(' ').slice(0,2).map(s => s[0]).join('').toUpperCase();
+        const torneiosCnt = j.qtdTorneios || j.qtd_torneios || 0;
+        const isVip = torneiosCnt >= 10;
+
+        let statusHtml = '';
+        if (p.enviado) {
+            const horaStr = p.ts ? new Date(p.ts).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
+            statusHtml = `<div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ Enviado ${horaStr}</div>`;
+        } else if (!p.valido) {
+            statusHtml = `<div style="font-size:.7rem;color:#ef4444;font-weight:700;">🚫 ${p.motivoBloqueio}</div>`;
+        } else {
+            statusHtml = `<button class="conv-btn-enviar" onclick="convEnviarJogadorIndividual(${idx})">📱 Enviar</button>`;
+        }
+
+        return `
+        <div class="conv-pl-row ${cls}">
+            <div class="conv-pl-avatar" ${isVip ? 'style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;"' : ''}>${iniciais}</div>
+            <div style="min-width:0;">
+                <div style="font-size:.85rem;font-weight:700;color:#fff;">${esc(j.nome || '?')}</div>
+                <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">
+                    ${isVip ? '<span style="background:rgba(245,158,11,.15);color:#fbbf24;padding:.05rem .35rem;border-radius:.25rem;font-weight:700;margin-right:.35rem;">VIP</span>' : ''}
+                    ${torneiosCnt} torneio${torneiosCnt !== 1 ? 's' : ''} · ${p.valido ? (j.whatsapp || '') : 'sem WhatsApp'}
+                </div>
+            </div>
+            <div></div>
+            <div>${statusHtml}</div>
+        </div>`;
+    }).join('');
+}
+
+// Enviar individual: gera link wa.me + abre nova aba + registra
+async function convEnviarJogadorIndividual(idx) {
+    const p = _convCampanha.listaJogadores[idx];
+    if (!p || !p.valido || p.enviado) return;
+    await _convEnviarUm(idx);
+}
+
+async function _convEnviarUm(idx) {
+    const p = _convCampanha.listaJogadores[idx];
+    if (!p || !p.valido) return false;
+
+    // Upload do flyer (1 vez só, fica em cache)
+    let flyerUrl = _convCampanha.flyerUrl;
+    if (_convCampanha.flyerFile && !_convCampanha.flyerUrlPublica) {
+        flyerUrl = await _convUploadFlyerSupabase();
+        _convCampanha.flyerUrlPublica = flyerUrl;
+    } else if (_convCampanha.flyerUrlPublica) {
+        flyerUrl = _convCampanha.flyerUrlPublica;
+    }
+
+    // Aplicar variáveis
+    const tpl = conviteTemplates.find(t => t.id === _convCampanha.templateId);
+    if (!tpl) return false;
+    const torneio = _convCampanha.torneioId ? (torneios || []).find(t => t.id === _convCampanha.torneioId) : null;
+    const mensagem = _convAplicarVariaveis(tpl.texto, p.jogador, torneio, sbClube, flyerUrl);
+
+    // Abre wa.me
+    const url = `https://wa.me/${p.numero}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, '_blank');
+
+    // Marca como enviado
+    p.enviado = true;
+    p.ts = Date.now();
+
+    // Registra no banco
+    try {
+        await sb.from('convite_envios').insert({
+            clube_id: sbClube.id,
+            jogador_id: p.jogador.id,
+            template_id: _convCampanha.templateId,
+            torneio_id: _convCampanha.torneioId || null,
+            flyer_url: flyerUrl || null,
+            status: 'enviado'
+        });
+    } catch (e) { console.warn('[Convites] erro registrar envio:', e); }
+
+    convRenderListaCampanha();
+    return true;
+}
+
+async function convIniciarEnvioSequencial() {
+    if (_convCampanha.enviando) return;
+    const validos = _convCampanha.listaJogadores.filter(p => p.valido && !p.enviado);
+    if (validos.length === 0) { showToast('⚠️ Ninguém pra enviar'); return; }
+
+    if (!confirm(`Vai enviar ${validos.length} convite${validos.length!==1?'s':''} sequencialmente, com 2s entre cada um. Cada um abrirá em uma nova aba do WhatsApp.\n\nContinuar?`)) return;
+
+    _convCampanha.enviando = true;
+    _convCampanha.indiceAtual = -1;
+    document.getElementById('conv-progress-bar').style.display = '';
+    document.getElementById('conv-btn-sequencial').disabled = true;
+
+    for (let i = 0; i < _convCampanha.listaJogadores.length; i++) {
+        if (!_convCampanha.enviando) break; // pausado/cancelado
+        const p = _convCampanha.listaJogadores[i];
+        if (!p.valido || p.enviado) continue;
+
+        _convCampanha.indiceAtual = i - 1;
+        await _convEnviarUm(i);
+
+        // Atualiza barra
+        const total = validos.length;
+        const enviados = _convCampanha.listaJogadores.filter(x => x.enviado).length;
+        const pct = Math.round((enviados / total) * 100);
+        document.getElementById('conv-progress-fill').style.width = pct + '%';
+        document.getElementById('conv-progress-texto').textContent = `${enviados} / ${total} enviados`;
+        document.getElementById('conv-progress-pct').textContent = pct + '%';
+
+        // Pausa de 2s entre cada
+        await new Promise(r => setTimeout(r, 2000));
+    }
+
+    _convCampanha.enviando = false;
+    document.getElementById('conv-btn-sequencial').disabled = false;
+    showToast('🎉 Envio sequencial concluído!');
+}
+
+function convPausarEnvio() {
+    _convCampanha.enviando = false;
+    showToast('⏸️ Envio pausado');
+    document.getElementById('conv-btn-sequencial').disabled = false;
+}
+
+function convFinalizarEnvio() {
+    _convCampanha.enviando = false;
+    document.getElementById('conv-progress-bar').style.display = 'none';
+    document.getElementById('conv-btn-sequencial').disabled = false;
 }
 
 function renderPainelDono() {
