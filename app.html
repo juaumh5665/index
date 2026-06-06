@@ -1169,6 +1169,34 @@
 }
 .mobile-overlay.active { display: block; }
 
+/* ============================================================
+   KIOSK DONO — Botão Sair fixo (visível só no modo kiosk mobile)
+   Renderizado sempre no DOM mas escondido via CSS.
+   Ativado quando body tem .kiosk-dono em viewport ≤1023px.
+   ============================================================ */
+.kiosk-sair-btn {
+    display: none;
+    position: fixed;
+    top: .75rem;
+    right: .75rem;
+    z-index: 9999;
+    align-items: center;
+    gap: .4rem;
+    padding: .55rem .85rem;
+    background: rgba(220,38,38,.95);
+    color: #fff;
+    border: 1px solid rgba(248,113,113,.35);
+    border-radius: .55rem;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: .8rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(220,38,38,.35);
+    transition: transform .1s, background .15s;
+}
+.kiosk-sair-btn:hover { background: rgba(220,38,38,1); }
+.kiosk-sair-btn:active { transform: scale(.96); }
+
 /* Tablets + Mobile (≤1023px) — sidebar vira drawer com hamburger
    Desktop ≥1024px NÃO é afetado (continua com sidebar fixa de 240px). */
 @media (max-width: 1023px) {
@@ -1192,6 +1220,23 @@
         margin-left: 0 !important;
         padding: 4rem 1rem 1rem !important;
         width: 100% !important;
+    }
+
+    /* ===== MODO KIOSK DONO (mobile, admin com feature_painel_dono) =====
+       Esconde TUDO exceto o conteúdo do Painel do Dono.
+       Sair vira o único caminho de saída. */
+    body.kiosk-dono .kiosk-sair-btn { display: inline-flex !important; }
+    body.kiosk-dono #app-sidebar,
+    body.kiosk-dono aside,
+    body.kiosk-dono .sidebar { display: none !important; }
+    body.kiosk-dono .mobile-menu-btn,
+    body.kiosk-dono .mobile-overlay { display: none !important; }
+    /* Header de página interno (mostra "Dashboard"/"Cash Game" etc) — sumir */
+    body.kiosk-dono #main-app > div > header,
+    body.kiosk-dono header[style*="height:56px"] { display: none !important; }
+    /* Conteúdo principal ocupa 100% e respira ao redor do botão Sair */
+    body.kiosk-dono main, body.kiosk-dono .main-content {
+        padding: 3.5rem 1rem 1.5rem !important;
     }
 }
 
@@ -2707,6 +2752,12 @@ document.addEventListener('DOMContentLoaded', function(){
         <i class="fa-solid fa-bars"></i>
     </button>
     <div class="mobile-overlay" onclick="toggleMobileMenu()"></div>
+
+    <!-- BOTÃO SAIR (visível só no modo kiosk-dono mobile) -->
+    <button class="kiosk-sair-btn" onclick="logout()" type="button" aria-label="Sair">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Sair</span>
+    </button>
 
 
     <!-- SIDEBAR -->
@@ -8584,6 +8635,62 @@ document.addEventListener('click', (e) => {
             if (overlay) overlay.classList.remove('active');
         }, 100);
     }
+});
+
+// ============================================================
+// MODO KIOSK DONO (mobile) — admin com feature_painel_dono
+// ============================================================
+// Critérios pra ativar (TODOS verdadeiros):
+//   1. Viewport ≤1023px (mobile/tablet portrait)
+//   2. currentUser é admin/administrador
+//   3. Clube tem feature_painel_dono ativa (hasFeature)
+//
+// Quando ativo:
+//   - Adiciona body.kiosk-dono (CSS esconde sidebar/hamburger/header interno)
+//   - Força showPage('painel-dono') no boot
+//   - Bloqueia showPage de outras páginas (redireciona pra painel-dono)
+//   - Mostra botão "Sair" fixo no canto superior direito
+// ============================================================
+function _isMobileKioskDono() {
+    if (typeof window === 'undefined') return false;
+    if (window.innerWidth > 1023) return false;
+    if (!window.currentUser) return false;
+    const papel = (window.currentUser.papel || window.currentUser.role || '').toLowerCase();
+    const isAdmin = papel === 'admin' || papel === 'administrador';
+    if (!isAdmin) return false;
+    // Super admin global sempre tem todas as features
+    if (window._isSuperAdmin === true) return true;
+    if (typeof window.hasFeature !== 'function') return false;
+    try {
+        return !!window.hasFeature('painel_dono');
+    } catch (e) {
+        return false;
+    }
+}
+
+function _aplicarModoKioskDono() {
+    const ativar = _isMobileKioskDono();
+    if (ativar) {
+        document.body.classList.add('kiosk-dono');
+        // Força navegação pro painel-dono (única página acessível no modo kiosk)
+        if (window._paginaAtual !== 'painel-dono' && typeof showPage === 'function') {
+            try { showPage('painel-dono'); } catch (e) { console.warn('[kiosk] showPage falhou', e); }
+        }
+    } else {
+        document.body.classList.remove('kiosk-dono');
+    }
+}
+
+// Hook: aplica modo kiosk logo após login completar
+window.addEventListener('stackos:logged-in', () => {
+    // Pequeno delay pra hasFeature ter carregado os features do clube
+    setTimeout(_aplicarModoKioskDono, 150);
+});
+
+// Hook: reavalia ao redimensionar (rotação de tela, abrir/fechar devtools)
+window.addEventListener('resize', () => {
+    clearTimeout(window._kioskResizeTimer);
+    window._kioskResizeTimer = setTimeout(_aplicarModoKioskDono, 200);
 });
 
 // ============================================================
@@ -20455,6 +20562,12 @@ function _renderSidebarLocks() {
 }
 
 function showPage(page) {
+    // [KIOSK DONO MOBILE] Se ativo, só permite painel-dono
+    // (qualquer tentativa de navegar pra outra página redireciona de volta)
+    if (typeof _isMobileKioskDono === 'function' && _isMobileKioskDono() && page !== 'painel-dono') {
+        page = 'painel-dono';
+    }
+
     // Rastreia página atual pra outros sistemas (ex: realtime decide o que re-renderizar)
     window._paginaAtual = page;
 
