@@ -2950,6 +2950,18 @@ document.addEventListener('DOMContentLoaded', function(){
                                     </div>
                                 </div>
 
+                                <!-- A/B Testing: Variante B opcional -->
+                                <div style="margin-bottom:1rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:.55rem;padding:.85rem;">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;gap:.5rem;flex-wrap:wrap;">
+                                        <div style="display:flex;align-items:center;gap:.4rem;">
+                                            <span style="font-size:.85rem;">🅰️🅱️</span>
+                                            <div style="font-size:.7rem;color:#a855f7;font-weight:800;text-transform:uppercase;letter-spacing:.05em;">Variante B (A/B testing — opcional)</div>
+                                        </div>
+                                        <button type="button" onclick="document.getElementById('conv-tpl-texto-b').value=''" style="background:transparent;border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.2rem .55rem;border-radius:.3rem;font-size:.65rem;cursor:pointer;font-family:inherit;font-weight:700;">Limpar B</button>
+                                    </div>
+                                    <textarea id="conv-tpl-texto-b" class="inp" rows="4" placeholder="(opcional) Texto alternativo. Se preenchido, sistema alterna entre A e B aleatoriamente no envio." style="width:100%;font-family:var(--font-mono,monospace);font-size:.78rem;resize:vertical;background:rgba(0,0,0,.3);"></textarea>
+                                </div>
+
                                 <div style="display:flex;gap:.5rem;">
                                     <button id="conv-tpl-salvar" onclick="convSalvarTemplate()" style="flex:1;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;border:none;padding:.65rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">💾 Salvar Template</button>
                                     <button onclick="convLimparEditor()" style="background:transparent;color:#a1a1aa;border:1px solid #27272a;padding:.65rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">Limpar</button>
@@ -3018,6 +3030,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem;" id="conv-camp-filtros">
                                     <button class="conv-filtro-btn conv-filtro-active" data-filtro="ativos" onclick="convSetFiltro('ativos')">🔥 Ativos 30d</button>
                                     <button class="conv-filtro-btn" data-filtro="vips" onclick="convSetFiltro('vips')">⭐ VIPs (10+)</button>
+                                    <button class="conv-filtro-btn" data-filtro="aniversariantes" onclick="convSetFiltro('aniversariantes')">🎂 Aniversariantes</button>
                                     <button class="conv-filtro-btn" data-filtro="sumidos" onclick="convSetFiltro('sumidos')">💤 Sumidos 60d+</button>
                                     <button class="conv-filtro-btn" data-filtro="novos" onclick="convSetFiltro('novos')">🆕 Novos &lt;30d</button>
                                     <button class="conv-filtro-btn" data-filtro="todos" onclick="convSetFiltro('todos')">👥 Todos</button>
@@ -3083,19 +3096,140 @@ document.addEventListener('DOMContentLoaded', function(){
 
                     <!-- ABA 3: HISTÓRICO (Sessão 2) -->
                     <div id="conv-tab-historico" class="conv-tab-content" style="display:none;">
-                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:2rem;text-align:center;">
-                            <div style="font-size:2rem;margin-bottom:.5rem;">📊</div>
-                            <h3 style="font-size:.95rem;font-weight:800;color:#fff;margin-bottom:.5rem;">Histórico & Analytics</h3>
-                            <p style="font-size:.78rem;color:#71717a;line-height:1.5;max-width:380px;margin:0 auto;">Esta aba estará disponivel na próxima atualização. Vai mostrar métricas de envio, taxa de resposta, template mais eficaz e export CSV.</p>
+                        <!-- Stats cards (4 métricas top) -->
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.65rem;margin-bottom:1rem;" id="conv-hist-stats">
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
+                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Enviados</div>
+                                <div id="conv-hist-stat-enviados" style="font-size:1.5rem;font-weight:800;color:#fff;font-family:var(--font-mono,monospace);margin-top:.15rem;">—</div>
+                            </div>
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
+                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Jogadores únicos</div>
+                                <div id="conv-hist-stat-unicos" style="font-size:1.5rem;font-weight:800;color:#3b82f6;font-family:var(--font-mono,monospace);margin-top:.15rem;">—</div>
+                            </div>
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
+                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Taxa de resposta</div>
+                                <div id="conv-hist-stat-taxa" style="font-size:1.5rem;font-weight:800;color:#22c55e;font-family:var(--font-mono,monospace);margin-top:.15rem;">—</div>
+                            </div>
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
+                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Template top</div>
+                                <div id="conv-hist-stat-template" style="font-size:.85rem;font-weight:700;color:#fbbf24;margin-top:.25rem;line-height:1.2;">—</div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros -->
+                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1rem;margin-bottom:1rem;">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;align-items:end;">
+                                <div>
+                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Período</div>
+                                    <select id="conv-hist-periodo" class="inp" onchange="convHistoricoCarregar()" style="width:100%;font-size:.8rem;">
+                                        <option value="hoje">Hoje</option>
+                                        <option value="7d" selected>Últimos 7 dias</option>
+                                        <option value="30d">Últimos 30 dias</option>
+                                        <option value="mes">Este mês</option>
+                                        <option value="todos">Todos</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Jogador</div>
+                                    <input type="text" id="conv-hist-jogador" class="inp" placeholder="Buscar nome…" oninput="convHistoricoFiltrarLocal()" style="width:100%;font-size:.8rem;">
+                                </div>
+                                <div>
+                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Template</div>
+                                    <select id="conv-hist-template" class="inp" onchange="convHistoricoFiltrarLocal()" style="width:100%;font-size:.8rem;">
+                                        <option value="">— Todos —</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Status</div>
+                                    <select id="conv-hist-status" class="inp" onchange="convHistoricoFiltrarLocal()" style="width:100%;font-size:.8rem;">
+                                        <option value="">— Todos —</option>
+                                        <option value="enviado">📤 Enviado</option>
+                                        <option value="confirmou">✅ Confirmou</option>
+                                        <option value="recusou">❌ Recusou</option>
+                                        <option value="sem_resposta">🔇 Sem resposta</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <button onclick="convHistoricoExportarCSV()" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:.6rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;width:100%;">📥 CSV</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabela de envios -->
+                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;overflow:hidden;">
+                            <div id="conv-hist-tabela-wrap" style="max-height:60vh;overflow:auto;">
+                                <div style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;" id="conv-hist-loading">Carregando histórico…</div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- ABA 4: CONFIG (Sessão 2) -->
                     <div id="conv-tab-config" class="conv-tab-content" style="display:none;">
-                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:2rem;text-align:center;">
-                            <div style="font-size:2rem;margin-bottom:.5rem;">⚙️</div>
-                            <h3 style="font-size:.95rem;font-weight:800;color:#fff;margin-bottom:.5rem;">Configurações</h3>
-                            <p style="font-size:.78rem;color:#71717a;line-height:1.5;max-width:380px;margin:0 auto;">Anti-cansaço, cooldown, horário respeitoso, opt-out e assinatura — disponíveis na próxima atualização.</p>
+                        <div style="display:grid;grid-template-columns:1fr;gap:1rem;">
+
+                            <!-- Anti-cansaço -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                                    <div style="font-size:1.2rem;">😴</div>
+                                    <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Anti-cansaço</h3>
+                                </div>
+                                <p style="font-size:.72rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">Evita que o mesmo jogador receba convites em excesso ou em horários inadequados.</p>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.85rem;">
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Máx. por semana / jogador</div>
+                                        <input type="number" id="conv-cfg-max-semana" class="inp" min="0" max="50" value="2" style="width:100%;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Cooldown após sem resposta (dias)</div>
+                                        <input type="number" id="conv-cfg-cooldown" class="inp" min="0" max="365" value="30" style="width:100%;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Horário início</div>
+                                        <input type="number" id="conv-cfg-hora-inicio" class="inp" min="0" max="23" value="9" style="width:100%;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Horário fim</div>
+                                        <input type="number" id="conv-cfg-hora-fim" class="inp" min="0" max="23" value="22" style="width:100%;">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Assinatura padrão -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                                    <div style="font-size:1.2rem;">✍️</div>
+                                    <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Assinatura padrão</h3>
+                                </div>
+                                <p style="font-size:.72rem;color:#71717a;margin-bottom:.75rem;line-height:1.5;">Adicionada automaticamente no final de toda mensagem enviada.</p>
+                                <textarea id="conv-cfg-assinatura" class="inp" rows="3" placeholder="—&#10;TudonoPanoTV Club · Pra não receber: responda SAIR" style="width:100%;font-family:var(--font-mono,monospace);font-size:.78rem;resize:vertical;"></textarea>
+                            </div>
+
+                            <!-- Botão salvar -->
+                            <div>
+                                <button id="conv-cfg-salvar" onclick="convConfigSalvar()" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;border:none;padding:.75rem 1.25rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">💾 Salvar configurações</button>
+                            </div>
+
+                            <!-- Lista de Opt-out -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                                    <div style="font-size:1.2rem;">🚫</div>
+                                    <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Lista de Opt-out</h3>
+                                </div>
+                                <p style="font-size:.72rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">Jogadores aqui não recebem convites. Removidos da lista voltam a receber.</p>
+
+                                <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+                                    <select id="conv-cfg-optout-jogador" class="inp" style="flex:1;min-width:180px;font-size:.8rem;">
+                                        <option value="">— Selecione um jogador —</option>
+                                    </select>
+                                    <input type="text" id="conv-cfg-optout-motivo" class="inp" placeholder="Motivo (opcional)" style="flex:1;min-width:160px;font-size:.8rem;">
+                                    <button onclick="convOptoutAdicionar()" style="background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3);padding:.6rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">➕ Adicionar</button>
+                                </div>
+
+                                <div id="conv-cfg-optout-lista" style="max-height:40vh;overflow:auto;">
+                                    <div style="padding:1.5rem;text-align:center;color:#52525b;font-size:.78rem;">Carregando…</div>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
@@ -31333,8 +31467,8 @@ let conviteOptout = new Set(); // jogador_ids que pediram opt-out
 let conviteConfig = {
     max_semana: 2,
     cooldown_dias: 30,
-    horario_inicio: 9,
-    horario_fim: 22,
+    hora_inicio: 9,
+    hora_fim: 22,
     assinatura: ''
 };
 
@@ -31478,6 +31612,11 @@ async function renderConvitesPage() {
     // Carrega dados
     await convCarregarTemplates();
     await convCarregarOptout();
+    // [SESSÃO 2] Carrega config + calcula anti-fadiga em paralelo (não bloqueia UI)
+    Promise.all([
+        (typeof convConfigCarregar === 'function') ? convConfigCarregar().catch(() => {}) : Promise.resolve(),
+        (typeof convCalcularAntiFadiga === 'function') ? convCalcularAntiFadiga().catch(() => {}) : Promise.resolve()
+    ]);
     convPopularTorneios();
     convRenderListaTemplates();
     convAtualizarPreview();
@@ -31504,6 +31643,13 @@ function convSetTab(tab) {
     if (tab === 'campanha') {
         convPopularTorneios();
         convPopularTemplatesSelect();
+    }
+    // [SESSÃO 2] Lazy-load das abas novas
+    if (tab === 'historico' && typeof convHistoricoCarregar === 'function') {
+        convHistoricoCarregar();
+    }
+    if (tab === 'config' && typeof convConfigCarregar === 'function') {
+        convConfigCarregar();
     }
 }
 
@@ -31611,6 +31757,7 @@ async function convSalvarTemplate() {
     const nome = (document.getElementById('conv-tpl-nome').value || '').trim();
     const categoria = document.getElementById('conv-tpl-categoria').value;
     const texto = (document.getElementById('conv-tpl-texto').value || '').trim();
+    const textoB = (document.getElementById('conv-tpl-texto-b') ? document.getElementById('conv-tpl-texto-b').value || '' : '').trim();
     if (!nome) { showToast('⚠️ Dê um nome ao template'); return; }
     if (!texto) { showToast('⚠️ Escreva a mensagem'); return; }
 
@@ -31621,7 +31768,7 @@ async function convSalvarTemplate() {
         if (_convCampanha.editandoTemplateId) {
             // UPDATE
             const { data, error } = await sb.from('convite_templates')
-                .update({ nome, categoria, texto, atualizado_em: new Date().toISOString() })
+                .update({ nome, categoria, texto, texto_b: textoB || null, atualizado_em: new Date().toISOString() })
                 .eq('id', _convCampanha.editandoTemplateId)
                 .select().single();
             if (error) throw error;
@@ -31632,7 +31779,7 @@ async function convSalvarTemplate() {
             // INSERT
             const { data, error } = await sb.from('convite_templates').insert({
                 clube_id: sbClube.id,
-                nome, categoria, texto, ativo: true
+                nome, categoria, texto, texto_b: textoB || null, ativo: true
             }).select().single();
             if (error) throw error;
             conviteTemplates.unshift(data);
@@ -31652,6 +31799,8 @@ function convLimparEditor() {
     document.getElementById('conv-tpl-nome').value = '';
     document.getElementById('conv-tpl-categoria').value = 'convite';
     document.getElementById('conv-tpl-texto').value = '';
+    const tb = document.getElementById('conv-tpl-texto-b');
+    if (tb) tb.value = '';
     _convCampanha.editandoTemplateId = null;
     document.getElementById('conv-tpl-salvar').textContent = '💾 Salvar Template';
     convAtualizarPreview();
@@ -31664,6 +31813,8 @@ function convEditarTemplate(id) {
     document.getElementById('conv-tpl-nome').value = t.nome;
     document.getElementById('conv-tpl-categoria').value = t.categoria || 'convite';
     document.getElementById('conv-tpl-texto').value = t.texto;
+    const tb = document.getElementById('conv-tpl-texto-b');
+    if (tb) tb.value = t.texto_b || '';
     document.getElementById('conv-tpl-salvar').textContent = '💾 Atualizar Template';
     convAtualizarPreview();
     // Scroll pro editor
@@ -31912,6 +32063,21 @@ function _convFiltrarJogadores(filtro) {
             case 'vips':    return torneiosCnt >= 10;
             case 'sumidos': return tsUltima < d60 && tsUltima >= d90;
             case 'novos':   return cadastroTs >= d30;
+            case 'aniversariantes': {
+                // Aniversário hoje ou nos próximos 7 dias
+                const dn = j.dataNascimento || j.data_nascimento;
+                if (!dn) return false;
+                const d = new Date(dn);
+                if (isNaN(d.getTime())) return false;
+                const hoje = new Date();
+                // Considera M-D do aniversário vs hoje (próximos 7 dias)
+                for (let offset = 0; offset <= 7; offset++) {
+                    const alvo = new Date(hoje);
+                    alvo.setDate(hoje.getDate() + offset);
+                    if (d.getMonth() === alvo.getMonth() && d.getDate() === alvo.getDate()) return true;
+                }
+                return false;
+            }
             case 'todos':   return true;
             default: return true;
         }
@@ -31927,6 +32093,415 @@ async function convCarregarOptout() {
         if (error) { console.warn('[Convites] erro optout:', error); return; }
         conviteOptout = new Set((data || []).map(d => d.jogador_id));
     } catch (e) { console.warn('[Convites] erro:', e); }
+}
+
+// =====================================================================
+// CONVITES — SESSÃO 2: Histórico, Config, Opt-out CRUD, Anti-cansaço
+// =====================================================================
+// conviteConfig já declarado em cima (defaults). Será sobrescrito por convConfigCarregar()
+let _convHistEnvios = [];        // cache do último carregamento de histórico
+let _convAntiFadiga = new Map(); // jogadorId → { envios7d, semResposta3plus }
+
+// ---------- CONFIG ----------
+async function convConfigCarregar() {
+    if (!sb || !sbClube) return;
+    try {
+        const { data, error } = await sb.from('convite_config')
+            .select('*')
+            .eq('clube_id', sbClube.id)
+            .maybeSingle();
+        if (error && error.code !== 'PGRST116') {
+            console.warn('[Convites] erro config:', error);
+        }
+        conviteConfig = data || {
+            clube_id: sbClube.id,
+            max_semana: 2,
+            cooldown_dias: 30,
+            hora_inicio: 9,
+            hora_fim: 22,
+            assinatura: ''
+        };
+        // Preenche o form
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        setVal('conv-cfg-max-semana', conviteConfig.max_semana);
+        setVal('conv-cfg-cooldown', conviteConfig.cooldown_dias);
+        setVal('conv-cfg-hora-inicio', conviteConfig.hora_inicio);
+        setVal('conv-cfg-hora-fim', conviteConfig.hora_fim);
+        setVal('conv-cfg-assinatura', conviteConfig.assinatura || '');
+
+        // Popular dropdown de opt-out + lista atual
+        convConfigPopularDropdownOptout();
+        convConfigRenderListaOptout();
+    } catch (e) {
+        console.warn('[Convites] erro carregar config:', e);
+    }
+}
+
+async function convConfigSalvar() {
+    if (!sb || !sbClube) return;
+    const getInt = (id, def, min, max) => {
+        const v = parseInt((document.getElementById(id) || {}).value, 10);
+        if (isNaN(v) || v < min || v > max) return def;
+        return v;
+    };
+    const payload = {
+        clube_id: sbClube.id,
+        max_semana: getInt('conv-cfg-max-semana', 2, 0, 50),
+        cooldown_dias: getInt('conv-cfg-cooldown', 30, 0, 365),
+        hora_inicio: getInt('conv-cfg-hora-inicio', 9, 0, 23),
+        hora_fim: getInt('conv-cfg-hora-fim', 22, 0, 23),
+        assinatura: ((document.getElementById('conv-cfg-assinatura') || {}).value || '').trim()
+    };
+    if (payload.hora_fim <= payload.hora_inicio) {
+        showToast('⚠️ Horário fim precisa ser maior que início');
+        return;
+    }
+    const btn = document.getElementById('conv-cfg-salvar');
+    if (btn) { btn.disabled = true; btn.textContent = '💾 Salvando…'; }
+    try {
+        const { error } = await sb.from('convite_config')
+            .upsert(payload, { onConflict: 'clube_id' });
+        if (error) throw error;
+        conviteConfig = payload;
+        showToast('✅ Configurações salvas');
+    } catch (e) {
+        console.error('[Convites] erro salvar config:', e);
+        showToast('❌ Erro ao salvar configurações');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Salvar configurações'; }
+    }
+}
+
+// ---------- OPT-OUT CRUD ----------
+function convConfigPopularDropdownOptout() {
+    const sel = document.getElementById('conv-cfg-optout-jogador');
+    if (!sel) return;
+    const opts = ['<option value="">— Selecione um jogador —</option>'];
+    (jogadores || [])
+        .filter(j => j && !j.bloqueado && !conviteOptout.has(j.id))
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''))
+        .forEach(j => opts.push(`<option value="${j.id}">${escapeHtml(j.nome || '—')}</option>`));
+    sel.innerHTML = opts.join('');
+}
+
+async function convConfigRenderListaOptout() {
+    const wrap = document.getElementById('conv-cfg-optout-lista');
+    if (!wrap) return;
+    if (!sb || !sbClube) { wrap.innerHTML = '<div style="padding:1rem;color:#71717a;font-size:.78rem;">Sem conexão.</div>'; return; }
+    try {
+        const { data, error } = await sb.from('convite_optout')
+            .select('jogador_id, motivo, criado_em')
+            .eq('clube_id', sbClube.id)
+            .order('criado_em', { ascending: false });
+        if (error) throw error;
+        const lista = data || [];
+        if (lista.length === 0) {
+            wrap.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#52525b;font-size:.78rem;">Nenhum jogador em opt-out 👌</div>';
+            return;
+        }
+        const linhas = lista.map(o => {
+            const j = (jogadores || []).find(x => x.id === o.jogador_id) || { nome: '(jogador removido)' };
+            const dt = o.criado_em ? new Date(o.criado_em).toLocaleDateString('pt-BR') : '—';
+            return `
+                <div style="display:flex;align-items:center;gap:.75rem;padding:.65rem .85rem;border-bottom:1px solid #18181b;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:.85rem;font-weight:700;color:#fff;">${escapeHtml(j.nome || '—')}</div>
+                        <div style="font-size:.68rem;color:#71717a;margin-top:.15rem;">${escapeHtml(o.motivo || 'Sem motivo')} · ${dt}</div>
+                    </div>
+                    <button onclick="convOptoutRemover('${o.jogador_id}')" style="background:transparent;border:1px solid #27272a;color:#a1a1aa;padding:.35rem .65rem;border-radius:.35rem;font-size:.7rem;cursor:pointer;font-family:inherit;font-weight:700;">Remover</button>
+                </div>
+            `;
+        }).join('');
+        wrap.innerHTML = linhas;
+    } catch (e) {
+        console.error('[Convites] erro lista optout:', e);
+        wrap.innerHTML = '<div style="padding:1rem;color:#f87171;font-size:.78rem;">Erro ao carregar lista de opt-out.</div>';
+    }
+}
+
+async function convOptoutAdicionar() {
+    const sel = document.getElementById('conv-cfg-optout-jogador');
+    const motivoEl = document.getElementById('conv-cfg-optout-motivo');
+    if (!sel || !sel.value) { showToast('⚠️ Selecione um jogador'); return; }
+    const jogadorId = sel.value;
+    const motivo = ((motivoEl || {}).value || '').trim() || null;
+    try {
+        const { error } = await sb.from('convite_optout').insert({
+            clube_id: sbClube.id,
+            jogador_id: jogadorId,
+            motivo
+        });
+        if (error) throw error;
+        conviteOptout.add(jogadorId);
+        if (motivoEl) motivoEl.value = '';
+        sel.value = '';
+        convConfigPopularDropdownOptout();
+        convConfigRenderListaOptout();
+        showToast('✅ Jogador adicionado ao opt-out');
+    } catch (e) {
+        console.error('[Convites] erro add optout:', e);
+        showToast('❌ Erro ao adicionar');
+    }
+}
+
+async function convOptoutRemover(jogadorId) {
+    if (!jogadorId) return;
+    if (!confirm('Remover esse jogador da lista de opt-out? Ele voltará a poder receber convites.')) return;
+    try {
+        const { error } = await sb.from('convite_optout')
+            .delete()
+            .eq('clube_id', sbClube.id)
+            .eq('jogador_id', jogadorId);
+        if (error) throw error;
+        conviteOptout.delete(jogadorId);
+        convConfigPopularDropdownOptout();
+        convConfigRenderListaOptout();
+        showToast('✅ Removido do opt-out');
+    } catch (e) {
+        console.error('[Convites] erro remove optout:', e);
+        showToast('❌ Erro ao remover');
+    }
+}
+
+// ---------- HISTÓRICO ----------
+function _convHistPeriodoToTimestamp(p) {
+    const agora = new Date();
+    const hoje0 = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    if (p === 'hoje') return hoje0.toISOString();
+    if (p === '7d')   return new Date(hoje0.getTime() - 7  * 86400000).toISOString();
+    if (p === '30d')  return new Date(hoje0.getTime() - 30 * 86400000).toISOString();
+    if (p === 'mes')  return new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString();
+    return null; // 'todos'
+}
+
+async function convHistoricoCarregar() {
+    if (!sb || !sbClube) return;
+    const loadingEl = document.getElementById('conv-hist-loading');
+    if (loadingEl) loadingEl.textContent = 'Carregando histórico…';
+    try {
+        const periodo = (document.getElementById('conv-hist-periodo') || {}).value || '7d';
+        const sinceIso = _convHistPeriodoToTimestamp(periodo);
+
+        let q = sb.from('convite_envios')
+            .select('id, jogador_id, template_id, torneio_id, flyer_url, status, variante, resposta_ts, ts')
+            .eq('clube_id', sbClube.id)
+            .order('ts', { ascending: false })
+            .limit(500);
+        if (sinceIso) q = q.gte('ts', sinceIso);
+
+        const { data, error } = await q;
+        if (error) throw error;
+        _convHistEnvios = data || [];
+
+        // Popular dropdown templates do filtro
+        const selTpl = document.getElementById('conv-hist-template');
+        if (selTpl) {
+            const opts = ['<option value="">— Todos —</option>'];
+            (conviteTemplates || []).forEach(t => opts.push(`<option value="${t.id}">${escapeHtml(t.nome || '—')}</option>`));
+            selTpl.innerHTML = opts.join('');
+        }
+
+        convHistoricoCalcularStats();
+        convHistoricoRenderTabela();
+    } catch (e) {
+        console.error('[Convites] erro histórico:', e);
+        const wrap = document.getElementById('conv-hist-tabela-wrap');
+        if (wrap) wrap.innerHTML = '<div style="padding:2rem;text-align:center;color:#f87171;font-size:.85rem;">Erro ao carregar histórico.</div>';
+    }
+}
+
+function convHistoricoCalcularStats() {
+    const filtrados = _convHistGetFiltrados();
+    const total = filtrados.length;
+    const unicos = new Set(filtrados.map(e => e.jogador_id)).size;
+    const respondeu = filtrados.filter(e => e.status === 'confirmou' || e.status === 'recusou').length;
+    const taxa = total > 0 ? Math.round((respondeu / total) * 100) : 0;
+
+    // Template mais usado
+    const tplCount = {};
+    filtrados.forEach(e => { if (e.template_id) tplCount[e.template_id] = (tplCount[e.template_id] || 0) + 1; });
+    let topTplId = null, topQtd = 0;
+    Object.entries(tplCount).forEach(([id, q]) => { if (q > topQtd) { topTplId = id; topQtd = q; }});
+    const topTplNome = topTplId ? ((conviteTemplates || []).find(t => t.id === topTplId) || {}).nome : null;
+
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('conv-hist-stat-enviados', total);
+    set('conv-hist-stat-unicos', unicos);
+    set('conv-hist-stat-taxa', taxa + '%');
+    set('conv-hist-stat-template', topTplNome ? (topTplNome + ' (' + topQtd + ')') : '—');
+}
+
+function _convHistGetFiltrados() {
+    const buscaJog = ((document.getElementById('conv-hist-jogador') || {}).value || '').trim().toLowerCase();
+    const filtroTpl = (document.getElementById('conv-hist-template') || {}).value || '';
+    const filtroSt  = (document.getElementById('conv-hist-status')   || {}).value || '';
+    return (_convHistEnvios || []).filter(e => {
+        if (filtroTpl && e.template_id !== filtroTpl) return false;
+        if (filtroSt && e.status !== filtroSt) return false;
+        if (buscaJog) {
+            const j = (jogadores || []).find(x => x.id === e.jogador_id);
+            const nome = (j && j.nome) ? j.nome.toLowerCase() : '';
+            if (!nome.includes(buscaJog)) return false;
+        }
+        return true;
+    });
+}
+
+function convHistoricoFiltrarLocal() {
+    convHistoricoCalcularStats();
+    convHistoricoRenderTabela();
+}
+
+function convHistoricoRenderTabela() {
+    const wrap = document.getElementById('conv-hist-tabela-wrap');
+    if (!wrap) return;
+    const filtrados = _convHistGetFiltrados();
+    if (filtrados.length === 0) {
+        wrap.innerHTML = '<div style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;">Nenhum envio nesse filtro.</div>';
+        return;
+    }
+    const statusBadges = {
+        enviado:      '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">📤 Enviado</span>',
+        confirmou:    '<span style="background:rgba(34,197,94,.15);color:#22c55e;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">✅ Confirmou</span>',
+        recusou:      '<span style="background:rgba(239,68,68,.15);color:#ef4444;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">❌ Recusou</span>',
+        sem_resposta: '<span style="background:rgba(115,115,115,.15);color:#a1a1aa;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">🔇 Sem resp.</span>'
+    };
+    const linhas = filtrados.map(e => {
+        const j = (jogadores || []).find(x => x.id === e.jogador_id);
+        const tpl = (conviteTemplates || []).find(t => t.id === e.template_id);
+        const dt = e.ts ? new Date(e.ts) : null;
+        const dtTxt = dt ? (dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : '—';
+        const variantBadge = e.variante === 'B' ? '<span title="Variante B (A/B testing)" style="background:rgba(168,85,247,.2);color:#a855f7;padding:.1rem .35rem;border-radius:.25rem;font-size:.6rem;font-weight:800;margin-left:.35rem;">B</span>' : '';
+        return `
+            <div style="display:grid;grid-template-columns:auto 1.5fr 1.5fr 1fr auto;gap:.65rem;padding:.6rem .85rem;border-bottom:1px solid #18181b;align-items:center;font-size:.78rem;">
+                <div style="color:#71717a;font-family:var(--font-mono,monospace);font-size:.72rem;white-space:nowrap;">${dtTxt}</div>
+                <div style="color:#fff;font-weight:600;">${escapeHtml(j ? (j.nome || '—') : '(removido)')}${variantBadge}</div>
+                <div style="color:#a1a1aa;">${escapeHtml(tpl ? (tpl.nome || '—') : '—')}</div>
+                <div>${statusBadges[e.status] || e.status}</div>
+                <div style="display:flex;gap:.3rem;">
+                    <button title="Confirmou"     onclick="convHistoricoMarcarStatus('${e.id}','confirmou')"    style="background:transparent;border:1px solid #27272a;color:#22c55e;width:30px;height:30px;border-radius:.3rem;cursor:pointer;font-size:.78rem;">✅</button>
+                    <button title="Recusou"       onclick="convHistoricoMarcarStatus('${e.id}','recusou')"      style="background:transparent;border:1px solid #27272a;color:#ef4444;width:30px;height:30px;border-radius:.3rem;cursor:pointer;font-size:.78rem;">❌</button>
+                    <button title="Sem resposta"  onclick="convHistoricoMarcarStatus('${e.id}','sem_resposta')" style="background:transparent;border:1px solid #27272a;color:#a1a1aa;width:30px;height:30px;border-radius:.3rem;cursor:pointer;font-size:.78rem;">🔇</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    wrap.innerHTML = `
+        <div style="display:grid;grid-template-columns:auto 1.5fr 1.5fr 1fr auto;gap:.65rem;padding:.55rem .85rem;background:#18181b;font-size:.62rem;text-transform:uppercase;color:#71717a;font-weight:800;letter-spacing:.05em;border-bottom:1px solid #1e1e23;position:sticky;top:0;z-index:1;">
+            <div>Data</div><div>Jogador</div><div>Template</div><div>Status</div><div>Marcar</div>
+        </div>
+        ${linhas}
+    `;
+}
+
+async function convHistoricoMarcarStatus(envioId, novoStatus) {
+    if (!sb || !sbClube || !envioId) return;
+    try {
+        const { error } = await sb.from('convite_envios')
+            .update({ status: novoStatus, resposta_ts: new Date().toISOString() })
+            .eq('id', envioId)
+            .eq('clube_id', sbClube.id);
+        if (error) throw error;
+        // Atualiza cache local
+        const e = _convHistEnvios.find(x => x.id === envioId);
+        if (e) { e.status = novoStatus; e.resposta_ts = new Date().toISOString(); }
+        convHistoricoCalcularStats();
+        convHistoricoRenderTabela();
+        showToast('✅ Status atualizado');
+    } catch (e) {
+        console.error('[Convites] erro marcar status:', e);
+        showToast('❌ Erro ao marcar status');
+    }
+}
+
+function convHistoricoExportarCSV() {
+    const filtrados = _convHistGetFiltrados();
+    if (filtrados.length === 0) { showToast('⚠️ Nada pra exportar'); return; }
+    const rows = [['Data', 'Jogador', 'Template', 'Torneio', 'Status', 'Variante', 'Resposta em']];
+    filtrados.forEach(e => {
+        const j = (jogadores || []).find(x => x.id === e.jogador_id);
+        const tpl = (conviteTemplates || []).find(t => t.id === e.template_id);
+        const torn = e.torneio_id ? ((torneios || []).find(t => t.id === e.torneio_id) || {}).nome : '';
+        rows.push([
+            e.ts ? new Date(e.ts).toLocaleString('pt-BR') : '',
+            j ? (j.nome || '') : '(removido)',
+            tpl ? (tpl.nome || '') : '',
+            torn || '',
+            e.status || '',
+            e.variante || 'A',
+            e.resposta_ts ? new Date(e.resposta_ts).toLocaleString('pt-BR') : ''
+        ]);
+    });
+    const csv = rows.map(r => r.map(c => {
+        const s = String(c || '');
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+    }).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `convites-historico-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+    showToast('📥 CSV exportado (' + filtrados.length + ' linhas)');
+}
+
+// ---------- ANTI-CANSAÇO (visual na Campanha) ----------
+// Calcula, pra cada jogador, quantos envios recebeu nos últimos 7 dias
+// e quantos sem-resposta consecutivos. Retorna Map(jogadorId → flags).
+async function convCalcularAntiFadiga() {
+    if (!sb || !sbClube) return new Map();
+    try {
+        const since = new Date(Date.now() - 7 * 86400000).toISOString();
+        const { data, error } = await sb.from('convite_envios')
+            .select('jogador_id, status, ts')
+            .eq('clube_id', sbClube.id)
+            .gte('ts', since)
+            .order('ts', { ascending: false })
+            .limit(2000);
+        if (error) throw error;
+        const map = new Map();
+        (data || []).forEach(e => {
+            const cur = map.get(e.jogador_id) || { envios7d: 0, semResposta: 0, sequenciaSemResp: 0, seqAtiva: true };
+            cur.envios7d += 1;
+            if (cur.seqAtiva) {
+                if (e.status === 'sem_resposta' || e.status === 'enviado') cur.sequenciaSemResp += 1;
+                else cur.seqAtiva = false; // confirmou/recusou quebra a sequência
+            }
+            map.set(e.jogador_id, cur);
+        });
+        _convAntiFadiga = map;
+        return map;
+    } catch (e) {
+        console.warn('[Convites] erro anti-fadiga:', e);
+        return new Map();
+    }
+}
+
+function convGetFadigaBadges(jogadorId) {
+    const max = (conviteConfig && conviteConfig.max_semana) ? conviteConfig.max_semana : 2;
+    const f = _convAntiFadiga.get(jogadorId);
+    if (!f) return '';
+    const badges = [];
+    if (f.envios7d >= max) {
+        badges.push(`<span title="${f.envios7d} convites nos últimos 7 dias (limite: ${max})" style="background:rgba(245,158,11,.15);color:#fbbf24;padding:.1rem .35rem;border-radius:.25rem;font-size:.6rem;font-weight:800;margin-left:.3rem;">⚠️ ${f.envios7d}/semana</span>`);
+    }
+    if (f.sequenciaSemResp >= 3) {
+        badges.push(`<span title="${f.sequenciaSemResp} envios sem resposta seguidos — pode estar cansado" style="background:rgba(239,68,68,.15);color:#ef4444;padding:.1rem .35rem;border-radius:.25rem;font-size:.6rem;font-weight:800;margin-left:.3rem;">⚠️ sem resp.</span>`);
+    }
+    return badges.join('');
+}
+
+// ---------- SCORE DE ENGAJAMENTO (placeholder simples) ----------
+function convGetScoreEngajamento(jogadorId) {
+    const f = _convAntiFadiga.get(jogadorId);
+    if (!f) return null;
+    // Cálculo simples: começa em 80, perde por sem-resposta, ganha por respostas
+    const respostas = Math.max(0, f.envios7d - f.sequenciaSemResp);
+    const raw = 50 + (respostas * 10) - (f.sequenciaSemResp * 8);
+    return Math.max(0, Math.min(100, raw));
 }
 
 function convCarregarListaCampanha() {
@@ -31999,10 +32574,10 @@ function convRenderListaCampanha() {
         <div class="conv-pl-row ${cls}">
             <div class="conv-pl-avatar" ${isVip ? 'style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;"' : ''}>${iniciais}</div>
             <div style="min-width:0;">
-                <div style="font-size:.85rem;font-weight:700;color:#fff;">${esc(j.nome || '?')}</div>
+                <div style="font-size:.85rem;font-weight:700;color:#fff;">${esc(j.nome || '?')}${(typeof convGetFadigaBadges === 'function') ? convGetFadigaBadges(j.id) : ''}</div>
                 <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">
                     ${isVip ? '<span style="background:rgba(245,158,11,.15);color:#fbbf24;padding:.05rem .35rem;border-radius:.25rem;font-weight:700;margin-right:.35rem;">VIP</span>' : ''}
-                    ${torneiosCnt} torneio${torneiosCnt !== 1 ? 's' : ''} · ${p.valido ? (j.whatsapp || '') : 'sem WhatsApp'}
+                    ${torneiosCnt} torneio${torneiosCnt !== 1 ? 's' : ''} · ${p.valido ? (j.whatsapp || '') : 'sem WhatsApp'}${(typeof convGetScoreEngajamento === 'function' && convGetScoreEngajamento(j.id) !== null) ? ' · <span style="color:#a855f7;font-weight:700;">Score ' + convGetScoreEngajamento(j.id) + '</span>' : ''}
                 </div>
             </div>
             <div></div>
@@ -32034,8 +32609,18 @@ async function _convEnviarUm(idx) {
     // Aplicar variáveis
     const tpl = conviteTemplates.find(t => t.id === _convCampanha.templateId);
     if (!tpl) return false;
+
+    // [A/B TESTING] Se template tiver texto_b preenchido, alterna aleatório
+    const temVariante = !!(tpl.texto_b && tpl.texto_b.trim());
+    const variante = temVariante && Math.random() < 0.5 ? 'B' : 'A';
+    const textoBase = (variante === 'B' && temVariante) ? tpl.texto_b : tpl.texto;
+
     const torneio = _convCampanha.torneioId ? (torneios || []).find(t => t.id === _convCampanha.torneioId) : null;
-    const mensagem = _convAplicarVariaveis(tpl.texto, p.jogador, torneio, sbClube, flyerUrl);
+    let mensagem = _convAplicarVariaveis(textoBase, p.jogador, torneio, sbClube, flyerUrl);
+
+    // [ASSINATURA] Adiciona automaticamente se houver
+    const assinatura = (conviteConfig && conviteConfig.assinatura) ? String(conviteConfig.assinatura).trim() : '';
+    if (assinatura) mensagem = mensagem + '\n\n' + assinatura;
 
     // Abre wa.me
     const url = `https://wa.me/${p.numero}?text=${encodeURIComponent(mensagem)}`;
@@ -32053,7 +32638,8 @@ async function _convEnviarUm(idx) {
             template_id: _convCampanha.templateId,
             torneio_id: _convCampanha.torneioId || null,
             flyer_url: flyerUrl || null,
-            status: 'enviado'
+            status: 'enviado',
+            variante: variante
         });
     } catch (e) { console.warn('[Convites] erro registrar envio:', e); }
 
