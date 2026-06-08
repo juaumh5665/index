@@ -31621,19 +31621,29 @@ function _convAplicarVariaveis(texto, jogador, torneio, clube, flyerUrl) {
     r = r.replace(/\{prize\}/g, prizeV ? formatMoney(prizeV) : 'R$ 0');
     r = r.replace(/\{clube\}/g, c.nome || c.name || 'o clube');
 
-    // [AUTO-FLYER + CACHE-BUST]
-    // - Cache-bust (?cb=timestamp): URL única por envio evita "preview falhou" cacheado no WhatsApp
+    // [AUTO-FLYER + OG WRAPPER + CACHE-BUST]
+    // - Wrapper /api/flyer: HTML com Open Graph tags → WhatsApp gera preview confiável
+    //   (URL direta do Supabase Storage não gera preview quando há texto junto)
+    // - Cache-bust (?cb=timestamp): URL única por envio evita "preview falhou" cacheado
     // - Posição: se template não tem {flyer}, insere no INÍCIO da mensagem
-    //   (WhatsApp gera preview do PRIMEIRO link encontrado — link no início = maior chance de miniatura)
     if (flyerUrl) {
-        const sep = flyerUrl.includes('?') ? '&' : '?';
-        const flyerComCb = flyerUrl + sep + 'cb=' + Date.now();
+        const clubeNome = c.nome || c.name || 'Convite';
+        const torneioNome = t.nome || '';
+        const origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : 'https://stackos.com.br';
+        const cb = Date.now();
+        const linkPreview =
+            origin + '/api/flyer'
+            + '?img=' + encodeURIComponent(flyerUrl)
+            + '&clube=' + encodeURIComponent(clubeNome)
+            + (torneioNome ? '&torneio=' + encodeURIComponent(torneioNome) : '')
+            + '&cb=' + cb;
+
         if (templateTemFlyer) {
             // Template tem {flyer} → respeita posição definida no template
-            r = r.replace(/\{flyer\}/g, flyerComCb);
+            r = r.replace(/\{flyer\}/g, linkPreview);
         } else {
             // Template sem {flyer} → vai pro INÍCIO da mensagem (preview funciona melhor)
-            r = flyerComCb + '\n\n' + r.replace(/^\s+/, '');
+            r = linkPreview + '\n\n' + r.replace(/^\s+/, '');
         }
     } else if (templateTemFlyer) {
         // Sem flyer carregado mas template tem {flyer} → remove a variável vazia
