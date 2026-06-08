@@ -3147,6 +3147,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <option value="confirmou">✅ Confirmou</option>
                                         <option value="recusou">❌ Recusou</option>
                                         <option value="sem_resposta">🔇 Sem resposta</option>
+                                        <option value="numero_invalido">🚫 Número inválido</option>
                                     </select>
                                 </div>
                                 <div>
@@ -32474,10 +32475,11 @@ function convHistoricoRenderTabela() {
         return;
     }
     const statusBadges = {
-        enviado:      '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">📤 Enviado</span>',
-        confirmou:    '<span style="background:rgba(34,197,94,.15);color:#22c55e;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">✅ Confirmou</span>',
-        recusou:      '<span style="background:rgba(239,68,68,.15);color:#ef4444;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">❌ Recusou</span>',
-        sem_resposta: '<span style="background:rgba(115,115,115,.15);color:#a1a1aa;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">🔇 Sem resp.</span>'
+        enviado:         '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">📤 Enviado</span>',
+        confirmou:       '<span style="background:rgba(34,197,94,.15);color:#22c55e;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">✅ Confirmou</span>',
+        recusou:         '<span style="background:rgba(239,68,68,.15);color:#ef4444;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">❌ Recusou</span>',
+        sem_resposta:    '<span style="background:rgba(115,115,115,.15);color:#a1a1aa;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">🔇 Sem resp.</span>',
+        numero_invalido: '<span style="background:rgba(239,68,68,.15);color:#ef4444;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">🚫 Nº inválido</span>'
     };
     const linhas = filtrados.map(e => {
         const j = (jogadores || []).find(x => x.id === e.jogador_id);
@@ -32674,13 +32676,24 @@ function convRenderListaCampanha() {
         const isVip = torneiosCnt >= 10;
 
         let statusHtml = '';
-        if (p.enviado) {
+        if (p.semWhatsapp) {
+            // Marcado manualmente como número inválido (após operador ver erro no WhatsApp)
+            statusHtml = `<div style="font-size:.7rem;color:#ef4444;font-weight:700;">🚫 Sem WhatsApp</div>`;
+        } else if (p.enviado) {
             const horaStr = p.ts ? new Date(p.ts).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
-            statusHtml = `<div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ Enviado ${horaStr}</div>`;
+            statusHtml = `
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;">
+                    <div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ Enviado ${horaStr}</div>
+                    <button onclick="convMarcarSemWhatsapp(${idx})" title="Marcar como número sem WhatsApp (reverte envio)" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.15rem .45rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">❌ Sem WA</button>
+                </div>`;
         } else if (!p.valido) {
             statusHtml = `<div style="font-size:.7rem;color:#ef4444;font-weight:700;">🚫 ${p.motivoBloqueio}</div>`;
         } else {
-            statusHtml = `<button class="conv-btn-enviar" onclick="convEnviarJogadorIndividual(${idx})">📱 Enviar</button>`;
+            statusHtml = `
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;">
+                    <button class="conv-btn-enviar" onclick="convEnviarJogadorIndividual(${idx})">📱 Enviar</button>
+                    <button onclick="convMarcarSemWhatsapp(${idx})" title="Marcar como número sem WhatsApp (não envia)" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.15rem .45rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">❌ Sem WA</button>
+                </div>`;
         }
 
         return `
@@ -32758,6 +32771,86 @@ async function _convEnviarUm(idx) {
 
     convRenderListaCampanha();
     return true;
+}
+
+// =====================================================================
+// CONVITES — Marcar jogador como "Sem WhatsApp"
+// =====================================================================
+// Cenário: operador clica "Enviar" e o WhatsApp Web mostra erro tipo
+// "Esse número não está no WhatsApp". Operador volta e clica em "❌ Sem WA"
+// pra evitar enviar de novo no futuro.
+//
+// Ações:
+// 1. Adiciona jogador ao convite_optout (motivo: "Número sem WhatsApp")
+// 2. Se já havia envio registrado (status='enviado'), reverte pra 'numero_invalido'
+// 3. Marca p.semWhatsapp = true na UI
+// =====================================================================
+async function convMarcarSemWhatsapp(idx) {
+    const p = _convCampanha.listaJogadores[idx];
+    if (!p || !p.jogador) return;
+    if (p.semWhatsapp) return; // já marcado
+
+    if (!confirm(`Marcar ${p.jogador.nome || 'esse jogador'} como sem WhatsApp?\n\nEle será adicionado à lista de opt-out e não receberá mais convites até você remover pela aba Config.`)) return;
+
+    const jogadorId = p.jogador.id;
+    if (!sb || !sbClube) {
+        showToast('❌ Sem conexão');
+        return;
+    }
+
+    try {
+        // 1. Adiciona ao opt-out (UPSERT — idempotente)
+        const { error: optErr } = await sb.from('convite_optout').upsert({
+            clube_id: sbClube.id,
+            jogador_id: jogadorId,
+            motivo: 'Número sem WhatsApp'
+        }, { onConflict: 'clube_id,jogador_id' });
+
+        // Fallback se a tabela não tiver constraint composta:
+        if (optErr && optErr.code !== '23505') {
+            // Tenta INSERT puro (vai falhar se já existe, mas não é problema)
+            await sb.from('convite_optout').insert({
+                clube_id: sbClube.id,
+                jogador_id: jogadorId,
+                motivo: 'Número sem WhatsApp'
+            }).catch(() => {});
+        }
+
+        // Atualiza cache local
+        if (typeof conviteOptout !== 'undefined' && conviteOptout && typeof conviteOptout.add === 'function') {
+            conviteOptout.add(jogadorId);
+        }
+
+        // 2. Reverte status do envio mais recente (se houver) pra 'numero_invalido'
+        if (p.enviado) {
+            try {
+                // Pega o envio mais recente desse jogador
+                const { data: envios } = await sb.from('convite_envios')
+                    .select('id')
+                    .eq('clube_id', sbClube.id)
+                    .eq('jogador_id', jogadorId)
+                    .order('ts', { ascending: false })
+                    .limit(1);
+
+                if (envios && envios.length > 0) {
+                    await sb.from('convite_envios')
+                        .update({ status: 'numero_invalido', resposta_ts: new Date().toISOString() })
+                        .eq('id', envios[0].id);
+                }
+            } catch (e) {
+                console.warn('[Convites] erro reverter status envio:', e);
+            }
+        }
+
+        // 3. Atualiza UI
+        p.semWhatsapp = true;
+        p.enviado = false;
+        convRenderListaCampanha();
+        showToast(`🚫 ${p.jogador.nome || 'Jogador'} marcado como sem WhatsApp`);
+    } catch (e) {
+        console.error('[Convites] erro marcar sem WhatsApp:', e);
+        showToast('❌ Erro ao marcar como sem WhatsApp');
+    }
 }
 
 async function convIniciarEnvioSequencial() {
