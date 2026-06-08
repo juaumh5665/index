@@ -31651,7 +31651,11 @@ function _convAplicarVariaveis(texto, jogador, torneio, clube, flyerUrl) {
         if (templateTemFlyer) {
             r = r.replace(/\{flyer\}/g, linkPreview);
         } else {
-            r = linkPreview + '\n\n' + r.replace(/^\s+/, '');
+            // Template sem {flyer} → anexa no FIM da mensagem.
+            // Motivo: assim o preview-de-texto na lista de conversas mostra o INÍCIO
+            // da mensagem (texto), não a URL. WhatsApp ainda gera miniatura do flyer
+            // (link único + wrapper Open Graph = preview garantido em qualquer posição).
+            r = r.replace(/\s+$/, '') + '\n\n' + linkPreview;
         }
     } else if (templateTemFlyer) {
         r = r.replace(/\{flyer\}/g, '');
