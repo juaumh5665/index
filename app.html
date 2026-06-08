@@ -8788,6 +8788,17 @@ document.addEventListener('click', (e) => {
 function _isMobileKioskDono() {
     if (typeof window === 'undefined') return false;
     if (window.innerWidth > 1023) return false;
+
+    // [PWA] Kiosk mode SÓ ativa quando rodando como PWA instalado (standalone).
+    // No navegador comum (stackos.com.br/app via Chrome/Safari) deve usar mobile normal.
+    let isStandalone = false;
+    try {
+        isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches === true)
+                    || window.navigator.standalone === true  // iOS Safari instalado
+                    || new URLSearchParams(window.location.search).get('source') === 'pwa';
+    } catch (e) { isStandalone = false; }
+    if (!isStandalone) return false;
+
     if (!window.currentUser) return false;
     const papel = (window.currentUser.papel || window.currentUser.role || '').toLowerCase();
     const isAdmin = papel === 'admin' || papel === 'administrador';
