@@ -31550,6 +31550,44 @@ function _normalizarWhatsappE164(whatsappRaw) {
         if (!dddsValidos.includes(ddd)) return { valido: false, motivo: 'DDD inválido' };
     }
 
+    // === Detecção de números fictícios (anti-spam de base de teste) ===
+    // 1) Todos os dígitos iguais (ex: 5511111111111)
+    if (/^(\d)\1+$/.test(n)) {
+        return { valido: false, motivo: 'Número fictício (dígitos repetidos)' };
+    }
+
+    // 2) Parte do número (sem DDI/DDD) com dígitos repetidos
+    //    Ex: 55 + 11 + 99999999999  → corpo = 99999999999
+    const corpo = n.startsWith('55') ? n.substring(4) : n.substring(2);
+    if (corpo.length >= 7 && /^(\d)\1+$/.test(corpo)) {
+        return { valido: false, motivo: 'Número fictício (corpo com dígitos repetidos)' };
+    }
+
+    // 3) Sequência crescente ou decrescente longa no corpo (ex: 12345678, 98765432)
+    if (corpo.length >= 8) {
+        let asc = true, desc = true;
+        for (let i = 1; i < corpo.length; i++) {
+            const diff = parseInt(corpo[i]) - parseInt(corpo[i-1]);
+            if (diff !== 1) asc = false;
+            if (diff !== -1) desc = false;
+            if (!asc && !desc) break;
+        }
+        if (asc || desc) {
+            return { valido: false, motivo: 'Número fictício (sequência)' };
+        }
+    }
+
+    // 4) Corpo todo com zeros ou tem 5+ zeros seguidos (improvável real)
+    if (/0{5,}/.test(corpo)) {
+        return { valido: false, motivo: 'Número fictício (muitos zeros)' };
+    }
+
+    // 5) Padrões absurdos comuns de teste
+    const padroes = ['12345678', '87654321', '00000000', '99999999', '11111111', '12121212', '01234567'];
+    if (padroes.some(p => corpo.includes(p))) {
+        return { valido: false, motivo: 'Número fictício (padrão de teste)' };
+    }
+
     return {
         valido: true,
         numero: n,
@@ -31571,6 +31609,9 @@ function _convAplicarVariaveis(texto, jogador, torneio, clube, flyerUrl) {
     const buyinV = (t.buyin || t.valorBuyin || 0);
     const prizeV = (typeof getPrize === 'function' && t.id) ? getPrize(t) : (t.prizePool || 0);
 
+    // Detecta se template tem a variável {flyer} ANTES de substituir
+    const templateTemFlyer = /\{flyer\}/.test(r);
+
     r = r.replace(/\{nome\}/g, j.nome || 'jogador');
     r = r.replace(/\{apelido\}/g, j.apelido || j.nome || '');
     r = r.replace(/\{torneio\}/g, t.nome || 'torneio');
@@ -31580,6 +31621,12 @@ function _convAplicarVariaveis(texto, jogador, torneio, clube, flyerUrl) {
     r = r.replace(/\{prize\}/g, prizeV ? formatMoney(prizeV) : 'R$ 0');
     r = r.replace(/\{clube\}/g, c.nome || c.name || 'o clube');
     r = r.replace(/\{flyer\}/g, flyerUrl || '');
+
+    // [AUTO-FLYER] Se o flyer foi carregado MAS o template não tinha {flyer}, anexa no fim.
+    // Isso garante que o WhatsApp gere preview do flyer mesmo em templates sem a variável.
+    if (flyerUrl && !templateTemFlyer) {
+        r = r.replace(/\s+$/, '') + '\n\n' + flyerUrl;
+    }
 
     return r;
 }
