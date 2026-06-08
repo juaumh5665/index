@@ -31621,32 +31621,39 @@ function _convAplicarVariaveis(texto, jogador, torneio, clube, flyerUrl) {
     r = r.replace(/\{prize\}/g, prizeV ? formatMoney(prizeV) : 'R$ 0');
     r = r.replace(/\{clube\}/g, c.nome || c.name || 'o clube');
 
-    // [AUTO-FLYER + OG WRAPPER + CACHE-BUST]
-    // - Wrapper /api/flyer: HTML com Open Graph tags → WhatsApp gera preview confiável
-    //   (URL direta do Supabase Storage não gera preview quando há texto junto)
-    // - Cache-bust (?cb=timestamp): URL única por envio evita "preview falhou" cacheado
+    // [AUTO-FLYER + OG WRAPPER + SHORTLINK + CACHE-BUST]
+    // - Wrapper /api/flyer: HTML com Open Graph tags → WhatsApp gera preview
+    // - Slug curto (preferido): /api/flyer?s=abc123 — URL fica enxuta no Web
+    // - Fallback: /api/flyer?img=... (legado, se slug não disponível)
+    // - Cache-bust (?cb=timestamp): URL única por envio evita cache de "no preview"
     // - Posição: se template não tem {flyer}, insere no INÍCIO da mensagem
     if (flyerUrl) {
-        const clubeNome = c.nome || c.name || 'Convite';
-        const torneioNome = t.nome || '';
         const origin = (typeof window !== 'undefined' && window.location) ? window.location.origin : 'https://stackos.com.br';
         const cb = Date.now();
-        const linkPreview =
-            origin + '/api/flyer'
-            + '?img=' + encodeURIComponent(flyerUrl)
-            + '&clube=' + encodeURIComponent(clubeNome)
-            + (torneioNome ? '&torneio=' + encodeURIComponent(torneioNome) : '')
-            + '&cb=' + cb;
+        const slug = (typeof _convCampanha !== 'undefined' && _convCampanha && _convCampanha.flyerSlug) ? _convCampanha.flyerSlug : null;
+
+        let linkPreview;
+        if (slug) {
+            // URL curta: /api/flyer?s=abc123&cb=...
+            linkPreview = origin + '/api/flyer?s=' + encodeURIComponent(slug) + '&cb=' + cb;
+        } else {
+            // Fallback: URL longa com img + metadados na querystring
+            const clubeNome = c.nome || c.name || 'Convite';
+            const torneioNome = t.nome || '';
+            linkPreview =
+                origin + '/api/flyer'
+                + '?img=' + encodeURIComponent(flyerUrl)
+                + '&clube=' + encodeURIComponent(clubeNome)
+                + (torneioNome ? '&torneio=' + encodeURIComponent(torneioNome) : '')
+                + '&cb=' + cb;
+        }
 
         if (templateTemFlyer) {
-            // Template tem {flyer} → respeita posição definida no template
             r = r.replace(/\{flyer\}/g, linkPreview);
         } else {
-            // Template sem {flyer} → vai pro INÍCIO da mensagem (preview funciona melhor)
             r = linkPreview + '\n\n' + r.replace(/^\s+/, '');
         }
     } else if (templateTemFlyer) {
-        // Sem flyer carregado mas template tem {flyer} → remove a variável vazia
         r = r.replace(/\{flyer\}/g, '');
     }
 
@@ -32038,6 +32045,8 @@ async function convHandleFlyerUpload(input) {
         _convCampanha.flyerFile = compressed;
         _convCampanha.flyerNome = file.name;
         _convCampanha.flyerUrl = URL.createObjectURL(compressed);
+        _convCampanha.flyerUrlPublica = null;  // [SHORTLINK] força re-upload (flyer trocou)
+        _convCampanha.flyerSlug = null;        // [SHORTLINK] força criar novo slug
         _convAtualizarFlyerUI();
         showToast(`📸 Flyer carregado (${(compressed.size/1024).toFixed(0)} KB)`);
     } catch (e) {
@@ -32080,6 +32089,8 @@ function convRemoverFlyer() {
     _convCampanha.flyerFile = null;
     _convCampanha.flyerUrl = null;
     _convCampanha.flyerNome = null;
+    _convCampanha.flyerUrlPublica = null;  // [SHORTLINK] invalida cache de upload anterior
+    _convCampanha.flyerSlug = null;        // [SHORTLINK] invalida slug do flyer anterior
     document.getElementById('conv-flyer-input').value = '';
     _convAtualizarFlyerUI();
 }
@@ -32102,6 +32113,24 @@ async function _convUploadFlyerSupabase() {
 
         const { data } = sb.storage.from('convite-flyers').getPublicUrl(path);
         const publicUrl = data.publicUrl;
+
+        // [SHORTLINK] Cria slug curto no banco pra usar como /api/flyer?s={slug}
+        // Isso evita "URL gigante" aparecer no WhatsApp Web. Falha silenciosa: se
+        // não rolar, o fallback usa a URL longa direta no /api/flyer.
+        try {
+            const slug = Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-3);
+            const torneioObj = _convCampanha.torneioId ? (torneios || []).find(t => t.id === _convCampanha.torneioId) : null;
+            const { error: slugErr } = await sb.from('convite_flyer_links').insert({
+                slug,
+                clube_id: sbClube.id,
+                flyer_url: publicUrl,
+                clube_nome: (sbClube.nome || sbClube.name || '').slice(0, 80),
+                torneio_nome: (torneioObj ? (torneioObj.nome || '') : '').slice(0, 100)
+            });
+            if (!slugErr) {
+                _convCampanha.flyerSlug = slug;
+            }
+        } catch (e) { console.warn('[Convites] erro shortlink:', e); }
 
         // Se marcou "salvar no torneio", atualiza torneio
         if (_convCampanha.torneioId && document.getElementById('conv-flyer-salvar-torneio').checked) {
