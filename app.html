@@ -16053,6 +16053,201 @@ function imprimirReciboPagamento(dados) {
     logAudit && logAudit('IMPRESSAO', 'Recibo de pagamento impresso · ' + (dados.jogadorNome || ''));
 }
 
+// =====================================================================
+// RECIBO DE PAGAMENTO via WhatsApp
+// =====================================================================
+// Não interfere em nada do fluxo financeiro existente. Cria mensagem
+// formatada (template fixo "detalhado") e abre wa.me com texto pré-pronto.
+// Reusa _normalizarWhatsappE164 (que já tem detecção de número fictício).
+//
+// Estrutura de dados aceita: { jogadorId, jogadorNome, valor, splits, obs, ts,
+//                              saldoAntes, totalConta }
+//   - splits: [{ valor, metodo }, ...] — opcional, default = 1 método
+//   - saldoAntes: saldo do jogador ANTES do pagamento (negativo = devendo)
+//   - totalConta: valor original da dívida (pra cálculo de saldo final)
+// =====================================================================
+function _whatsappMetodoLabel(m) {
+    const map = {
+        dinheiro: '💵 Dinheiro',
+        pix: '📱 PIX',
+        debito: '💳 Débito',
+        credito: '💳 Crédito',
+        vaga: '🎫 Vaga',
+        premio: '🏆 Prêmio',
+        premio_pendente: '⏳ Prêmio pendente'
+    };
+    return map[m] || m || '—';
+}
+
+function _whatsappRecibioFmtSaldo(saldoFinal) {
+    // saldoFinal = saldoAntes + valorPago. negativo = ainda devendo. positivo = a receber.
+    if (Math.abs(saldoFinal) < 0.005) return '✅ Saldo zerado';
+    if (saldoFinal < 0) return '⚠️ Ainda devendo: ' + formatMoney(Math.abs(saldoFinal));
+    return '💰 Saldo a receber: ' + formatMoney(saldoFinal);
+}
+
+function _whatsappMontarMensagemRecibo(dados) {
+    const clube = (sbClube && (sbClube.nome || sbClube.name)) || (config && config.clube && config.clube.nome) || 'StackOS';
+    const data = new Date(dados.ts || Date.now());
+    const dataStr = data.toLocaleDateString('pt-BR');
+    const horaStr = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const splits = Array.isArray(dados.splits) && dados.splits.length ? dados.splits : [{ valor: dados.valor, metodo: 'dinheiro' }];
+    const splitsTxt = splits.map(s => '• ' + _whatsappMetodoLabel(s.metodo) + ': ' + formatMoney(Number(s.valor))).join('\n');
+    const saldoFinal = (Number(dados.saldoAntes) || 0) + (Number(dados.valor) || 0);
+    const saldoTxt = _whatsappRecibioFmtSaldo(saldoFinal);
+
+    let msg = '🎰 *' + clube + '*\n';
+    msg += '━━━━━━━━━━━━━━━━━\n';
+    msg += '🧾 *Recibo de Pagamento*\n\n';
+    msg += '👤 ' + (dados.jogadorNome || '—') + '\n';
+    msg += '📅 ' + dataStr + '  ' + horaStr + '\n\n';
+    msg += '━━━━━━━━━━━━━━━━━\n';
+    msg += '💰 *Total pago:* ' + formatMoney(dados.valor) + '\n\n';
+    msg += '*Forma de pagamento:*\n' + splitsTxt + '\n\n';
+    msg += '━━━━━━━━━━━━━━━━━\n';
+    msg += saldoTxt + '\n';
+    if (dados.obs) msg += '\n📝 Obs: ' + dados.obs + '\n';
+    msg += '\n✅ Recebido com sucesso!';
+    return msg;
+}
+
+function enviarReciboWhatsapp(dados) {
+    if (!dados || !dados.jogadorId) {
+        showToast('❌ Dados do pagamento ausentes');
+        return false;
+    }
+    const j = (typeof jogadores !== 'undefined' && jogadores) ? jogadores.find(x => x.id === dados.jogadorId) : null;
+    if (!j) {
+        showToast('❌ Jogador não encontrado');
+        return false;
+    }
+    if (!j.whatsapp || !String(j.whatsapp).trim()) {
+        showToast('⚠️ Jogador não tem WhatsApp cadastrado');
+        return false;
+    }
+    // Reusa validação existente (que detecta fictícios automaticamente)
+    if (typeof _normalizarWhatsappE164 !== 'function') {
+        showToast('❌ Validador de WhatsApp indisponível');
+        return false;
+    }
+    const val = _normalizarWhatsappE164(j.whatsapp);
+    if (!val.valido) {
+        showToast('🚫 WhatsApp inválido: ' + (val.motivo || 'erro'));
+        return false;
+    }
+
+    const dadosCompletos = Object.assign({
+        jogadorNome: j.nome,
+        ts: Date.now()
+    }, dados);
+
+    const mensagem = _whatsappMontarMensagemRecibo(dadosCompletos);
+    const url = 'https://wa.me/' + val.numero + '?text=' + encodeURIComponent(mensagem);
+    window.open(url, '_blank');
+
+    // Rastreio simples: localStorage por jogador (sem mexer no banco)
+    try {
+        const key = '_recibo_wa_enviados';
+        const map = JSON.parse(localStorage.getItem(key) || '{}');
+        const id = dados.transacaoId || ('p-' + dadosCompletos.ts);
+        map[id] = { ts: dadosCompletos.ts, jogadorId: j.id };
+        localStorage.setItem(key, JSON.stringify(map));
+    } catch (e) {}
+
+    logAudit && logAudit('RECIBO_WHATSAPP', 'Recibo enviado via WhatsApp · ' + j.nome + ' · ' + formatMoney(dados.valor));
+    showToast('📱 WhatsApp aberto pra envio do recibo');
+    return true;
+}
+
+function _reciboWhatsappJaEnviado(transacaoIdOuTs) {
+    try {
+        const map = JSON.parse(localStorage.getItem('_recibo_wa_enviados') || '{}');
+        return !!map[transacaoIdOuTs] || !!map['p-' + transacaoIdOuTs];
+    } catch (e) { return false; }
+}
+
+// Modal "ações pós-pagamento" — substitui o confirm() de impressão
+// Mantém a opção de imprimir + adiciona WhatsApp
+function abrirAcoesPosPagamento(dadosRecibo) {
+    // Remove modal anterior se houver
+    const old = document.getElementById('pos-pgto-modal');
+    if (old) old.remove();
+
+    const j = (typeof jogadores !== 'undefined' && jogadores) ? jogadores.find(x => x.id === dadosRecibo.jogadorId) : null;
+    const wa = j && j.whatsapp ? String(j.whatsapp).trim() : '';
+    const saldoFinal = (Number(dadosRecibo.saldoAntes) || 0) + (Number(dadosRecibo.valor) || 0);
+    const saldoTxt = _whatsappRecibioFmtSaldo(saldoFinal);
+    let saldoCor = '#22c55e';
+    let saldoBg = 'rgba(34,197,94,.06)';
+    let saldoBorder = 'rgba(34,197,94,.25)';
+    if (saldoFinal < -0.005) { saldoCor = '#ef4444'; saldoBg = 'rgba(239,68,68,.06)'; saldoBorder = 'rgba(239,68,68,.25)'; }
+    else if (saldoFinal > 0.005) { saldoCor = '#3b82f6'; saldoBg = 'rgba(59,130,246,.06)'; saldoBorder = 'rgba(59,130,246,.25)'; }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pos-pgto-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9500;backdrop-filter:blur(4px);padding:1rem;';
+    overlay.innerHTML = `
+        <div style="background:#111113;border:1px solid #2a2a30;border-radius:1rem;max-width:440px;width:100%;font-family:'Manrope',sans-serif;">
+            <div style="padding:1.1rem 1.25rem;border-bottom:1px solid #2a2a30;display:flex;align-items:center;justify-content:space-between;">
+                <div style="font-weight:800;font-size:1.05rem;color:#e4e4e7;">Pagamento Confirmado</div>
+                <button onclick="document.getElementById('pos-pgto-modal').remove()" style="background:transparent;border:0;color:#71717a;font-size:1.3rem;cursor:pointer;">&times;</button>
+            </div>
+            <div style="padding:1.25rem;">
+                <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:.65rem;padding:.85rem 1rem;text-align:center;margin-bottom:1rem;">
+                    <i class="fa-solid fa-check-circle" style="color:#22c55e;font-size:1.5rem;"></i>
+                    <div style="margin-top:.35rem;color:#22c55e;font-size:.95rem;font-weight:800;">${formatMoney(dadosRecibo.valor)} recebido</div>
+                    <div style="color:#a1a1aa;font-size:.78rem;margin-top:.15rem;">de ${dadosRecibo.jogadorNome || '—'}</div>
+                </div>
+
+                <div style="background:${saldoBg};border:1px solid ${saldoBorder};border-radius:.55rem;padding:.7rem 1rem;text-align:center;margin-bottom:1.25rem;font-size:.85rem;font-weight:700;color:${saldoCor};">
+                    ${saldoTxt}
+                </div>
+
+                <div style="font-size:.82rem;color:#a1a1aa;margin-bottom:1rem;text-align:center;">Quer enviar o comprovante?</div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.8rem;">
+                    <button id="pos-pgto-print" style="background:#0a0a0b;border:1px solid #2a2a30;color:#e4e4e7;padding:1rem .75rem;border-radius:.55rem;font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.4rem;">
+                        <i class="fa-solid fa-print" style="font-size:1.5rem;color:#f59e0b;"></i>
+                        Imprimir
+                        <small style="font-weight:500;color:#71717a;font-size:.68rem;">térmica 80mm</small>
+                    </button>
+                    <button id="pos-pgto-whatsapp" ${!wa ? 'disabled' : ''} style="background:#0a0a0b;border:1px solid #2a2a30;color:#e4e4e7;padding:1rem .75rem;border-radius:.55rem;font-family:inherit;font-size:.82rem;font-weight:700;cursor:${wa?'pointer':'not-allowed'};display:flex;flex-direction:column;align-items:center;gap:.4rem;opacity:${wa?'1':'.5'};">
+                        <i class="fa-brands fa-whatsapp" style="font-size:1.5rem;color:#25d366;"></i>
+                        WhatsApp
+                        <small style="font-weight:500;color:#71717a;font-size:.68rem;">${wa || 'sem cadastro'}</small>
+                    </button>
+                </div>
+
+                <button id="pos-pgto-fechar" style="width:100%;background:transparent;border:1px solid #2a2a30;color:#a1a1aa;padding:.65rem;border-radius:.5rem;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;">Pronto, fechar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('pos-pgto-print').addEventListener('click', () => {
+        try {
+            imprimirReciboPagamento({
+                jogadorNome: dadosRecibo.jogadorNome,
+                valor: dadosRecibo.valor,
+                metodo: dadosRecibo.metodoLabel || '—',
+                descricao: dadosRecibo.obs || '',
+                ts: dadosRecibo.ts || Date.now(),
+                taxaAplicada: dadosRecibo.taxaAplicada || 0
+            });
+        } catch (e) { console.error('[Recibo] erro imprimir:', e); }
+        overlay.remove();
+    });
+
+    if (wa) {
+        document.getElementById('pos-pgto-whatsapp').addEventListener('click', () => {
+            enviarReciboWhatsapp(dadosRecibo);
+            overlay.remove();
+        });
+    }
+
+    document.getElementById('pos-pgto-fechar').addEventListener('click', () => overlay.remove());
+}
+
 // === COMANDA (FECHAMENTO DE COMANDA) ===
 function imprimirComanda(comanda) {
     // comanda do bar
@@ -35513,8 +35708,16 @@ function renderExtratoJogador() {
     el.innerHTML = ext.map(t => {
         const positivo = t.valor >= 0;
         const metodo = t.metodo ? PAYMENT_METHODS[t.metodo] : null;
+        // Botão "📱 Enviar recibo" só pra transações de PAGAMENTO (positivas, do caixa)
+        const ehPagamento = t.tipo === 'pagamento';
+        const jaEnviado = ehPagamento && typeof _reciboWhatsappJaEnviado === 'function' && _reciboWhatsappJaEnviado(t.id);
+        const btnReciboWa = ehPagamento ? `
+            <button onclick="_extratoEnviarReciboWa('${t.id}')" title="${jaEnviado ? 'Reenviar recibo via WhatsApp' : 'Enviar recibo via WhatsApp'}"
+                style="background:${jaEnviado?'transparent':'rgba(37,211,102,.1)'};border:1px solid ${jaEnviado?'#2a2a30':'rgba(37,211,102,.3)'};color:${jaEnviado?'#71717a':'#25d366'};padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
+                <i class="fa-brands fa-whatsapp"></i> ${jaEnviado?'Reenviar':'Enviar'}
+            </button>` : '';
         return `
-        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
             <div style="width:32px;height:32px;border-radius:50%;background:${positivo?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${positivo?'#22c55e':'#ef4444'};display:flex;align-items:center;justify-content:center;font-size:.75rem;">
                 <i class="fa-solid ${getTipoIcon(t.tipo)}"></i>
             </div>
@@ -35526,9 +35729,39 @@ function renderExtratoJogador() {
                 </div>
             </div>
             <span style="font-family:var(--font-mono);font-weight:800;font-size:.9rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
+            ${btnReciboWa}
             <button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar transação" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-rotate-left"></i></button>
         </div>`;
     }).join('');
+}
+
+// Wrapper pra disparar envio do recibo a partir do extrato (transação antiga)
+function _extratoEnviarReciboWa(transacaoId) {
+    if (typeof transacoes === 'undefined' || !transacoes) return;
+    const tx = transacoes.find(t => t.id === transacaoId);
+    if (!tx) {
+        showToast('❌ Transação não encontrada');
+        return;
+    }
+    // Saldo na época: best-effort. Pra reenvio, calcula saldo NA DATA da transação
+    // (soma todas as transações com ts <= tx.ts, exclusive a própria) — isso é o saldo ANTES.
+    let saldoAntes = 0;
+    try {
+        const minhas = transacoes.filter(t2 => t2.jogadorId === tx.jogadorId && t2.ts < tx.ts);
+        saldoAntes = minhas.reduce((s, t2) => s + Number(t2.valor || 0), 0);
+    } catch (e) {}
+
+    enviarReciboWhatsapp({
+        jogadorId: tx.jogadorId,
+        valor: Math.abs(Number(tx.valor) || 0),
+        splits: tx.metodo ? [{ valor: Math.abs(Number(tx.valor) || 0), metodo: tx.metodo }] : null,
+        obs: tx.descricao && tx.descricao.includes('—') ? tx.descricao.split('—').slice(1).join('—').trim() : '',
+        ts: tx.ts,
+        saldoAntes: saldoAntes,
+        transacaoId: tx.id
+    });
+    // Re-renderiza extrato pra atualizar o badge "Reenviar"
+    setTimeout(() => { try { renderExtratoJogador(); } catch(e) {} }, 100);
 }
 
 function getTipoIcon(tipo) {
@@ -36105,17 +36338,38 @@ function _confirmarPagamentoContaImpl() {
 
     logAudit('PAGAMENTO', `Pagamento de ${formatMoney(valor)} · ${j.nome} via ${metodoLabel}`, { jogadorId: pagamentoJogadorId, valor, metodo, splits });
 
-    // Oferece impressão de recibo (em background, não bloqueia)
+    // Oferece ações pós-pagamento (imprimir + WhatsApp) em modal não-bloqueante.
+    // Substitui o confirm() de impressão antigo. Modal calcula saldo final
+    // (zerado / devedor / a receber) e mostra no recibo enviado pelo WhatsApp.
     setTimeout(() => {
-        if (confirm(`Imprimir recibo do pagamento de ${formatMoney(valor)}?`)) {
-            imprimirReciboPagamento({
+        const saldoAntes = typeof getSaldoJogador === 'function'
+            ? (function(){ try { return getSaldoJogador(pagamentoJogadorId) - valor; } catch(e) { return 0; } })()
+            : 0;
+        if (typeof abrirAcoesPosPagamento === 'function') {
+            abrirAcoesPosPagamento({
+                jogadorId: pagamentoJogadorId,
                 jogadorNome: j.nome,
                 valor: valor,
-                metodo: metodoLabel,
-                descricao: obs,
+                splits: splits.map(p => ({ valor: Number(p.valor), metodo: p.metodo })),
+                metodoLabel: metodoLabel,
+                obs: obs,
                 ts: Date.now(),
                 taxaAplicada: taxaAplicada,
+                saldoAntes: saldoAntes,
+                transacaoId: 'pgto-' + tMarcador
             });
+        } else {
+            // Fallback de segurança — comportamento legado
+            if (confirm(`Imprimir recibo do pagamento de ${formatMoney(valor)}?`)) {
+                imprimirReciboPagamento({
+                    jogadorNome: j.nome,
+                    valor: valor,
+                    metodo: metodoLabel,
+                    descricao: obs,
+                    ts: Date.now(),
+                    taxaAplicada: taxaAplicada,
+                });
+            }
         }
     }, 300);
 
