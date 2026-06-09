@@ -8915,10 +8915,13 @@ function _stackbarProcessarFilaImpressao() {
     const item = _stackbarFilaImpressao.shift();
 
     try {
-        // Cria iframe oculto fora do viewport (não tira foco)
+        // Iframe FORA do viewport (não atrapalha visualmente) mas COM tamanho
+        // e visibilidade reais. Estilos como `visibility:hidden` ou `1x1px`
+        // fazem o Chrome descartar o print job silenciosamente — o iframe
+        // precisa ser "renderizável" pro spooler receber o documento.
         const iframe = document.createElement('iframe');
         iframe.setAttribute('aria-hidden', 'true');
-        iframe.style.cssText = 'position:fixed;width:1px;height:1px;border:0;opacity:0;pointer-events:none;left:-9999px;top:-9999px;visibility:hidden;';
+        iframe.style.cssText = 'position:fixed;left:-10000px;top:-10000px;border:0;';
         document.body.appendChild(iframe);
 
         let cleaned = false;
@@ -8942,14 +8945,23 @@ function _stackbarProcessarFilaImpressao() {
                     clearTimeout(safetyTimeout);
                     setTimeout(cleanup, 100);
                 });
-                // foca no iframe (necessário pra alguns drivers reconhecerem o contexto)
-                w.focus();
-                w.print();
-                // Fallback: se afterprint não disparar em 1.5s, força cleanup
+                // 50ms de delay garante que o Chrome renderizou antes do print
+                // (alguns drivers descartam o job se o doc não estiver "pronto")
+                setTimeout(function() {
+                    try {
+                        w.focus();
+                        w.print();
+                    } catch (e) {
+                        console.error('[STACKBAR] erro print:', e);
+                        clearTimeout(safetyTimeout);
+                        cleanup();
+                    }
+                }, 50);
+                // Fallback: se afterprint não disparar em 2s, força cleanup
                 setTimeout(function() {
                     clearTimeout(safetyTimeout);
                     cleanup();
-                }, 1500);
+                }, 2000);
             } catch (e) {
                 console.error('[STACKBAR] erro print iframe:', e);
                 clearTimeout(safetyTimeout);
