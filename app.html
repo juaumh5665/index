@@ -1655,9 +1655,39 @@ html {
     background: var(--gold-dim);
 }
 @media print {
+    /* ===== Padrão de impressão TÉRMICA (80mm) ===== */
+    /* Cobre todas as impressões via modal #print-preview-modal: */
+    /* buy-in, rebuy, add-on, jackpot, comanda, recibo, extrato, fechamento, etc. */
+    /* Pra 58mm: troca '80mm' por '58mm' nos 4 lugares abaixo. */
+    @page {
+        size: 80mm auto;       /* Largura 80mm, altura conforme conteúdo */
+        margin: 0;
+    }
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 80mm !important;
+        background: #fff !important;
+    }
     body * { visibility: hidden; }
     #print-target, #print-target * { visibility: visible; }
-    #print-target { position: absolute; left: 0; top: 0; width: 100%; }
+    #print-target {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm !important;
+        max-width: 80mm !important;
+        padding: 3mm 2mm 8mm 2mm !important;
+        box-sizing: border-box !important;
+        font-family: "Courier New", "Lucida Console", monospace !important;
+        font-size: 12px !important;
+        line-height: 1.3 !important;
+        color: #000 !important;
+        background: #fff !important;
+        white-space: pre-wrap !important;
+        word-wrap: break-word !important;
+        overflow: visible !important;
+    }
     .no-print { display: none !important; }
 }
 
@@ -8969,13 +8999,26 @@ function _stackbarProcessarFilaImpressao() {
             }
         };
 
-        // HTML do cupom — replica o mesmo formato do print-preview-content
+        // HTML do cupom — formato OTIMIZADO para impressora térmica 80mm
+        // @page size: 80mm auto → largura fixa de 80mm, altura conforme conteúdo
+        // (a térmica corta exatamente onde acaba o cupom, sem desperdício de papel).
+        // Se sua térmica for 58mm, troca '80mm' por '58mm' nos 3 lugares abaixo.
         const escape = (s) => String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
         const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cupom</title>' +
             '<style>' +
-            '@page { margin: 0; }' +
-            'html, body { margin: 0; padding: 0; background: #fff; color: #000; }' +
-            '.cupom { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; line-height: 1.4; padding: 8px; }' +
+            '@page { size: 80mm auto; margin: 0; }' +
+            'html, body { margin: 0; padding: 0; width: 80mm; background: #fff; color: #000; }' +
+            '.cupom {' +
+                'font-family: "Courier New", "Lucida Console", monospace;' +
+                'font-size: 12px;' +
+                'line-height: 1.3;' +
+                'white-space: pre-wrap;' +
+                'word-wrap: break-word;' +
+                'padding: 3mm 2mm 8mm 2mm;' +  // 8mm no fim = espaço pra o corte da térmica
+                'width: 76mm;' +
+                'box-sizing: border-box;' +
+            '}' +
+            '@media print { html, body { width: 80mm !important; } }' +
             '</style></head><body><div class="cupom">' + escape(item.textoCupom) + '</div></body></html>';
 
         const doc = iframe.contentWindow.document;
@@ -35016,15 +35059,24 @@ function salvarIntegracoes() {
 }
 
 function testarImpressao() {
-    const win = window.open('', '_blank', 'width=400,height=600');
+    const win = window.open('', '_blank', 'width=320,height=600');
     win.document.write(`
         <html><head><title>Teste de Impressão</title>
         <style>
-            body { font-family: 'Courier New', monospace; padding: 20px; font-size: 12px; }
-            h2 { text-align: center; margin: 0 0 10px; }
-            .line { border-top: 1px dashed #000; margin: 8px 0; }
-            .row { display: flex; justify-content: space-between; margin: 4px 0; }
-            .footer { text-align: center; margin-top: 15px; font-size: 11px; }
+            @page { size: 80mm auto; margin: 0; }
+            html, body { margin: 0; padding: 0; width: 80mm; background: #fff; color: #000; }
+            body {
+                font-family: 'Courier New', 'Lucida Console', monospace;
+                padding: 3mm 2mm 8mm 2mm;
+                font-size: 12px;
+                line-height: 1.3;
+                width: 76mm;
+                box-sizing: border-box;
+            }
+            h2 { text-align: center; margin: 0 0 6px; font-size: 14px; }
+            .line { border-top: 1px dashed #000; margin: 6px 0; }
+            .row { display: flex; justify-content: space-between; margin: 3px 0; }
+            .footer { text-align: center; margin-top: 10px; font-size: 11px; }
         </style></head>
         <body>
             <h2>${config.clube.nome || 'StackOS'}</h2>
