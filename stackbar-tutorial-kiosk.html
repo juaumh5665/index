@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StackBar — Tutorial: Impressão silenciosa (--kiosk-printing)</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root { --gold: #f59e0b; --bg: #0a0a0b; --surface: #111113; --surface-2: #18181b; --border: #1e1e23; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: #e4e4e7; font-family: 'Manrope', sans-serif; min-height: 100vh; padding: 1.5rem 1rem; line-height: 1.5; }
+.wrap { max-width: 760px; margin: 0 auto; }
+h1 { font-size: 1.6rem; font-weight: 800; color: #fff; margin-bottom: .35rem; }
+.sub { color: #71717a; font-size: .85rem; margin-bottom: 1.5rem; }
+.alert {
+    background: rgba(245,158,11,.08);
+    border: 1px solid rgba(245,158,11,.25);
+    border-left: 3px solid var(--gold);
+    border-radius: .5rem;
+    padding: .85rem 1rem;
+    color: #fbbf24;
+    font-size: .85rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: .5rem;
+}
+.step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: .75rem;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+.step-head { display: flex; align-items: center; gap: .65rem; margin-bottom: .85rem; }
+.step-num {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--gold), #fbbf24);
+    color: #1a1a23;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: .85rem;
+}
+.step-title { font-size: 1rem; font-weight: 800; color: #fff; }
+.step-body { font-size: .9rem; color: #d4d4d8; }
+.step-body p { margin-bottom: .75rem; }
+code, .code {
+    background: rgba(0,0,0,.4);
+    border: 1px solid #2a2a30;
+    border-radius: .35rem;
+    padding: .2rem .45rem;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: .82rem;
+    color: #fbbf24;
+}
+pre.code {
+    padding: .85rem 1rem;
+    overflow-x: auto;
+    line-height: 1.4;
+    margin: .5rem 0;
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+.os-tabs {
+    display: flex;
+    gap: .35rem;
+    margin-bottom: 1rem;
+    background: var(--surface-2);
+    padding: .25rem;
+    border-radius: .5rem;
+}
+.os-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #a1a1aa;
+    padding: .55rem;
+    border-radius: .35rem;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: .8rem;
+    cursor: pointer;
+}
+.os-tab.active { background: var(--gold); color: #1a1a23; }
+.os-content { display: none; }
+.os-content.active { display: block; }
+.tip {
+    margin-top: .85rem;
+    padding: .65rem .85rem;
+    background: rgba(34,197,94,.06);
+    border: 1px solid rgba(34,197,94,.2);
+    border-radius: .45rem;
+    font-size: .8rem;
+    color: #86efac;
+}
+.tip strong { color: #4ade80; }
+.warn {
+    margin-top: .85rem;
+    padding: .65rem .85rem;
+    background: rgba(239,68,68,.06);
+    border: 1px solid rgba(239,68,68,.2);
+    border-radius: .45rem;
+    font-size: .8rem;
+    color: #fca5a5;
+}
+.warn strong { color: #ef4444; }
+.checklist { list-style: none; padding: 0; }
+.checklist li {
+    padding: .35rem 0;
+    color: #d4d4d8;
+    font-size: .88rem;
+}
+.checklist li::before {
+    content: "☐ ";
+    color: #71717a;
+    margin-right: .35rem;
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<h1>🖨️ Impressão silenciosa do StackBar</h1>
+<div class="sub">Configurar Chrome com <code>--kiosk-printing</code> pra cupons saírem direto na impressora térmica sem mostrar diálogo</div>
+
+<div class="alert">
+    <i class="fa-solid fa-circle-info" style="margin-top:.15rem;"></i>
+    <div>
+        <strong>Por que isso é necessário:</strong> Por padrão, o Chrome abre uma janela de "Imprimir" a cada cupom — pediria pra você clicar "Imprimir" toda vez. O modo <code>--kiosk-printing</code> faz o Chrome imprimir <strong>direto</strong> na impressora padrão, sem nenhum clique. Essencial pro StackBar funcionar 100% automático.
+    </div>
+</div>
+
+<!-- ===== STEP 1 ===== -->
+<div class="step">
+    <div class="step-head">
+        <div class="step-num">1</div>
+        <div class="step-title">Configurar impressora padrão do Windows</div>
+    </div>
+    <div class="step-body">
+        <p>Antes de qualquer coisa, o Windows precisa saber qual impressora usar quando o Chrome mandar imprimir "sem perguntar".</p>
+        <p><strong>Passos:</strong></p>
+        <ol style="padding-left: 1.5rem; margin-top: .5rem;">
+            <li style="margin-bottom:.35rem;">Abre o menu Iniciar → <strong>Configurações</strong> → <strong>Dispositivos</strong> → <strong>Impressoras e scanners</strong></li>
+            <li style="margin-bottom:.35rem;"><strong>Desmarque</strong> "Permitir que o Windows gerencie minha impressora padrão" (essa opção troca a padrão automaticamente, atrapalha)</li>
+            <li style="margin-bottom:.35rem;">Clique na sua impressora térmica (ex: <code>EPSON TM-T20</code>, <code>Bematech MP-4200</code>) → <strong>Gerenciar</strong> → <strong>Definir como padrão</strong></li>
+        </ol>
+        <div class="tip">
+            <strong>✓ Como confirmar:</strong> abra qualquer PDF e dê Ctrl+P. A impressora térmica deve aparecer pré-selecionada.
+        </div>
+    </div>
+</div>
+
+<!-- ===== STEP 2 ===== -->
+<div class="step">
+    <div class="step-head">
+        <div class="step-num">2</div>
+        <div class="step-title">Criar atalho do Chrome com a flag</div>
+    </div>
+    <div class="step-body">
+        <p>O <code>--kiosk-printing</code> precisa ser passado quando o Chrome inicia. Vamos criar um atalho dedicado.</p>
+
+        <div class="os-tabs">
+            <button class="os-tab active" onclick="showOS('win')">🪟 Windows</button>
+            <button class="os-tab" onclick="showOS('mac')">🍎 macOS</button>
+            <button class="os-tab" onclick="showOS('linux')">🐧 Linux</button>
+        </div>
+
+        <div id="os-win" class="os-content active">
+            <ol style="padding-left: 1.5rem;">
+                <li style="margin-bottom:.35rem;">Clique com botão direito na área de trabalho → <strong>Novo</strong> → <strong>Atalho</strong></li>
+                <li style="margin-bottom:.35rem;">Cole o caminho:</li>
+            </ol>
+            <pre class="code">"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing --app=https://stackos.com.br/app</pre>
+            <ol start="3" style="padding-left: 1.5rem;">
+                <li style="margin-bottom:.35rem;">Nome do atalho: <code>StackOS Bar</code> (ou o que preferir)</li>
+                <li style="margin-bottom:.35rem;">Concluir</li>
+            </ol>
+            <div class="tip">
+                <strong>✓ Dica:</strong> use <code>--app=URL</code> no lugar de só <code>--kiosk-printing</code> sozinho. Isso abre o StackOS em modo "app" (sem barra de endereço, sem abas), parecendo um software dedicado.
+            </div>
+        </div>
+
+        <div id="os-mac" class="os-content">
+            <p>No Mac é mais chato porque não tem como criar atalho gráfico facilmente. Use o terminal:</p>
+            <pre class="code">/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --kiosk-printing \
+  --app=https://stackos.com.br/app</pre>
+            <p style="margin-top:.5rem;">Pra criar um atalho clicável, abra o <strong>Automator</strong> → "Aplicativo" → "Executar Script Shell" → cole o comando acima → salve como app na área de trabalho.</p>
+        </div>
+
+        <div id="os-linux" class="os-content">
+            <p>Cria um arquivo <code>~/.local/share/applications/stackos-bar.desktop</code>:</p>
+            <pre class="code">[Desktop Entry]
+Name=StackOS Bar
+Exec=google-chrome --kiosk-printing --app=https://stackos.com.br/app
+Terminal=false
+Type=Application
+Icon=google-chrome</pre>
+        </div>
+    </div>
+</div>
+
+<!-- ===== STEP 3 ===== -->
+<div class="step">
+    <div class="step-head">
+        <div class="step-num">3</div>
+        <div class="step-title">Testar a impressão silenciosa</div>
+    </div>
+    <div class="step-body">
+        <ol style="padding-left: 1.5rem;">
+            <li style="margin-bottom:.35rem;">Abra o atalho que você criou (StackOS Bar)</li>
+            <li style="margin-bottom:.35rem;">Faça login normalmente</li>
+            <li style="margin-bottom:.35rem;">Vá em <strong>Convites → Config (do StackBar)</strong> e marque "Esta máquina recebe impressões"</li>
+            <li style="margin-bottom:.35rem;">No StackBar PWA do celular, registre um item de teste numa comanda</li>
+            <li style="margin-bottom:.35rem;">O cupom deve imprimir <strong>sem nenhum diálogo aparecer</strong> na tela do PC</li>
+        </ol>
+        <div class="tip">
+            <strong>✓ Sucesso:</strong> Cupom saiu na térmica sem o admin nem perceber. ✨
+        </div>
+        <div class="warn">
+            <strong>✗ Falhou:</strong> Apareceu diálogo "Imprimir"? Significa que a flag não foi aplicada. Confira:
+            <ul style="padding-left: 1.2rem; margin-top: .35rem;">
+                <li>Você fechou TODAS as janelas do Chrome antes de abrir pelo atalho? (a flag não funciona se já tem Chrome aberto)</li>
+                <li>O caminho do Chrome no atalho está correto? (testa abrir o atalho — se abrir, o caminho tá ok)</li>
+                <li>A impressora padrão do Windows é mesmo a térmica?</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- ===== STEP 4 ===== -->
+<div class="step">
+    <div class="step-head">
+        <div class="step-num">4</div>
+        <div class="step-title">Modo Solo (clube sem máquina dedicada do bar)</div>
+    </div>
+    <div class="step-body">
+        <p>Se o seu clube tem <strong>apenas 1 computador</strong> (admin no caixa + impressora compartilhada), ative o "Modo Solo" no Painel do StackBar:</p>
+        <ol style="padding-left: 1.5rem;">
+            <li style="margin-bottom:.35rem;">Acesse o painel de configuração do StackBar (geralmente em <code>stackos.com.br/stackbar-painel.html</code>)</li>
+            <li style="margin-bottom:.35rem;">Marque a opção <strong>"Permitir admin imprimir (modo solo)"</strong></li>
+            <li style="margin-bottom:.35rem;">Salvar</li>
+        </ol>
+        <p>A partir daí, mesmo o admin logado vai receber os cupons automaticamente. A impressão é via <strong>iframe oculto</strong> — não interrompe o trabalho do admin no caixa.</p>
+    </div>
+</div>
+
+<!-- ===== CHECKLIST ===== -->
+<div class="step">
+    <div class="step-head">
+        <div class="step-num"><i class="fa-solid fa-check"></i></div>
+        <div class="step-title">Checklist de configuração</div>
+    </div>
+    <div class="step-body">
+        <ul class="checklist">
+            <li>Impressora térmica conectada e instalada no Windows</li>
+            <li>Impressora térmica definida como <strong>padrão</strong> do Windows</li>
+            <li>"Permitir que o Windows gerencie impressora padrão" <strong>desmarcado</strong></li>
+            <li>Atalho do Chrome com <code>--kiosk-printing</code> criado</li>
+            <li>StackBar marcado como "esta máquina recebe impressões" no PWA</li>
+            <li>Auto-impressão ligada no Painel do StackBar (config geral)</li>
+            <li>"Modo Solo" ativo no Painel (se for o caso de admin imprimir)</li>
+            <li>Teste de cupom funcionou sem mostrar diálogo</li>
+        </ul>
+    </div>
+</div>
+
+</div>
+
+<script>
+function showOS(os) {
+    document.querySelectorAll('.os-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.os-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('os-' + os).classList.add('active');
+}
+</script>
+
+</body>
+</html>

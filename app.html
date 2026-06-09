@@ -8880,9 +8880,102 @@ let sbClube   = null;
 //   "esta máquina física tem a impressora térmica e deve receber as comandas".
 //   Default: false em todas as máquinas.
 // ============================================================
-let _stackbarConfig = { imprimir_item_auto: false, papeis_impressao: ['caixa'] };
+let _stackbarConfig = { imprimir_item_auto: false, papeis_impressao: ['caixa'], permitir_admin_imprimir: false };
 let _stackbarItensImpressos = new Set();
 let _stackbarBootTs = Date.now();
+
+// =============================================================
+// StackBar — Impressão silenciosa via iframe oculto + fila
+// =============================================================
+// Substitui o modal de preview no fluxo de auto-impressão.
+// Iframe oculto:
+//   - Não rouba foco da página principal (admin continua no caixa)
+//   - Não muda o histórico do navegador
+//   - Imprime usando o próprio contexto do iframe (window.print do iframe)
+// Fila sequencial:
+//   - Múltiplos itens simultâneos (3+ garçons) não geram race condition
+//   - Processa um por vez com 200ms de gap pro driver da impressora
+//   - Timeout de segurança de 8s evita fila travada
+// Requer Chrome com --kiosk-printing pra impressão sem diálogo.
+// =============================================================
+let _stackbarFilaImpressao = [];
+let _stackbarImprimindoAgora = false;
+
+function _stackbarImprimirSilencioso(textoCupom, itemId) {
+    if (!textoCupom) return;
+    _stackbarFilaImpressao.push({ textoCupom, itemId, ts: Date.now() });
+    _stackbarProcessarFilaImpressao();
+}
+
+function _stackbarProcessarFilaImpressao() {
+    if (_stackbarImprimindoAgora) return;
+    if (_stackbarFilaImpressao.length === 0) return;
+
+    _stackbarImprimindoAgora = true;
+    const item = _stackbarFilaImpressao.shift();
+
+    try {
+        // Cria iframe oculto fora do viewport (não tira foco)
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.cssText = 'position:fixed;width:1px;height:1px;border:0;opacity:0;pointer-events:none;left:-9999px;top:-9999px;visibility:hidden;';
+        document.body.appendChild(iframe);
+
+        let cleaned = false;
+        const cleanup = () => {
+            if (cleaned) return;
+            cleaned = true;
+            try { iframe.remove(); } catch(_) {}
+            _stackbarImprimindoAgora = false;
+            // 200ms de gap antes do próximo pra driver da impressora respirar
+            setTimeout(_stackbarProcessarFilaImpressao, 200);
+        };
+
+        // Safety timeout: nunca trava a fila por mais que 8s
+        const safetyTimeout = setTimeout(cleanup, 8000);
+
+        iframe.onload = function () {
+            try {
+                const w = iframe.contentWindow;
+                // afterprint dispara depois do print() retornar (Chrome moderno)
+                w.addEventListener('afterprint', function() {
+                    clearTimeout(safetyTimeout);
+                    setTimeout(cleanup, 100);
+                });
+                // foca no iframe (necessário pra alguns drivers reconhecerem o contexto)
+                w.focus();
+                w.print();
+                // Fallback: se afterprint não disparar em 1.5s, força cleanup
+                setTimeout(function() {
+                    clearTimeout(safetyTimeout);
+                    cleanup();
+                }, 1500);
+            } catch (e) {
+                console.error('[STACKBAR] erro print iframe:', e);
+                clearTimeout(safetyTimeout);
+                cleanup();
+            }
+        };
+
+        // HTML do cupom — replica o mesmo formato do print-preview-content
+        const escape = (s) => String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+        const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cupom</title>' +
+            '<style>' +
+            '@page { margin: 0; }' +
+            'html, body { margin: 0; padding: 0; background: #fff; color: #000; }' +
+            '.cupom { font-family: "JetBrains Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; line-height: 1.4; padding: 8px; }' +
+            '</style></head><body><div class="cupom">' + escape(item.textoCupom) + '</div></body></html>';
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+    } catch (e) {
+        console.error('[STACKBAR] erro iframe impressão:', e);
+        _stackbarImprimindoAgora = false;
+        setTimeout(_stackbarProcessarFilaImpressao, 200);
+    }
+}
 
 function _stackbarMaquinaEhImpressora() {
     try { return localStorage.getItem('stackbar_maquina_imprime') === 'true'; }
@@ -9659,7 +9752,7 @@ async function _stackbarCarregarConfig() {
     if (typeof sb === 'undefined' || !sbClube || !sbClube.id) return;
     try {
         const { data, error } = await sb.from('stackbar_config')
-            .select('imprimir_item_auto, papeis_impressao')
+            .select('imprimir_item_auto, papeis_impressao, permitir_admin_imprimir')
             .eq('clube_id', sbClube.id)
             .maybeSingle();
         if (error) { console.warn('[STACKBAR] carregar config:', error); return; }
@@ -9668,7 +9761,10 @@ async function _stackbarCarregarConfig() {
             _stackbarConfig.papeis_impressao = Array.isArray(data.papeis_impressao)
                 ? data.papeis_impressao
                 : ['caixa'];
-            console.log('[STACKBAR] auto-impressão:', _stackbarConfig.imprimir_item_auto ? 'ATIVA' : 'inativa', '| papéis:', _stackbarConfig.papeis_impressao);
+            _stackbarConfig.permitir_admin_imprimir = !!data.permitir_admin_imprimir;
+            console.log('[STACKBAR] auto-impressão:', _stackbarConfig.imprimir_item_auto ? 'ATIVA' : 'inativa',
+                '| papéis:', _stackbarConfig.papeis_impressao,
+                '| modo solo (admin):', _stackbarConfig.permitir_admin_imprimir ? 'ON' : 'off');
         }
         _stackbarAtualizarBadge();
     } catch(e) {
@@ -9739,10 +9835,15 @@ function _stackbarAtualizarBadge() {
         const papelUser = (currentUser && currentUser.papel) ? currentUser.papel : null;
         const papeisAut = _stackbarConfig.papeis_impressao || ['caixa'];
 
+        // Admin pode imprimir se: estiver na lista OU se permitir_admin_imprimir=true (modo solo)
+        const ehAdmin = papelUser === 'admin' || papelUser === 'administrador';
+        const papelAutorizado = papeisAut.includes(papelUser);
+        const adminPodeSolo = ehAdmin && !!_stackbarConfig.permitir_admin_imprimir;
+        const papelOk = papelAutorizado || adminPodeSolo;
+
         const deveMostrar = _stackbarConfig.imprimir_item_auto
                           && _stackbarMaquinaEhImpressora()
-                          && papelUser
-                          && papeisAut.includes(papelUser);
+                          && papelOk;
 
         if (!deveMostrar) {
             if (badge) badge.remove();
@@ -9774,9 +9875,15 @@ function _stackbarTalvezImprimirItem(payload) {
         if (!_stackbarMaquinaEhImpressora()) return;
 
         // Filtro 3: o usuário logado tem papel autorizado a receber impressão?
+        // Admin tem regra especial: precisa estar em papeis_impressao OU ter
+        // permitir_admin_imprimir=true (modo solo do clube)
         const papelUser = (currentUser && currentUser.papel) ? currentUser.papel : null;
         const papeisAut = _stackbarConfig.papeis_impressao || ['caixa'];
-        if (!papelUser || !papeisAut.includes(papelUser)) return;
+        if (!papelUser) return;
+        const ehAdmin = papelUser === 'admin' || papelUser === 'administrador';
+        const papelAutorizado = papeisAut.includes(papelUser);
+        const adminPodeSolo = ehAdmin && !!_stackbarConfig.permitir_admin_imprimir;
+        if (!papelAutorizado && !adminPodeSolo) return;
 
         // Filtro 4: é evento INSERT?
         if (!payload || payload.eventType !== 'INSERT') return;
@@ -9815,7 +9922,15 @@ function _stackbarTalvezImprimirItem(payload) {
         };
 
         const txt = gerarCupomItemNovo(item, comanda);
-        if (typeof abrirPreviewImpressao === 'function') {
+
+        // IMPRESSÃO SILENCIOSA via iframe oculto + fila sequencial.
+        // Não rouba foco do operador no caixa (admin) — diferente do modal de
+        // preview que mostrava popup a cada item. Imprime direto via iframe
+        // que tem seu próprio contexto window.print().
+        if (typeof _stackbarImprimirSilencioso === 'function') {
+            _stackbarImprimirSilencioso(txt, novo.id);
+        } else if (typeof abrirPreviewImpressao === 'function') {
+            // Fallback de segurança (não deveria acontecer)
             abrirPreviewImpressao('Novo Item (StackBar)', txt);
         }
 

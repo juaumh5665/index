@@ -710,6 +710,24 @@
         </div>
       </div>
 
+      <!-- ⭐ MODO SOLO (admin imprime quando clube tem só 1 máquina) -->
+      <div class="config-row" style="flex-direction:column;align-items:stretch;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:14px;margin-top:6px;">
+        <div class="config-info" style="margin-bottom:10px;">
+          <strong>👑 Modo solo (admin imprime)</strong>
+          <span>Ative se seu clube tem <strong>apenas 1 máquina</strong> (admin no caixa + impressora térmica compartilhada). O admin passa a receber cupons mesmo não estando em "papéis autorizados". A impressão é silenciosa via iframe oculto — não interrompe o trabalho do admin no caixa.</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <span style="font-size:14px;color:#e4e4e7;font-weight:600;">Permitir admin receber cupons</span>
+          <div class="switch" id="swPermitirAdminImprimir" data-cfg="permitir_admin_imprimir"></div>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(245,158,11,.2);">
+          <a href="/stackbar-tutorial-kiosk.html" target="_blank" rel="noopener" style="color:#fbbf24;font-size:12px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+            📖 Como configurar Chrome (--kiosk-printing) →
+          </a>
+          <div style="font-size:11px;color:#71717a;margin-top:4px;">Sem essa configuração, o Chrome vai mostrar diálogo a cada cupom (atrapalha o uso).</div>
+        </div>
+      </div>
+
       <div class="config-row" style="flex-direction:column;align-items:stretch;">
         <div class="config-info">
           <strong>Papéis autorizados a receber impressão</strong>
@@ -775,7 +793,8 @@ let CONFIG = {
   papeis_permitidos: ['admin', 'caixa'],
   comissao_padrao_pct: 10.0,
   imprimir_item_auto: false,
-  papeis_impressao: ['caixa']
+  papeis_impressao: ['caixa'],
+  permitir_admin_imprimir: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1033,7 +1052,7 @@ async function revogarToken() {
 async function carregarConfig() {
   const { data, error } = await sb
     .from('stackbar_config')
-    .select('clube_id, permitir_estoque_negativo, papeis_permitidos, comissao_padrao_pct, imprimir_item_auto, papeis_impressao')
+    .select('clube_id, permitir_estoque_negativo, papeis_permitidos, comissao_padrao_pct, imprimir_item_auto, papeis_impressao, permitir_admin_imprimir')
     .eq('clube_id', CLUBE_ID)
     .maybeSingle();
 
@@ -1056,6 +1075,7 @@ async function carregarConfig() {
     CONFIG.papeis_impressao = Array.isArray(data.papeis_impressao)
       ? data.papeis_impressao
       : ['caixa'];
+    CONFIG.permitir_admin_imprimir = !!data.permitir_admin_imprimir;
   } else {
     // Primeira vez: persiste o default para já permitir o admin entrar pelo bar.html
     try {
@@ -1106,6 +1126,11 @@ function renderConfig() {
   // ⭐ Switch auto-impressão
   if ($('swImprimirAuto')) {
     $('swImprimirAuto').classList.toggle('on', CONFIG.imprimir_item_auto);
+  }
+
+  // ⭐ Switch Modo Solo (admin imprime quando clube tem só 1 máquina)
+  if ($('swPermitirAdminImprimir')) {
+    $('swPermitirAdminImprimir').classList.toggle('on', CONFIG.permitir_admin_imprimir);
   }
 
   // Chips de papéis autorizados a receber impressão
@@ -1194,6 +1219,18 @@ async function salvarConfig() {
     });
     if (error) throw error;
     if (!data?.ok) throw new Error('Falha ao salvar');
+
+    // [MODO SOLO] UPDATE direto pra coluna nova — evita mexer na RPC existente.
+    // Falha silenciosa: se a coluna ainda não existir no banco (SQL não rodado),
+    // não derruba o save dos outros campos. RLS já garante que só usuário do
+    // clube consegue UPDATE.
+    try {
+      const { error: errSolo } = await sb.from('stackbar_config')
+        .update({ permitir_admin_imprimir: !!CONFIG.permitir_admin_imprimir })
+        .eq('clube_id', CLUBE_ID);
+      if (errSolo) console.warn('[MODO SOLO] update falhou (coluna existe?):', errSolo);
+    } catch (e) { console.warn('[MODO SOLO] erro update:', e); }
+
     showToast('✅ Configurações salvas', 'success');
   } catch (err) {
     console.error('Salvar config error:', err);
@@ -1386,6 +1423,14 @@ function setupListeners() {
     CONFIG.imprimir_item_auto = !CONFIG.imprimir_item_auto;
     $('swImprimirAuto').classList.toggle('on', CONFIG.imprimir_item_auto);
   });
+
+  // ⭐ Switch Modo Solo (admin imprime quando clube tem só 1 máquina)
+  if ($('swPermitirAdminImprimir')) {
+    $('swPermitirAdminImprimir').addEventListener('click', () => {
+      CONFIG.permitir_admin_imprimir = !CONFIG.permitir_admin_imprimir;
+      $('swPermitirAdminImprimir').classList.toggle('on', CONFIG.permitir_admin_imprimir);
+    });
+  }
 
   // ⭐ Switch "esta máquina é impressora" (local, persiste no localStorage)
   $('swMaquinaImprime').addEventListener('click', () => {
