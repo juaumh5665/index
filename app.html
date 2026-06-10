@@ -12748,14 +12748,14 @@ async function solicitarResetSenha() {
         return;
     }
     try {
-        // Domínio canônico — evita problemas se admin acessar via preview/local/subdomínio
-        // (também precisa estar configurado em Authentication > URL Configuration no Supabase)
+        // Domínio canônico + rota /app (onde o app.html roda — tem supabase + handler PASSWORD_RECOVERY)
+        // Precisa estar em "Redirect URLs" do Supabase: https://stackos.com.br/**
         const isProducao = /stackos\.com\.br$/.test(window.location.hostname);
         const baseUrl = isProducao
             ? window.location.origin
             : 'https://stackos.com.br';
         const { error } = await sb.auth.resetPasswordForEmail(email, {
-            redirectTo: baseUrl + '/reset-senha',
+            redirectTo: baseUrl + '/app',
         });
         if (error) throw error;
         showToast('📧 Email de recuperação enviado para ' + email);
@@ -13223,8 +13223,118 @@ sb.auth.onAuthStateChange((event, session) => {
         document.body.classList.add('auth-active');
     } else if (event === 'TOKEN_REFRESHED') {
         sbSession = session;
+    } else if (event === 'PASSWORD_RECOVERY') {
+        // Usuário clicou no link de recuperação do email
+        // Abre modal pra definir nova senha (token de recovery já validado pelo Supabase)
+        if (typeof abrirModalNovaSenha === 'function') {
+            setTimeout(() => abrirModalNovaSenha(), 200);
+        }
     }
 });
+
+// =====================================================================
+// Modal "Definir nova senha" — disparado pelo evento PASSWORD_RECOVERY
+// =====================================================================
+// Quando o usuário clica no link de recuperação do email, o Supabase
+// dispara PASSWORD_RECOVERY via onAuthStateChange. Aqui mostramos um
+// modal pra ele digitar a nova senha. Após salvar, faz logout e leva
+// pra tela de login normal (mais seguro do que logar direto).
+// =====================================================================
+function abrirModalNovaSenha() {
+    // Remove se já existe (não duplica)
+    const old = document.getElementById('modal-nova-senha');
+    if (old) old.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'modal-nova-senha';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(8px);padding:1rem;font-family:\'Manrope\',sans-serif;';
+    overlay.innerHTML = `
+        <div style="background:#111113;border:1px solid #2a2a30;border-radius:1rem;max-width:440px;width:100%;box-shadow:0 25px 50px rgba(0,0,0,.6);">
+            <div style="padding:1.5rem 1.5rem 0.5rem;text-align:center;">
+                <div style="width:56px;height:56px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:.75rem;">
+                    <i class="fa-solid fa-key" style="color:#fff;font-size:1.4rem;"></i>
+                </div>
+                <h2 style="font-size:1.25rem;font-weight:800;color:#e4e4e7;margin:0;">Defina sua nova senha</h2>
+                <p style="color:#a1a1aa;font-size:.85rem;margin:.5rem 0 0;line-height:1.45;">O link foi validado. Digite e confirme uma nova senha pra finalizar.</p>
+            </div>
+            <div style="padding:1.5rem;">
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:.7rem;color:#a1a1aa;font-weight:700;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">Nova senha</label>
+                    <input type="password" id="ns-senha1" placeholder="Mínimo 6 caracteres" style="width:100%;background:#0a0a0b;border:1px solid #2a2a30;color:#e4e4e7;padding:.75rem .85rem;border-radius:.5rem;font-family:inherit;font-size:.95rem;outline:none;" autocomplete="new-password">
+                </div>
+                <div style="margin-bottom:1.25rem;">
+                    <label style="display:block;font-size:.7rem;color:#a1a1aa;font-weight:700;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">Confirmar nova senha</label>
+                    <input type="password" id="ns-senha2" placeholder="Repita a senha" style="width:100%;background:#0a0a0b;border:1px solid #2a2a30;color:#e4e4e7;padding:.75rem .85rem;border-radius:.5rem;font-family:inherit;font-size:.95rem;outline:none;" autocomplete="new-password">
+                </div>
+                <div id="ns-erro" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:.6rem .8rem;border-radius:.45rem;font-size:.78rem;margin-bottom:1rem;"></div>
+                <button id="ns-btn-salvar" style="width:100%;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;padding:.85rem;border:0;border-radius:.55rem;font-family:inherit;font-weight:800;font-size:.9rem;cursor:pointer;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;gap:.5rem;">
+                    <i class="fa-solid fa-check"></i> Salvar nova senha
+                </button>
+                <button id="ns-btn-cancelar" style="width:100%;background:transparent;border:0;color:#71717a;padding:.7rem;font-family:inherit;font-size:.78rem;cursor:pointer;margin-top:.5rem;">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const s1 = document.getElementById('ns-senha1');
+    const s2 = document.getElementById('ns-senha2');
+    const erroEl = document.getElementById('ns-erro');
+    const btn = document.getElementById('ns-btn-salvar');
+    const cancelBtn = document.getElementById('ns-btn-cancelar');
+
+    const showErr = (msg) => {
+        erroEl.style.display = 'block';
+        erroEl.textContent = '⚠️ ' + msg;
+    };
+
+    const limparErro = () => { erroEl.style.display = 'none'; erroEl.textContent = ''; };
+    s1.addEventListener('input', limparErro);
+    s2.addEventListener('input', limparErro);
+
+    setTimeout(() => s1.focus(), 100);
+
+    const salvar = async () => {
+        limparErro();
+        const senha1 = s1.value;
+        const senha2 = s2.value;
+
+        if (!senha1 || senha1.length < 6) return showErr('Senha precisa ter pelo menos 6 caracteres');
+        if (senha1 !== senha2) return showErr('As senhas não coincidem');
+
+        btn.disabled = true;
+        btn.style.opacity = '.7';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+
+        try {
+            const { error } = await sb.auth.updateUser({ password: senha1 });
+            if (error) throw error;
+
+            // Sucesso! Faz logout pra forçar login com nova senha (mais seguro)
+            try { await sb.auth.signOut(); } catch (e) {}
+            overlay.remove();
+            showToast('✅ Senha atualizada com sucesso! Faça login com a nova senha.');
+            // Limpa hash da URL pra não reabrir o modal em refresh
+            try { history.replaceState(null, '', window.location.pathname); } catch (e) {}
+        } catch (e) {
+            showErr(e.message || 'Erro ao salvar senha');
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Salvar nova senha';
+        }
+    };
+
+    btn.addEventListener('click', salvar);
+    s2.addEventListener('keypress', (e) => { if (e.key === 'Enter') salvar(); });
+    cancelBtn.addEventListener('click', () => {
+        if (confirm('Tem certeza? Você precisará pedir um novo link de recuperação.')) {
+            overlay.remove();
+            try { sb.auth.signOut(); } catch (e) {}
+            try { history.replaceState(null, '', window.location.pathname); } catch (e) {}
+        }
+    });
+}
 
 async function login() {
     const email = document.getElementById('login-user').value.trim().toLowerCase();
