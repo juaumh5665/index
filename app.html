@@ -4343,7 +4343,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             <i class="fa-solid fa-info-circle"></i> <strong>Exemplo prático:</strong> Configurando "Compras até nível 10" e "Add-on até nível 10":
                             <ul style="margin:.5rem 0 0 1.2rem;padding:0;color:#cbd5e1;">
                                 <li>Níveis 1 a 10: tudo permitido</li>
-                                <li>A partir do nível 11: buy-in, re-entry, rebuy e add-on bloqueados</li>
+                                <li>A partir do nível 11: buy-in, re-entry e add-on bloqueados (rebuys de jogadores ativos continuam permitidos)</li>
                                 <li>Se o torneio tiver <strong>Last Chance</strong> ativo, ele libera após o add-on</li>
                             </ul>
                         </div>
@@ -7443,8 +7443,8 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div class="t2-coll-body">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
                             <div>
-                                <label class="inp-label">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(buy-in, re-entry, rebuy)</span></label>
-                                <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que buy-in, re-entry e rebuy podem ser registrados" onchange="t2AtualizarStatusTravas()">
+                                <label class="inp-label">Entradas até nível <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(buy-in e re-entry)</span></label>
+                                <input id="t-reentry" type="number" value="6" class="inp" placeholder="0 = sem trava" title="Nível máximo em que novos jogadores (buy-in) e jogadores eliminados voltando (re-entry) podem entrar. Rebuys de jogadores ativos NÃO são afetados por essa trava." onchange="t2AtualizarStatusTravas()">
                             </div>
                             <div>
                                 <label class="inp-label">Add-on disponível no intervalo (até nível)</label>
@@ -22849,7 +22849,7 @@ function abrirEditarTorneio(idx) {
                         '<div>' +
                             '<label class="inp-label">Entradas até nível</label>' +
                             '<input id="edit-reentry-ate" class="inp" type="number" min="0" value="' + (Number(t.reentryAte) || 0) + '">' +
-                            '<div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Buy-in, re-entry, rebuy</div>' +
+                            '<div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Buy-in e re-entry (rebuys de jogadores ativos não são afetados)</div>' +
                         '</div>' +
                         '<div>' +
                             '<label class="inp-label">Add-on até nível</label>' +
@@ -23844,7 +23844,16 @@ function _emJanelaBreakEspecial(t) {
 }
 
 // Tipos que entram na trava de "entradas" (todos os tipos de compra pra continuar)
+// Tipos de compra que envolvem MOVIMENTAÇÃO FINANCEIRA do jogador.
+// Usado pra agrupar lógica (e.g. estatísticas, descrições, formatação).
 const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
+
+// Tipos que ENTRAM na trava de "Entradas até nível N":
+// buy-in (jogador novo) e re-entry (jogador eliminado voltando).
+// Rebuy simples/duplo são compras de jogadores ATIVOS — não bloqueiam por nível.
+// (essa decisão é deliberada: a trava existe pra encerrar inscrições/reinscrições,
+//  não pra impedir jogador ativo de continuar comprando fichas)
+const _TIPOS_NOVA_ENTRADA = ['buyin', 'reentry'];
 
 // Retorna o "nível humano" — só conta níveis de jogo, ignora breaks.
 // Por exemplo: se a estrutura é [N1, N2, BREAK, N3] e nivelAtual=2 (= BREAK),
@@ -23956,8 +23965,10 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     // Agora: retorna 10 (correto — ainda na janela de compras do nível 10)
     const nivelAtual = _nivelHumano(t);
     
-    // Entradas (buy-in, re-entry, rebuy simples, rebuy duplo) — mesma trava
-    if (_TIPOS_COMPRA.includes(tipo)) {
+    // Entradas: a trava "Entradas até nível N" vale APENAS pra novos jogadores
+    // (buy-in) e jogadores eliminados voltando (re-entry). Rebuys simples/duplo
+    // são compras de jogadores ATIVOS — sempre permitidos enquanto torneio roda.
+    if (_TIPOS_NOVA_ENTRADA.includes(tipo)) {
         // CASO ESPECIAL: buy-in em torneio FREE tem janela própria (até buyinFreeAteNivel)
         // O re-entry/rebuy continua usando a janela geral (entradasAteNivel)
         if (tipo === 'buyin' && _isBuyinFree(t)) {
@@ -23972,7 +23983,7 @@ function _tipoBloqueadoPorTrava(t, tipo) {
                     if (max != null && nivelAtual > max) {
                         return {
                             bloqueado: true,
-                            motivo: `Entradas só até o nível ${max} (atual: ${nivelAtual})`
+                            motivo: `Novas entradas (buy-in/re-entry) só até o nível ${max} (atual: ${nivelAtual})`
                         };
                     }
                     // Liberado — sai da special case, segue o fluxo normal abaixo (já passou)
@@ -23990,7 +24001,7 @@ function _tipoBloqueadoPorTrava(t, tipo) {
             if (max != null && nivelAtual > max) {
                 return { 
                     bloqueado: true, 
-                    motivo: `Entradas só até o nível ${max} (atual: ${nivelAtual})` 
+                    motivo: `Novas entradas (buy-in/re-entry) só até o nível ${max} (atual: ${nivelAtual})` 
                 };
             }
         }
