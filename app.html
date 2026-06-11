@@ -22690,13 +22690,22 @@ function renderTabJogadores() {
 
     elimDiv.innerHTML = [...eliminadosFiltrados].reverse().map(e => {
         const j = jogadores.find(j => j.id === e.jogadorId);
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.85;gap:.5rem;">
+        // Só mostra botão "Add Retro" se torneio tem add-on configurado E jogador ainda não comprou add-on
+        const torneioTemAddon = (Number(t.addonFichas) || 0) > 0;
+        const jaTemAddon = t.entries.some(en => en.jogadorId === e.jogadorId && en.tipo === 'addon');
+        const podeAddRetro = torneioTemAddon && !jaTemAddon;
+        const btnAddRetro = podeAddRetro ? `
+            <button onclick="_lancarCompraRetroativa('${e.jogadorId}')" title="Lançar add-on retroativo (jogador comprou antes da eliminação mas não foi registrado)" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
+                <i class="fa-solid fa-plus"></i> Add Retro
+            </button>` : '';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.85;gap:.5rem;flex-wrap:wrap;">
             <div style="flex:1;min-width:0;">
                 <span style="font-weight:700;font-size:.85rem;">${j ? j.nome : 'Desconhecido'}</span>
             </div>
             <button onclick="_acertarEliminado('${e.jogadorId}', ${e.posicao})" title="Abrir acerto financeiro deste jogador (premiação + dívidas)" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
                 <i class="fa-solid fa-money-bill-wave"></i> Acertar
             </button>
+            ${btnAddRetro}
             <button onclick="_imprimirExtratoTorneioJogador('${e.jogadorId}')" title="Imprimir extrato deste jogador no torneio atual" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
                 <i class="fa-solid fa-receipt"></i> Extrato
             </button>
@@ -22827,6 +22836,95 @@ function _acertarEliminado(jogadorId, posicao) {
     }
 }
 window._acertarEliminado = _acertarEliminado;
+
+// =====================================================================
+// LANÇAR COMPRA RETROATIVA (add-on) em jogador ELIMINADO
+// =====================================================================
+// Cobre o caso real: jogador comprou add-on antes de ser eliminado, mas o
+// operador esqueceu de lançar no sistema. Foi eliminado correta­mente,
+// mas falta registrar a compra (financeiro + prize pool).
+//
+// O que faz:
+//   1. Cria entry tipo='addon' com flag retroativo:true (rastreio)
+//   2. Cria transação financeira (cobra do jogador — saldo devedor)
+//   3. NÃO restaura o jogador no torneio (continua eliminado)
+//   4. Recalcula prize pool/premiação automaticamente (via entries)
+//   5. Audit log
+//
+// NÃO mexe em: cálculos de rake, prize, staff, chipcount, médias.
+// NÃO valida trava de nível (a compra já aconteceu de fato, só registra).
+// =====================================================================
+function _lancarCompraRetroativa(jogadorId) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return showToast('⚠️ Torneio não encontrado');
+
+    const j = jogadores.find(x => String(x.id) === String(jogadorId));
+    if (!j) return showToast('⚠️ Jogador não encontrado');
+
+    // Só faz sentido se torneio tem add-on configurado
+    const fichas = Number(t.addonFichas) || 0;
+    const valor = Number(t.addonValor) || 0;
+    if (fichas <= 0) {
+        return showToast('⚠️ Este torneio não tem add-on configurado');
+    }
+
+    // Evita duplicação: jogador só pode ter 1 add-on
+    const jaTemAddon = (t.entries || []).some(e => String(e.jogadorId) === String(jogadorId) && e.tipo === 'addon');
+    if (jaTemAddon) {
+        return showToast('⚠️ Jogador já tem add-on registrado neste torneio');
+    }
+
+    // Confirmação detalhada (operador vê exatamente o que vai acontecer)
+    const valorTxt = valor > 0 ? `R$ ${valor.toFixed(2).replace('.', ',')}` : 'cortesia';
+    const fichasTxt = fichas.toLocaleString('pt-BR');
+    const msg = `LANÇAR ADD-ON RETROATIVO\n\n` +
+                `Jogador: ${j.nome}\n` +
+                `Valor: ${valorTxt}\n` +
+                `Fichas: ${fichasTxt}\n\n` +
+                `⚠️ Importante:\n` +
+                `• Jogador CONTINUA eliminado (não restaura)\n` +
+                `• Cobra do saldo do jogador (vira dívida se não pagou)\n` +
+                `• Recalcula prize pool conforme regras do torneio\n` +
+                `• Operação registrada com flag "retroativo"\n\n` +
+                `Confirmar?`;
+    if (!confirm(msg)) return;
+
+    // 1. Cria entry de add-on retroativo
+    const ts = Date.now();
+    const novaEntry = {
+        id: (typeof _genUuid === 'function') ? _genUuid() : (`retro_${ts}_${Math.random().toString(36).slice(2, 8)}`),
+        jogadorId: String(jogadorId),
+        tipo: 'addon',
+        ts: ts,
+        valor: valor,
+        retroativo: true  // flag pra distinguir em relatórios/auditoria
+    };
+    t.entries.push(novaEntry);
+
+    // 2. Registra transação financeira (jogador deve o valor — saldo negativo)
+    if (typeof registrarTransacao === 'function' && valor > 0) {
+        registrarTransacao({
+            jogadorId: String(jogadorId),
+            tipo: 'addon',
+            valor: -valor,
+            descricao: `Add-on RETROATIVO · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id
+        });
+    }
+
+    // 3. Persiste e atualiza UI
+    if (typeof saveData === 'function') saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('ADDON_RETROATIVO', `Add-on retroativo lançado: ${j.nome} · ${t.nome} · ${valorTxt}`, { jogadorId: String(jogadorId), torneioId: t.id, valor, fichas });
+    }
+    if (typeof updateModalTorneio === 'function') updateModalTorneio();
+    if (typeof renderTorneiosList === 'function') renderTorneiosList();
+    if (typeof renderTabJogadores === 'function') renderTabJogadores();
+
+    showToast(`✅ Add-on retroativo lançado · ${j.nome} (${valorTxt})`);
+}
+window._lancarCompraRetroativa = _lancarCompraRetroativa;
 
 function renderTabLancamentosDetalhados() {
     const t = torneios[activeTorneioIdx];
@@ -25916,10 +26014,24 @@ function confirmarEliminacao(pulaAcerto) {
     }, '⏳ Processando eliminação, aguarde...');
 }
 
+// =====================================================================
+// Snapshot da última eliminação pra permitir REVERTER se o operador
+// clicar X no modal de Acerto Financeiro sem completar.
+// Limpo ao confirmar/deixar pendente o acerto, e após 5 minutos
+// (pra não permitir "reverter" eliminações antigas por engano).
+// =====================================================================
+let _ultimoSnapshotEliminacao = null;
+
 function _confirmarEliminacaoImpl(pulaAcerto) {
     const t   = torneios[activeTorneioIdx];
     const jid = document.getElementById('eliminar-jogador').value;
     if (!jid) return;
+
+    // Snapshot ANTES da eliminação — permite reverter se o operador
+    // fechar o modal de acerto sem completar (X no canto superior).
+    // Limpo após 5 min OU quando o operador confirma/deixa-pendente.
+    const _snapshotPreEliminacao = JSON.stringify(t);
+    const _tornIdxPreEliminacao = torneios.indexOf(t);
 
     // Para KO: pegar eliminador se selecionado
     const eliminadorSel = document.getElementById('eliminador-jogador');
@@ -26004,6 +26116,16 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
     // O jogador continua eliminado normalmente, mas sem abrir modal de acerto financeiro.
     // O acerto pode ser disparado depois pelo botão "💰 Acertar" no card do eliminado.
     if (!pulaAcerto) {
+        // Salva snapshot na global pra permitir REVERTER eliminação
+        // caso o operador clique X no modal de acerto sem completar
+        _ultimoSnapshotEliminacao = {
+            snapshot: _snapshotPreEliminacao,
+            tornIdx: _tornIdxPreEliminacao,
+            jogadorId: jid,
+            nomeJog: getJogadorNome(jid),
+            posicao: posicao,
+            timestamp: Date.now()
+        };
         sugerirAcertoNoCaixa(jid);
     } else {
         showToast('💤 Eliminado — acerto pendente. Clique em "💰 Acertar" no card dele quando vier ao caixa.');
@@ -41375,6 +41497,8 @@ window.acertoAtualizarSomaMisto = acertoAtualizarSomaMisto;
 async function acertoConfirmar() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
+    // Operador completou o acerto — limpa snapshot (não pode mais reverter eliminação)
+    _ultimoSnapshotEliminacao = null;
     const { jogadorId, posicao, valorPremio, valorDivida, valorLiquido, metodo, pagamentos } = _acertoPremio;
     
     const valorMovimentado = parseFloat(document.getElementById('ap-valor-editavel').value) || 0;
@@ -41491,6 +41615,8 @@ async function acertoConfirmar() {
 async function acertoDeixarPendente() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
+    // Operador escolheu deixar pendente — limpa snapshot (não pode reverter eliminação por engano)
+    _ultimoSnapshotEliminacao = null;
     const { jogadorId, posicao, valorPremio } = _acertoPremio;
     
     // Mesmo deixando pendente, registra a premiação como crédito do jogador
@@ -41539,10 +41665,123 @@ async function acertoDeixarPendente() {
 
 // Fechar modal sem fazer nada (X) — libera fila pra continuar
 function acertoFecharSemAcao() {
+    // Se há snapshot recente de eliminação (ainda dentro de 5 min),
+    // abre modal de confirmação pra o operador escolher o que fazer.
+    // Resolve o cenário: operador eliminou por engano e clicou X no acerto.
+    if (_ultimoSnapshotEliminacao && (Date.now() - _ultimoSnapshotEliminacao.timestamp) < 5 * 60 * 1000) {
+        _abrirModalAcertoSaida();
+        return;
+    }
+    // Comportamento original: fecha modal e libera fila
     closeModal('modal-acerto-premio');
     _liberarFilaAcertos();
 }
 window.acertoFecharSemAcao = acertoFecharSemAcao;
+
+// =====================================================================
+// Modal que aparece ao clicar X no modal de Acerto Financeiro
+// =====================================================================
+// Dá 3 opções pro operador (em vez de apenas fechar e deixar a eliminação
+// gravada silenciosamente):
+//   1. Deixar pendente — fecha o acerto, eliminação fica
+//   2. Cancelar eliminação — restaura snapshot pré-eliminação
+//   3. Voltar ao acerto — fecha esse modal, mantém o acerto aberto
+// =====================================================================
+function _abrirModalAcertoSaida() {
+    const snap = _ultimoSnapshotEliminacao;
+    if (!snap) {
+        // Fallback: sem snapshot, fecha normalmente
+        closeModal('modal-acerto-premio');
+        _liberarFilaAcertos();
+        return;
+    }
+
+    // Remove versão anterior se houver
+    const old = document.getElementById('modal-acerto-saida');
+    if (old) old.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'modal-acerto-saida';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px);padding:1rem;font-family:\'Manrope\',sans-serif;';
+    overlay.innerHTML = `
+        <div style="background:#111113;border:1px solid #2a2a30;border-radius:1rem;max-width:460px;width:100%;">
+            <div style="padding:1.5rem 1.5rem .75rem;text-align:center;">
+                <div style="width:56px;height:56px;background:linear-gradient(135deg,#f59e0b,#fbbf24);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:.75rem;">
+                    <i class="fa-solid fa-circle-question" style="color:#1a1a23;font-size:1.4rem;"></i>
+                </div>
+                <h2 style="font-size:1.1rem;font-weight:800;color:#e4e4e7;margin:0;">Você não completou o acerto</h2>
+                <p style="color:#a1a1aa;font-size:.82rem;margin:.5rem 0 0;line-height:1.45;">Eliminado <b style="color:#fff;">${snap.nomeJog || '—'}</b> (${snap.posicao}º). O que deseja fazer?</p>
+            </div>
+            <div style="padding:1rem 1.5rem 1.5rem;display:flex;flex-direction:column;gap:.6rem;">
+                <button onclick="_acertoSaida_deixarPendente()" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:.8rem;border-radius:.55rem;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;text-align:left;display:flex;align-items:center;gap:.6rem;">
+                    <i class="fa-solid fa-clock" style="font-size:1.05rem;"></i>
+                    <div style="flex:1;">
+                        <div>Deixar acerto pendente</div>
+                        <div style="font-size:.68rem;color:#a1a1aa;font-weight:500;margin-top:.15rem;">Eliminação fica gravada. Clica em "💰 Acertar" depois.</div>
+                    </div>
+                </button>
+                <button onclick="_acertoSaida_cancelarEliminacao()" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.8rem;border-radius:.55rem;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;text-align:left;display:flex;align-items:center;gap:.6rem;">
+                    <i class="fa-solid fa-rotate-left" style="font-size:1.05rem;"></i>
+                    <div style="flex:1;">
+                        <div>Cancelar eliminação</div>
+                        <div style="font-size:.68rem;color:#a1a1aa;font-weight:500;margin-top:.15rem;">Reverte tudo — jogador volta a ativo (foi engano).</div>
+                    </div>
+                </button>
+                <button onclick="_acertoSaida_voltar()" style="background:transparent;border:1px solid #2a2a30;color:#a1a1aa;padding:.7rem;border-radius:.5rem;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;">
+                    <i class="fa-solid fa-arrow-left"></i> Voltar ao acerto
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function _acertoSaida_deixarPendente() {
+    // Fecha modal de confirmação + fecha modal de acerto. Eliminação fica gravada.
+    const m = document.getElementById('modal-acerto-saida');
+    if (m) m.remove();
+    _ultimoSnapshotEliminacao = null;
+    closeModal('modal-acerto-premio');
+    if (typeof _liberarFilaAcertos === 'function') _liberarFilaAcertos();
+    showToast('💤 Acerto pendente. Use "💰 Acertar" no card do eliminado quando ele vier ao caixa.');
+}
+
+function _acertoSaida_cancelarEliminacao() {
+    // RESTAURA do snapshot — operação delicada
+    const snap = _ultimoSnapshotEliminacao;
+    if (!snap || !snap.snapshot) {
+        showToast('⚠️ Snapshot indisponível');
+        return;
+    }
+    try {
+        torneios[snap.tornIdx] = JSON.parse(snap.snapshot);
+        _ultimoSnapshotEliminacao = null;
+        if (typeof saveData === 'function') saveData();
+        if (typeof logAudit === 'function') {
+            logAudit('CANCEL_ELIMINACAO_PELO_X', `Eliminação cancelada (X do modal de acerto): ${snap.nomeJog} · era ${snap.posicao}º`, { jogadorId: snap.jogadorId, torneioId: torneios[snap.tornIdx] && torneios[snap.tornIdx].id });
+        }
+        const m = document.getElementById('modal-acerto-saida');
+        if (m) m.remove();
+        closeModal('modal-acerto-premio');
+        if (typeof _liberarFilaAcertos === 'function') _liberarFilaAcertos();
+        if (typeof updateModalTorneio === 'function') updateModalTorneio();
+        if (typeof renderTorneiosList === 'function') renderTorneiosList();
+        showToast(`✅ Eliminação de ${snap.nomeJog} cancelada — jogador voltou pra ativos`);
+    } catch (e) {
+        console.error('[CancelarEliminacao]', e);
+        showToast('⚠️ Erro ao reverter eliminação');
+    }
+}
+
+function _acertoSaida_voltar() {
+    // Fecha apenas o modal de confirmação, mantém o modal de acerto aberto
+    const m = document.getElementById('modal-acerto-saida');
+    if (m) m.remove();
+}
+
+window._acertoSaida_deixarPendente = _acertoSaida_deixarPendente;
+window._acertoSaida_cancelarEliminacao = _acertoSaida_cancelarEliminacao;
+window._acertoSaida_voltar = _acertoSaida_voltar;
 
 function _metodoLabel(m) {
     return ({pix:'PIX', dinheiro:'Dinheiro', debito:'Débito', credito:'Crédito'})[m] || m;
