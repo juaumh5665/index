@@ -23594,6 +23594,24 @@ function renderTabBlinds() {
                 <span style="font-size:.6rem;color:${isAtual ? 'var(--gold)' : jaPassou ? '#3f3f46' : '#71717a'};font-weight:600;text-align:center;">${isAtual ? 'rolando' : jaPassou ? 'passou' : 'pendente'}</span>
             </div>`;
     }).join('');
+
+    // ===== Botões pra ADICIONAR mais níveis/intervalos no fim =====
+    // (Cliente pode estender a estrutura durante o torneio sem precisar
+    //  abrir Editar Torneio. Sempre adiciona no FINAL — nunca no meio
+    //  pra evitar conflito com nível atual / breaks já configurados.)
+    container.innerHTML += `
+        <div style="margin-top:.85rem;padding-top:.75rem;border-top:1px dashed #27272a;display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;">
+            <button onclick="_addBlindNivelEmAndamento()" class="btn-ghost" style="font-size:.72rem;padding:.4rem .85rem;border-radius:.4rem;display:inline-flex;align-items:center;gap:.35rem;">
+                <i class="fa-solid fa-plus" style="font-size:.65rem;"></i> Adicionar Nível
+            </button>
+            <button onclick="_addBreakEmAndamento()" class="btn-ghost" style="font-size:.72rem;padding:.4rem .85rem;border-radius:.4rem;display:inline-flex;align-items:center;gap:.35rem;color:#06b6d4;border-color:rgba(6,182,212,.4);">
+                <i class="fa-solid fa-pause" style="font-size:.65rem;"></i> Adicionar Intervalo
+            </button>
+        </div>
+        <div style="margin-top:.4rem;font-size:.62rem;color:#52525b;text-align:center;line-height:1.4;">
+            Novos níveis/intervalos são adicionados no <b>final da estrutura</b>. Após adicionar, você pode editá-los como qualquer outro nível pendente.
+        </div>
+    `;
 }
 
 // Marca que tem alterações não salvas e mostra o botão Salvar
@@ -23726,6 +23744,80 @@ function salvarBlindsInline() {
     if (typeof updateTV === 'function') updateTV(activeTorneioIdx);
 }
 window.salvarBlindsInline = salvarBlindsInline;
+
+// =====================================================================
+// ADICIONAR Nível/Intervalo em torneio em ANDAMENTO
+// =====================================================================
+// Permite estender a estrutura de blinds durante o torneio sem precisar
+// abrir "Editar Torneio". Sempre adiciona no FINAL da estrutura.
+// Não toca em cálculos financeiros, premiação, mesas ou janelas de compra.
+// =====================================================================
+function _addBlindNivelEmAndamento() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !Array.isArray(t.blinds)) {
+        return showToast('⚠️ Torneio inválido');
+    }
+
+    // Se há alterações pendentes nos inputs (dirty), pede pra salvar antes
+    // pra não perder valores que o operador acabou de digitar.
+    if (_blindsInlineDirty) {
+        return showToast('⚠️ Salve as alterações pendentes antes de adicionar novo nível');
+    }
+
+    // Calcula valores do próximo nível baseado no ÚLTIMO nível normal (não break)
+    // Usa progressão simples: dobra SB/BB, mantém tempo padrão.
+    const niveisNormais = t.blinds.filter(b => !b.isBreak);
+    const last = niveisNormais[niveisNormais.length - 1];
+
+    let novoNivel;
+    if (last) {
+        novoNivel = {
+            sb: ((last.sb || 0) * 2) || 100,
+            bb: ((last.bb || 0) * 2) || 200,
+            ante: (last.ante || 0) * 2,
+            tempo: last.tempo || t.tempoNivel || 15
+        };
+    } else {
+        novoNivel = { sb: 100, bb: 200, ante: 0, tempo: t.tempoNivel || 15 };
+    }
+
+    t.blinds.push(novoNivel);
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('ADD_BLIND_NIVEL', `Novo nível adicionado em andamento · ${t.nome} (nível ${niveisNormais.length + 1})`, { torneioId: t.id });
+    }
+    showToast(`✅ Nível ${niveisNormais.length + 1} adicionado`);
+
+    // Re-renderiza pra mostrar a nova linha
+    renderTabBlinds();
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    if (typeof updateTV === 'function') updateTV(activeTorneioIdx);
+}
+
+function _addBreakEmAndamento() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !Array.isArray(t.blinds)) {
+        return showToast('⚠️ Torneio inválido');
+    }
+
+    if (_blindsInlineDirty) {
+        return showToast('⚠️ Salve as alterações pendentes antes de adicionar novo intervalo');
+    }
+
+    t.blinds.push({ isBreak: true, tempo: 10, sb: 0, bb: 0, ante: 0 });
+    saveData();
+    if (typeof logAudit === 'function') {
+        logAudit('ADD_BLIND_INTERVALO', `Novo intervalo adicionado em andamento · ${t.nome}`, { torneioId: t.id });
+    }
+    showToast('✅ Intervalo adicionado');
+
+    renderTabBlinds();
+    if (typeof renderTorneioControle === 'function') renderTorneioControle();
+    if (typeof updateTV === 'function') updateTV(activeTorneioIdx);
+}
+
+window._addBlindNivelEmAndamento = _addBlindNivelEmAndamento;
+window._addBreakEmAndamento = _addBreakEmAndamento;
 
 // ============================================================
 // PAYOUT
