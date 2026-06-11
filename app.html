@@ -5812,6 +5812,15 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div id="ap-valor-divida" style="font-size:1rem;font-weight:800;color:#ef4444;font-family:var(--font-mono);">- R$ 0,00</div>
             </div>
+
+            <!-- Extrato detalhado (visível só se há dívida — pra conferência com o jogador) -->
+            <div id="ap-divida-detalhes-wrap" style="display:none;margin:.5rem 0 .25rem;padding:.55rem .7rem;background:rgba(239,68,68,.04);border:1px dashed rgba(239,68,68,.22);border-radius:.45rem;max-height:200px;overflow-y:auto;">
+                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.45rem;display:flex;align-items:center;gap:.35rem;">
+                    <i class="fa-solid fa-list-ul" style="color:#ef4444;font-size:.58rem;"></i>
+                    Extrato — conferência
+                </div>
+                <div id="ap-divida-detalhes" style="display:flex;flex-direction:column;"></div>
+            </div>
             
             <!-- Líquido -->
             <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0 .2rem;margin-top:.3rem;">
@@ -40806,6 +40815,64 @@ function _resetFilaAcertos() {
 }
 window._resetFilaAcertos = _resetFilaAcertos;
 
+// =====================================================================
+// Extrato detalhado no modal de Acerto Financeiro (Premiação)
+// =====================================================================
+// Mostra todas as transações do jogador no torneio pra que o operador
+// possa conferir com o jogador antes de pagar/descontar. Não modifica
+// nenhum cálculo financeiro — só renderiza o que já existe em transacoes.
+// =====================================================================
+function _acertoRenderDetalhesDivida(jogadorId, valorDivida) {
+    const wrap = document.getElementById('ap-divida-detalhes-wrap');
+    const list = document.getElementById('ap-divida-detalhes');
+    if (!wrap || !list) return;
+
+    // Sem dívida = não precisa mostrar extrato (mantém modal mais limpo)
+    if (!valorDivida || valorDivida <= 0) {
+        wrap.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+
+    // Pega TODAS as transações do jogador, ordenadas por data (mais antigas primeiro)
+    // Isso dá pro operador ver a sequência: buy-in → rebuys → comanda → eventuais pagamentos parciais
+    if (typeof transacoes === 'undefined' || !Array.isArray(transacoes)) {
+        wrap.style.display = 'none';
+        return;
+    }
+    const txs = transacoes
+        .filter(t => String(t.jogadorId) === String(jogadorId))
+        .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+    if (txs.length === 0) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    wrap.style.display = 'block';
+    list.innerHTML = txs.map(t => {
+        const positivo = (t.valor || 0) >= 0;
+        const data = new Date(t.ts || 0);
+        const dataStr = data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const icon = (typeof getTipoIcon === 'function') ? getTipoIcon(t.tipo) : 'fa-circle';
+        const desc = t.descricao || t.tipo || '—';
+        const cor = positivo ? '#22c55e' : '#ef4444';
+        return `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.28rem 0;font-size:.74rem;border-bottom:1px solid rgba(255,255,255,.04);">
+                <div style="display:flex;align-items:center;gap:.4rem;flex:1;min-width:0;">
+                    <i class="fa-solid ${icon}" style="color:${cor};font-size:.68rem;flex-shrink:0;width:14px;text-align:center;"></i>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#e4e4e7;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${desc}</div>
+                        <div style="color:#52525b;font-size:.6rem;">${dataStr}</div>
+                    </div>
+                </div>
+                <div style="color:${cor};font-family:var(--font-mono);font-weight:700;font-size:.76rem;white-space:nowrap;margin-left:.5rem;">${positivo ? '+' : ''}${formatMoney(t.valor)}</div>
+            </div>
+        `;
+    }).join('');
+}
+window._acertoRenderDetalhesDivida = _acertoRenderDetalhesDivida;
+
 function abrirAcertoPremio(jogadorId, posicao) {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
@@ -40855,6 +40922,10 @@ function abrirAcertoPremio(jogadorId, posicao) {
     document.getElementById('ap-divida-sub').textContent = valorDivida > 0 ? '(bar/buy-in/comanda)' : '(nenhuma)';
     document.getElementById('ap-valor-divida').textContent = `- ${formatMoney(valorDivida)}`;
     document.getElementById('ap-valor-divida').style.color = valorDivida > 0 ? '#ef4444' : '#52525b';
+
+    // Renderiza extrato detalhado pra operador conferir com o jogador
+    // (mostra todas as transações que compõem o saldo — buy-in, rebuy, comanda, pagamentos)
+    _acertoRenderDetalhesDivida(jogadorId, valorDivida);
     
     // 🎫 VAGA EXTRA — se a posição tem vaga configurada, mostra card especial
     const vagas = (pp.vagas && Array.isArray(pp.vagas)) ? pp.vagas : [];
