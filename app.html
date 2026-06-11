@@ -5814,12 +5814,18 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
 
             <!-- Extrato detalhado (visível só se há dívida — pra conferência com o jogador) -->
-            <div id="ap-divida-detalhes-wrap" style="display:none;margin:.5rem 0 .25rem;padding:.55rem .7rem;background:rgba(239,68,68,.04);border:1px dashed rgba(239,68,68,.22);border-radius:.45rem;max-height:200px;overflow-y:auto;">
-                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.45rem;display:flex;align-items:center;gap:.35rem;">
-                    <i class="fa-solid fa-list-ul" style="color:#ef4444;font-size:.58rem;"></i>
-                    Extrato — conferência
+            <div id="ap-divida-detalhes-wrap" style="display:none;margin:.5rem 0 .25rem;padding:.55rem .7rem;background:rgba(239,68,68,.04);border:1px dashed rgba(239,68,68,.22);border-radius:.45rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.45rem;gap:.5rem;flex-wrap:wrap;">
+                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:.35rem;">
+                        <i class="fa-solid fa-list-ul" style="color:#ef4444;font-size:.58rem;"></i>
+                        Extrato — conferência
+                    </div>
+                    <div style="display:flex;gap:.25rem;background:#0a0a0c;padding:.2rem;border-radius:.35rem;">
+                        <button type="button" id="ap-extrato-tab-torneio" onclick="_acertoTrocarFiltroExtrato('torneio')" style="background:#a855f7;color:#fff;border:0;padding:.2rem .55rem;border-radius:.25rem;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.6rem;font-weight:700;">Só este torneio</button>
+                        <button type="button" id="ap-extrato-tab-historico" onclick="_acertoTrocarFiltroExtrato('historico')" style="background:transparent;color:#71717a;border:0;padding:.2rem .55rem;border-radius:.25rem;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.6rem;font-weight:700;">Histórico</button>
+                    </div>
                 </div>
-                <div id="ap-divida-detalhes" style="display:flex;flex-direction:column;"></div>
+                <div id="ap-divida-detalhes" style="display:flex;flex-direction:column;max-height:180px;overflow-y:auto;"></div>
             </div>
             
             <!-- Líquido -->
@@ -8065,16 +8071,29 @@ document.addEventListener('DOMContentLoaded', function(){
 
             <!-- TAB: JOGADORES -->
             <div id="tab-jogadores" class="tab-content" style="display:none;">
+                <!-- Barra de busca por nome (filtra ativos, eliminados e lançamentos) -->
+                <div style="margin-bottom:1rem;display:flex;gap:.5rem;align-items:center;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.55rem;padding:.5rem .75rem;">
+                    <i class="fa-solid fa-magnifying-glass" style="color:#71717a;font-size:.85rem;"></i>
+                    <input type="text" id="tab-jog-filtro" placeholder="Buscar jogador pelo nome..." oninput="_aplicarFiltroJogadores(this.value)" style="flex:1;background:transparent;border:0;color:#fafafa;font-size:.85rem;outline:none;font-family:'Manrope',sans-serif;">
+                    <button onclick="document.getElementById('tab-jog-filtro').value='';_aplicarFiltroJogadores('');" id="tab-jog-filtro-clear" style="background:transparent;border:0;color:#52525b;font-size:.9rem;cursor:pointer;display:none;" title="Limpar filtro">&times;</button>
+                </div>
+
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
                     <!-- Ativos -->
                     <div>
-                        <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Em Jogo</div>
-                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;display:flex;justify-content:space-between;align-items:baseline;">
+                            <span>Em Jogo</span>
+                            <span id="mt-jog-ativos-count" style="color:#52525b;font-weight:600;letter-spacing:0;text-transform:none;font-size:.7rem;"></span>
+                        </div>
+                        <div id="mt-jogadores-ativos" style="display:flex;flex-direction:column;gap:.4rem;max-height:340px;overflow-y:auto;padding-right:.25rem;"></div>
                     </div>
                     <!-- Eliminados com ranking -->
                     <div>
-                        <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Eliminados</div>
-                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                        <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;display:flex;justify-content:space-between;align-items:baseline;">
+                            <span>Eliminados</span>
+                            <span id="mt-jog-elim-count" style="color:#52525b;font-weight:600;letter-spacing:0;text-transform:none;font-size:.7rem;"></span>
+                        </div>
+                        <div id="mt-jogadores-eliminados" style="display:flex;flex-direction:column;gap:.4rem;max-height:340px;overflow-y:auto;padding-right:.25rem;"></div>
                     </div>
                 </div>
 
@@ -22594,6 +22613,16 @@ function renderBountyPanel(t) {
 // ============================================================
 // TORNEIO — TABS
 // ============================================================
+// Filtro de busca por nome na aba Jogadores (compartilhado com Lançamentos individuais)
+let _jogadoresFiltroNome = '';
+function _aplicarFiltroJogadores(valor) {
+    _jogadoresFiltroNome = (valor || '').toLowerCase().trim();
+    const clearBtn = document.getElementById('tab-jog-filtro-clear');
+    if (clearBtn) clearBtn.style.display = _jogadoresFiltroNome ? 'inline' : 'none';
+    renderTabJogadores();
+}
+window._aplicarFiltroJogadores = _aplicarFiltroJogadores;
+
 function renderTabJogadores() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
@@ -22605,28 +22634,62 @@ function renderTabJogadores() {
     const entriesUniq   = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
     const ativos        = entriesUniq.filter(id => !eliminadosIds.has(id));
 
-    ativoDiv.innerHTML = ativos.length ? ativos.map(id => {
+    // Filtra por nome se houver busca
+    const filtro = _jogadoresFiltroNome;
+    const matchNome = (id) => {
+        if (!filtro) return true;
+        const j = jogadores.find(x => x.id === id);
+        if (!j) return false;
+        const nome = (j.nome || '').toLowerCase();
+        const apelido = (j.apelido || '').toLowerCase();
+        return nome.includes(filtro) || apelido.includes(filtro);
+    };
+
+    const ativosFiltrados = ativos.filter(matchNome);
+    const eliminadosFiltrados = t.eliminados.filter(e => matchNome(e.jogadorId));
+
+    // Atualiza contagens nos headers
+    const countAtivosEl = document.getElementById('mt-jog-ativos-count');
+    const countElimEl   = document.getElementById('mt-jog-elim-count');
+    if (countAtivosEl) {
+        countAtivosEl.textContent = filtro
+            ? `${ativosFiltrados.length} / ${ativos.length}`
+            : `${ativos.length}`;
+    }
+    if (countElimEl) {
+        countElimEl.textContent = filtro
+            ? `${eliminadosFiltrados.length} / ${t.eliminados.length}`
+            : `${t.eliminados.length}`;
+    }
+
+    ativoDiv.innerHTML = ativosFiltrados.length ? ativosFiltrados.map(id => {
         const j = jogadores.find(j => j.id === id);
         const re = t.entries.filter(e => e.jogadorId === id && e.tipo === 'reentry').length;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;">
-            <div>
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;gap:.5rem;">
+            <div style="flex:1;min-width:0;">
                 <span style="font-weight:700;font-size:.85rem;">${j ? j.nome : 'Desconhecido'}</span>
                 ${j && j.apelido ? `<span style="font-size:.7rem;color:#52525b;margin-left:.4rem;">${j.apelido}</span>` : ''}
                 ${re ? `<span class="tag" style="background:rgba(245,158,11,.12);color:var(--gold);margin-left:.5rem;">${re}x re-entry</span>` : ''}
             </div>
-            <span style="font-size:.7rem;color:#22c55e;font-weight:700;">● Ativo</span>
+            <button onclick="_imprimirExtratoTorneioJogador('${id}')" title="Imprimir extrato deste jogador no torneio atual" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
+                <i class="fa-solid fa-receipt"></i> Extrato
+            </button>
+            <span style="font-size:.7rem;color:#22c55e;font-weight:700;white-space:nowrap;">● Ativo</span>
         </div>`;
-    }).join('') : '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhum jogador inscrito</div>';
+    }).join('') : `<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">${filtro ? 'Nenhum jogador encontrado' : 'Nenhum jogador inscrito'}</div>`;
 
-    elimDiv.innerHTML = [...t.eliminados].reverse().map(e => {
+    elimDiv.innerHTML = [...eliminadosFiltrados].reverse().map(e => {
         const j = jogadores.find(j => j.id === e.jogadorId);
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.65;">
-            <div>
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.65;gap:.5rem;">
+            <div style="flex:1;min-width:0;">
                 <span style="font-weight:700;font-size:.85rem;">${j ? j.nome : 'Desconhecido'}</span>
             </div>
-            <span style="font-size:.75rem;color:#ef4444;font-weight:700;">${e.posicao}º lugar</span>
+            <button onclick="_imprimirExtratoTorneioJogador('${e.jogadorId}')" title="Imprimir extrato deste jogador no torneio atual" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
+                <i class="fa-solid fa-receipt"></i> Extrato
+            </button>
+            <span style="font-size:.75rem;color:#ef4444;font-weight:700;white-space:nowrap;">${e.posicao}º lugar</span>
         </div>`;
-    }).join('') || '<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">Nenhum eliminado ainda</div>';
+    }).join('') || `<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">${filtro ? 'Nenhum eliminado encontrado' : 'Nenhum eliminado ainda'}</div>`;
 
     // Renderiza tabela de lançamentos detalhados (com botão de estornar por linha)
     renderTabLancamentosDetalhados();
@@ -22641,6 +22704,99 @@ function renderTabJogadoresTorneio() {
 // com botão de estornar em cada linha (só visível pra admin).
 // BUG-FIX (Sessão 26/05): entries com mesmo `comboId` são AGRUPADAS numa linha "Combo".
 // O combo mostra total, todas as ações em badges, e desdobra ao expandir.
+// =====================================================================
+// Extrato simplificado do jogador NO TORNEIO ATUAL — pra impressão térmica
+// =====================================================================
+// Pega só as transações com refId === torneioId (filtra histórico antigo)
+// e imprime no formato compacto de 80mm com total final. Não modifica
+// nada do cálculo financeiro — só lê e formata.
+// =====================================================================
+function _imprimirExtratoTorneioJogador(jogadorId) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return showToast('⚠️ Torneio não encontrado');
+    const j = jogadores.find(x => String(x.id) === String(jogadorId));
+    if (!j) return showToast('⚠️ Jogador não encontrado');
+
+    if (typeof transacoes === 'undefined' || !Array.isArray(transacoes)) {
+        return showToast('⚠️ Transações indisponíveis');
+    }
+
+    // Filtra transações do jogador VINCULADAS a este torneio (refId === t.id)
+    const txs = transacoes
+        .filter(tx => String(tx.jogadorId) === String(jogadorId) && String(tx.refId) === String(t.id))
+        .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+    if (txs.length === 0) {
+        return showToast('ℹ️ Nenhum lançamento deste jogador no torneio atual');
+    }
+
+    const totalGasto = txs.filter(tx => tx.valor < 0).reduce((s, tx) => s + tx.valor, 0); // negativo
+    const totalRecebido = txs.filter(tx => tx.valor > 0).reduce((s, tx) => s + tx.valor, 0); // positivo
+    const saldo = totalRecebido + totalGasto; // pode ser positivo, zero ou negativo
+
+    // Monta texto formatado pra impressão térmica 80mm (usa helpers já existentes)
+    let txt = '';
+    if (typeof _printHeader === 'function') {
+        txt += _printHeader();
+    }
+    txt += _printCenter('EXTRATO DO TORNEIO', 32) + '\n';
+    txt += '--------------------------------\n';
+    txt += `Torneio: ${(t.nome || '').substring(0, 24)}\n`;
+    txt += `Jogador: ${(j.nome || '').substring(0, 24)}\n`;
+    txt += `Data: ${new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n`;
+    txt += '--------------------------------\n';
+    txt += 'LANCAMENTOS\n';
+    txt += '--------------------------------\n';
+
+    // Função local pra formatar valor à direita com largura fixa de 32 chars
+    const fmtLinha = (desc, valor) => {
+        const valorStr = (valor >= 0 ? '+' : '-') + 'R$ ' + Math.abs(valor).toFixed(2).replace('.', ',');
+        const espacoDesc = 32 - valorStr.length - 1;
+        const descCurta = desc.length > espacoDesc ? desc.substring(0, espacoDesc) : desc;
+        return descCurta.padEnd(espacoDesc, ' ') + ' ' + valorStr;
+    };
+
+    txs.forEach(tx => {
+        const data = new Date(tx.ts || 0);
+        const horaStr = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const desc = (tx.descricao || tx.tipo || '—').split(' · ')[0]; // pega só o primeiro pedaço
+        txt += fmtLinha(`${horaStr} ${desc}`, tx.valor) + '\n';
+    });
+
+    txt += '--------------------------------\n';
+    if (totalGasto < 0) {
+        txt += fmtLinha('Total gasto', totalGasto) + '\n';
+    }
+    if (totalRecebido > 0) {
+        txt += fmtLinha('Total recebido', totalRecebido) + '\n';
+    }
+    txt += fmtLinha('SALDO', saldo) + '\n';
+    txt += '--------------------------------\n';
+
+    if (saldo < -0.005) {
+        txt += _printCenter('JOGADOR DEVE PAGAR', 32) + '\n';
+        txt += _printCenter('R$ ' + Math.abs(saldo).toFixed(2).replace('.', ','), 32) + '\n';
+    } else if (saldo > 0.005) {
+        txt += _printCenter('JOGADOR TEM A RECEBER', 32) + '\n';
+        txt += _printCenter('R$ ' + saldo.toFixed(2).replace('.', ','), 32) + '\n';
+    } else {
+        txt += _printCenter('SALDO ZERADO', 32) + '\n';
+    }
+
+    if (typeof _printFooter === 'function') {
+        txt += _printFooter();
+    }
+
+    if (typeof abrirPreviewImpressao === 'function') {
+        abrirPreviewImpressao('Extrato do Torneio', txt);
+    }
+
+    if (typeof logAudit === 'function') {
+        logAudit('EXTRATO_TORNEIO_PRINT', `Extrato impresso · ${j.nome} · ${t.nome}`, { torneioId: t.id, jogadorId: j.id });
+    }
+}
+window._imprimirExtratoTorneioJogador = _imprimirExtratoTorneioJogador;
+
 function renderTabLancamentosDetalhados() {
     const t = torneios[activeTorneioIdx];
     const tbody = document.getElementById('mt-lancamentos-tbody');
@@ -22725,14 +22881,30 @@ function renderTabLancamentosDetalhados() {
     });
     lancamentos.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-    if (count) count.innerText = `${lancamentos.length} lançamento${lancamentos.length === 1 ? '' : 's'}`;
+    // Aplica filtro por nome (compartilhado com a busca da aba Jogadores)
+    const filtro = (typeof _jogadoresFiltroNome === 'string' ? _jogadoresFiltroNome : '').trim();
+    const lancamentosFiltrados = filtro
+        ? lancamentos.filter(l => {
+            const j = jogadores.find(x => x.id === l.jogadorId);
+            if (!j) return false;
+            const nome = (j.nome || '').toLowerCase();
+            const apelido = (j.apelido || '').toLowerCase();
+            return nome.includes(filtro) || apelido.includes(filtro);
+        })
+        : lancamentos;
 
-    if (lancamentos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#3f3f46;font-size:.8rem;">Nenhum lançamento ainda</td></tr>';
+    if (count) {
+        count.innerText = filtro
+            ? `${lancamentosFiltrados.length} / ${lancamentos.length} lançamento${lancamentos.length === 1 ? '' : 's'}`
+            : `${lancamentos.length} lançamento${lancamentos.length === 1 ? '' : 's'}`;
+    }
+
+    if (lancamentosFiltrados.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:2rem;text-align:center;color:#3f3f46;font-size:.8rem;">${filtro ? 'Nenhum lançamento encontrado pra esse jogador' : 'Nenhum lançamento ainda'}</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = lancamentos.map(l => {
+    tbody.innerHTML = lancamentosFiltrados.map(l => {
         const jogadorNome = getJogadorNome(l.jogadorId);
         const dt = l.ts ? new Date(l.ts) : null;
         const dataStr = dt ? (dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })) : '—';
@@ -40818,10 +40990,17 @@ window._resetFilaAcertos = _resetFilaAcertos;
 // =====================================================================
 // Extrato detalhado no modal de Acerto Financeiro (Premiação)
 // =====================================================================
-// Mostra todas as transações do jogador no torneio pra que o operador
-// possa conferir com o jogador antes de pagar/descontar. Não modifica
-// nenhum cálculo financeiro — só renderiza o que já existe em transacoes.
+// Mostra transações do jogador pra que o operador possa conferir antes
+// de pagar/descontar. Tem 2 modos:
+//   - 'torneio'   (default): só transações deste torneio (refId === t.id)
+//   - 'historico'          : todas as transações do jogador no clube
+// Não modifica nenhum cálculo financeiro — só renderiza.
 // =====================================================================
+let _acertoExtratoModo = 'torneio'; // default: só este torneio
+let _acertoExtratoJogadorAtual = null; // armazena pra trocar de modo sem reabrir
+let _acertoExtratoDividaAtual = 0;
+let _acertoExtratoTorneioId = null;
+
 function _acertoRenderDetalhesDivida(jogadorId, valorDivida) {
     const wrap = document.getElementById('ap-divida-detalhes-wrap');
     const list = document.getElementById('ap-divida-detalhes');
@@ -40834,28 +41013,45 @@ function _acertoRenderDetalhesDivida(jogadorId, valorDivida) {
         return;
     }
 
-    // Pega TODAS as transações do jogador, ordenadas por data (mais antigas primeiro)
-    // Isso dá pro operador ver a sequência: buy-in → rebuys → comanda → eventuais pagamentos parciais
+    // Armazena referências pra permitir troca de modo sem recálculo
+    _acertoExtratoJogadorAtual = jogadorId;
+    _acertoExtratoDividaAtual = valorDivida;
+    const t = (typeof torneios !== 'undefined' && torneios && torneios[activeTorneioIdx]) ? torneios[activeTorneioIdx] : null;
+    _acertoExtratoTorneioId = t ? t.id : null;
+
+    // Atualiza visual dos botões de tab pra refletir modo atual
+    _acertoAtualizarTabsExtrato();
+
     if (typeof transacoes === 'undefined' || !Array.isArray(transacoes)) {
         wrap.style.display = 'none';
         return;
     }
-    const txs = transacoes
-        .filter(t => String(t.jogadorId) === String(jogadorId))
-        .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+    // Filtra conforme modo selecionado
+    let txs = transacoes.filter(t2 => String(t2.jogadorId) === String(jogadorId));
+    if (_acertoExtratoModo === 'torneio' && _acertoExtratoTorneioId != null) {
+        txs = txs.filter(t2 => String(t2.refId) === String(_acertoExtratoTorneioId));
+    }
+    txs.sort((a, b) => (a.ts || 0) - (b.ts || 0));
 
     if (txs.length === 0) {
-        wrap.style.display = 'none';
+        // Se filtrou por torneio e ficou vazio, sugere alternar pra histórico
+        if (_acertoExtratoModo === 'torneio') {
+            wrap.style.display = 'block';
+            list.innerHTML = '<div style="padding:.6rem;text-align:center;color:#71717a;font-size:.72rem;">Nenhum lançamento neste torneio. Clique em <b>Histórico</b> pra ver outros.</div>';
+        } else {
+            wrap.style.display = 'none';
+        }
         return;
     }
 
     wrap.style.display = 'block';
-    list.innerHTML = txs.map(t => {
-        const positivo = (t.valor || 0) >= 0;
-        const data = new Date(t.ts || 0);
+    list.innerHTML = txs.map(t2 => {
+        const positivo = (t2.valor || 0) >= 0;
+        const data = new Date(t2.ts || 0);
         const dataStr = data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        const icon = (typeof getTipoIcon === 'function') ? getTipoIcon(t.tipo) : 'fa-circle';
-        const desc = t.descricao || t.tipo || '—';
+        const icon = (typeof getTipoIcon === 'function') ? getTipoIcon(t2.tipo) : 'fa-circle';
+        const desc = t2.descricao || t2.tipo || '—';
         const cor = positivo ? '#22c55e' : '#ef4444';
         return `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:.28rem 0;font-size:.74rem;border-bottom:1px solid rgba(255,255,255,.04);">
@@ -40866,12 +41062,39 @@ function _acertoRenderDetalhesDivida(jogadorId, valorDivida) {
                         <div style="color:#52525b;font-size:.6rem;">${dataStr}</div>
                     </div>
                 </div>
-                <div style="color:${cor};font-family:var(--font-mono);font-weight:700;font-size:.76rem;white-space:nowrap;margin-left:.5rem;">${positivo ? '+' : ''}${formatMoney(t.valor)}</div>
+                <div style="color:${cor};font-family:var(--font-mono);font-weight:700;font-size:.76rem;white-space:nowrap;margin-left:.5rem;">${positivo ? '+' : ''}${formatMoney(t2.valor)}</div>
             </div>
         `;
     }).join('');
 }
 window._acertoRenderDetalhesDivida = _acertoRenderDetalhesDivida;
+
+// Atualiza apenas o destaque visual dos botões de tab
+function _acertoAtualizarTabsExtrato() {
+    const btnTorneio = document.getElementById('ap-extrato-tab-torneio');
+    const btnHistorico = document.getElementById('ap-extrato-tab-historico');
+    if (!btnTorneio || !btnHistorico) return;
+    if (_acertoExtratoModo === 'torneio') {
+        btnTorneio.style.background = '#a855f7';
+        btnTorneio.style.color = '#fff';
+        btnHistorico.style.background = 'transparent';
+        btnHistorico.style.color = '#71717a';
+    } else {
+        btnHistorico.style.background = '#a855f7';
+        btnHistorico.style.color = '#fff';
+        btnTorneio.style.background = 'transparent';
+        btnTorneio.style.color = '#71717a';
+    }
+}
+
+function _acertoTrocarFiltroExtrato(modo) {
+    if (modo !== 'torneio' && modo !== 'historico') return;
+    _acertoExtratoModo = modo;
+    if (_acertoExtratoJogadorAtual && _acertoExtratoDividaAtual > 0) {
+        _acertoRenderDetalhesDivida(_acertoExtratoJogadorAtual, _acertoExtratoDividaAtual);
+    }
+}
+window._acertoTrocarFiltroExtrato = _acertoTrocarFiltroExtrato;
 
 function abrirAcertoPremio(jogadorId, posicao) {
     const t = torneios[activeTorneioIdx];
@@ -40925,6 +41148,7 @@ function abrirAcertoPremio(jogadorId, posicao) {
 
     // Renderiza extrato detalhado pra operador conferir com o jogador
     // (mostra todas as transações que compõem o saldo — buy-in, rebuy, comanda, pagamentos)
+    _acertoExtratoModo = 'torneio'; // sempre começa filtrado por este torneio
     _acertoRenderDetalhesDivida(jogadorId, valorDivida);
     
     // 🎫 VAGA EXTRA — se a posição tem vaga configurada, mostra card especial
