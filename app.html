@@ -5704,6 +5704,41 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
         </div>
 
+        <!-- MODO COPA — toggle + slider (banner roxo, opcional) -->
+        <div id="prm-copa-banner" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.55rem;padding:.7rem .85rem;margin-bottom:1rem;">
+            <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;">
+                <input type="checkbox" id="prm-copa-toggle" onchange="prmToggleCopa()" style="accent-color:#a855f7;width:18px;height:18px;">
+                <div style="flex:1;">
+                    <div style="font-size:.85rem;font-weight:700;color:#a855f7;display:flex;align-items:center;gap:.4rem;">
+                        <i class="fa-solid fa-trophy" style="font-size:.75rem;"></i> Modo Copa — split do prize pool
+                    </div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">Divide o prize pool entre premiação individual e premiação de equipes (cada uma com sua tabela)</div>
+                </div>
+                <span id="prm-copa-status" style="background:#52525b;color:#fff;font-size:.6rem;padding:.15rem .5rem;border-radius:.25rem;font-weight:700;letter-spacing:.05em;">DESLIGADO</span>
+            </label>
+            <div id="prm-copa-config" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px dashed rgba(168,85,247,.2);">
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <label style="font-size:.7rem;color:#a1a1aa;white-space:nowrap;">% para equipes:</label>
+                    <input type="range" id="prm-copa-percent" min="0" max="100" value="50" oninput="prmAtualizarPercentCopa(this.value)" style="flex:1;accent-color:#a855f7;">
+                    <input type="number" id="prm-copa-percent-num" min="0" max="100" value="50" oninput="prmAtualizarPercentCopa(this.value, true)" style="width:55px;background:#0a0a0c;border:1px solid #27272a;color:#fafafa;padding:.25rem .4rem;border-radius:.3rem;font-family:var(--font-mono);font-size:.8rem;text-align:center;">
+                    <span style="color:#a855f7;font-weight:700;">%</span>
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:.5rem;font-size:.7rem;font-family:var(--font-mono);">
+                    <span style="color:#71717a;">👤 Individual: <span id="prm-copa-preview-ind" style="color:#22c55e;font-weight:700;">R$ 0,00</span></span>
+                    <span style="color:#71717a;">👥 Equipes: <span id="prm-copa-preview-eq" style="color:#a855f7;font-weight:700;">R$ 0,00</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cabeçalho do bloco individual (aparece só em Modo Copa) -->
+        <div id="prm-individual-header" style="display:none;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.3);border-radius:.45rem;padding:.5rem .75rem;margin-bottom:.6rem;">
+            <div style="display:flex;align-items:center;gap:.4rem;">
+                <i class="fa-solid fa-user" style="color:#22c55e;font-size:.7rem;"></i>
+                <span style="font-size:.7rem;color:#22c55e;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Premiação Individual</span>
+                <span id="prm-individual-total-header" style="margin-left:auto;font-family:var(--font-mono);font-size:.7rem;color:#22c55e;font-weight:700;">R$ 0,00</span>
+            </div>
+        </div>
+
         <!-- Controles -->
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:1rem;align-items:end;">
             <div>
@@ -5734,6 +5769,43 @@ document.addEventListener('DOMContentLoaded', function(){
             <span style="text-align:left;padding-left:.4rem;">🎫 Vaga <span style="color:#3f3f46;font-weight:600;">(opcional)</span></span>
         </div>
         <div id="prm-payout-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:40vh;overflow-y:auto;margin-bottom:1rem;"></div>
+
+        <!-- BLOCO EQUIPES (Modo Copa) — só aparece quando Modo Copa ativo -->
+        <div id="prm-equipes-bloco" style="display:none;margin-bottom:1rem;">
+            <div style="background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.3);border-radius:.45rem;padding:.5rem .75rem;margin-bottom:.6rem;">
+                <div style="display:flex;align-items:center;gap:.4rem;">
+                    <i class="fa-solid fa-users" style="color:#a855f7;font-size:.7rem;"></i>
+                    <span style="font-size:.7rem;color:#a855f7;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">Premiação Equipes</span>
+                    <span id="prm-equipes-total-header" style="margin-left:auto;font-family:var(--font-mono);font-size:.7rem;color:#a855f7;font-weight:700;">R$ 0,00</span>
+                </div>
+            </div>
+            <!-- Controles Equipes -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem;align-items:end;">
+                <div>
+                    <label class="inp-label">Qtd. Premiados (equipes)</label>
+                    <input id="prm-eq-qtd" type="number" min="1" max="100" value="3" class="inp" oninput="recalcularPayoutDistEquipes()">
+                </div>
+                <div>
+                    <label class="inp-label">Modelo</label>
+                    <select id="prm-eq-modelo" class="inp" onchange="recalcularPayoutDistEquipes()">
+                        <option value="smart">Inteligente (padrão)</option>
+                        <option value="flat">Plano (igual)</option>
+                        <option value="top-heavy">Foco no top 1</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:.4rem;">
+                    <button onclick="recalcularPayoutDistEquipes(true)" class="btn-ghost" style="padding:.55rem .75rem;font-size:.75rem;width:100%;" title="Recalcular distribuição">
+                        <i class="fa-solid fa-rotate"></i> Recalcular
+                    </button>
+                </div>
+            </div>
+            <div style="padding:.5rem .75rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.45rem;margin-bottom:.5rem;display:grid;grid-template-columns:3rem .9fr .9fr;gap:.5rem;font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;">
+                <span>Pos</span>
+                <span style="text-align:center;">% Prize Equipe</span>
+                <span style="text-align:right;">R$ Premiação</span>
+            </div>
+            <div id="prm-eq-payout-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:30vh;overflow-y:auto;"></div>
+        </div>
 
         <!-- Totais e alertas -->
         <div id="prm-totais" style="padding:.6rem .85rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:.45rem;font-size:.8rem;display:flex;justify-content:space-between;margin-bottom:1rem;">
@@ -26488,6 +26560,14 @@ function updateTV(idx) {
             valores: t.premiacaoProjetada.valores.map(v => Math.round(v)),
             percentuais: t.premiacaoProjetada.percentuais,
             vagas: t.premiacaoProjetada.vagas || [],
+            // Modo Copa — campos opcionais. TV só renderiza o bloco extra se modoCopa=true
+            modoCopa: !!t.premiacaoProjetada.modoCopa,
+            percentEquipe: Number(t.premiacaoProjetada.percentEquipe) || 0,
+            equipes: (t.premiacaoProjetada.modoCopa && t.premiacaoProjetada.equipes) ? {
+                qtd: t.premiacaoProjetada.equipes.qtd,
+                valores: (t.premiacaoProjetada.equipes.valores || []).map(v => Math.round(v)),
+                percentuais: t.premiacaoProjetada.equipes.percentuais || [],
+            } : null,
         } : null,
         // Fonte dos números configurada nas Preferências
         fontMono: (config && config.preferencias && config.preferencias.fontMono) || 'jetbrains',
@@ -40695,12 +40775,34 @@ function abrirPremiacaoProjetada() {
         };
     }
 
+    // Modo Copa — inicializa estrutura paralela pra equipes (NÃO obrigatória)
+    // Quando modoCopa=false, premiação funciona normal (zero impacto em torneios existentes)
+    if (t.premiacaoProjetada.modoCopa == null) t.premiacaoProjetada.modoCopa = false;
+    if (t.premiacaoProjetada.percentEquipe == null) t.premiacaoProjetada.percentEquipe = 50;
+    if (!t.premiacaoProjetada.equipes) {
+        t.premiacaoProjetada.equipes = {
+            qtd: 3,
+            modelo: 'smart',
+            percentuais: [],
+            valores: [],
+        };
+    }
+
     const pp = t.premiacaoProjetada;
     document.getElementById('prm-qtd').value = pp.qtd;
     document.getElementById('prm-modelo').value = pp.modelo;
     document.getElementById('prm-show-tv').checked = pp.mostrarNaTV || false;
+    
+    // Modo Copa — setup dos campos visuais
+    document.getElementById('prm-copa-toggle').checked = !!pp.modoCopa;
+    document.getElementById('prm-copa-percent').value = pp.percentEquipe;
+    document.getElementById('prm-copa-percent-num').value = pp.percentEquipe;
+    document.getElementById('prm-eq-qtd').value = pp.equipes.qtd;
+    document.getElementById('prm-eq-modelo').value = pp.equipes.modelo;
+    prmAtualizarVisualCopa();  // mostra/esconde blocos conforme estado do toggle
 
     recalcularPayoutDist(false);
+    if (pp.modoCopa) recalcularPayoutDistEquipes(false);
     openModal('modal-premiacao-proj');
 }
 
@@ -40711,7 +40813,13 @@ function recalcularPayoutDist(forceRegen = false) {
 
     const qtd = Math.max(1, parseInt(document.getElementById('prm-qtd').value) || 6);
     const modelo = document.getElementById('prm-modelo').value;
-    const prize = getPrize(t);
+    const prizeTotal = getPrize(t);
+    
+    // Quando Modo Copa ativo, individual recebe só uma fatia do prize.
+    // O restante (percentEquipe%) vai pra premiação de equipes.
+    // NUNCA mexer em getPrize — apenas calcula o pedaço local pra distribuir.
+    const percEquipe = (pp.modoCopa) ? Math.max(0, Math.min(100, Number(pp.percentEquipe) || 0)) : 0;
+    const prize = prizeTotal * (100 - percEquipe) / 100;
 
     // Re-gera percentuais se não existe ou se qtd/modelo mudaram ou forceRegen
     const precisaRegenerar = forceRegen || !pp.percentuais || pp.percentuais.length !== qtd || pp.modelo !== modelo;
@@ -40788,22 +40896,41 @@ function recalcularPayoutDist(forceRegen = false) {
 function atualizarTotalPayout() {
     const t = torneios[activeTorneioIdx];
     if (!t || !t.premiacaoProjetada) return;
-    const prize = getPrize(t);
+    const prizeTotal = getPrize(t);
+    const pp = t.premiacaoProjetada;
+    // Quando Modo Copa ativo, individual usa só uma fatia do prize total
+    const percEquipe = (pp.modoCopa) ? Math.max(0, Math.min(100, Number(pp.percentEquipe) || 0)) : 0;
+    const prize = prizeTotal * (100 - percEquipe) / 100;
     const totalVal = t.premiacaoProjetada.valores.reduce((s, v) => s + v, 0);
     const totalPct = t.premiacaoProjetada.percentuais.reduce((s, p) => s + p, 0);
     const totalEl = document.getElementById('prm-totais');
     const dispEl = document.getElementById('prm-total-dist');
-    if (dispEl) dispEl.innerText = formatMoney(totalVal);
+    
+    // Atualiza também o header do bloco individual (visível em Modo Copa)
+    const indHeaderEl = document.getElementById('prm-individual-total-header');
+    if (indHeaderEl) indHeaderEl.innerText = formatMoney(totalVal);
+    
+    // Quando Modo Copa: total geral é soma de individual + equipes
+    if (pp.modoCopa) {
+        const totalEq = (pp.equipes && pp.equipes.valores) ? pp.equipes.valores.reduce((s, v) => s + v, 0) : 0;
+        if (dispEl) dispEl.innerText = formatMoney(totalVal + totalEq);
+    } else {
+        if (dispEl) dispEl.innerText = formatMoney(totalVal);
+    }
 
-    // Cor indica se está próximo do prize pool
-    const diff = Math.abs(totalVal - prize);
-    const tolerancia = prize * 0.02; // 2% de tolerância
+    // Cor indica se está próximo do prize pool (compara com TOTAL quando Modo Copa)
+    const totalExibido = pp.modoCopa
+        ? (totalVal + ((pp.equipes && pp.equipes.valores) ? pp.equipes.valores.reduce((s, v) => s + v, 0) : 0))
+        : totalVal;
+    const refPrize = pp.modoCopa ? prizeTotal : prize;
+    const diff = Math.abs(totalExibido - refPrize);
+    const tolerancia = refPrize * 0.02; // 2% de tolerância
     if (totalEl) {
         if (diff <= tolerancia) {
             totalEl.style.background = 'rgba(34,197,94,.06)';
             totalEl.style.borderColor = 'rgba(34,197,94,.2)';
             dispEl.style.color = '#22c55e';
-        } else if (totalVal > prize) {
+        } else if (totalExibido > refPrize) {
             totalEl.style.background = 'rgba(239,68,68,.06)';
             totalEl.style.borderColor = 'rgba(239,68,68,.25)';
             dispEl.style.color = '#ef4444';
@@ -40814,6 +40941,168 @@ function atualizarTotalPayout() {
         }
     }
 }
+
+// =====================================================================
+// MODO COPA — Funções de controle da premiação dividida
+// =====================================================================
+// Estrutura paralela: t.premiacaoProjetada.equipes (com qtd, modelo, percentuais, valores)
+// Compartilha com individual: prize pool, percentEquipe (slider)
+// Quando modoCopa=false, equipes fica inerte (não afeta nada)
+// =====================================================================
+
+function prmAtualizarVisualCopa() {
+    // Liga/desliga partes da UI conforme o estado do toggle Modo Copa
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    const pp = t.premiacaoProjetada;
+    const ativo = !!pp.modoCopa;
+    
+    const config = document.getElementById('prm-copa-config');
+    const status = document.getElementById('prm-copa-status');
+    const indHeader = document.getElementById('prm-individual-header');
+    const eqBloco = document.getElementById('prm-equipes-bloco');
+    
+    if (config) config.style.display = ativo ? 'block' : 'none';
+    if (status) {
+        status.textContent = ativo ? 'ATIVO' : 'DESLIGADO';
+        status.style.background = ativo ? '#a855f7' : '#52525b';
+    }
+    if (indHeader) indHeader.style.display = ativo ? 'block' : 'none';
+    if (eqBloco) eqBloco.style.display = ativo ? 'block' : 'none';
+    
+    if (ativo) {
+        prmAtualizarPreviewCopa();
+    }
+}
+
+function prmToggleCopa() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    t.premiacaoProjetada.modoCopa = document.getElementById('prm-copa-toggle').checked;
+    prmAtualizarVisualCopa();
+    // Recalcula individual com o prize total ou parcial (depende do toggle)
+    recalcularPayoutDist(false);
+    if (t.premiacaoProjetada.modoCopa) {
+        recalcularPayoutDistEquipes(false);
+    }
+}
+
+function prmAtualizarPercentCopa(valor, comingFromNumberInput) {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    let v = parseInt(valor) || 0;
+    v = Math.max(0, Math.min(100, v));
+    t.premiacaoProjetada.percentEquipe = v;
+    // Sincroniza os dois inputs (slider + number)
+    if (comingFromNumberInput) {
+        document.getElementById('prm-copa-percent').value = v;
+    } else {
+        document.getElementById('prm-copa-percent-num').value = v;
+    }
+    // Recalcula ambas premiações com a nova divisão
+    recalcularPayoutDist(true);
+    if (t.premiacaoProjetada.modoCopa) {
+        recalcularPayoutDistEquipes(true);
+    }
+}
+
+function prmAtualizarPreviewCopa() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    const prizeTotal = getPrize(t);  // NÃO modificado — só consulta
+    const perc = Math.max(0, Math.min(100, Number(t.premiacaoProjetada.percentEquipe) || 0));
+    const valEquipe = prizeTotal * perc / 100;
+    const valIndividual = prizeTotal - valEquipe;
+    const elInd = document.getElementById('prm-copa-preview-ind');
+    const elEq = document.getElementById('prm-copa-preview-eq');
+    if (elInd) elInd.innerText = formatMoney(valIndividual);
+    if (elEq) elEq.innerText = formatMoney(valEquipe);
+}
+
+function recalcularPayoutDistEquipes(forceRegen = false) {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    const pp = t.premiacaoProjetada;
+    if (!pp.equipes) pp.equipes = { qtd: 3, modelo: 'smart', percentuais: [], valores: [] };
+    
+    const qtd = Math.max(1, parseInt(document.getElementById('prm-eq-qtd').value) || 3);
+    const modelo = document.getElementById('prm-eq-modelo').value;
+    const prizeTotal = getPrize(t);  // NÃO modificado — só consulta
+    const percEquipe = Math.max(0, Math.min(100, Number(pp.percentEquipe) || 0));
+    const prizeEquipes = prizeTotal * percEquipe / 100;
+    
+    const eq = pp.equipes;
+    const precisaRegenerar = forceRegen || !eq.percentuais || eq.percentuais.length !== qtd || eq.modelo !== modelo;
+    
+    let pcts;
+    if (precisaRegenerar) {
+        if (modelo === 'flat')           pcts = gerarPayoutFlat(qtd);
+        else if (modelo === 'top-heavy') pcts = gerarPayoutTopHeavy(qtd);
+        else                              pcts = gerarPayoutInteligente(qtd);
+    } else {
+        pcts = [...eq.percentuais];
+    }
+    
+    eq.qtd = qtd;
+    eq.modelo = modelo;
+    eq.percentuais = pcts;
+    eq.valores = pcts.map(pc => (prizeEquipes * pc) / 100);
+    
+    // Renderiza lista (mesma estrutura visual do individual mas com 3 colunas — sem Vaga)
+    const lista = document.getElementById('prm-eq-payout-list');
+    if (!lista) return;
+    lista.innerHTML = pcts.map((pct, i) => `
+        <div style="display:grid;grid-template-columns:3rem .9fr .9fr;gap:.5rem;align-items:center;padding:.4rem .6rem;background:${i===0?'rgba(168,85,247,.08)':i===1?'rgba(196,181,253,.05)':i===2?'rgba(221,214,254,.04)':'#0f0f12'};border:1px solid ${i===0?'rgba(168,85,247,.3)':i===1?'rgba(196,181,253,.2)':i===2?'rgba(221,214,254,.15)':'#1e1e23'};border-radius:.4rem;">
+            <span style="font-weight:800;color:${i===0?'#a855f7':i===1?'#c4b5fd':i===2?'#ddd6fe':'#71717a'};">${i+1}ª</span>
+            <input type="number" step="0.1" min="0" value="${pct.toFixed(1)}" data-idx="${i}" class="prm-eq-pct-inp inp" style="padding:.3rem .5rem;font-family:var(--font-mono);font-size:.8rem;text-align:center;">
+            <input type="number" step="1" min="0" value="${Math.round(eq.valores[i])}" data-idx="${i}" class="prm-eq-val-inp inp" style="padding:.3rem .5rem;font-family:var(--font-mono);font-size:.8rem;text-align:right;">
+        </div>
+    `).join('');
+    
+    // Eventos de edição (espelho do individual)
+    document.querySelectorAll('.prm-eq-pct-inp').forEach(inp => {
+        inp.oninput = function() {
+            const i = parseInt(this.dataset.idx);
+            const v = parseFloat(this.value) || 0;
+            eq.percentuais[i] = v;
+            eq.valores[i] = (prizeEquipes * v) / 100;
+            atualizarTotalEquipes();
+            const valInp = document.querySelector(`.prm-eq-val-inp[data-idx="${i}"]`);
+            if (valInp) valInp.value = Math.round(eq.valores[i]);
+            atualizarTotalPayout();  // atualiza também o total geral
+        };
+    });
+    document.querySelectorAll('.prm-eq-val-inp').forEach(inp => {
+        inp.oninput = function() {
+            const i = parseInt(this.dataset.idx);
+            const v = parseFloat(this.value) || 0;
+            eq.valores[i] = v;
+            if (prizeEquipes > 0) eq.percentuais[i] = (v / prizeEquipes) * 100;
+            atualizarTotalEquipes();
+            const pctInp = document.querySelector(`.prm-eq-pct-inp[data-idx="${i}"]`);
+            if (pctInp) pctInp.value = eq.percentuais[i].toFixed(1);
+            atualizarTotalPayout();  // atualiza também o total geral
+        };
+    });
+    
+    atualizarTotalEquipes();
+    atualizarTotalPayout();
+}
+
+function atualizarTotalEquipes() {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada || !t.premiacaoProjetada.equipes) return;
+    const totalVal = t.premiacaoProjetada.equipes.valores.reduce((s, v) => s + v, 0);
+    const eqHeaderEl = document.getElementById('prm-equipes-total-header');
+    if (eqHeaderEl) eqHeaderEl.innerText = formatMoney(totalVal);
+}
+
+window.prmToggleCopa = prmToggleCopa;
+window.prmAtualizarPercentCopa = prmAtualizarPercentCopa;
+window.prmAtualizarPreviewCopa = prmAtualizarPreviewCopa;
+window.prmAtualizarVisualCopa = prmAtualizarVisualCopa;
+window.recalcularPayoutDistEquipes = recalcularPayoutDistEquipes;
+window.atualizarTotalEquipes = atualizarTotalEquipes;
 
 function salvarPremiacaoProjetada() {
     const t = torneios[activeTorneioIdx];

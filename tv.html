@@ -600,6 +600,15 @@
         }
         .pw-prize-carousel-header i { color: #f5d572; }
 
+        /* Variante EQUIPES — roxo */
+        .pw-prize-carousel.pw-equipes {
+            background: linear-gradient(180deg, rgba(40,20,60,.55), rgba(0,0,0,.75) 70%);
+            border-top: 1px solid rgba(168,85,247,.4);
+            border-bottom: 1px solid rgba(168,85,247,.4);
+        }
+        .pw-prize-carousel.pw-equipes .pw-prize-carousel-header { color: #c4b5fd; }
+        .pw-prize-carousel.pw-equipes .pw-prize-carousel-header i { color: #c4b5fd; }
+
         /* Ticker horizontal - track com máscara nas bordas */
         .pw-prize-track {
             position: relative;
@@ -1264,6 +1273,14 @@
                 </div>
             </div>
 
+            <!-- PREMIAÇÃO TICKER — EQUIPES (Modo Copa) — só aparece se modoCopa=true -->
+            <div id="prize-carousel-equipes" class="pw-prize-carousel pw-equipes">
+                <div class="pw-prize-carousel-header"><i class="fa-solid fa-users"></i> Premiação Equipes</div>
+                <div class="pw-prize-track">
+                    <div class="pw-prize-strip" id="prize-strip-equipes"></div>
+                </div>
+            </div>
+
             <!-- BOTTOM STRIP -->
             <div class="pw-bottom-strip" id="pw-bottom-strip">
                 <!-- pills rendered dynamically -->
@@ -1537,11 +1554,19 @@ function montarCarouselPremiacao(d) {
         var pp = d.premiacaoProjetada;
         if (!pp || !pp.valores || !pp.valores.length) {
             carousel.classList.remove('show');
+            // Também esconde carrossel de equipes se estava visível
+            var carEq = document.getElementById('prize-carousel-equipes');
+            if (carEq) carEq.classList.remove('show');
             return;
         }
 
         // Verifica se os dados mudaram - evita rebuild desnecessário
-        var dataKey = JSON.stringify(pp.valores);
+        // (inclui modoCopa e equipes pra detectar mudança quando ativa/desativa)
+        var dataKey = JSON.stringify({
+            v: pp.valores,
+            mc: pp.modoCopa,
+            eqv: (pp.equipes && pp.equipes.valores) || null,
+        });
         if (_prizeTicker.dataKey === dataKey && strip.children.length > 0) {
             // Dados iguais - só garante que está visível
             if (!carousel.classList.contains('show')) {
@@ -1575,6 +1600,37 @@ function montarCarouselPremiacao(d) {
         strip.style.animationDuration = segundos + 's';
 
         carousel.classList.add('show');
+
+        // ===== Modo Copa — renderiza carrossel paralelo de Equipes =====
+        // Espelho do bloco acima mas pintado de roxo (variante .pw-equipes)
+        var carouselEq = document.getElementById('prize-carousel-equipes');
+        var stripEq = document.getElementById('prize-strip-equipes');
+        if (carouselEq && stripEq) {
+            var temEquipes = pp.modoCopa && pp.equipes && pp.equipes.valores && pp.equipes.valores.length > 0;
+            if (!temEquipes) {
+                carouselEq.classList.remove('show');
+                stripEq.innerHTML = '';
+            } else {
+                stripEq.innerHTML = '';
+                var conjuntosEq = pp.equipes.valores.length <= 4 ? 8 : (pp.equipes.valores.length <= 6 ? 6 : 4);
+                for (var passEq = 0; passEq < conjuntosEq; passEq++) {
+                    for (var iEq = 0; iEq < pp.equipes.valores.length; iEq++) {
+                        var itemEq = criarItemTicker(iEq, pp.equipes.valores[iEq], null);
+                        // Troca o sufixo "º" pra "ª" (feminino — equipe) e "Lugar" pra "Equipe"
+                        var posEl = itemEq.querySelector('.pw-prize-pos');
+                        var labelEl = itemEq.querySelector('.pw-prize-label');
+                        if (posEl) posEl.textContent = (iEq + 1) + 'ª';
+                        if (labelEl) labelEl.textContent = 'Equipe';
+                        stripEq.appendChild(itemEq);
+                    }
+                }
+                var pctTranslateEq = (100 / conjuntosEq);
+                stripEq.style.setProperty('--ticker-end', '-' + pctTranslateEq + '%');
+                var segundosEq = Math.max(20, pp.equipes.valores.length * conjuntosEq * 0.8);
+                stripEq.style.animationDuration = segundosEq + 's';
+                carouselEq.classList.add('show');
+            }
+        }
     }
 
     function iniciarCiclagemCarousel() {
@@ -1682,6 +1738,9 @@ function montarCarouselPremiacao(d) {
                 // Esconde carousel Pro Live
                 var car = document.getElementById('prize-carousel');
                 if (car) car.classList.remove('show');
+                // Esconde também o carousel de Equipes (Modo Copa)
+                var carEq = document.getElementById('prize-carousel-equipes');
+                if (carEq) carEq.classList.remove('show');
                 pararCarouselPremiacao();
                 // Usa ticker global
                 montarTickerGlobal(d);
