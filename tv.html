@@ -1054,6 +1054,21 @@
             flex-shrink: 0;
         }
         .global-prize-ticker.show { display: block; }
+        
+        /* Variante EQUIPES — borda e header roxo (Modo Copa) */
+        .global-prize-ticker.gt-equipes {
+            background: linear-gradient(180deg, rgba(40,20,60,.3), rgba(0,0,0,.7) 70%);
+            border-top: 1px solid rgba(168,85,247,.3);
+            border-bottom: 1px solid rgba(168,85,247,.3);
+        }
+        .global-prize-ticker.gt-equipes .gt-header { color: #c4b5fd !important; }
+        .global-prize-ticker.gt-equipes .gt-header i { color: #c4b5fd; }
+        .global-prize-ticker.gt-equipes .gt-pos { color: #c4b5fd; }
+        .global-prize-ticker.gt-equipes .gt-pos.gold { color: #a855f7; }
+        .global-prize-ticker.gt-equipes .gt-pos.silver { color: #c4b5fd; }
+        .global-prize-ticker.gt-equipes .gt-pos.bronze { color: #ddd6fe; }
+        .global-prize-ticker.gt-equipes .gt-label { color: #c4b5fd; }
+        .global-prize-ticker.gt-equipes .gt-value { color: #ddd6fe; }
         .gt-header {
             display: flex; align-items: center; justify-content: center;
             gap: .6rem;
@@ -1352,6 +1367,14 @@
                     <div class="gt-strip" id="gt-strip">
                         <!-- itens criados dinamicamente -->
                     </div>
+                </div>
+            </div>
+
+            <!-- TICKER GLOBAL EQUIPES (Modo Copa, layouts não-Pro Live) -->
+            <div id="global-prize-ticker-equipes" class="global-prize-ticker gt-equipes">
+                <div class="gt-header"><i class="fa-solid fa-users"></i> Premiação Equipes</div>
+                <div class="gt-track">
+                    <div class="gt-strip" id="gt-strip-equipes"></div>
                 </div>
             </div>
         </div>
@@ -1714,6 +1737,53 @@ function montarCarouselPremiacao(d) {
             strip.style.animationDuration = seg + 's';
 
             ticker.classList.add('show');
+
+            // ===== Modo Copa — ticker paralelo de Equipes (variante roxa) =====
+            var tickerEq = document.getElementById('global-prize-ticker-equipes');
+            var stripEq = document.getElementById('gt-strip-equipes');
+            if (tickerEq && stripEq) {
+                var temEquipes = pp.modoCopa && pp.equipes && pp.equipes.valores && pp.equipes.valores.length > 0;
+                if (!temEquipes) {
+                    tickerEq.classList.remove('show');
+                    stripEq.innerHTML = '';
+                } else {
+                    stripEq.innerHTML = '';
+                    var conjEq = pp.equipes.valores.length <= 4 ? 8 : (pp.equipes.valores.length <= 6 ? 6 : 4);
+                    for (var passEq = 0; passEq < conjEq; passEq++) {
+                        for (var iEq = 0; iEq < pp.equipes.valores.length; iEq++) {
+                            var classeEq = '';
+                            if (iEq === 0)      classeEq = 'gold';
+                            else if (iEq === 1) classeEq = 'silver';
+                            else if (iEq === 2) classeEq = 'bronze';
+
+                            var itemEq = document.createElement('div');
+                            itemEq.className = 'gt-item';
+
+                            var posEq = document.createElement('span');
+                            posEq.className = 'gt-pos ' + classeEq;
+                            posEq.textContent = (iEq + 1) + 'ª';  // feminino: equipe
+                            itemEq.appendChild(posEq);
+
+                            var labEq = document.createElement('span');
+                            labEq.className = 'gt-label';
+                            labEq.textContent = 'Equipe';
+                            itemEq.appendChild(labEq);
+
+                            var valEq = document.createElement('span');
+                            valEq.className = 'gt-value';
+                            valEq.textContent = 'R$ ' + (pp.equipes.valores[iEq] || 0).toLocaleString('pt-BR');
+                            itemEq.appendChild(valEq);
+
+                            stripEq.appendChild(itemEq);
+                        }
+                    }
+                    var pctTransEq = (100 / conjEq);
+                    stripEq.style.setProperty('--ticker-end', '-' + pctTransEq + '%');
+                    var segEq = Math.max(20, pp.equipes.valores.length * conjEq * 0.8);
+                    stripEq.style.animationDuration = segEq + 's';
+                    tickerEq.classList.add('show');
+                }
+            }
         } catch (e) {
             console.error('montarTickerGlobal erro:', e);
         }
@@ -1732,6 +1802,9 @@ function montarCarouselPremiacao(d) {
                 // Esconde ticker global
                 var gt = document.getElementById('global-prize-ticker');
                 if (gt) gt.classList.remove('show');
+                // Esconde também o ticker global de Equipes (Modo Copa)
+                var gtEq = document.getElementById('global-prize-ticker-equipes');
+                if (gtEq) gtEq.classList.remove('show');
                 // Usa carousel Pro Live
                 montarCarouselPremiacao(d);
             } else {
@@ -3209,6 +3282,14 @@ function montarCarouselPremiacao(d) {
         valores: (t.premiacao_proj.valores || []).map(v => Math.round(v)),
         percentuais: t.premiacao_proj.percentuais,
         vagas: t.premiacao_proj.vagas || [],
+        // Modo Copa — campos opcionais (idêntico ao updateTV do app.html)
+        modoCopa: !!t.premiacao_proj.modoCopa,
+        percentEquipe: Number(t.premiacao_proj.percentEquipe) || 0,
+        equipes: (t.premiacao_proj.modoCopa && t.premiacao_proj.equipes) ? {
+          qtd: t.premiacao_proj.equipes.qtd,
+          valores: (t.premiacao_proj.equipes.valores || []).map(v => Math.round(v)),
+          percentuais: t.premiacao_proj.equipes.percentuais || [],
+        } : null,
       } : null,
     };
     
