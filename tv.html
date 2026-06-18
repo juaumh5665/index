@@ -1606,6 +1606,7 @@
     // Expõe globalmente pro onclick
     window._tvQualidadeAlterar = _tvQualidadeAlterar;
     window._tvQualidadeAplicar = _tvQualidadeAplicar;
+    window._tvQualidadeCarregar = _tvQualidadeCarregar;
     // ========================================================================
     
     function _mostrarControlesZoom() {
@@ -2216,6 +2217,14 @@ function montarCarouselPremiacao(d) {
             if (d.proLiveBgCustomUrl || d.proLiveBgGalleryKey) hasWatermarkClass = ' has-watermark';
         }
         document.body.className = 'layout-' + layout + (layout === 'pokerweb' ? ' pw-layout-active' : '') + responsiveClass + proLiveClasses + hasLogoClass + hasWatermarkClass;
+
+        // ====================================================================
+        // BUGFIX: o body.className acima APAGA as classes de qualidade
+        // (quality-padrao / quality-reduzido / quality-performance) a cada render.
+        // Reaplicamos a class lendo do localStorage pra preservar a escolha
+        // do operador entre renders.
+        // ====================================================================
+        if (typeof window._tvQualidadeCarregar === 'function') window._tvQualidadeCarregar();
 
         // ===== Personalização premium (logo + marca d'água + frase rodapé) =====
         // Só aplica se layout é pokerweb; nos outros layouts, esconde os elementos.
