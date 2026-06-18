@@ -151,6 +151,74 @@
             transform-origin: top left;
         }
 
+        /* ============================================================
+           SELETOR DE QUALIDADE (3 modos)
+           ============================================================
+           Aplicado via class no <body>. Permite ao operador escolher
+           o nível de efeitos visuais conforme a capacidade da TV.
+
+           - quality-padrao    : todos os efeitos (default)
+           - quality-reduzido  : sem blur, glows reduzidos
+           - quality-performance : sem blur/glow/shadow, animações estáticas
+
+           Persistido em localStorage com chave stackos-tv-quality.
+           Aplicado SÓ na TV (este arquivo) — não afeta o app.html.
+           ============================================================ */
+
+        /* MODO REDUZIDO — desliga blurs (efeito mais pesado) e reduz glows */
+        body.quality-reduzido,
+        body.quality-reduzido * {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+        body.quality-reduzido .pw-timer-display,
+        body.quality-reduzido .pw-blind-display,
+        body.quality-reduzido .pw-stat-value,
+        body.quality-reduzido .pw-tournament-name {
+            text-shadow: 0 0 4px rgba(245, 213, 114, .4) !important;
+        }
+
+        /* MODO PERFORMANCE — desliga TUDO que é pesado */
+        body.quality-performance,
+        body.quality-performance * {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            text-shadow: none !important;
+            filter: none !important;
+        }
+        body.quality-performance .pw-timer-display,
+        body.quality-performance .pw-blind-display,
+        body.quality-performance .pw-stat-value,
+        body.quality-performance .pw-tournament-name,
+        body.quality-performance .pw-prize-pos,
+        body.quality-performance .pw-prize-label,
+        body.quality-performance .pw-prize-value {
+            text-shadow: none !important;
+        }
+        /* Sombras grandes/glow removidas em modo Performance */
+        body.quality-performance .pw-stat-card,
+        body.quality-performance .pw-prize-carousel,
+        body.quality-performance .global-prize-ticker,
+        body.quality-performance .pw-blind-container {
+            box-shadow: none !important;
+        }
+        /* Carrossel: animação mais lenta (menos repaints) */
+        body.quality-performance .pw-prize-strip,
+        body.quality-performance .gt-strip {
+            animation-duration: 180s !important;
+        }
+        /* Animações decorativas pausadas */
+        body.quality-performance .pw-prize-pos.gold,
+        body.quality-performance .pw-prize-pos.silver,
+        body.quality-performance .pw-prize-pos.bronze {
+            animation: none !important;
+        }
+
+        /* Botão de qualidade muda de cor conforme o modo */
+        body.quality-reduzido #tv-qualidade-btn { color: #fbbf24 !important; }
+        body.quality-performance #tv-qualidade-btn { color: #ef4444 !important; }
+        /* === FIM SELETOR DE QUALIDADE === */
+
         /* === PRO LIVE (profissional verde com brilho e grid de stats) === */
         body.layout-pokerweb {
             background:
@@ -1180,6 +1248,10 @@
     <body class="layout-classico">
         <!-- ZOOM CONTROLS — aparece ao mover mouse, esconde após 3s -->
         <div id="tv-zoom-controls" style="position:fixed;top:.6rem;right:.6rem;z-index:9999;display:flex;gap:.3rem;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:.5rem;padding:.3rem;opacity:0;transition:opacity .3s;pointer-events:none;">
+            <button onclick="_tvQualidadeAlterar()" id="tv-qualidade-btn" title="Qualidade visual — clique pra alternar (Padrão/Reduzido/Performance)" style="background:transparent;border:none;color:#fff;height:2rem;padding:0 .55rem;border-radius:.3rem;cursor:pointer;font-size:.7rem;font-weight:700;line-height:1;display:inline-flex;align-items:center;gap:.3rem;font-family:inherit;border-right:1px solid rgba(255,255,255,.15);margin-right:.15rem;">
+                <i class="fa-solid fa-sliders" style="font-size:.75rem;"></i>
+                <span id="tv-qualidade-label">Padrão</span>
+            </button>
             <button onclick="_tvZoomDelta(-5)" title="Diminuir zoom" style="background:transparent;border:none;color:#fff;width:2rem;height:2rem;border-radius:.3rem;cursor:pointer;font-size:1.2rem;font-weight:700;line-height:1;">−</button>
             <div id="tv-zoom-val" style="display:flex;align-items:center;justify-content:center;min-width:3rem;color:#fff;font-size:.75rem;font-family:monospace;font-weight:700;">100%</div>
             <button onclick="_tvZoomDelta(+5)" title="Aumentar zoom" style="background:transparent;border:none;color:#fff;width:2rem;height:2rem;border-radius:.3rem;cursor:pointer;font-size:1.2rem;font-weight:700;line-height:1;">+</button>
@@ -1480,6 +1552,61 @@
         _aplicarSmartFit();
         _mostrarControlesZoom();
     }
+
+    // ========================================================================
+    // SELETOR DE QUALIDADE (3 modos: padrão / reduzido / performance)
+    // ========================================================================
+    // Persiste em localStorage com chave 'stackos-tv-quality'.
+    // Aplica via class no <body>: quality-padrao | quality-reduzido | quality-performance
+    // ========================================================================
+    var _QUALIDADE_KEY = 'stackos-tv-quality';
+    var _QUALIDADE_MODOS = ['padrao', 'reduzido', 'performance'];
+    var _QUALIDADE_LABELS = { padrao: 'Padrão', reduzido: 'Reduzido', performance: 'Performance' };
+
+    function _tvQualidadeCarregar() {
+        // Lê do localStorage; se inválido, default = 'padrao'
+        var modo = 'padrao';
+        try {
+            var salvo = localStorage.getItem(_QUALIDADE_KEY);
+            if (salvo && _QUALIDADE_MODOS.indexOf(salvo) >= 0) modo = salvo;
+        } catch (e) { /* localStorage indisponível, segue em memória */ }
+        _tvQualidadeAplicar(modo);
+    }
+
+    function _tvQualidadeAplicar(modo) {
+        if (_QUALIDADE_MODOS.indexOf(modo) < 0) modo = 'padrao';
+        // Remove classes anteriores e aplica a nova
+        document.body.classList.remove('quality-padrao', 'quality-reduzido', 'quality-performance');
+        document.body.classList.add('quality-' + modo);
+        // Atualiza label do botão
+        var label = document.getElementById('tv-qualidade-label');
+        if (label) label.textContent = _QUALIDADE_LABELS[modo];
+        // Persiste
+        try { localStorage.setItem(_QUALIDADE_KEY, modo); } catch (e) {}
+    }
+
+    function _tvQualidadeAlterar() {
+        // Cicla: padrão → reduzido → performance → padrão
+        var atual = 'padrao';
+        for (var i = 0; i < _QUALIDADE_MODOS.length; i++) {
+            if (document.body.classList.contains('quality-' + _QUALIDADE_MODOS[i])) {
+                atual = _QUALIDADE_MODOS[i];
+                break;
+            }
+        }
+        var idxAtual = _QUALIDADE_MODOS.indexOf(atual);
+        var proximo = _QUALIDADE_MODOS[(idxAtual + 1) % _QUALIDADE_MODOS.length];
+        _tvQualidadeAplicar(proximo);
+        _mostrarControlesZoom(); // mantém controle visível após clique
+    }
+
+    // Carrega ao iniciar
+    document.addEventListener('DOMContentLoaded', _tvQualidadeCarregar);
+
+    // Expõe globalmente pro onclick
+    window._tvQualidadeAlterar = _tvQualidadeAlterar;
+    window._tvQualidadeAplicar = _tvQualidadeAplicar;
+    // ========================================================================
     
     function _mostrarControlesZoom() {
         var ctl = document.getElementById('tv-zoom-controls');
