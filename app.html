@@ -5813,6 +5813,37 @@ document.addEventListener('DOMContentLoaded', function(){
             <span id="prm-total-dist" style="font-family:var(--font-mono);font-weight:800;color:#22c55e;">R$ 0</span>
         </div>
 
+        <!-- Estilo de exibição na TV (Modo Copa não afetado) -->
+        <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.65rem .85rem;margin-bottom:.5rem;">
+            <div style="font-size:.7rem;color:#a1a1aa;font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.35rem;">
+                <i class="fa-solid fa-tv" style="color:var(--gold);font-size:.7rem;"></i>
+                Estilo de exibição na TV
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;">
+                <label style="display:flex;align-items:center;gap:.35rem;padding:.45rem .55rem;background:#18181b;border:1px solid #27272a;border-radius:.4rem;cursor:pointer;font-size:.7rem;">
+                    <input type="radio" name="prm-estilo" value="horizontal" id="prm-estilo-h" style="accent-color:var(--gold);" checked>
+                    <div style="flex:1;">
+                        <div style="font-weight:700;">🎬 Horizontal</div>
+                        <div style="font-size:.6rem;color:#71717a;">Atual · padrão</div>
+                    </div>
+                </label>
+                <label style="display:flex;align-items:center;gap:.35rem;padding:.45rem .55rem;background:#18181b;border:1px solid #27272a;border-radius:.4rem;cursor:pointer;font-size:.7rem;">
+                    <input type="radio" name="prm-estilo" value="vertical" id="prm-estilo-v" style="accent-color:var(--gold);">
+                    <div style="flex:1;">
+                        <div style="font-weight:700;">📜 Vertical</div>
+                        <div style="font-size:.6rem;color:#71717a;">Rola pra cima</div>
+                    </div>
+                </label>
+                <label style="display:flex;align-items:center;gap:.35rem;padding:.45rem .55rem;background:#18181b;border:1px solid #27272a;border-radius:.4rem;cursor:pointer;font-size:.7rem;">
+                    <input type="radio" name="prm-estilo" value="destaque" id="prm-estilo-d" style="accent-color:var(--gold);">
+                    <div style="flex:1;">
+                        <div style="font-weight:700;">💫 Destaque</div>
+                        <div style="font-size:.6rem;color:#71717a;">1 por vez, gigante</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <!-- Ações -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
             <label style="display:flex;align-items:center;gap:.6rem;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;">
@@ -26560,6 +26591,8 @@ function updateTV(idx) {
             valores: t.premiacaoProjetada.valores.map(v => Math.round(v)),
             percentuais: t.premiacaoProjetada.percentuais,
             vagas: t.premiacaoProjetada.vagas || [],
+            // Estilo de exibição: 'horizontal' (atual) | 'vertical' | 'destaque'
+            estiloPremiacao: t.premiacaoProjetada.estiloPremiacao || 'horizontal',
             // Modo Copa — campos opcionais. TV só renderiza o bloco extra se modoCopa=true
             modoCopa: !!t.premiacaoProjetada.modoCopa,
             percentEquipe: Number(t.premiacaoProjetada.percentEquipe) || 0,
@@ -40793,6 +40826,11 @@ function abrirPremiacaoProjetada() {
     document.getElementById('prm-modelo').value = pp.modelo;
     document.getElementById('prm-show-tv').checked = pp.mostrarNaTV || false;
     
+    // Estilo de exibição na TV (default 'horizontal' = comportamento atual, zero regressão)
+    const estiloAtual = pp.estiloPremiacao || 'horizontal';
+    const radioEstilo = document.querySelector(`input[name="prm-estilo"][value="${estiloAtual}"]`);
+    if (radioEstilo) radioEstilo.checked = true;
+    
     // Modo Copa — setup dos campos visuais
     document.getElementById('prm-copa-toggle').checked = !!pp.modoCopa;
     document.getElementById('prm-copa-percent').value = pp.percentEquipe;
@@ -41108,6 +41146,9 @@ function salvarPremiacaoProjetada() {
     const t = torneios[activeTorneioIdx];
     if (!t || !t.premiacaoProjetada) return;
     t.premiacaoProjetada.mostrarNaTV = document.getElementById('prm-show-tv').checked;
+    // Estilo de exibição na TV (horizontal | vertical | destaque)
+    const radioMarcado = document.querySelector('input[name="prm-estilo"]:checked');
+    t.premiacaoProjetada.estiloPremiacao = radioMarcado ? radioMarcado.value : 'horizontal';
 
     saveData();
     closeModal('modal-premiacao-proj');
