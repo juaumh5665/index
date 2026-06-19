@@ -720,24 +720,24 @@
             background: linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,.95) 70%);
             border-top: 2px solid #d4af37;
             border-bottom: 1px solid rgba(212,175,55,.3);
-            padding: .65rem .85rem;
+            padding: .35rem .85rem;
             margin: 0 calc(var(--pw-pad-x, 1rem) * -1);
         }
         .pw-prize-carousel-v.show { display: block; }
         .pw-prize-carousel-v .pw-prize-carousel-header {
-            margin-bottom: .35rem;
+            margin-bottom: .2rem;
         }
         .pw-prize-track-v {
             position: relative;
             overflow: hidden;
-            height: clamp(80px, 11vh, 130px);
-            mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
-            -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+            height: clamp(58px, 7vh, 78px);
+            mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
         }
         .pw-prize-strip-v {
             display: flex;
             flex-direction: column;
-            gap: .4rem;
+            gap: .25rem;
             will-change: transform;
             animation: pw-ticker-scroll-v 60s linear infinite;
         }
@@ -755,9 +755,9 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: .4rem .85rem;
+            padding: .25rem .85rem;
             background: rgba(255,255,255,.04);
-            border-radius: .35rem;
+            border-radius: .3rem;
             font-family: var(--font-mono, 'JetBrains Mono', monospace);
             flex-shrink: 0;
         }
@@ -774,20 +774,20 @@
             border: 1px solid rgba(205,127,50,.2);
         }
         .pw-prize-item-v .pw-prize-pos-v {
-            font-size: clamp(.85rem, 1.2vw, 1.15rem);
+            font-size: clamp(.75rem, 1vw, 1rem);
             font-weight: 700;
             color: #d4af37;
         }
         .pw-prize-item-v.silver .pw-prize-pos-v { color: #c0c0c0; }
         .pw-prize-item-v.bronze .pw-prize-pos-v { color: #cd7f32; }
         .pw-prize-item-v .pw-prize-label-v {
-            font-size: clamp(.65rem, .9vw, .85rem);
+            font-size: clamp(.6rem, .8vw, .75rem);
             color: rgba(245,230,200,.7);
             letter-spacing: .1em;
             text-transform: uppercase;
         }
         .pw-prize-item-v .pw-prize-value-v {
-            font-size: clamp(.95rem, 1.3vw, 1.25rem);
+            font-size: clamp(.85rem, 1.1vw, 1.1rem);
             font-weight: 700;
             color: #f5e6c8;
         }
@@ -807,24 +807,24 @@
             background: linear-gradient(180deg, rgba(0,0,0,.85), rgba(0,0,0,.95) 70%);
             border-top: 2px solid #d4af37;
             border-bottom: 1px solid rgba(212,175,55,.3);
-            padding: .85rem 1rem;
+            padding: .55rem 1rem .65rem;
             margin: 0 calc(var(--pw-pad-x, 1rem) * -1);
             text-align: center;
-            min-height: clamp(110px, 14vh, 170px);
+            min-height: clamp(78px, 10vh, 115px);
         }
         .pw-prize-spotlight.show { display: block; }
         .pw-spotlight-header {
-            font-size: clamp(.7rem, .9vw, .95rem);
+            font-size: clamp(.65rem, .85vw, .9rem);
             color: #d4af37;
             font-weight: 700;
             letter-spacing: .2em;
             text-transform: uppercase;
-            margin-bottom: .45rem;
+            margin-bottom: .25rem;
             opacity: .9;
         }
         .pw-spotlight-header i { color: #d4af37; }
         .pw-spotlight-value {
-            font-size: clamp(2rem, 4vw, 3.4rem);
+            font-size: clamp(1.6rem, 3.2vw, 2.6rem);
             font-weight: 700;
             color: #f5e6c8;
             font-family: var(--font-mono, 'JetBrains Mono', monospace);
@@ -1877,6 +1877,7 @@ var _prizeSpotlightState = {
     index: 0,
     items: [],
     isEquipes: false,
+    dataKey: null,  // chave pra detectar mudança real de dados (evita reset a cada render)
 };
 
 function _pararSpotlight() {
@@ -1884,6 +1885,7 @@ function _pararSpotlight() {
         clearInterval(_prizeSpotlightState.interval);
         _prizeSpotlightState.interval = null;
     }
+    _prizeSpotlightState.dataKey = null;
 }
 
 function _atualizarSpotlightDot() {
@@ -1918,12 +1920,32 @@ function _renderSpotlightItem() {
 }
 
 function _iniciarSpotlight(pp) {
-    _pararSpotlight();
     var spotlight = document.getElementById('prize-spotlight');
     if (!spotlight || !pp || !pp.valores || pp.valores.length === 0) {
+        _pararSpotlight();
         if (spotlight) spotlight.classList.remove('show');
         return;
     }
+
+    // Calcula dataKey pra detectar se dados mudaram de verdade.
+    // BUGFIX: a TV chama montarCarouselPremiacao a cada render (1-3s). Sem essa
+    // checagem, o índice era resetado pra 0 antes do interval de 5.5s expirar,
+    // travando o spotlight no 1º lugar e causando piscar contínuo do fading.
+    var dataKey = JSON.stringify({
+        v: pp.valores,
+        mc: !!pp.modoCopa,
+        eqv: (pp.equipes && pp.equipes.valores) || null,
+    });
+
+    // Já está rodando com os MESMOS dados? Só garante que está visível e sai.
+    if (_prizeSpotlightState.interval && _prizeSpotlightState.dataKey === dataKey) {
+        if (!spotlight.classList.contains('show')) spotlight.classList.add('show');
+        return;
+    }
+
+    // Dados mudaram (ou primeira vez) — reinicia tudo
+    _pararSpotlight();
+    _prizeSpotlightState.dataKey = dataKey;
     _prizeSpotlightState.items = pp.valores.map(function(v, i) { return { idx: i, valor: v }; });
     _prizeSpotlightState.index = 0;
     _prizeSpotlightState.isEquipes = false;
@@ -1957,10 +1979,29 @@ function _esconderTodosEstilosPremiacao() {
     _pararSpotlight();
 }
 
+// Estado pra o vertical (evita rebuild desnecessário a cada render)
+var _prizeVerticalState = {
+    dataKey: null,
+};
+
 function _montarVertical(pp) {
     var carousel = document.getElementById('prize-carousel-v');
     var strip = document.getElementById('prize-strip-v');
     if (!carousel || !strip) return;
+
+    // BUGFIX: igual ao spotlight, evita rebuild a cada re-render
+    // (que reiniciaria a animação CSS, causando "soluço" no scroll vertical)
+    var dataKey = JSON.stringify({
+        v: pp.valores,
+        mc: !!pp.modoCopa,
+        eqv: (pp.equipes && pp.equipes.valores) || null,
+    });
+    if (_prizeVerticalState.dataKey === dataKey && strip.children.length > 0) {
+        if (!carousel.classList.contains('show')) carousel.classList.add('show');
+        return;
+    }
+    _prizeVerticalState.dataKey = dataKey;
+
     strip.innerHTML = '';
     var conjuntos = pp.valores.length <= 4 ? 6 : (pp.valores.length <= 6 ? 4 : 3);
     for (var pass = 0; pass < conjuntos; pass++) {
