@@ -1971,12 +1971,22 @@ function _iniciarSpotlight(pp) {
     }, 5500);
 }
 
-function _esconderTodosEstilosPremiacao() {
+function _esconderTodosEstilosPremiacao(preservar) {
+    // BUGFIX: aceita lista de IDs a NÃO esconder.
+    // Sem isso, o roteador chamava esta função antes de _iniciarSpotlight
+    // ou _montarVertical, escondendo o elemento que ia mostrar em seguida
+    // e zerando o estado (dataKey, interval), causando:
+    //   1) Spotlight travado no 1º lugar (dataKey resetado a cada render)
+    //   2) Vertical + Modo Copa: equipes era escondido e nunca re-mostrado
+    //      quando dataKey era igual (função saía antes).
+    preservar = preservar || [];
     ['prize-carousel', 'prize-carousel-equipes', 'prize-carousel-v', 'prize-carousel-v-equipes', 'prize-spotlight'].forEach(function(id) {
+        if (preservar.indexOf(id) >= 0) return;  // não toca no que vamos mostrar
         var el = document.getElementById(id);
         if (el) el.classList.remove('show');
     });
-    _pararSpotlight();
+    // Só para o spotlight se ele NÃO estiver na lista de preservados
+    if (preservar.indexOf('prize-spotlight') < 0) _pararSpotlight();
 }
 
 // Estado pra o vertical (evita rebuild desnecessário a cada render)
@@ -1996,8 +2006,22 @@ function _montarVertical(pp) {
         mc: !!pp.modoCopa,
         eqv: (pp.equipes && pp.equipes.valores) || null,
     });
+
+    // Sempre garante visibilidade dos elementos do vertical (mesmo se dataKey é igual)
+    // — necessário porque algo pode ter escondido entre uma chamada e outra
+    if (!carousel.classList.contains('show')) carousel.classList.add('show');
+    var carouselEqGuard = document.getElementById('prize-carousel-v-equipes');
+    var temEquipesGuard = pp.modoCopa && pp.equipes && pp.equipes.valores && pp.equipes.valores.length > 0;
+    if (carouselEqGuard) {
+        if (temEquipesGuard) {
+            if (!carouselEqGuard.classList.contains('show')) carouselEqGuard.classList.add('show');
+        } else {
+            carouselEqGuard.classList.remove('show');
+        }
+    }
+
+    // Dados iguais ao último rebuild — não recria DOM (preserva animação CSS)
     if (_prizeVerticalState.dataKey === dataKey && strip.children.length > 0) {
-        if (!carousel.classList.contains('show')) carousel.classList.add('show');
         return;
     }
     _prizeVerticalState.dataKey = dataKey;
@@ -2024,7 +2048,7 @@ function _montarVertical(pp) {
     strip.style.animationDuration = seg + 's';
     carousel.classList.add('show');
 
-    // Modo Copa: vertical equipes
+    // Modo Copa: vertical equipes — popula apenas se dados de equipes mudaram
     var carouselEq = document.getElementById('prize-carousel-v-equipes');
     var stripEq = document.getElementById('prize-strip-v-equipes');
     var temEquipes = pp.modoCopa && pp.equipes && pp.equipes.valores && pp.equipes.valores.length > 0;
@@ -2067,12 +2091,14 @@ function montarCarouselPremiacao(d) {
         // Roteamento por estilo (vertical | destaque | horizontal=default)
         var estilo = pp.estiloPremiacao || 'horizontal';
         if (estilo === 'vertical') {
-            _esconderTodosEstilosPremiacao();
+            // Preserva os 2 elementos do vertical pra não esconder antes de mostrar
+            _esconderTodosEstilosPremiacao(['prize-carousel-v', 'prize-carousel-v-equipes']);
             _montarVertical(pp);
             return;
         }
         if (estilo === 'destaque') {
-            _esconderTodosEstilosPremiacao();
+            // Preserva o spotlight pra não parar o interval antes de _iniciarSpotlight checar dataKey
+            _esconderTodosEstilosPremiacao(['prize-spotlight']);
             _iniciarSpotlight(pp);
             return;
         }
