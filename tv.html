@@ -735,9 +735,9 @@
             -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent);
         }
         .pw-prize-strip-v {
-            display: flex;
-            flex-direction: column;
-            gap: .25rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .3rem .5rem;
             will-change: transform;
             animation: pw-ticker-scroll-v 60s linear infinite;
         }
@@ -755,11 +755,12 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: .25rem .85rem;
+            padding: .25rem .65rem;
             background: rgba(255,255,255,.04);
             border-radius: .3rem;
             font-family: var(--font-mono, 'JetBrains Mono', monospace);
-            flex-shrink: 0;
+            gap: .4rem;
+            min-width: 0;  /* permite filhos com text-overflow */
         }
         .pw-prize-item-v.gold {
             background: rgba(212,175,55,.12);
@@ -773,6 +774,15 @@
             background: rgba(205,127,50,.08);
             border: 1px solid rgba(205,127,50,.2);
         }
+        /* Grupo "Nº LUGAR" — junto na esquerda */
+        .pw-prize-item-v .pw-prize-left-v {
+            display: inline-flex;
+            align-items: baseline;
+            gap: .3rem;
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
         .pw-prize-item-v .pw-prize-pos-v {
             font-size: clamp(.75rem, 1vw, 1rem);
             font-weight: 700;
@@ -781,15 +791,16 @@
         .pw-prize-item-v.silver .pw-prize-pos-v { color: #c0c0c0; }
         .pw-prize-item-v.bronze .pw-prize-pos-v { color: #cd7f32; }
         .pw-prize-item-v .pw-prize-label-v {
-            font-size: clamp(.6rem, .8vw, .75rem);
+            font-size: clamp(.6rem, .75vw, .72rem);
             color: rgba(245,230,200,.7);
-            letter-spacing: .1em;
+            letter-spacing: .08em;
             text-transform: uppercase;
         }
         .pw-prize-item-v .pw-prize-value-v {
             font-size: clamp(.85rem, 1.1vw, 1.1rem);
             font-weight: 700;
             color: #f5e6c8;
+            white-space: nowrap;
         }
         /* Variante equipes — item */
         .pw-equipes-v .pw-prize-item-v.gold {
@@ -2036,15 +2047,19 @@ function _montarVertical(pp) {
             else if (i === 2) classe = 'bronze';
             var item = document.createElement('div');
             item.className = 'pw-prize-item-v ' + classe;
-            item.innerHTML = '<span class="pw-prize-pos-v">' + (i + 1) + 'º</span>' +
-                             '<span class="pw-prize-label-v">LUGAR</span>' +
+            item.innerHTML = '<span class="pw-prize-left-v">' +
+                                '<span class="pw-prize-pos-v">' + (i + 1) + 'º</span>' +
+                                '<span class="pw-prize-label-v">LUGAR</span>' +
+                             '</span>' +
                              '<span class="pw-prize-value-v">R$ ' + (pp.valores[i] || 0).toLocaleString('pt-BR') + '</span>';
             strip.appendChild(item);
         }
     }
     var pct = (100 / conjuntos);
     strip.style.setProperty('--ticker-end-v', '-' + pct + '%');
-    var seg = Math.max(30, pp.valores.length * conjuntos * 1.5);
+    // 2 cols: ceil(N/2) linhas por conjunto. Tempo ~3s por linha (mais lento que antes, melhor leitura)
+    var linhasPorConjunto = Math.ceil(pp.valores.length / 2);
+    var seg = Math.max(30, linhasPorConjunto * conjuntos * 3);
     strip.style.animationDuration = seg + 's';
     carousel.classList.add('show');
 
@@ -2064,15 +2079,18 @@ function _montarVertical(pp) {
             else if (iEq === 2) classeEq = 'bronze';
             var itemEq = document.createElement('div');
             itemEq.className = 'pw-prize-item-v ' + classeEq;
-            itemEq.innerHTML = '<span class="pw-prize-pos-v">' + (iEq + 1) + 'ª</span>' +
-                               '<span class="pw-prize-label-v">EQUIPE</span>' +
+            itemEq.innerHTML = '<span class="pw-prize-left-v">' +
+                                  '<span class="pw-prize-pos-v">' + (iEq + 1) + 'ª</span>' +
+                                  '<span class="pw-prize-label-v">EQUIPE</span>' +
+                               '</span>' +
                                '<span class="pw-prize-value-v">R$ ' + (pp.equipes.valores[iEq] || 0).toLocaleString('pt-BR') + '</span>';
             stripEq.appendChild(itemEq);
         }
     }
     var pctEq = (100 / conjEq);
     stripEq.style.setProperty('--ticker-end-v', '-' + pctEq + '%');
-    var segEq = Math.max(30, pp.equipes.valores.length * conjEq * 1.5);
+    var linhasPorConjuntoEq = Math.ceil(pp.equipes.valores.length / 2);
+    var segEq = Math.max(30, linhasPorConjuntoEq * conjEq * 3);
     stripEq.style.animationDuration = segEq + 's';
     carouselEq.classList.add('show');
 }
