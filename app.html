@@ -20515,6 +20515,23 @@ async function adminEstenderTrialRapido(clubeId, nome, dias) {
         });
         if (error) throw error;
         
+        // =====================================================================
+        // BUGFIX: a RPC estender_validade atualiza só data_validade mas NÃO
+        // mexe no campo clubes.status. Resultado: painel admin mostrava ATIVA
+        // (status calculado em runtime na RPC listar_clubes_admin), mas a tabela
+        // clubes mantinha status = 'expirado', bloqueando o dono ao logar.
+        // Aqui forçamos o UPDATE do status pra refletir a nova validade.
+        // (Quando a RPC for corrigida no Supabase, este bloco pode ser removido.)
+        // =====================================================================
+        const novoStatus = new Date(novaData) >= new Date(new Date().toISOString().split('T')[0]) ? 'ativo' : 'expirado';
+        const { error: errStatus } = await sb.from('clubes')
+            .update({ status: novoStatus })
+            .eq('id', clubeId);
+        if (errStatus) {
+            console.warn('[ADMIN] estender_validade OK mas falhou ao sincronizar clubes.status:', errStatus);
+            // Não bloqueia — apenas avisa. O painel ainda mostra atualizado pela RPC.
+        }
+        
         // Feedback visual
         const dataFmt = new Date(novaData).toLocaleDateString('pt-BR');
         if (typeof showToast === 'function') {
