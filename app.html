@@ -2913,6 +2913,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <header style="height:56px;border-bottom:1px solid #1a1a1e;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;background:#0a0a0b;flex-shrink:0;">
             <h2 id="page-title" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:#52525b;">Dashboard</h2>
             <div style="display:flex;align-items:center;gap:.85rem;">
+                <button onclick="abrirCentralAjuda()" title="Central de Ajuda (?)" style="background:transparent;border:1px solid #27272a;color:#71717a;cursor:pointer;padding:.35rem .55rem;border-radius:.4rem;font-size:.7rem;transition:all .15s;display:inline-flex;align-items:center;gap:.35rem;" onmouseover="this.style.borderColor='#06b6d4';this.style.color='#06b6d4'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-circle-question"></i> <span style="font-size:.65rem;font-weight:700;letter-spacing:.05em;">AJUDA</span></button>
                 <button onclick="abrirAjudaAtalhos()" title="Atalhos de teclado (F1)" style="background:transparent;border:1px solid #27272a;color:#71717a;cursor:pointer;padding:.35rem .55rem;border-radius:.4rem;font-size:.7rem;transition:all .15s;display:inline-flex;align-items:center;gap:.35rem;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#27272a';this.style.color='#71717a'"><i class="fa-solid fa-keyboard"></i> <span style="font-size:.65rem;font-weight:700;letter-spacing:.05em;">F1</span></button>
                 <div id="clock" class="mono" style="color:var(--gold);font-size:1rem;font-weight:700;">00:00:00</div>
             </div>
@@ -6289,6 +6290,41 @@ document.addEventListener('DOMContentLoaded', function(){
         <button onclick="fazerBackupAutomatico();renderBackupsLista();showToast('💾 Backup criado')" class="btn-gold" style="padding:.7rem;border-radius:.5rem;width:100%;">
             <i class="fa-solid fa-floppy-disk"></i> Criar Backup Agora
         </button>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     CENTRAL DE AJUDA — Sprint 1 (esqueleto + conteúdo inicial)
+     Acessível por: botão "AJUDA" no header global + atalho ? no teclado
+     Conteúdo: ver constante _CENTRAL_AJUDA_CONTEUDO no JS
+     ════════════════════════════════════════════════════════════════════ -->
+<div id="modal-central-ajuda" class="modal-overlay">
+    <div id="ca-container" style="background:#0a0a0b;border:1px solid #1e1e23;border-radius:1rem;width:100%;max-width:1080px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Header -->
+        <div style="background:#111113;padding:1rem 1.5rem;border-bottom:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <i class="fa-solid fa-book-open" style="color:var(--gold);font-size:1.1rem;"></i>
+                <div style="color:#fafafa;font-weight:700;font-size:1rem;">Central de Ajuda — StackOS</div>
+            </div>
+            <button onclick="closeModal('modal-central-ajuda')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+
+        <!-- Busca -->
+        <div style="padding:.85rem 1.5rem;background:#0f0f12;border-bottom:1px solid #1e1e23;flex-shrink:0;">
+            <div id="ca-busca-wrap" style="background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.55rem .85rem;display:flex;align-items:center;gap:.6rem;transition:border-color .15s;">
+                <i class="fa-solid fa-magnifying-glass" style="color:#71717a;font-size:.85rem;"></i>
+                <input type="text" id="ca-busca-input" placeholder="Buscar tutorial... (ex: rebuy, fechamento, TV)" oninput="_caFiltrar()" onfocus="document.getElementById('ca-busca-wrap').style.borderColor='var(--gold)'" onblur="document.getElementById('ca-busca-wrap').style.borderColor='#27272a'" style="flex:1;background:transparent;border:none;outline:none;color:#fafafa;font-size:.85rem;font-family:inherit;">
+                <span id="ca-busca-counter" style="font-size:.7rem;color:#52525b;display:none;"></span>
+            </div>
+        </div>
+
+        <!-- Body: sidebar + conteúdo -->
+        <div style="display:grid;grid-template-columns:220px 1fr;flex:1;min-height:0;overflow:hidden;">
+            <div id="ca-sidebar" style="background:#0d0d10;border-right:1px solid #1e1e23;padding:.85rem 0;overflow-y:auto;"></div>
+            <div id="ca-conteudo" style="padding:1.5rem 1.75rem;overflow-y:auto;background:#0a0a0b;"></div>
+        </div>
+
     </div>
 </div>
 
@@ -18636,6 +18672,580 @@ function abrirModalTemplatesNativos() {
 function abrirAjudaAtalhos() {
     openModal('modal-ajuda-atalhos');
 }
+
+// =========================================================================
+// CENTRAL DE AJUDA — Sprint 1 (esqueleto + 12 artigos iniciais pro operador)
+// =========================================================================
+// Como funciona:
+//   1. Botão "AJUDA" no header global chama abrirCentralAjuda()
+//   2. Atalho de teclado "?" (shift+/) também abre
+//   3. Sidebar lista categorias com contagem
+//   4. Click numa categoria mostra os artigos dela
+//   5. Click num artigo abre o conteúdo completo
+//   6. Busca filtra em tempo real por título e tags
+//
+// Onde editar o conteúdo:
+//   - Constante _CENTRAL_AJUDA_CONTEUDO abaixo
+//   - Cada artigo tem: id, categoria, titulo, descricao, tempoMin,
+//     objetivo, passos[], dicas[], avisos[], relacionados[]
+//   - Pra adicionar novo artigo: copie um existente e ajuste
+//   - Pra adicionar nova categoria: adicione em "categorias"
+//
+// Sem screenshots por enquanto — texto direto.
+// =========================================================================
+
+const _CENTRAL_AJUDA_CONTEUDO = {
+    categorias: [
+        { id: 'primeiros-passos', nome: 'Primeiros Passos', icone: 'fa-sparkles' },
+        { id: 'torneios',          nome: 'Torneios',         icone: 'fa-trophy' },
+        { id: 'cash',              nome: 'Cash Games',       icone: 'fa-dollar-sign' },
+        { id: 'bar',               nome: 'Bar e Comandas',   icone: 'fa-mug-hot' },
+        { id: 'fechamento',        nome: 'Fechamento',       icone: 'fa-receipt' },
+        { id: 'tv',                nome: 'TV ao Vivo',       icone: 'fa-tv' },
+        { id: 'jogadores',         nome: 'Jogadores',        icone: 'fa-users' },
+    ],
+    artigos: [
+        // ===== PRIMEIROS PASSOS =====
+        {
+            id: 'visao-geral',
+            categoria: 'primeiros-passos',
+            titulo: 'Visão geral do sistema',
+            descricao: 'Conheça as principais áreas do StackOS e onde fica cada coisa',
+            tempoMin: 2,
+            tags: ['inicio', 'menu', 'navegar', 'sidebar'],
+            objetivo: 'Entender a estrutura do sistema pra saber onde ir em cada situação.',
+            passos: [
+                'No lado esquerdo da tela fica a "sidebar" — é o menu principal. Ali tem: Dashboard, Torneios, Cash, Bar, Fechamento, Jogadores, Funcionários, Usuários e Configurações.',
+                'No topo de cada tela tem o título da página atual e o relógio do sistema, no lado direito.',
+                'Bem em cima, ao lado do relógio, ficam dois botões: "AJUDA" (esse modal) e "F1" (atalhos de teclado).',
+                'No canto inferior esquerdo aparece seu nome, papel (admin/operador), status da conexão e o botão "Sair".'
+            ],
+            dicas: [
+                'Aperte F1 a qualquer momento pra ver TODOS os atalhos de teclado.',
+                'Se a conexão cair, o sistema avisa em vermelho no canto inferior esquerdo. Os dados continuam salvos no seu navegador até voltar.'
+            ],
+            relacionados: ['criar-torneio']
+        },
+
+        // ===== TORNEIOS =====
+        {
+            id: 'criar-torneio',
+            categoria: 'torneios',
+            titulo: 'Como criar um torneio',
+            descricao: 'Cadastre um novo torneio do zero com blinds, premiação e regras',
+            tempoMin: 3,
+            destaque: true,
+            tags: ['novo', 'criar', 'torneio', 'blinds', 'premiacao'],
+            objetivo: 'Cadastrar um novo torneio pronto pra rodar com jogadores.',
+            passos: [
+                'Na sidebar lateral esquerda, clique em "Torneios".',
+                'Clique no botão "+ Novo Torneio" no topo direito da página.',
+                'Preencha o NOME do torneio (ex: "Sábado 19h - Freezeout").',
+                'Configure os VALORES: Buy-in, Rebuy, Add-on, Staff e Jackpot. Se algum não se aplicar, deixe 0.',
+                'Configure os BLINDS: tempo de cada nível e a estrutura. Você pode usar um template salvo clicando em "Carregar template".',
+                'Em PREMIAÇÃO, escolha quantos lugares serão premiados.',
+                'Clique em "Salvar Torneio". Ele aparece na lista, pronto pra iniciar.'
+            ],
+            dicas: [
+                'Use templates! Crie uma vez, salve, e nas próximas é só carregar (poupa 80% do tempo).',
+                'A "Cascata de Staff" automatiza distribuição entre dealers. Configure uma vez nas Configurações.',
+                'Os blinds podem ser editados durante o torneio se precisar ajustar.'
+            ],
+            avisos: [
+                'Depois de INICIAR o torneio (botão "Iniciar"), alguns campos não podem mais ser alterados (valores de buy-in, por exemplo).'
+            ],
+            relacionados: ['rodar-torneio', 'premiacao-projetada', 'cancelar-lancamento']
+        },
+        {
+            id: 'rodar-torneio',
+            categoria: 'torneios',
+            titulo: 'Como rodar um torneio (entries, rebuys, add-ons)',
+            descricao: 'Lançamento de jogadores, rebuys e add-ons durante o evento',
+            tempoMin: 4,
+            destaque: true,
+            tags: ['entry', 'rebuy', 'add-on', 'addon', 'jogador', 'comprar'],
+            objetivo: 'Registrar entradas e compras dos jogadores enquanto o torneio rola.',
+            passos: [
+                'Com o torneio criado, clique em "Iniciar" pra começar (timer começa a contar).',
+                'Pra lançar um JOGADOR pela primeira vez: clique em "Nova Entrada". Selecione o jogador (ou cadastre na hora). Escolha o tipo (Buy-in, Buy-in com Jackpot, etc) e confirme.',
+                'Pra lançar um REBUY: clique na linha do jogador na lista de "Jogadores ativos". No modal que abrir, clique no botão de rebuy desejado (simples, duplo, etc).',
+                'Pra ADD-ON: mesma coisa, mas só funciona durante o intervalo configurado de add-on.',
+                'O sistema atualiza automaticamente o chip count, prize pool e ranking.'
+            ],
+            dicas: [
+                'O ícone de "🖨" ao lado de cada compra imprime o comprovante térmico.',
+                'Se o jogador for novo, dá pra cadastrar direto do modal de Nova Entrada sem sair da tela.',
+                'O "Intervalo de Add-on" trava as compras fora da janela configurada — evita lançamentos errados.'
+            ],
+            avisos: [
+                'Se lançar errado, NÃO PRECISA APAGAR DO BANCO — use a função "Estornar" na linha da compra (veja artigo "Cancelar um lançamento").'
+            ],
+            relacionados: ['cancelar-lancamento', 'eliminar-jogador']
+        },
+        {
+            id: 'eliminar-jogador',
+            categoria: 'torneios',
+            titulo: 'Como eliminar um jogador',
+            descricao: 'Registre eliminações com ou sem acerto financeiro na hora',
+            tempoMin: 3,
+            tags: ['eliminar', 'bust', 'ranking', 'posicao'],
+            objetivo: 'Marcar um jogador como eliminado e registrar sua posição final.',
+            passos: [
+                'Clique na linha do jogador na lista de "Jogadores ativos".',
+                'No modal, clique no botão "Eliminar".',
+                'O sistema sugere a próxima posição livre (ex: "12º lugar"). Confirme ou ajuste.',
+                'Se o jogador for receber premiação NA HORA, clique em "Eliminar e acertar agora". O sistema calcula o valor e gera o lançamento.',
+                'Se o acerto for DEPOIS (típico de torneios longos), clique em "Eliminar — acertar depois". O jogador fica marcado como eliminado pendente.'
+            ],
+            dicas: [
+                'A opção "acertar depois" é ótima quando o jogador sai mas não quer receber na hora — fica registrado e você acerta no fim.',
+                'Eliminados pendentes ficam destacados na lista pra você não esquecer.'
+            ],
+            avisos: [
+                'Eliminação está vinculada à posição. Se eliminar errado, use a função de reverter no modal do jogador eliminado.'
+            ],
+            relacionados: ['rodar-torneio', 'acerto-depois']
+        },
+        {
+            id: 'cancelar-lancamento',
+            categoria: 'torneios',
+            titulo: 'Como cancelar um rebuy ou compra errada',
+            descricao: 'Estorne uma compra lançada por engano sem precisar mexer no banco',
+            tempoMin: 2,
+            destaque: true,
+            tags: ['estornar', 'cancelar', 'reverter', 'erro', 'apagar', 'desfazer'],
+            objetivo: 'Reverter uma compra (rebuy/add-on/buy-in) lançada incorretamente.',
+            passos: [
+                'Na tela do torneio em andamento, clique na linha do jogador.',
+                'No modal que abrir, role até "Histórico de Compras" desse jogador.',
+                'Localize a compra errada na lista.',
+                'Clique no ícone de lixeira ao lado dela.',
+                'Confirme a ação. O estorno é registrado e gera um lançamento contrário no financeiro.'
+            ],
+            dicas: [
+                'O sistema mantém o histórico do estorno na auditoria — útil pra rastreamento.',
+                'Estornar uma entrada (buy-in) também reverte chip count e o ranking.'
+            ],
+            avisos: [
+                'Se o torneio já foi fechado, o estorno aparece no fechamento do DIA ATUAL, não do dia do torneio original.'
+            ],
+            relacionados: ['rodar-torneio', 'fechamento-dia']
+        },
+        {
+            id: 'acerto-depois',
+            categoria: 'torneios',
+            titulo: 'Acertar com jogador eliminado depois do torneio',
+            descricao: 'Como pagar quem foi eliminado "pra acertar depois"',
+            tempoMin: 2,
+            tags: ['acerto', 'pagar', 'eliminado', 'depois', 'pendente'],
+            objetivo: 'Finalizar o pagamento de jogadores eliminados com status "pendente".',
+            passos: [
+                'Abra o torneio e role até a lista de "Eliminados".',
+                'Os jogadores com acerto pendente ficam destacados (geralmente em laranja ou amarelo).',
+                'Clique na linha do jogador.',
+                'Clique em "Acertar agora".',
+                'O sistema mostra o valor a pagar e gera o lançamento financeiro automático.'
+            ],
+            dicas: [
+                'Os valores são calculados com base na premiação configurada — não precisa ficar fazendo conta.',
+                'Você pode também acertar TODOS pendentes de uma vez no fechamento do dia.'
+            ],
+            relacionados: ['eliminar-jogador', 'fechamento-dia']
+        },
+        {
+            id: 'premiacao-projetada',
+            categoria: 'torneios',
+            titulo: 'Como configurar a Premiação Projetada na TV',
+            descricao: 'Mostre prêmios estimados na TV pra animar os jogadores',
+            tempoMin: 3,
+            tags: ['premiacao', 'projetada', 'tv', 'vertical', 'destaque', 'modo copa', 'equipes'],
+            objetivo: 'Exibir a premiação ao vivo na TV pública/dono.',
+            passos: [
+                'Abra o torneio em andamento.',
+                'Clique no botão "Premiação Projetada" (geralmente no painel direito ou topo).',
+                'Marque o checkbox de exibir na TV.',
+                'Escolha o ESTILO: "Horizontal" (tabela tradicional), "Vertical" (rolagem em 2 colunas) ou "Destaque" (1 prêmio por vez em rotação).',
+                'Se for torneio em equipes, ative o "Modo Copa" e configure o % pra equipes.',
+                'Clique em "Salvar". A TV pública atualiza em 1-3 segundos.'
+            ],
+            dicas: [
+                'Estilo "Vertical" é ótimo pra muitos prêmios — 2 posições por linha rolando.',
+                'Estilo "Destaque" funciona bem pra premiações pequenas (3-5 lugares) — mais teatral.',
+                'No "Modo Copa", a TV mostra individual + equipes alternando.'
+            ],
+            relacionados: ['compartilhar-tv']
+        },
+
+        // ===== CASH GAMES =====
+        {
+            id: 'abrir-mesa-cash',
+            categoria: 'cash',
+            titulo: 'Como abrir e gerenciar uma mesa de Cash',
+            descricao: 'Abertura, rake, entradas e fechamento de sessão',
+            tempoMin: 3,
+            tags: ['cash', 'mesa', 'sessao', 'rake'],
+            objetivo: 'Operar uma mesa de cash game completa, do início ao fechamento.',
+            passos: [
+                'Na sidebar, clique em "Cash".',
+                'Clique em "+ Nova Mesa". Defina nome (ex: "NL10 - Mesa 1") e valores.',
+                'Quando um jogador chega, clique na mesa e em "Adicionar Jogador". Selecione e informe o stack inicial.',
+                'Pra registrar uma saída, clique no jogador e em "Sair". Informe o stack final — o sistema calcula o resultado (lucro/prejuízo).',
+                'Pra fechar a mesa, certifique-se que todos saíram. Clique em "Fechar Mesa" — gera relatório de rake e movimentação.'
+            ],
+            dicas: [
+                'Cada movimento gera lançamento financeiro automático. Você não precisa lançar nada manual.',
+                'O extrato individual de cada jogador pode ser impresso pelo botão de impressão na linha dele.'
+            ],
+            relacionados: ['fechamento-dia']
+        },
+
+        // ===== BAR =====
+        {
+            id: 'gerir-comanda',
+            categoria: 'bar',
+            titulo: 'Como abrir, lançar itens e pagar uma comanda',
+            descricao: 'Fluxo completo da comanda do bar',
+            tempoMin: 3,
+            tags: ['comanda', 'bar', 'pagar', 'lancar', 'produto'],
+            objetivo: 'Gerenciar pedidos do bar do início ao pagamento.',
+            passos: [
+                'Na sidebar, clique em "Bar".',
+                'Clique em "+ Nova Comanda". Selecione o cliente (jogador cadastrado ou nome livre).',
+                'Pra adicionar item: clique na comanda aberta. Escolha o produto da lista e clique em "+". Quantidade ajustável.',
+                'Os itens vão se acumulando. O total atualiza automaticamente.',
+                'Pra PAGAR: clique em "Pagar Conta" na comanda. Escolha a forma de pagamento (dinheiro, pix, débito, crédito).',
+                'Se for fechar/imprimir só pra ver, use "Imprimir Comanda" sem fechar.'
+            ],
+            dicas: [
+                'Os produtos vêm do cadastro em Configurações > Bar > Produtos. Mantenha esse cadastro atualizado.',
+                'Você pode dar desconto antes de fechar (botão "Aplicar Desconto").'
+            ],
+            avisos: [
+                'Depois de PAGAR, a comanda não pode mais ser editada. Confira tudo antes.'
+            ],
+            relacionados: ['fechamento-dia']
+        },
+
+        // ===== FECHAMENTO =====
+        {
+            id: 'fechamento-dia',
+            categoria: 'fechamento',
+            titulo: 'Como fazer o Fechamento do Dia',
+            descricao: 'Encerre o dia com relatório completo do que entrou e saiu',
+            tempoMin: 3,
+            destaque: true,
+            tags: ['fechamento', 'caixa', 'dia', 'relatorio', 'encerrar'],
+            objetivo: 'Encerrar a operação do dia com balanço financeiro consolidado.',
+            passos: [
+                'Certifique-se que todos os torneios e mesas de cash estão FECHADOS.',
+                'Acerte todos os jogadores pendentes ("Eliminados — acertar depois").',
+                'Na sidebar, clique em "Fechamento do Dia".',
+                'O sistema mostra um resumo: entradas (buy-ins, rebuys), saídas (premiações pagas), bar, jackpot e saldo final.',
+                'Revise tudo. Se algo estiver errado, volte e corrija antes de fechar.',
+                'Clique em "Imprimir Fechamento" pra emitir o cupom térmico.',
+                'Clique em "Confirmar e Fechar Dia" — o dia é arquivado e não pode mais ser editado.'
+            ],
+            dicas: [
+                'O relatório impresso pode ser usado pra prestação de contas dos sócios.',
+                'O sistema guarda histórico de fechamentos — você pode consultar dias anteriores em "Relatórios".'
+            ],
+            avisos: [
+                'NÃO FECHE O DIA enquanto houver pendências (jogador esperando acerto, comanda aberta, etc). Depois de fechado, não dá pra mexer.'
+            ],
+            relacionados: ['acerto-depois', 'gerir-comanda']
+        },
+
+        // ===== TV AO VIVO =====
+        {
+            id: 'compartilhar-tv',
+            categoria: 'tv',
+            titulo: 'Como compartilhar o link da TV pública',
+            descricao: 'Mostre o torneio ao vivo pros jogadores no celular ou TV grande',
+            tempoMin: 2,
+            destaque: true,
+            tags: ['tv', 'publica', 'link', 'compartilhar', 'whatsapp'],
+            objetivo: 'Gerar e compartilhar o link público pros jogadores acompanharem.',
+            passos: [
+                'Abra o torneio.',
+                'Clique no botão "TV Pública" (ou "Abrir TV nova aba").',
+                'Copie o link que aparece na barra de endereço — algo como stackos.com.br/tv/abc123.',
+                'Cole o link no grupo do WhatsApp ou compartilhe como quiser. Qualquer pessoa com o link pode acessar.',
+                'Pra mostrar numa TV grande, abra o link no navegador da Smart TV ou conecte um notebook via HDMI.'
+            ],
+            dicas: [
+                'No canto superior direito da TV tem botões pra ajustar ZOOM (pra TV pequena/grande) e QUALIDADE (pra TVs antigas ou conexão fraca).',
+                'O modo "Reduzido" e "Performance" tiram efeitos visuais e ajudam em TVs/computadores fracos.'
+            ],
+            avisos: [
+                'O link público mostra TODOS os dados do torneio em tempo real. Se quiser privacidade, use um link curto e descartável.'
+            ],
+            relacionados: ['premiacao-projetada']
+        },
+
+        // ===== JOGADORES =====
+        {
+            id: 'cadastrar-jogador',
+            categoria: 'jogadores',
+            titulo: 'Como cadastrar um jogador',
+            descricao: 'Cadastre rapidamente um novo jogador no sistema',
+            tempoMin: 2,
+            tags: ['jogador', 'cadastrar', 'novo', 'criar'],
+            objetivo: 'Adicionar um novo jogador pra usar em torneios e cash.',
+            passos: [
+                'Na sidebar, clique em "Jogadores".',
+                'Clique em "+ Novo Jogador" no topo direito.',
+                'Preencha nome (obrigatório), CPF, telefone, email (opcionais).',
+                'Pode adicionar uma foto também (útil pra identificar visualmente).',
+                'Clique em "Cadastrar".'
+            ],
+            dicas: [
+                'Você também pode cadastrar UM jogador novo direto do modal "Nova Entrada" do torneio — não precisa sair pra fazer cadastro.',
+                'Pra importar VÁRIOS jogadores de uma vez, use a função de importação em Configurações > Backup.'
+            ],
+            relacionados: ['rodar-torneio']
+        },
+    ]
+};
+
+// Estado atual da Central (categoria ativa, artigo aberto, busca)
+let _caEstado = { categoria: null, artigoId: null, busca: '' };
+
+function abrirCentralAjuda(artigoId) {
+    _caEstado.categoria = null;
+    _caEstado.artigoId = artigoId || null;
+    _caEstado.busca = '';
+    const inputBusca = document.getElementById('ca-busca-input');
+    if (inputBusca) inputBusca.value = '';
+    _caRenderSidebar();
+    if (artigoId) {
+        _caAbrirArtigo(artigoId);
+    } else {
+        _caRenderHome();
+    }
+    openModal('modal-central-ajuda');
+}
+window.abrirCentralAjuda = abrirCentralAjuda;
+
+function _caRenderSidebar() {
+    const sb = document.getElementById('ca-sidebar');
+    if (!sb) return;
+    const cats = _CENTRAL_AJUDA_CONTEUDO.categorias;
+    const artigos = _CENTRAL_AJUDA_CONTEUDO.artigos;
+    let html = '<div style="padding:.4rem 1rem;color:#71717a;font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.2rem;">Por área</div>';
+    const ativaHome = !_caEstado.categoria;
+    html += `<div onclick="_caHome()" style="padding:.55rem 1rem;font-size:.8rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;transition:all .12s;${ativaHome ? 'color:var(--gold);background:rgba(212,175,55,.08);border-left:2px solid var(--gold);padding-left:calc(1rem - 2px);' : 'color:#a1a1aa;border-left:2px solid transparent;'}" onmouseover="if(!this.style.background.includes('212'))this.style.background='#18181b'" onmouseout="if(!this.style.background.includes('212'))this.style.background='transparent'"><i class="fa-solid fa-house" style="font-size:.78rem;width:14px;"></i> Início</div>`;
+    cats.forEach(c => {
+        const n = artigos.filter(a => a.categoria === c.id).length;
+        if (n === 0) return;
+        const ativa = _caEstado.categoria === c.id;
+        html += `<div onclick="_caSelecionarCategoria('${c.id}')" style="padding:.55rem 1rem;font-size:.8rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;transition:all .12s;${ativa ? 'color:var(--gold);background:rgba(212,175,55,.08);border-left:2px solid var(--gold);padding-left:calc(1rem - 2px);' : 'color:#a1a1aa;border-left:2px solid transparent;'}" onmouseover="if(!this.style.background.includes('212'))this.style.background='#18181b'" onmouseout="if(!this.style.background.includes('212'))this.style.background='transparent'"><i class="fa-solid ${c.icone}" style="font-size:.78rem;width:14px;"></i> <span style="flex:1;">${c.nome}</span> <span style="color:#52525b;font-size:.65rem;">${n}</span></div>`;
+    });
+    sb.innerHTML = html;
+}
+
+function _caHome() {
+    _caEstado.categoria = null;
+    _caEstado.artigoId = null;
+    _caRenderSidebar();
+    _caRenderHome();
+}
+window._caHome = _caHome;
+
+function _caRenderHome() {
+    const cont = document.getElementById('ca-conteudo');
+    if (!cont) return;
+    const artigos = _CENTRAL_AJUDA_CONTEUDO.artigos;
+    const destaques = artigos.filter(a => a.destaque);
+    let html = `<div style="margin-bottom:1.5rem;">
+        <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.4rem;">Central de Ajuda</div>
+        <h1 style="color:#fafafa;font-size:1.4rem;font-weight:800;margin:0 0 .35rem;">Como podemos te ajudar?</h1>
+        <p style="color:#a1a1aa;font-size:.85rem;margin:0;line-height:1.5;">Escolha uma categoria ao lado ou veja os tutoriais mais buscados abaixo.</p>
+    </div>`;
+
+    if (destaques.length > 0) {
+        html += `<div style="color:#71717a;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;font-weight:700;">⭐ Tutoriais essenciais</div>`;
+        html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.65rem;margin-bottom:1.5rem;">`;
+        destaques.forEach(a => {
+            const cat = _CENTRAL_AJUDA_CONTEUDO.categorias.find(c => c.id === a.categoria);
+            html += `<div onclick="_caAbrirArtigo('${a.id}')" style="background:#111113;border:1px solid #1e1e23;border-radius:.6rem;padding:.85rem 1rem;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='#27272a';this.style.background='#18181b'" onmouseout="this.style.borderColor='#1e1e23';this.style.background='#111113'">
+                <div style="color:#71717a;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;"><i class="fa-solid ${cat?.icone || 'fa-circle'}" style="font-size:.65rem;"></i> ${cat?.nome || ''}</div>
+                <div style="color:#fafafa;font-size:.88rem;font-weight:700;margin-bottom:.2rem;line-height:1.3;">${a.titulo}</div>
+                <div style="color:#71717a;font-size:.72rem;line-height:1.4;">${a.descricao}</div>
+                <div style="color:#52525b;font-size:.65rem;margin-top:.45rem;display:flex;align-items:center;gap:.35rem;"><i class="fa-regular fa-clock"></i> ${a.tempoMin} min</div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    _CENTRAL_AJUDA_CONTEUDO.categorias.forEach(c => {
+        const artigosCat = artigos.filter(a => a.categoria === c.id);
+        if (artigosCat.length === 0) return;
+        html += `<div style="margin-top:1.25rem;">
+            <div style="color:#a1a1aa;font-size:.78rem;font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem;"><i class="fa-solid ${c.icone}" style="font-size:.75rem;color:var(--gold);"></i> ${c.nome} <span style="color:#52525b;font-size:.65rem;font-weight:400;">(${artigosCat.length})</span></div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;">`;
+        artigosCat.forEach(a => {
+            html += `<div onclick="_caAbrirArtigo('${a.id}')" style="padding:.55rem .8rem;background:#0f0f12;border:1px solid #1a1a1e;border-radius:.4rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:.75rem;transition:all .12s;" onmouseover="this.style.borderColor='#27272a';this.style.background='#18181b'" onmouseout="this.style.borderColor='#1a1a1e';this.style.background='#0f0f12'">
+                <div style="color:#fafafa;font-size:.78rem;flex:1;min-width:0;">${a.titulo}</div>
+                <div style="color:#52525b;font-size:.65rem;flex-shrink:0;display:flex;align-items:center;gap:.35rem;"><i class="fa-regular fa-clock"></i> ${a.tempoMin}m</div>
+            </div>`;
+        });
+        html += `</div></div>`;
+    });
+    cont.innerHTML = html;
+    cont.scrollTop = 0;
+}
+
+function _caSelecionarCategoria(catId) {
+    _caEstado.categoria = catId;
+    _caEstado.artigoId = null;
+    _caRenderSidebar();
+    _caRenderListaCategoria(catId);
+}
+window._caSelecionarCategoria = _caSelecionarCategoria;
+
+function _caRenderListaCategoria(catId) {
+    const cont = document.getElementById('ca-conteudo');
+    if (!cont) return;
+    const cat = _CENTRAL_AJUDA_CONTEUDO.categorias.find(c => c.id === catId);
+    const artigosCat = _CENTRAL_AJUDA_CONTEUDO.artigos.filter(a => a.categoria === catId);
+    let html = `<div style="margin-bottom:1.25rem;">
+        <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.4rem;"><i class="fa-solid ${cat?.icone || ''}"></i> ${cat?.nome || 'Categoria'}</div>
+        <h1 style="color:#fafafa;font-size:1.3rem;font-weight:800;margin:0;">${artigosCat.length} tutorial(is)</h1>
+    </div>`;
+    artigosCat.forEach(a => {
+        html += `<div onclick="_caAbrirArtigo('${a.id}')" style="padding:.85rem 1rem;background:#111113;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;margin-bottom:.55rem;transition:all .15s;" onmouseover="this.style.borderColor='#27272a';this.style.background='#18181b'" onmouseout="this.style.borderColor='#1e1e23';this.style.background='#111113'">
+            <div style="color:#fafafa;font-size:.9rem;font-weight:700;margin-bottom:.2rem;line-height:1.3;">${a.titulo} ${a.destaque ? '<span style="color:#fbbf24;font-size:.65rem;margin-left:.3rem;">⭐ ESSENCIAL</span>' : ''}</div>
+            <div style="color:#a1a1aa;font-size:.75rem;line-height:1.4;">${a.descricao}</div>
+            <div style="color:#52525b;font-size:.65rem;margin-top:.4rem;display:flex;align-items:center;gap:.35rem;"><i class="fa-regular fa-clock"></i> ${a.tempoMin} min de leitura</div>
+        </div>`;
+    });
+    cont.innerHTML = html;
+    cont.scrollTop = 0;
+}
+
+function _caAbrirArtigo(id) {
+    const a = _CENTRAL_AJUDA_CONTEUDO.artigos.find(x => x.id === id);
+    if (!a) return;
+    _caEstado.artigoId = id;
+    _caEstado.categoria = a.categoria;
+    _caRenderSidebar();
+    const cont = document.getElementById('ca-conteudo');
+    if (!cont) return;
+    const cat = _CENTRAL_AJUDA_CONTEUDO.categorias.find(c => c.id === a.categoria);
+    let html = `<div style="margin-bottom:1.25rem;">
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+            <span onclick="_caHome()" style="color:#71717a;font-size:.7rem;cursor:pointer;text-decoration:underline;">Início</span>
+            <span style="color:#3f3f46;font-size:.7rem;">›</span>
+            <span onclick="_caSelecionarCategoria('${cat?.id}')" style="color:#71717a;font-size:.7rem;cursor:pointer;text-decoration:underline;">${cat?.nome}</span>
+        </div>
+        <h1 style="color:#fafafa;font-size:1.4rem;font-weight:800;margin:0 0 .35rem;line-height:1.3;">${a.titulo}</h1>
+        <div style="color:#71717a;font-size:.72rem;display:flex;gap:1rem;align-items:center;"><span><i class="fa-regular fa-clock"></i> ${a.tempoMin} min</span>${a.destaque ? '<span style="color:#fbbf24;">⭐ Tutorial essencial</span>' : ''}</div>
+    </div>`;
+
+    if (a.objetivo) {
+        html += `<div style="background:#0f0f12;border-left:3px solid #06b6d4;padding:.65rem .85rem;border-radius:0 .35rem .35rem 0;margin-bottom:1.1rem;font-size:.78rem;color:#a1a1aa;line-height:1.55;">
+            <strong style="color:#fafafa;">Objetivo:</strong> ${a.objetivo}
+        </div>`;
+    }
+
+    if (a.passos && a.passos.length > 0) {
+        html += `<div style="margin-bottom:1.25rem;">
+            <div style="color:#71717a;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">Passo a passo</div>`;
+        a.passos.forEach((p, idx) => {
+            html += `<div style="display:flex;gap:.75rem;margin-bottom:.6rem;align-items:flex-start;">
+                <div style="background:#18181b;border:1px solid #27272a;min-width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--gold);font-weight:700;flex-shrink:0;margin-top:1px;">${idx + 1}</div>
+                <div style="color:#d4d4d8;font-size:.83rem;line-height:1.6;padding-top:.1rem;">${p}</div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    if (a.dicas && a.dicas.length > 0) {
+        html += `<div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:.5rem;padding:.75rem .95rem;margin-bottom:.85rem;">
+            <div style="color:#22c55e;font-size:.7rem;font-weight:700;letter-spacing:.05em;margin-bottom:.45rem;"><i class="fa-solid fa-lightbulb"></i> DICAS</div>`;
+        a.dicas.forEach(d => {
+            html += `<div style="color:#a1a1aa;font-size:.78rem;line-height:1.55;margin-bottom:.3rem;">• ${d}</div>`;
+        });
+        html += `</div>`;
+    }
+
+    if (a.avisos && a.avisos.length > 0) {
+        html += `<div style="background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.25);border-radius:.5rem;padding:.75rem .95rem;margin-bottom:.85rem;">
+            <div style="color:#fbbf24;font-size:.7rem;font-weight:700;letter-spacing:.05em;margin-bottom:.45rem;"><i class="fa-solid fa-triangle-exclamation"></i> ATENÇÃO</div>`;
+        a.avisos.forEach(av => {
+            html += `<div style="color:#a1a1aa;font-size:.78rem;line-height:1.55;margin-bottom:.3rem;">• ${av}</div>`;
+        });
+        html += `</div>`;
+    }
+
+    if (a.relacionados && a.relacionados.length > 0) {
+        html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e1e23;">
+            <div style="color:#71717a;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;">Artigos relacionados</div>
+            <div style="display:flex;flex-wrap:wrap;gap:.5rem;">`;
+        a.relacionados.forEach(rid => {
+            const ra = _CENTRAL_AJUDA_CONTEUDO.artigos.find(x => x.id === rid);
+            if (!ra) return;
+            html += `<span onclick="_caAbrirArtigo('${ra.id}')" style="background:#111113;border:1px solid #1e1e23;color:#06b6d4;padding:.4rem .75rem;border-radius:.35rem;cursor:pointer;font-size:.72rem;transition:all .15s;" onmouseover="this.style.borderColor='#06b6d4'" onmouseout="this.style.borderColor='#1e1e23'">→ ${ra.titulo}</span>`;
+        });
+        html += `</div></div>`;
+    }
+
+    cont.innerHTML = html;
+    cont.scrollTop = 0;
+}
+window._caAbrirArtigo = _caAbrirArtigo;
+
+function _caFiltrar() {
+    const q = (document.getElementById('ca-busca-input')?.value || '').trim().toLowerCase();
+    const counter = document.getElementById('ca-busca-counter');
+    if (!q) {
+        if (counter) counter.style.display = 'none';
+        if (_caEstado.categoria) _caRenderListaCategoria(_caEstado.categoria);
+        else _caRenderHome();
+        return;
+    }
+    const artigos = _CENTRAL_AJUDA_CONTEUDO.artigos.filter(a => {
+        const haystack = (a.titulo + ' ' + (a.descricao || '') + ' ' + (a.tags || []).join(' ')).toLowerCase();
+        return haystack.includes(q);
+    });
+    if (counter) {
+        counter.textContent = artigos.length + ' resultado(s)';
+        counter.style.display = 'inline';
+    }
+    const cont = document.getElementById('ca-conteudo');
+    if (!cont) return;
+    let html = `<div style="margin-bottom:1rem;">
+        <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.3rem;">Resultados da busca por "${q.replace(/</g,'&lt;')}"</div>
+        <h2 style="color:#fafafa;font-size:1.1rem;font-weight:800;margin:0;">${artigos.length} artigo(s) encontrado(s)</h2>
+    </div>`;
+    if (artigos.length === 0) {
+        html += `<div style="text-align:center;padding:3rem 1rem;color:#52525b;">
+            <i class="fa-solid fa-magnifying-glass" style="font-size:2rem;display:block;margin-bottom:.75rem;"></i>
+            <div style="font-size:.85rem;">Nenhum tutorial encontrado pra "${q.replace(/</g,'&lt;')}"</div>
+            <div style="font-size:.72rem;margin-top:.4rem;color:#71717a;">Tente outras palavras ou navegue por categorias.</div>
+        </div>`;
+    } else {
+        artigos.forEach(a => {
+            const cat = _CENTRAL_AJUDA_CONTEUDO.categorias.find(c => c.id === a.categoria);
+            html += `<div onclick="_caAbrirArtigo('${a.id}')" style="padding:.7rem 1rem;background:#111113;border:1px solid #1e1e23;border-radius:.4rem;cursor:pointer;margin-bottom:.5rem;transition:all .15s;" onmouseover="this.style.borderColor='#27272a';this.style.background='#18181b'" onmouseout="this.style.borderColor='#1e1e23';this.style.background='#111113'">
+                <div style="color:#71717a;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.2rem;"><i class="fa-solid ${cat?.icone || ''}" style="font-size:.6rem;"></i> ${cat?.nome || ''}</div>
+                <div style="color:#fafafa;font-size:.85rem;font-weight:700;margin-bottom:.15rem;">${a.titulo}</div>
+                <div style="color:#a1a1aa;font-size:.72rem;line-height:1.4;">${a.descricao}</div>
+            </div>`;
+        });
+    }
+    cont.innerHTML = html;
+    cont.scrollTop = 0;
+}
+window._caFiltrar = _caFiltrar;
+
+// Atalho de teclado: "?" abre a Central (apenas quando não está digitando em input)
+document.addEventListener('keydown', function(e) {
+    if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target?.tagName || '').toUpperCase()) && !e.target?.isContentEditable) {
+        e.preventDefault();
+        abrirCentralAjuda();
+    }
+});
 
 
 
