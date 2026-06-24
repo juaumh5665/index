@@ -4533,6 +4533,19 @@ document.addEventListener('DOMContentLoaded', function(){
                             <i class="fa-solid fa-arrow-up"></i> Fazer Upgrade
                         </button>
                     </div>
+
+                    <!-- ===== ZONA DE PERIGO: Reset de Base Financeira ===== -->
+                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;border:1px solid rgba(239,68,68,.3);background:linear-gradient(180deg,rgba(239,68,68,.04),rgba(0,0,0,0));">
+                        <div style="font-size:.65rem;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Zona de Perigo — Reset de Base Financeira</div>
+                        <div style="font-size:.75rem;color:#a1a1aa;margin-bottom:1rem;line-height:1.5;">
+                            Apaga <strong style="color:#ef4444;">todo o histórico financeiro</strong> do clube — torneios, transações, comandas, cash games, fechamentos, rankings — e <strong style="color:#22c55e;">preserva</strong> jogadores cadastrados, funcionários, produtos do bar, configurações, templates e patrocinadores.
+                            <br><br>
+                            <span style="color:#fbbf24;">⚠️ Esta ação é irreversível.</span> Faça um backup antes (opção disponível no próximo modal). Os logs de auditoria dos últimos 30 dias serão preservados.
+                        </div>
+                        <button onclick="_abrirModalResetFinanceiro()" style="padding:.85rem 1.25rem;border-radius:.5rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#ef4444;font-weight:700;cursor:pointer;font-size:.85rem;width:100%;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
+                            <i class="fa-solid fa-broom"></i> Resetar Base Financeira
+                        </button>
+                    </div>
                 </div>
 
                 <!-- ABA: BACKUP -->
@@ -6276,6 +6289,87 @@ document.addEventListener('DOMContentLoaded', function(){
         <button onclick="fazerBackupAutomatico();renderBackupsLista();showToast('💾 Backup criado')" class="btn-gold" style="padding:.7rem;border-radius:.5rem;width:100%;">
             <i class="fa-solid fa-floppy-disk"></i> Criar Backup Agora
         </button>
+    </div>
+</div>
+
+<!-- ════════ MODAL: RESET DE BASE FINANCEIRA ════════ -->
+<div id="modal-reset-financeiro" class="modal-overlay">
+    <div style="background:#111113;border:2px solid #ef4444;border-radius:1.25rem;padding:2rem;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;color:#ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Resetar Base Financeira</h3>
+            <button onclick="closeModal('modal-reset-financeiro')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+
+        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:.6rem;padding:1rem;margin-bottom:1rem;">
+            <div style="font-size:.78rem;color:#fca5a5;line-height:1.6;">
+                <strong>⚠️ Esta ação é IRREVERSÍVEL.</strong><br>
+                Todos os torneios, transações, comandas, cash games, fechamentos, rankings e tickets serão <strong>apagados permanentemente</strong>. Use esta função apenas em casos de bagunça de lançamentos, dados de teste ou início de operação real.
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:1rem;">
+            <div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:.5rem;padding:.85rem;">
+                <div style="font-size:.65rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-trash"></i> Será apagado</div>
+                <div style="font-size:.7rem;color:#a1a1aa;line-height:1.7;">
+                    • Torneios e entries<br>
+                    • Eliminados, mesas, dealers, capiles<br>
+                    • Estornos e jackpot do torneio<br>
+                    • Transações e fechamentos<br>
+                    • Bar: comandas e itens<br>
+                    • Cash games (mesas e sessões)<br>
+                    • Rankings, tickets, vouchers<br>
+                    • Contas a pagar, pagamentos<br>
+                    • Histórico de crédito<br>
+                    • Auditoria > 30 dias
+                </div>
+            </div>
+            <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:.5rem;padding:.85rem;">
+                <div style="font-size:.65rem;font-weight:700;color:#22c55e;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-shield-check"></i> Será preservado</div>
+                <div style="font-size:.7rem;color:#a1a1aa;line-height:1.7;">
+                    • Cadastro do clube<br>
+                    • <strong>Jogadores cadastrados</strong><br>
+                    • Funcionários<br>
+                    • Usuários do sistema<br>
+                    • Produtos e grupos do bar<br>
+                    • Configurações (StackBar, etc)<br>
+                    • Templates de convite<br>
+                    • Patrocinadores<br>
+                    • Cupons, planos, assinatura<br>
+                    • Auditoria recente (30 dias)
+                </div>
+            </div>
+        </div>
+
+        <label style="display:flex;align-items:center;gap:.6rem;padding:.85rem;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.2);border-radius:.5rem;margin-bottom:1rem;cursor:pointer;">
+            <input type="checkbox" id="reset-fin-backup-check" checked style="accent-color:#06b6d4;width:1.1rem;height:1.1rem;cursor:pointer;">
+            <div>
+                <div style="font-size:.8rem;color:#fff;font-weight:600;"><i class="fa-solid fa-download" style="color:#06b6d4;"></i> Baixar backup JSON antes de apagar</div>
+                <div style="font-size:.68rem;color:#71717a;margin-top:.15rem;">Salva tudo o que será deletado em um arquivo .json no seu computador (pode ser usado para análise futura).</div>
+            </div>
+        </label>
+
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:.75rem;color:#a1a1aa;margin-bottom:.5rem;">
+                Para confirmar, digite <strong style="color:#ef4444;font-family:monospace;">RESETAR</strong> no campo abaixo:
+            </label>
+            <input type="text" id="reset-fin-confirmacao" placeholder="Digite RESETAR" autocomplete="off" oninput="_validarFormReset()" style="width:100%;padding:.7rem;background:#0f0f12;border:1px solid #1e1e23;color:#fff;border-radius:.5rem;font-family:monospace;letter-spacing:.1em;text-align:center;text-transform:uppercase;font-weight:700;">
+        </div>
+
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:.75rem;color:#a1a1aa;margin-bottom:.5rem;">
+                <i class="fa-solid fa-lock"></i> Senha do administrador (sua senha de login):
+            </label>
+            <input type="password" id="reset-fin-senha" placeholder="••••••••" autocomplete="current-password" oninput="_validarFormReset()" style="width:100%;padding:.7rem;background:#0f0f12;border:1px solid #1e1e23;color:#fff;border-radius:.5rem;">
+        </div>
+
+        <div id="reset-fin-progresso" style="display:none;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.85rem;margin-bottom:1rem;font-size:.75rem;color:#a1a1aa;font-family:monospace;max-height:180px;overflow-y:auto;"></div>
+
+        <div style="display:flex;gap:.75rem;">
+            <button onclick="closeModal('modal-reset-financeiro')" id="reset-fin-btn-cancelar" class="btn-ghost" style="flex:1;padding:.85rem;border-radius:.5rem;">Cancelar</button>
+            <button onclick="_executarResetFinanceiro()" id="reset-fin-btn-executar" disabled style="flex:2;padding:.85rem;border-radius:.5rem;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#ef4444;font-weight:700;cursor:not-allowed;opacity:.5;">
+                <i class="fa-solid fa-broom"></i> Resetar Base Financeira
+            </button>
+        </div>
     </div>
 </div>
 
@@ -15541,6 +15635,262 @@ function _togglePrintNegritoForte() {
     try { localStorage.setItem('stackos-print-extra-bold', ativo ? '1' : '0'); } catch (e) {}
 }
 window._togglePrintNegritoForte = _togglePrintNegritoForte;
+
+// =========================================================================
+// RESET DE BASE FINANCEIRA — Configurações > Segurança > Zona de Perigo
+// =========================================================================
+// Apaga histórico financeiro/operacional do clube (torneios, transações,
+// comandas, cash games, fechamentos, rankings, tickets, etc) mas PRESERVA
+// jogadores, funcionários, configurações, produtos, templates e patrocinadores.
+//
+// Fluxo:
+//  1. Usuário clica "Resetar Base Financeira" na aba Segurança
+//  2. Modal mostra inventário do que será apagado vs preservado
+//  3. Usuário marca/desmarca "Baixar backup JSON antes"
+//  4. Usuário digita "RESETAR" + senha do admin pra liberar o botão
+//  5. Sistema valida senha via signInWithPassword (re-auth)
+//  6. Se backup ligado: exporta JSON com tudo que vai apagar
+//  7. Chama RPC resetar_base_financeira_clube no Supabase (transação atômica)
+//  8. Limpa localStorage de dados operacionais (preserva configs/jogadores)
+//  9. Força reload pra estado limpo
+// =========================================================================
+
+// Tabelas que serão APAGADAS pela RPC do Supabase (referência pra backup)
+const _RESET_FIN_TABELAS_APAGAR = [
+    'torneio_entries', 'torneio_eliminados', 'torneio_mesas',
+    'torneio_capiles', 'torneio_dealers', 'torneio_estornos',
+    'torneio_jackpot_compras', 'torneios',
+    'transacoes', 'contas_pagar', 'pagamentos', 'historico_credito',
+    'bar_comanda_itens', 'bar_comandas',
+    'cash_sessoes', 'cash_mesas',
+    'rankings', 'tickets', 'vouchers', 'solicitacoes_credito'
+];
+
+// localStorage chaves que serão LIMPAS (resto preservado)
+const _RESET_FIN_LOCALSTORAGE_APAGAR = [
+    'ps_torneios', 'ps_transacoes', 'ps_fechamentos',
+    'ps_bar_comandas', 'ps_bar_caixa', 'ps_cash_mesas',
+    'ps_rankings', 'ps_torneio_dealers', 'ps_torneio_capiles',
+    'ps_tickets', 'ps_vouchers', 'ps_voucher_movimentos'
+];
+
+function _abrirModalResetFinanceiro() {
+    // Limpa campos
+    const inputConf = document.getElementById('reset-fin-confirmacao');
+    const inputSenha = document.getElementById('reset-fin-senha');
+    const progresso = document.getElementById('reset-fin-progresso');
+    const btnExec = document.getElementById('reset-fin-btn-executar');
+    if (inputConf) inputConf.value = '';
+    if (inputSenha) inputSenha.value = '';
+    if (progresso) { progresso.style.display = 'none'; progresso.innerHTML = ''; }
+    if (btnExec) {
+        btnExec.disabled = true;
+        btnExec.style.opacity = '.5';
+        btnExec.style.cursor = 'not-allowed';
+    }
+    document.getElementById('modal-reset-financeiro').classList.add('show');
+}
+window._abrirModalResetFinanceiro = _abrirModalResetFinanceiro;
+
+function _validarFormReset() {
+    const conf = (document.getElementById('reset-fin-confirmacao')?.value || '').trim().toUpperCase();
+    const senha = (document.getElementById('reset-fin-senha')?.value || '').trim();
+    const btn = document.getElementById('reset-fin-btn-executar');
+    if (!btn) return;
+    const ok = (conf === 'RESETAR') && senha.length >= 4;
+    btn.disabled = !ok;
+    btn.style.opacity = ok ? '1' : '.5';
+    btn.style.cursor = ok ? 'pointer' : 'not-allowed';
+}
+window._validarFormReset = _validarFormReset;
+
+function _resetFinProgresso(msg, tipo) {
+    const box = document.getElementById('reset-fin-progresso');
+    if (!box) return;
+    if (box.style.display === 'none') box.style.display = 'block';
+    const cor = tipo === 'erro' ? '#ef4444' : (tipo === 'ok' ? '#22c55e' : '#a1a1aa');
+    const linha = document.createElement('div');
+    linha.style.color = cor;
+    linha.style.marginBottom = '.25rem';
+    linha.textContent = msg;
+    box.appendChild(linha);
+    box.scrollTop = box.scrollHeight;
+}
+
+async function _gerarBackupJsonReset(clubeId) {
+    _resetFinProgresso('📦 Gerando backup JSON...');
+    const backup = {
+        gerado_em: new Date().toISOString(),
+        clube_id: clubeId,
+        nome_clube: (typeof clubeAtual !== 'undefined' && clubeAtual?.nome) ? clubeAtual.nome : 'desconhecido',
+        tabelas: {}
+    };
+    let totalRegistros = 0;
+    for (const tabela of _RESET_FIN_TABELAS_APAGAR) {
+        try {
+            // SELECT com filtro clube_id (algumas tabelas usam clube_id, outras herdam via FK)
+            const { data, error } = await sb.from(tabela).select('*').eq('clube_id', clubeId);
+            if (error && error.code !== '42703') { // 42703 = column doesn't exist
+                _resetFinProgresso(`  ⚠️  ${tabela}: ${error.message}`, 'erro');
+                continue;
+            }
+            // Se a coluna clube_id não existe, tenta sem filtro (são dados derivados)
+            let registros = data;
+            if (error?.code === '42703') {
+                const { data: d2 } = await sb.from(tabela).select('*').limit(0);
+                registros = d2 || [];
+            }
+            backup.tabelas[tabela] = registros || [];
+            totalRegistros += (registros || []).length;
+            _resetFinProgresso(`  ✓ ${tabela}: ${(registros || []).length} registro(s)`);
+        } catch (e) {
+            _resetFinProgresso(`  ⚠️  ${tabela}: ${e.message || e}`, 'erro');
+        }
+    }
+    // Download do JSON
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const data = new Date().toISOString().split('T')[0];
+    const nome = (backup.nome_clube || 'clube').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.href = url;
+    a.download = `backup-${nome}-${data}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    _resetFinProgresso(`  📥 Backup baixado: ${totalRegistros} registro(s) totais`, 'ok');
+    return totalRegistros;
+}
+
+function _limparLocalStorageFinanceiro() {
+    _resetFinProgresso('🧹 Limpando localStorage operacional...');
+    let n = 0;
+    _RESET_FIN_LOCALSTORAGE_APAGAR.forEach(key => {
+        if (localStorage.getItem(key) !== null) {
+            localStorage.removeItem(key);
+            n++;
+        }
+    });
+    _resetFinProgresso(`  ✓ ${n} chave(s) removidas`, 'ok');
+    return n;
+}
+
+async function _executarResetFinanceiro() {
+    const btnExec = document.getElementById('reset-fin-btn-executar');
+    const btnCancel = document.getElementById('reset-fin-btn-cancelar');
+    const senha = document.getElementById('reset-fin-senha')?.value.trim();
+    const fazBackup = document.getElementById('reset-fin-backup-check')?.checked;
+
+    if (!senha) { showToast('⚠️ Informe a senha'); return; }
+
+    // Desabilita botões durante a execução
+    btnExec.disabled = true;
+    btnExec.style.opacity = '.5';
+    btnExec.style.cursor = 'not-allowed';
+    btnCancel.disabled = true;
+    btnCancel.style.opacity = '.5';
+
+    try {
+        // ============================================================
+        // 1. Re-autenticação: valida senha do usuário logado
+        // ============================================================
+        _resetFinProgresso('🔐 Validando senha do administrador...');
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user || !user.email) {
+            _resetFinProgresso('  ✗ Não foi possível identificar o usuário logado', 'erro');
+            throw new Error('Usuário não identificado');
+        }
+        const { error: errAuth } = await sb.auth.signInWithPassword({
+            email: user.email,
+            password: senha
+        });
+        if (errAuth) {
+            _resetFinProgresso(`  ✗ Senha incorreta`, 'erro');
+            throw new Error('Senha incorreta');
+        }
+        _resetFinProgresso('  ✓ Senha validada', 'ok');
+
+        // ============================================================
+        // 2. Identifica o clube
+        // ============================================================
+        const clubeId = (typeof clubeAtual !== 'undefined' && clubeAtual?.id) ? clubeAtual.id : null;
+        if (!clubeId) {
+            _resetFinProgresso('  ✗ Clube atual não identificado', 'erro');
+            throw new Error('Clube não identificado');
+        }
+
+        // ============================================================
+        // 3. Backup opcional (antes de apagar)
+        // ============================================================
+        if (fazBackup) {
+            await _gerarBackupJsonReset(clubeId);
+        }
+
+        // ============================================================
+        // 4. Chama a RPC do Supabase (faz tudo em transação atômica)
+        // ============================================================
+        _resetFinProgresso('🗑️  Apagando dados do banco (transação atômica)...');
+        const { data: resultado, error: errRpc } = await sb.rpc('resetar_base_financeira_clube', {
+            p_clube_id: clubeId
+        });
+        if (errRpc) {
+            _resetFinProgresso(`  ✗ Erro: ${errRpc.message}`, 'erro');
+            throw errRpc;
+        }
+        if (resultado && typeof resultado === 'object') {
+            let total = 0;
+            Object.keys(resultado).forEach(k => {
+                const n = resultado[k];
+                if (typeof n === 'number') {
+                    _resetFinProgresso(`  ✓ ${k}: ${n} registro(s) apagado(s)`);
+                    total += n;
+                }
+            });
+            _resetFinProgresso(`  ✓ Total: ${total} registro(s) apagado(s)`, 'ok');
+        } else {
+            _resetFinProgresso(`  ✓ RPC executada com sucesso`, 'ok');
+        }
+
+        // ============================================================
+        // 5. Limpa localStorage operacional
+        // ============================================================
+        _limparLocalStorageFinanceiro();
+
+        // ============================================================
+        // 6. Auditoria (loga a ação na auditoria, que será preservada)
+        // ============================================================
+        if (typeof logAudit === 'function') {
+            try {
+                logAudit('RESET_FINANCEIRO', 'Base financeira resetada', { 
+                    clube_id: clubeId, 
+                    backup: fazBackup,
+                    timestamp: new Date().toISOString() 
+                });
+            } catch(e) { /* não bloqueia */ }
+        }
+
+        _resetFinProgresso('', 'ok');
+        _resetFinProgresso('✅ RESET CONCLUÍDO COM SUCESSO!', 'ok');
+        _resetFinProgresso('   Recarregando o sistema em 4 segundos...', 'ok');
+
+        // ============================================================
+        // 7. Aguarda e força reload (limpa estado da memória)
+        // ============================================================
+        setTimeout(() => {
+            window.location.reload();
+        }, 4000);
+
+    } catch (e) {
+        console.error('[RESET_FINANCEIRO] Erro:', e);
+        _resetFinProgresso(`✗ Falha: ${e.message || e}`, 'erro');
+        // Reabilita botão de cancelar pra o usuário sair
+        btnCancel.disabled = false;
+        btnCancel.style.opacity = '1';
+        // Mantém botão executar desabilitado (pra evitar dupla execução)
+    }
+}
+window._executarResetFinanceiro = _executarResetFinanceiro;
 
 function fecharPreviewImpressao() {
     document.getElementById('print-preview-modal').classList.remove('show');
