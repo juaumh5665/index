@@ -9991,11 +9991,13 @@ function iniciarRealtime() {
         }, (payload) => _onRealtimeEvent('torneio', payload))
         
         .on('postgres_changes', { 
-            event: '*', schema: 'public', table: 'torneio_entries' 
+            event: '*', schema: 'public', table: 'torneio_entries',
+            filter: `clube_id=eq.${clubeId}` 
         }, (payload) => _onRealtimeEvent('entry', payload))
         
         .on('postgres_changes', { 
-            event: '*', schema: 'public', table: 'torneio_eliminados' 
+            event: '*', schema: 'public', table: 'torneio_eliminados',
+            filter: `clube_id=eq.${clubeId}` 
         }, (payload) => _onRealtimeEvent('eliminado', payload))
         
         // === BAR / COMANDAS ===
