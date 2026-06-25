@@ -15758,7 +15758,7 @@ async function _gerarBackupJsonReset(clubeId) {
     const backup = {
         gerado_em: new Date().toISOString(),
         clube_id: clubeId,
-        nome_clube: (typeof clubeAtual !== 'undefined' && clubeAtual?.nome) ? clubeAtual.nome : 'desconhecido',
+        nome_clube: (typeof sbClube !== 'undefined' && sbClube?.nome) ? sbClube.nome : 'desconhecido',
         tabelas: {}
     };
     let totalRegistros = 0;
@@ -15850,7 +15850,9 @@ async function _executarResetFinanceiro() {
         // ============================================================
         // 2. Identifica o clube
         // ============================================================
-        const clubeId = (typeof clubeAtual !== 'undefined' && clubeAtual?.id) ? clubeAtual.id : null;
+        // BUGFIX: a variável correta no StackOS é `sbClube` (não `clubeAtual`).
+        // Antes dava sempre "Clube não identificado" mesmo com senha validada.
+        const clubeId = (typeof sbClube !== 'undefined' && sbClube?.id) ? sbClube.id : null;
         if (!clubeId) {
             _resetFinProgresso('  ✗ Clube atual não identificado', 'erro');
             throw new Error('Clube não identificado');
