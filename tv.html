@@ -3422,10 +3422,12 @@ function montarCarouselPremiacao(d) {
         agendarReload();
       })
       .on('postgres_changes', { 
-        event: '*', schema: 'public', table: 'torneio_entries' 
+        event: '*', schema: 'public', table: 'torneio_entries',
+        filter: `clube_id=eq.${pubState.clubeId}` 
       }, () => agendarReload())
       .on('postgres_changes', { 
-        event: '*', schema: 'public', table: 'torneio_eliminados' 
+        event: '*', schema: 'public', table: 'torneio_eliminados',
+        filter: `clube_id=eq.${pubState.clubeId}` 
       }, () => agendarReload())
       .on('postgres_changes', {
         // Patrocinadores: invalida cache e re-renderiza carrossel se o break estiver visível.
