@@ -15710,7 +15710,7 @@ const _RESET_FIN_LOCALSTORAGE_APAGAR = [
     'ps_tickets', 'ps_vouchers', 'ps_voucher_movimentos'
 ];
 
-function _abrirModalResetFinanceiro() {
+async function _abrirModalResetFinanceiro() {
     // Limpa campos
     const inputConf = document.getElementById('reset-fin-confirmacao');
     const inputSenha = document.getElementById('reset-fin-senha');
@@ -15725,6 +15725,34 @@ function _abrirModalResetFinanceiro() {
         btnExec.style.cursor = 'not-allowed';
     }
     openModal('modal-reset-financeiro');
+
+    // Verifica se pode resetar (limite de 1 reset por mês)
+    // Não bloqueia o modal — só mostra aviso prévio se já fez no mês.
+    try {
+        const { data } = await sb.rpc('pode_resetar_base_financeira');
+        if (data && data.ok && !data.pode && data.motivo === 'limite_mensal_atingido') {
+            const ultimoFmt = new Date(data.ultimo_reset).toLocaleString('pt-BR');
+            const proxFmt = new Date(data.proximo_mes_em).toLocaleDateString('pt-BR');
+            const box = document.getElementById('reset-fin-progresso');
+            if (box) {
+                box.style.display = 'block';
+                box.style.background = '#1f1611';
+                box.style.borderColor = '#92400e';
+                box.innerHTML = '<div style="color:#fbbf24;font-size:.8rem;line-height:1.6;">' +
+                    '<strong>⚠️ Limite mensal atingido</strong><br>' +
+                    'Já houve um reset em <strong>' + ultimoFmt + '</strong>.<br>' +
+                    'Próximo reset disponível a partir de <strong>' + proxFmt + '</strong>.<br>' +
+                    '<span style="color:#a1a1aa;font-size:.72rem;">Em caso de necessidade urgente, contate o suporte.</span>' +
+                    '</div>';
+            }
+            // Desabilita os inputs e o botão (cosmético — o backend bloqueia mesmo)
+            if (inputConf) inputConf.disabled = true;
+            if (inputSenha) inputSenha.disabled = true;
+        }
+    } catch(e) {
+        // RPC pode não existir ainda (caso o SQL não tenha sido aplicado) — não bloqueia
+        console.warn('[RESET] pode_resetar_base_financeira não disponível:', e?.message);
+    }
 }
 window._abrirModalResetFinanceiro = _abrirModalResetFinanceiro;
 
@@ -15873,7 +15901,15 @@ async function _executarResetFinanceiro() {
             p_clube_id: clubeId
         });
         if (errRpc) {
-            _resetFinProgresso(`  ✗ Erro: ${errRpc.message}`, 'erro');
+            // Tratamento amigável do erro de limite mensal
+            if (errRpc.message && errRpc.message.includes('LIMITE_RESET_MENSAL')) {
+                // Extrai a parte após "LIMITE_RESET_MENSAL: "
+                const msg = errRpc.message.replace(/^.*LIMITE_RESET_MENSAL:\s*/, '');
+                _resetFinProgresso('  ⚠️ ' + msg, 'erro');
+                _resetFinProgresso('  ℹ️  Em caso de necessidade urgente, contate o suporte.', 'erro');
+            } else {
+                _resetFinProgresso(`  ✗ Erro: ${errRpc.message}`, 'erro');
+            }
             throw errRpc;
         }
         if (resultado && typeof resultado === 'object') {
