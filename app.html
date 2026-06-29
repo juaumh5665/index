@@ -2592,6 +2592,9 @@ document.addEventListener('DOMContentLoaded', function(){
         <button onclick="adminMostrarTab('contatos')" id="admin-tab-contatos" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
             <i class="fa-solid fa-envelope"></i> Leads <span id="admin-leads-badge" style="display:none;background:#dc2626;color:white;font-size:.6rem;padding:.1rem .35rem;border-radius:.25rem;font-weight:700;margin-left:.25rem;"></span>
         </button>
+        <button onclick="adminMostrarTab('suporte')" id="admin-tab-suporte" class="admin-tab" style="padding:1rem 1.25rem;background:transparent;border:none;color:#71717a;cursor:pointer;border-bottom:2px solid transparent;font-weight:600;font-size:.9rem;">
+            <i class="fa-solid fa-wrench"></i> Suporte
+        </button>
     </div>
     
     <!-- Content area -->
@@ -2794,7 +2797,51 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
             </div>
         </div>
-        
+
+        <!-- ════════════════════════════════════════════════════════════════════
+             TAB: SUPORTE — ferramentas administrativas pra atender clubes
+             Hoje contém: Reset de Base Financeira (assistente 4 etapas)
+             Futuro: outras ferramentas (reset senha, mover plano, etc)
+             ════════════════════════════════════════════════════════════════════ -->
+        <div id="admin-content-suporte" class="admin-content" style="display:none;">
+            <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:.4rem;">Ferramentas de Suporte</h2>
+            <p style="color:#a1a1aa;font-size:.85rem;margin-bottom:1.5rem;">Operações administrativas executadas em nome dos clientes. Toda ação é registrada na auditoria.</p>
+
+            <!-- Card: Reset Financeiro -->
+            <div style="background:#18181b;border:1px solid #27272a;border-radius:.75rem;padding:1.5rem;max-width:720px;">
+                <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem;">
+                    <div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);border-radius:.5rem;padding:.6rem .8rem;flex-shrink:0;">
+                        <i class="fa-solid fa-trash-can" style="color:#ef4444;font-size:1.1rem;"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <h3 style="font-size:1.05rem;font-weight:700;margin:0 0 .3rem;">Reset de Base Financeira (Cliente)</h3>
+                        <p style="color:#a1a1aa;font-size:.82rem;margin:0;line-height:1.5;">
+                            Apaga torneios, transações, comandas, mesas de cash, rankings, tickets e vouchers de um clube específico.
+                            Use só quando o cliente solicitar explicitamente e estiver bloqueado pelo limite mensal próprio.
+                        </p>
+                    </div>
+                </div>
+                <div style="background:#0f0f12;border-left:3px solid #fbbf24;border-radius:0 .35rem .35rem 0;padding:.7rem .95rem;margin-bottom:1rem;font-size:.78rem;color:#a1a1aa;line-height:1.55;">
+                    <strong style="color:#fbbf24;">⚠️ Cuidados importantes:</strong>
+                    <ul style="margin:.4rem 0 0;padding-left:1.1rem;">
+                        <li>Confirme o nome do clube em <strong>4 etapas</strong> antes da execução</li>
+                        <li>É <strong>obrigatório</strong> informar motivo + nome do solicitante (auditoria)</li>
+                        <li>Backup JSON é gerado automaticamente antes da operação</li>
+                        <li>Após o reset, <strong>peça pro cliente fazer F5 / reabrir o app</strong> pra limpar cache local</li>
+                    </ul>
+                </div>
+                <button onclick="_resetAdminAbrir()" style="background:#dc2626;border:none;color:white;padding:.75rem 1.5rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;display:inline-flex;align-items:center;gap:.5rem;">
+                    <i class="fa-solid fa-trash-can"></i> Iniciar assistente de reset
+                </button>
+            </div>
+
+            <!-- Placeholder pra futuras ferramentas -->
+            <div style="margin-top:1.5rem;padding:1rem;background:#0d0d0f;border:1px dashed #27272a;border-radius:.75rem;max-width:720px;font-size:.78rem;color:#52525b;text-align:center;">
+                Outras ferramentas de suporte serão adicionadas aqui.
+            </div>
+
+        </div>
+
     </div>
 </div>
 
@@ -6329,6 +6376,50 @@ document.addEventListener('DOMContentLoaded', function(){
 </div>
 
 <!-- ════════ MODAL: RESET DE BASE FINANCEIRA ════════ -->
+<!-- ════════════════════════════════════════════════════════════════════
+     MODAL: RESET ADMIN — Assistente em 4 etapas pra super admin
+     resetar base financeira de QUALQUER clube (uso de suporte)
+     ════════════════════════════════════════════════════════════════════ -->
+<div id="modal-reset-admin" class="modal-overlay">
+    <div style="background:#0a0a0b;border:1px solid #27272a;border-radius:1rem;width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Header -->
+        <div style="background:#111113;padding:1rem 1.5rem;border-bottom:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <div>
+                <h3 style="font-weight:700;font-size:1rem;color:#fafafa;margin:0;"><i class="fa-solid fa-wrench" style="color:#a855f7;"></i> Reset de Base Financeira (Suporte)</h3>
+                <div id="reset-admin-step-indicator" style="font-size:.7rem;color:#71717a;margin-top:.25rem;letter-spacing:.05em;">Etapa 1 de 4</div>
+            </div>
+            <button onclick="_resetAdminCancelar()" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+
+        <!-- Progress bar -->
+        <div style="background:#0d0d10;padding:.5rem 1.5rem;border-bottom:1px solid #1e1e23;flex-shrink:0;">
+            <div style="background:#18181b;height:4px;border-radius:2px;overflow:hidden;">
+                <div id="reset-admin-progress-bar" style="background:linear-gradient(90deg,#a855f7,#ec4899);height:100%;width:25%;transition:width .3s ease;"></div>
+            </div>
+        </div>
+
+        <!-- Body dinâmico -->
+        <div id="reset-admin-body" style="flex:1;overflow-y:auto;padding:1.5rem;background:#0a0a0b;">
+            <!-- Renderizado por _resetAdminRenderEtapa() -->
+        </div>
+
+        <!-- Footer -->
+        <div id="reset-admin-footer" style="background:#111113;border-top:1px solid #1e1e23;padding:1rem 1.5rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-shrink:0;">
+            <button id="reset-admin-btn-voltar" onclick="_resetAdminVoltar()" style="background:#18181b;border:1px solid #27272a;color:#a1a1aa;padding:.6rem 1.2rem;border-radius:.5rem;cursor:pointer;font-weight:600;font-size:.82rem;font-family:'Manrope',sans-serif;">
+                <i class="fa-solid fa-arrow-left"></i> Voltar
+            </button>
+            <div style="display:flex;gap:.5rem;">
+                <button id="reset-admin-btn-cancelar" onclick="_resetAdminCancelar()" style="background:transparent;border:1px solid #27272a;color:#71717a;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:600;font-size:.82rem;font-family:'Manrope',sans-serif;">Cancelar</button>
+                <button id="reset-admin-btn-prosseguir" onclick="_resetAdminProsseguir()" style="background:linear-gradient(135deg,#a855f7,#ec4899);border:none;color:white;padding:.6rem 1.4rem;border-radius:.5rem;cursor:pointer;font-weight:700;font-size:.82rem;font-family:'Manrope',sans-serif;">
+                    Prosseguir <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
 <div id="modal-reset-financeiro" class="modal-overlay">
     <div style="background:#111113;border:2px solid #ef4444;border-radius:1.25rem;padding:2rem;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -15969,6 +16060,602 @@ async function _executarResetFinanceiro() {
 }
 window._executarResetFinanceiro = _executarResetFinanceiro;
 
+// ============================================================================
+// RESET ADMIN — Assistente em 4 etapas (SUPORTE) — uso super admin
+// ============================================================================
+// Permite ao super admin resetar a base financeira de QUALQUER clube
+// quando o cliente solicitar (atende casos de limite mensal atingido,
+// problemas técnicos, etc).
+//
+// 4 etapas com fricção crescente:
+//   1. Selecionar clube (busca por nome/CNPJ/email)
+//   2. Confirmar dados do clube (mostra resumo + histórico)
+//   3. Justificativa (motivo + autorizado_por + checkbox)
+//   4. Confirmação final (digitar nome exato do clube)
+//
+// Após executar:
+//   - Backup JSON gerado automaticamente (download)
+//   - RPC executa (super admin bypassa limite mensal)
+//   - Auditoria registrada com motivo, autorizado_por
+//   - Avisa pra cliente fazer F5
+// ============================================================================
+
+let _resetAdminEstado = {
+    step: 1,
+    clube: null,            // objeto completo do clube selecionado
+    motivo: '',
+    autorizadoPor: '',
+    confirmaSolicitacao: false,
+    nomeDigitado: '',
+    executando: false
+};
+
+function _resetAdminAbrir() {
+    _resetAdminEstado = {
+        step: 1,
+        clube: null,
+        motivo: '',
+        autorizadoPor: '',
+        confirmaSolicitacao: false,
+        nomeDigitado: '',
+        executando: false
+    };
+    openModal('modal-reset-admin');
+    _resetAdminRenderEtapa();
+}
+window._resetAdminAbrir = _resetAdminAbrir;
+
+function _resetAdminCancelar() {
+    if (_resetAdminEstado.executando) {
+        showToast('⚠️ Reset em andamento, aguarde concluir');
+        return;
+    }
+    if (_resetAdminEstado.step > 1 && _resetAdminEstado.clube) {
+        if (!confirm('Cancelar o assistente? As informações desta operação serão descartadas.')) {
+            return;
+        }
+    }
+    closeModal('modal-reset-admin');
+}
+window._resetAdminCancelar = _resetAdminCancelar;
+
+function _resetAdminVoltar() {
+    if (_resetAdminEstado.executando) return;
+    if (_resetAdminEstado.step > 1) {
+        _resetAdminEstado.step--;
+        _resetAdminRenderEtapa();
+    }
+}
+window._resetAdminVoltar = _resetAdminVoltar;
+
+function _resetAdminProsseguir() {
+    if (_resetAdminEstado.executando) return;
+
+    const s = _resetAdminEstado.step;
+
+    // Validações por etapa antes de avançar
+    if (s === 1) {
+        if (!_resetAdminEstado.clube) {
+            showToast('⚠️ Selecione um clube primeiro');
+            return;
+        }
+    } else if (s === 2) {
+        // Etapa de confirmação visual — só avança
+    } else if (s === 3) {
+        const motivo = (document.getElementById('reset-admin-motivo')?.value || '').trim();
+        const autor = (document.getElementById('reset-admin-autorizado')?.value || '').trim();
+        const checkConfirma = document.getElementById('reset-admin-check-solicitacao')?.checked;
+        if (motivo.length < 10) {
+            showToast('⚠️ Motivo precisa ter pelo menos 10 caracteres');
+            return;
+        }
+        if (autor.length < 3) {
+            showToast('⚠️ Informe quem autorizou o reset');
+            return;
+        }
+        if (!checkConfirma) {
+            showToast('⚠️ Confirme que o cliente solicitou o reset');
+            return;
+        }
+        _resetAdminEstado.motivo = motivo;
+        _resetAdminEstado.autorizadoPor = autor;
+        _resetAdminEstado.confirmaSolicitacao = true;
+    } else if (s === 4) {
+        // Etapa final — não avança, executa
+        return _resetAdminExecutar();
+    }
+
+    _resetAdminEstado.step++;
+    _resetAdminRenderEtapa();
+}
+window._resetAdminProsseguir = _resetAdminProsseguir;
+
+function _resetAdminRenderEtapa() {
+    const s = _resetAdminEstado.step;
+    const body = document.getElementById('reset-admin-body');
+    const indicator = document.getElementById('reset-admin-step-indicator');
+    const progressBar = document.getElementById('reset-admin-progress-bar');
+    const btnVoltar = document.getElementById('reset-admin-btn-voltar');
+    const btnProsseguir = document.getElementById('reset-admin-btn-prosseguir');
+
+    if (!body) return;
+
+    if (indicator) indicator.textContent = `Etapa ${s} de 4`;
+    if (progressBar) progressBar.style.width = (s * 25) + '%';
+    if (btnVoltar) btnVoltar.style.visibility = s > 1 ? 'visible' : 'hidden';
+
+    if (s === 1) {
+        _resetAdminRenderEtapa1(body);
+        if (btnProsseguir) btnProsseguir.innerHTML = 'Prosseguir <i class="fa-solid fa-arrow-right"></i>';
+    } else if (s === 2) {
+        _resetAdminRenderEtapa2(body);
+        if (btnProsseguir) btnProsseguir.innerHTML = 'Prosseguir <i class="fa-solid fa-arrow-right"></i>';
+    } else if (s === 3) {
+        _resetAdminRenderEtapa3(body);
+        if (btnProsseguir) btnProsseguir.innerHTML = 'Prosseguir <i class="fa-solid fa-arrow-right"></i>';
+    } else if (s === 4) {
+        _resetAdminRenderEtapa4(body);
+        if (btnProsseguir) btnProsseguir.innerHTML = '<i class="fa-solid fa-trash-can"></i> EXECUTAR RESET';
+        if (btnProsseguir) btnProsseguir.style.background = '#dc2626';
+    }
+}
+
+// ============================================================
+// ETAPA 1 — Selecionar Clube
+// ============================================================
+function _resetAdminRenderEtapa1(body) {
+    body.innerHTML = `
+        <div style="margin-bottom:1.25rem;">
+            <h4 style="font-size:1rem;font-weight:700;color:#fafafa;margin:0 0 .35rem;">Selecione o clube</h4>
+            <p style="font-size:.78rem;color:#a1a1aa;margin:0;line-height:1.5;">Busque pelo nome do clube, CNPJ ou email do dono. Click no clube pra continuar.</p>
+        </div>
+
+        <div style="margin-bottom:.85rem;">
+            <input type="text" id="reset-admin-busca" placeholder="Buscar clube..." oninput="_resetAdminBuscarClubes()"
+                style="width:100%;padding:.75rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.9rem;font-family:'Manrope',sans-serif;">
+        </div>
+
+        <div id="reset-admin-clubes-lista" style="border:1px solid #27272a;border-radius:.5rem;max-height:340px;overflow-y:auto;background:#0f0f12;">
+            <div style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;">
+                <i class="fa-solid fa-spinner fa-spin"></i> Carregando clubes...
+            </div>
+        </div>
+    `;
+    // Carrega clubes (usa cache se disponível)
+    if (Array.isArray(_adminClubesCache) && _adminClubesCache.length > 0) {
+        _resetAdminRenderListaClubes(_adminClubesCache);
+    } else {
+        // Força carga
+        sb.rpc('listar_clubes_admin').then(({ data, error }) => {
+            if (error) {
+                document.getElementById('reset-admin-clubes-lista').innerHTML =
+                    `<div style="padding:2rem;text-align:center;color:#dc2626;">Erro: ${error.message}</div>`;
+                return;
+            }
+            _adminClubesCache = data || [];
+            _resetAdminRenderListaClubes(_adminClubesCache);
+        });
+    }
+}
+
+function _resetAdminBuscarClubes() {
+    const q = (document.getElementById('reset-admin-busca')?.value || '').trim().toLowerCase();
+    if (!Array.isArray(_adminClubesCache)) return;
+    const filtrados = q ? _adminClubesCache.filter(c =>
+        (c.nome || '').toLowerCase().includes(q) ||
+        (c.email_dono || '').toLowerCase().includes(q) ||
+        (c.cnpj || '').toLowerCase().includes(q)
+    ) : _adminClubesCache;
+    _resetAdminRenderListaClubes(filtrados);
+}
+window._resetAdminBuscarClubes = _resetAdminBuscarClubes;
+
+function _resetAdminRenderListaClubes(clubes) {
+    const cont = document.getElementById('reset-admin-clubes-lista');
+    if (!cont) return;
+    if (!clubes.length) {
+        cont.innerHTML = '<div style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;">Nenhum clube encontrado</div>';
+        return;
+    }
+    let html = '';
+    clubes.forEach(c => {
+        const selecionado = _resetAdminEstado.clube && _resetAdminEstado.clube.id === c.id;
+        const corStatus = c.status === 'ativo' ? '#10b981' : c.status === 'expirado' ? '#dc2626' : '#71717a';
+        html += `<div onclick="_resetAdminSelecionarClube('${c.id}')"
+            style="padding:.85rem 1rem;border-bottom:1px solid #1e1e23;cursor:pointer;transition:background .12s;${selecionado ? 'background:rgba(168,85,247,.08);border-left:3px solid #a855f7;padding-left:calc(1rem - 3px);' : ''}"
+            onmouseover="if(!this.style.background.includes('168'))this.style.background='#18181b'"
+            onmouseout="if(!this.style.background.includes('168'))this.style.background='transparent'">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">
+                <div style="flex:1;min-width:0;">
+                    <div style="color:#fafafa;font-weight:600;font-size:.88rem;margin-bottom:.15rem;">${_escapeHtml(c.nome || 'Sem nome')}</div>
+                    <div style="color:#71717a;font-size:.7rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+                        ${c.cnpj ? `<span><i class="fa-solid fa-id-card" style="font-size:.62rem;"></i> ${_escapeHtml(c.cnpj)}</span>` : ''}
+                        ${c.email_dono ? `<span><i class="fa-solid fa-envelope" style="font-size:.62rem;"></i> ${_escapeHtml(c.email_dono)}</span>` : ''}
+                    </div>
+                </div>
+                <div style="background:${corStatus}1a;color:${corStatus};font-size:.62rem;padding:.2rem .5rem;border-radius:.25rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">${c.status || '—'}</div>
+            </div>
+        </div>`;
+    });
+    cont.innerHTML = html;
+}
+
+function _resetAdminSelecionarClube(clubeId) {
+    const clube = _adminClubesCache.find(c => c.id === clubeId);
+    if (!clube) return;
+    _resetAdminEstado.clube = clube;
+    // Re-renderiza pra mostrar seleção visual
+    _resetAdminRenderListaClubes(
+        _adminClubesCache.filter(c => {
+            const q = (document.getElementById('reset-admin-busca')?.value || '').trim().toLowerCase();
+            if (!q) return true;
+            return (c.nome || '').toLowerCase().includes(q) ||
+                   (c.email_dono || '').toLowerCase().includes(q) ||
+                   (c.cnpj || '').toLowerCase().includes(q);
+        })
+    );
+}
+window._resetAdminSelecionarClube = _resetAdminSelecionarClube;
+
+// ============================================================
+// ETAPA 2 — Confirmar dados do clube
+// ============================================================
+function _resetAdminRenderEtapa2(body) {
+    const c = _resetAdminEstado.clube || {};
+    body.innerHTML = `
+        <div style="margin-bottom:1.25rem;">
+            <h4 style="font-size:1rem;font-weight:700;color:#fafafa;margin:0 0 .35rem;">Confirmar dados do clube</h4>
+            <p style="font-size:.78rem;color:#a1a1aa;margin:0;line-height:1.5;">Confirme visualmente que este é o clube correto antes de prosseguir.</p>
+        </div>
+
+        <div style="background:#0f0f12;border:1px solid #27272a;border-radius:.6rem;padding:1.25rem;">
+            <div style="display:flex;align-items:flex-start;gap:.85rem;margin-bottom:1rem;padding-bottom:.85rem;border-bottom:1px solid #1e1e23;">
+                <div style="background:linear-gradient(135deg,#a855f7,#3b82f6);width:48px;height:48px;border-radius:.5rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fa-solid fa-building" style="color:white;font-size:1.1rem;"></i>
+                </div>
+                <div style="flex:1;">
+                    <div style="color:#fafafa;font-weight:800;font-size:1.05rem;">${_escapeHtml(c.nome || 'Sem nome')}</div>
+                    <div style="color:#71717a;font-size:.72rem;margin-top:.15rem;">ID: ${_escapeHtml(c.id || '—')}</div>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;font-size:.82rem;">
+                <div>
+                    <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">CNPJ</div>
+                    <div style="color:#fafafa;">${_escapeHtml(c.cnpj || '—')}</div>
+                </div>
+                <div>
+                    <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Status</div>
+                    <div style="color:#fafafa;text-transform:uppercase;">${_escapeHtml(c.status || '—')}</div>
+                </div>
+                <div>
+                    <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Email do dono</div>
+                    <div style="color:#fafafa;font-size:.78rem;word-break:break-all;">${_escapeHtml(c.email_dono || '—')}</div>
+                </div>
+                <div>
+                    <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Plano</div>
+                    <div style="color:#fafafa;">${_escapeHtml(c.plano_id || c.plano || '—')}</div>
+                </div>
+                ${c.data_validade ? `<div>
+                    <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Validade</div>
+                    <div style="color:#fafafa;">${new Date(c.data_validade).toLocaleDateString('pt-BR')}</div>
+                </div>` : ''}
+                ${c.criado_em ? `<div>
+                    <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Cliente desde</div>
+                    <div style="color:#fafafa;">${new Date(c.criado_em).toLocaleDateString('pt-BR')}</div>
+                </div>` : ''}
+            </div>
+        </div>
+
+        <div style="margin-top:1rem;padding:.85rem 1rem;background:rgba(220,38,38,.05);border:1px solid rgba(220,38,38,.25);border-radius:.5rem;font-size:.78rem;color:#fca5a5;line-height:1.6;">
+            <i class="fa-solid fa-circle-info" style="margin-right:.35rem;"></i>
+            <strong>Atenção:</strong> ao prosseguir, você será responsável por executar um reset no <strong>${_escapeHtml(c.nome || 'clube')}</strong>.
+            Confirme com o cliente que ele <strong>autorizou</strong> esta operação.
+        </div>
+    `;
+}
+
+// ============================================================
+// ETAPA 3 — Justificativa
+// ============================================================
+function _resetAdminRenderEtapa3(body) {
+    const c = _resetAdminEstado.clube || {};
+    body.innerHTML = `
+        <div style="margin-bottom:1.25rem;">
+            <h4 style="font-size:1rem;font-weight:700;color:#fafafa;margin:0 0 .35rem;">Justificativa do reset</h4>
+            <p style="font-size:.78rem;color:#a1a1aa;margin:0;line-height:1.5;">As informações abaixo serão registradas na auditoria pra cobertura legal.</p>
+        </div>
+
+        <div style="background:#0f0f12;border-left:3px solid #a855f7;border-radius:0 .35rem .35rem 0;padding:.7rem .95rem;margin-bottom:1.25rem;font-size:.78rem;color:#d4d4d8;">
+            Clube selecionado: <strong style="color:#a855f7;">${_escapeHtml(c.nome || '—')}</strong>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;color:#a1a1aa;font-size:.78rem;font-weight:600;margin-bottom:.4rem;">
+                Motivo do reset <span style="color:#dc2626;">*</span>
+                <span style="color:#52525b;font-weight:400;font-size:.7rem;"> (mínimo 10 caracteres)</span>
+            </label>
+            <textarea id="reset-admin-motivo" rows="3" placeholder="Ex: Cliente esgotou limite mensal e precisa começar mês novo com base limpa por bug de fechamento..."
+                style="width:100%;padding:.65rem .85rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.85rem;font-family:'Manrope',sans-serif;resize:vertical;min-height:80px;">${_escapeHtml(_resetAdminEstado.motivo || '')}</textarea>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;color:#a1a1aa;font-size:.78rem;font-weight:600;margin-bottom:.4rem;">
+                Autorizado por <span style="color:#dc2626;">*</span>
+                <span style="color:#52525b;font-weight:400;font-size:.7rem;"> (nome do solicitante)</span>
+            </label>
+            <input type="text" id="reset-admin-autorizado" placeholder="Ex: João Silva (dono do clube)"
+                value="${_escapeHtml(_resetAdminEstado.autorizadoPor || '')}"
+                style="width:100%;padding:.65rem .85rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.85rem;font-family:'Manrope',sans-serif;">
+        </div>
+
+        <label style="display:flex;align-items:flex-start;gap:.55rem;padding:.85rem;background:#0f0f12;border:1px solid #27272a;border-radius:.5rem;cursor:pointer;">
+            <input type="checkbox" id="reset-admin-check-solicitacao" ${_resetAdminEstado.confirmaSolicitacao ? 'checked' : ''} style="margin-top:.15rem;cursor:pointer;">
+            <span style="font-size:.8rem;color:#d4d4d8;line-height:1.5;">
+                Confirmo que <strong>recebi solicitação explícita</strong> do cliente pra realizar este reset.
+                Estou ciente que esta ação é <strong>irreversível</strong> e que devo orientar o cliente a fazer F5 após a conclusão.
+            </span>
+        </label>
+    `;
+    // Atualiza estado conforme digita
+    setTimeout(() => {
+        const motivoEl = document.getElementById('reset-admin-motivo');
+        const autorEl = document.getElementById('reset-admin-autorizado');
+        const checkEl = document.getElementById('reset-admin-check-solicitacao');
+        if (motivoEl) motivoEl.addEventListener('input', () => { _resetAdminEstado.motivo = motivoEl.value; });
+        if (autorEl) autorEl.addEventListener('input', () => { _resetAdminEstado.autorizadoPor = autorEl.value; });
+        if (checkEl) checkEl.addEventListener('change', () => { _resetAdminEstado.confirmaSolicitacao = checkEl.checked; });
+    }, 50);
+}
+
+// ============================================================
+// ETAPA 4 — Confirmação Final
+// ============================================================
+function _resetAdminRenderEtapa4(body) {
+    const c = _resetAdminEstado.clube || {};
+    body.innerHTML = `
+        <div style="margin-bottom:1.25rem;">
+            <h4 style="font-size:1.1rem;font-weight:800;color:#ef4444;margin:0 0 .35rem;"><i class="fa-solid fa-triangle-exclamation"></i> Confirmação final</h4>
+            <p style="font-size:.78rem;color:#a1a1aa;margin:0;line-height:1.5;">Esta é a última etapa antes da execução. Revise tudo e digite o nome exato do clube pra confirmar.</p>
+        </div>
+
+        <div style="background:rgba(220,38,38,.05);border:2px solid #dc2626;border-radius:.6rem;padding:1.25rem;margin-bottom:1.25rem;">
+            <div style="font-size:.7rem;color:#dc2626;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:.6rem;">⚠️ Resumo da operação</div>
+            <div style="font-size:.85rem;color:#fafafa;line-height:1.7;">
+                <div><strong style="color:#a1a1aa;">Clube:</strong> ${_escapeHtml(c.nome)}</div>
+                <div><strong style="color:#a1a1aa;">CNPJ:</strong> ${_escapeHtml(c.cnpj || '—')}</div>
+                <div><strong style="color:#a1a1aa;">Autorizado por:</strong> ${_escapeHtml(_resetAdminEstado.autorizadoPor)}</div>
+                <div style="margin-top:.4rem;padding-top:.4rem;border-top:1px solid rgba(220,38,38,.2);"><strong style="color:#a1a1aa;">Motivo:</strong></div>
+                <div style="font-size:.78rem;color:#d4d4d8;font-style:italic;margin-top:.15rem;">"${_escapeHtml(_resetAdminEstado.motivo)}"</div>
+            </div>
+            <div style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid rgba(220,38,38,.2);font-size:.78rem;color:#fca5a5;line-height:1.55;">
+                Serão apagados: <strong>torneios, transações, comandas, cash, rankings, tickets, vouchers</strong> deste clube.<br>
+                Serão preservados: <strong>jogadores, funcionários, usuários, produtos do bar, configurações</strong>.<br>
+                Backup JSON será baixado automaticamente antes do reset.
+            </div>
+        </div>
+
+        <div style="margin-bottom:.5rem;">
+            <label style="display:block;color:#fafafa;font-size:.82rem;font-weight:700;margin-bottom:.4rem;">
+                Digite o nome <strong style="color:#ef4444;">EXATO</strong> do clube pra confirmar:
+            </label>
+            <div style="font-size:.7rem;color:#71717a;margin-bottom:.5rem;">
+                Esperado: <code style="background:#18181b;padding:.15rem .4rem;border-radius:.25rem;color:#fafafa;font-family:monospace;font-size:.72rem;">${_escapeHtml(c.nome || '')}</code>
+            </div>
+            <input type="text" id="reset-admin-nome-confirma" placeholder="Digite aqui o nome exato..."
+                oninput="_resetAdminValidarNome()"
+                style="width:100%;padding:.75rem .95rem;background:#18181b;border:2px solid #27272a;color:#fafafa;border-radius:.5rem;font-size:.95rem;font-family:'Manrope',sans-serif;letter-spacing:.02em;">
+        </div>
+    `;
+    // Desabilita botão executar até digitar nome correto
+    const btn = document.getElementById('reset-admin-btn-prosseguir');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '.5';
+        btn.style.cursor = 'not-allowed';
+    }
+}
+
+function _resetAdminValidarNome() {
+    const c = _resetAdminEstado.clube || {};
+    const digitado = (document.getElementById('reset-admin-nome-confirma')?.value || '').trim();
+    const correto = (c.nome || '').trim();
+    const input = document.getElementById('reset-admin-nome-confirma');
+    const btn = document.getElementById('reset-admin-btn-prosseguir');
+    const match = digitado === correto && digitado.length > 0;
+
+    _resetAdminEstado.nomeDigitado = digitado;
+
+    if (input) {
+        input.style.borderColor = digitado.length === 0 ? '#27272a' : (match ? '#10b981' : '#dc2626');
+    }
+    if (btn) {
+        btn.disabled = !match;
+        btn.style.opacity = match ? '1' : '.5';
+        btn.style.cursor = match ? 'pointer' : 'not-allowed';
+    }
+}
+window._resetAdminValidarNome = _resetAdminValidarNome;
+
+// ============================================================
+// EXECUÇÃO — backup + RPC + auditoria
+// ============================================================
+async function _resetAdminExecutar() {
+    if (_resetAdminEstado.executando) return;
+    _resetAdminEstado.executando = true;
+
+    const c = _resetAdminEstado.clube;
+    const motivo = _resetAdminEstado.motivo;
+    const autor = _resetAdminEstado.autorizadoPor;
+    const body = document.getElementById('reset-admin-body');
+    const btnVoltar = document.getElementById('reset-admin-btn-voltar');
+    const btnCancelar = document.getElementById('reset-admin-btn-cancelar');
+    const btnProsseguir = document.getElementById('reset-admin-btn-prosseguir');
+
+    if (btnVoltar) btnVoltar.style.display = 'none';
+    if (btnCancelar) btnCancelar.style.display = 'none';
+    if (btnProsseguir) { btnProsseguir.disabled = true; btnProsseguir.style.opacity = '.5'; }
+
+    body.innerHTML = `
+        <h4 style="font-size:1rem;font-weight:700;color:#fafafa;margin:0 0 1rem;">Executando reset...</h4>
+        <div id="reset-admin-progresso" style="background:#0f0f12;border:1px solid #27272a;border-radius:.5rem;padding:1rem;font-family:monospace;font-size:.78rem;color:#a1a1aa;line-height:1.7;max-height:380px;overflow-y:auto;"></div>
+    `;
+
+    const progresso = document.getElementById('reset-admin-progresso');
+    const log = (msg, tipo) => {
+        const cor = tipo === 'erro' ? '#ef4444' : tipo === 'ok' ? '#10b981' : '#a1a1aa';
+        progresso.innerHTML += `<div style="color:${cor};">${msg}</div>`;
+        progresso.scrollTop = progresso.scrollHeight;
+    };
+
+    try {
+        // 1. Gera backup JSON ANTES de apagar
+        log('📦 Gerando backup JSON do clube...');
+        try {
+            await _gerarBackupJsonResetAdmin(c.id, c.nome);
+            log('  ✓ Backup baixado com sucesso', 'ok');
+        } catch (e) {
+            log(`  ⚠️ Falha no backup: ${e.message}. Continuando mesmo assim...`, 'erro');
+        }
+
+        // 2. Chama a RPC (super admin bypassa limite mensal)
+        log('🗑️  Executando RPC resetar_base_financeira_clube...');
+        const { data: resultado, error: errRpc } = await sb.rpc('resetar_base_financeira_clube', {
+            p_clube_id: c.id
+        });
+        if (errRpc) {
+            log(`  ✗ Erro RPC: ${errRpc.message}`, 'erro');
+            throw errRpc;
+        }
+        if (resultado && typeof resultado === 'object') {
+            let total = 0;
+            Object.keys(resultado).forEach(k => {
+                const n = resultado[k];
+                if (typeof n === 'number') {
+                    log(`  ✓ ${k}: ${n} registro(s) apagado(s)`);
+                    total += n;
+                }
+            });
+            log(`  ✓ Total: ${total} registro(s) apagado(s)`, 'ok');
+        }
+
+        // 3. Auditoria — registra log detalhado da operação de suporte
+        if (typeof logAudit === 'function') {
+            try {
+                logAudit('SUPER_ADMIN_RESET_BASE', `Reset executado pelo super admin para ${c.nome}`, {
+                    clube_id: c.id,
+                    clube_nome: c.nome,
+                    motivo: motivo,
+                    autorizado_por: autor,
+                    timestamp: new Date().toISOString()
+                });
+                log('  ✓ Auditoria registrada', 'ok');
+            } catch(e) {
+                log(`  ⚠️ Falha ao registrar auditoria: ${e.message}`, 'erro');
+            }
+        }
+
+        // 4. Mensagem final + lembrete pro cliente
+        log('', 'ok');
+        log('═══════════════════════════════════════', 'ok');
+        log('✅ RESET CONCLUÍDO COM SUCESSO', 'ok');
+        log('═══════════════════════════════════════', 'ok');
+        log('', 'ok');
+        log('⚠️  AVISE O CLIENTE:', 'erro');
+        log('   1. Feche e reabra o navegador', 'erro');
+        log('   2. OU pressione Ctrl+Shift+R', 'erro');
+        log('   3. OU faça logout/login no app', 'erro');
+        log('', 'ok');
+        log('Sem isso, ele ainda verá dados antigos do cache local.', 'erro');
+
+        // Botão concluir
+        if (btnProsseguir) {
+            btnProsseguir.disabled = false;
+            btnProsseguir.style.opacity = '1';
+            btnProsseguir.style.cursor = 'pointer';
+            btnProsseguir.innerHTML = '<i class="fa-solid fa-check"></i> Concluir';
+            btnProsseguir.onclick = () => {
+                closeModal('modal-reset-admin');
+                showToast('✓ Reset executado. Avise o cliente pra fazer F5.');
+            };
+        }
+        if (btnCancelar) btnCancelar.style.display = 'inline-flex';
+
+    } catch (e) {
+        console.error('[RESET_ADMIN] Erro:', e);
+        log('', 'erro');
+        log(`✗ FALHA: ${e.message || e}`, 'erro');
+        log('Veja o console pra detalhes técnicos.', 'erro');
+
+        // Botão fechar
+        if (btnProsseguir) {
+            btnProsseguir.disabled = false;
+            btnProsseguir.style.opacity = '1';
+            btnProsseguir.style.cursor = 'pointer';
+            btnProsseguir.innerHTML = 'Fechar';
+            btnProsseguir.style.background = '#18181b';
+            btnProsseguir.onclick = () => closeModal('modal-reset-admin');
+        }
+        if (btnCancelar) btnCancelar.style.display = 'inline-flex';
+    } finally {
+        _resetAdminEstado.executando = false;
+    }
+}
+window._resetAdminExecutar = _resetAdminExecutar;
+
+// ============================================================
+// Versão admin do backup — recebe clubeId+nome (não usa sbClube)
+// ============================================================
+async function _gerarBackupJsonResetAdmin(clubeId, clubeNome) {
+    const backup = {
+        gerado_em: new Date().toISOString(),
+        clube_id: clubeId,
+        nome_clube: clubeNome || 'desconhecido',
+        gerado_por: 'super_admin',
+        tabelas: {}
+    };
+    let totalRegistros = 0;
+    for (const tabela of _RESET_FIN_TABELAS_APAGAR) {
+        try {
+            const { data, error } = await sb.from(tabela).select('*').eq('clube_id', clubeId);
+            if (error && error.code !== '42703') continue;
+            let registros = data;
+            if (error?.code === '42703') {
+                const { data: d2 } = await sb.from(tabela).select('*').limit(0);
+                registros = d2 || [];
+            }
+            backup.tabelas[tabela] = registros || [];
+            totalRegistros += (registros || []).length;
+        } catch (e) {
+            // continua mesmo com erro pontual em tabela
+        }
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dataStr = new Date().toISOString().split('T')[0];
+    const nome = (clubeNome || 'clube').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.href = url;
+    a.download = `backup-admin-${nome}-${dataStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return totalRegistros;
+}
+
+// Carregamento sob demanda da tab Suporte (placeholder pra evolução futura)
+function adminCarregarSuporte() {
+    // Hoje só tem reset financeiro. No futuro carregar listas adicionais aqui.
+    // Pré-carrega clubes pra agilizar Etapa 1 do assistente.
+    if (!Array.isArray(_adminClubesCache) || _adminClubesCache.length === 0) {
+        sb.rpc('listar_clubes_admin').then(({ data }) => {
+            if (data) _adminClubesCache = data;
+        }).catch(() => {});
+    }
+}
+window.adminCarregarSuporte = adminCarregarSuporte;
+
 function fecharPreviewImpressao() {
     document.getElementById('print-preview-modal').classList.remove('show');
 }
@@ -22096,6 +22783,7 @@ function adminMostrarTab(tab) {
     else if (tab === 'cupons') adminCarregarCupons();
     else if (tab === 'contatos') adminCarregarContatos();
     else if (tab === 'dashboard') adminCarregarDashboard();
+    else if (tab === 'suporte') adminCarregarSuporte();
 }
 
 async function adminAtualizarTudo() {
