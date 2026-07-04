@@ -9065,6 +9065,10 @@ let activeTorneioId   = null;  // ID estável do torneio aberto (sobrevive a ref
 let activeComandaId   = null;
 let activeCashMesaId  = null;
 let activeCashContext = { mesaId: null, jogadorId: null };
+// Modo de exibição do painel "Rake da Mesa (Dealers)" por mesa.
+// Não persiste — sempre inicia em 'porDealer' quando a página abre.
+// Valores: 'porDealer' (agrupado, soma por dealer) | 'ultimos' (histórico completo)
+let _rakeDealerViewMode = {};
 
 // ============================================================
 // PERMISSIONS MATRIX
@@ -34442,6 +34446,57 @@ function renderCashMesas() {
                 const lancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
                 if (lancs.length === 0) return '';
                 const totalRake = lancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+                const modo = _rakeDealerViewMode[m.id] || 'porDealer';
+
+                // === Visão 1: Por dealer (agrupado) ===
+                // Agrupa por dealerId; se algum lançamento não tem dealerId, usa dealerNome como chave fallback.
+                let corpoHtml = '';
+                if (modo === 'porDealer') {
+                    const grupos = {};
+                    lancs.forEach(l => {
+                        const chave = l.dealerId || ('nome:' + (l.dealerNome || '—'));
+                        if (!grupos[chave]) grupos[chave] = { nome: l.dealerNome || '—', total: 0, count: 0 };
+                        grupos[chave].total += Number(l.valor) || 0;
+                        grupos[chave].count += 1;
+                    });
+                    const ranking = Object.values(grupos).sort((a, b) => b.total - a.total);
+                    corpoHtml = ranking.map(g => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.4rem .55rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
+                            <div style="display:flex;flex-direction:column;">
+                                <span style="color:#e4e4e7;font-weight:500;">${esc(g.nome)}</span>
+                                <span style="font-size:.65rem;color:#52525b;">${g.count} lançamento${g.count !== 1 ? 's' : ''}</span>
+                            </div>
+                            <span style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">${formatMoney(g.total)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    // === Visão 2: Últimos (histórico completo, sem corte, mais recente primeiro) ===
+                    const ordenados = [...lancs].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+                    const listaHtml = ordenados.map(l => `
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.3rem .5rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
+                            <div style="display:flex;flex-direction:column;">
+                                <span style="color:#e4e4e7;">${esc(l.dealerNome || '—')}</span>
+                                <span style="font-size:.65rem;color:#52525b;">${new Date(l.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${l.observacao ? ' · ' + esc(l.observacao).substring(0,30) : ''}</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:.5rem;">
+                                <span style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">${formatMoney(l.valor)}</span>
+                                <button onclick="removerLancRakeDealer('${m.id}','${l.id}')" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:.7rem;" title="Remover"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                        </div>
+                    `).join('');
+                    // Scroll interno se passar de ~8 itens (evita a lista tomar a página inteira)
+                    corpoHtml = ordenados.length > 8
+                        ? `<div style="max-height:290px;overflow-y:auto;display:flex;flex-direction:column;gap:.25rem;padding-right:.25rem;">${listaHtml}</div>`
+                        : listaHtml;
+                }
+
+                // Botões do toggle — estilo consistente com o resto do sistema
+                const btnStyle = 'flex:1;padding:.35rem .6rem;font-size:.68rem;border-radius:.3rem;cursor:pointer;font-family:inherit;font-weight:500;';
+                const btnAtivo = 'background:rgba(245,158,11,.15);color:var(--gold);border:1px solid rgba(245,158,11,.4);';
+                const btnInativo = 'background:transparent;color:#71717a;border:1px solid #27272a;';
+                const btnPorDealer = modo === 'porDealer' ? btnAtivo : btnInativo;
+                const btnUltimos = modo === 'ultimos' ? btnAtivo : btnInativo;
+
                 return `
                 <div style="padding:.85rem 1.5rem;background:rgba(245,158,11,.04);border-bottom:1px solid #1e1e23;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
@@ -34450,20 +34505,12 @@ function renderCashMesas() {
                         </div>
                         <div style="font-size:.95rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">${formatMoney(totalRake)}</div>
                     </div>
+                    <div style="display:flex;gap:.3rem;margin-bottom:.55rem;">
+                        <button onclick="alternarViewRakeDealer('${m.id}','porDealer')" style="${btnStyle}${btnPorDealer}">Por dealer</button>
+                        <button onclick="alternarViewRakeDealer('${m.id}','ultimos')" style="${btnStyle}${btnUltimos}">Últimos lançamentos</button>
+                    </div>
                     <div style="display:flex;flex-direction:column;gap:.25rem;">
-                        ${lancs.slice(-3).reverse().map(l => `
-                            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.3rem .5rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
-                                <div style="display:flex;flex-direction:column;">
-                                    <span style="color:#e4e4e7;">${esc(l.dealerNome || '—')}</span>
-                                    <span style="font-size:.65rem;color:#52525b;">${new Date(l.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${l.observacao ? ' · ' + esc(l.observacao).substring(0,30) : ''}</span>
-                                </div>
-                                <div style="display:flex;align-items:center;gap:.5rem;">
-                                    <span style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">${formatMoney(l.valor)}</span>
-                                    <button onclick="removerLancRakeDealer('${m.id}','${l.id}')" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:.7rem;" title="Remover"><i class="fa-solid fa-xmark"></i></button>
-                                </div>
-                            </div>
-                        `).join('')}
-                        ${lancs.length > 3 ? `<div style="font-size:.65rem;color:#52525b;text-align:center;margin-top:.15rem;">+ ${lancs.length - 3} lançamento${lancs.length-3 !== 1 ? 's' : ''} anterior${lancs.length-3 !== 1 ? 'es' : ''}</div>` : ''}
+                        ${corpoHtml}
                     </div>
                 </div>
                 `;
@@ -34834,6 +34881,14 @@ function confirmarLancarRakeDealer() {
     showToast(`💰 Rake de ${formatMoney(valor)} registrado · ${dealerNome}`);
     logAudit && logAudit('CASH_RAKE_DEALER', `Rake dealer: ${dealerNome} · ${formatMoney(valor)} · Mesa ${m.nome}`);
     _rakeDealerCtx = null;
+}
+
+// Alterna a visão do painel "Rake da Mesa (Dealers)" entre agrupado por dealer e histórico completo.
+// Estado não persiste — sempre inicia em 'porDealer' no reload.
+function alternarViewRakeDealer(mesaId, modo) {
+    if (modo !== 'porDealer' && modo !== 'ultimos') return;
+    _rakeDealerViewMode[mesaId] = modo;
+    renderCashMesas();
 }
 
 function removerLancRakeDealer(mesaId, lancId) {
