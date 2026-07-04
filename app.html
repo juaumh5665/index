@@ -25966,6 +25966,47 @@ function abrirEditarTorneio(idx) {
                 '</div>' +
             '</div>' +
 
+            // Setor: Buy-in Promocional (Early Bird)
+            '<div class="edit-coll' + (t.buyinPromoAtivo ? ' edit-coll-open' : '') + '" id="edit-coll-promo">' +
+                '<div class="edit-coll-head" onclick="_editToggleColl(\'promo\')">' +
+                    '<div style="display:flex;align-items:center;gap:.5rem;"><span class="edit-chev">▶</span><span style="color:#f59e0b;font-size:.8rem;">★</span><span>Buy-in promocional (Early Bird)</span></div>' +
+                    '<span class="edit-coll-status" id="edit-status-promo" style="font-size:.7rem;">' +
+                        (t.buyinPromoAtivo
+                            ? '<span style="color:#22c55e;">✓ Ativo · até N' + (Number(t.buyinPromoAteNivel) || 0) + '</span>'
+                            : '<span style="color:#71717a;">Desativado</span>') +
+                    '</span>' +
+                '</div>' +
+                '<div class="edit-coll-body">' +
+                    '<label style="display:flex;align-items:center;gap:.55rem;padding:.5rem .7rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;cursor:pointer;margin-bottom:.85rem;">' +
+                        '<input type="checkbox" id="edit-promo-ativo"' + (t.buyinPromoAtivo ? ' checked' : '') + ' onchange="_editTogglePromoUI()" style="width:16px;height:16px;accent-color:#f59e0b;">' +
+                        '<div style="flex:1;">' +
+                            '<div style="font-size:.8rem;color:#fafafa;font-weight:500;">Ativar Early Bird</div>' +
+                            '<div style="font-size:.65rem;color:#a1a1aa;margin-top:.1rem;">Substitui valor e fichas do buy-in até o nível configurado</div>' +
+                        '</div>' +
+                    '</label>' +
+                    '<div id="edit-promo-campos" style="display:' + (t.buyinPromoAtivo ? 'block' : 'none') + ';">' +
+                        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;margin-bottom:.75rem;">' +
+                            '<div>' +
+                                '<label class="inp-label">Valor R$</label>' +
+                                '<input id="edit-promo-valor" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.buyinPromoValor) || 0) + '">' +
+                            '</div>' +
+                            '<div>' +
+                                '<label class="inp-label">Fichas</label>' +
+                                '<input id="edit-promo-fichas" class="inp" type="number" min="0" value="' + (Number(t.buyinPromoFichas) || 0) + '">' +
+                            '</div>' +
+                            '<div>' +
+                                '<label class="inp-label">Até nível</label>' +
+                                '<input id="edit-promo-ate-nivel" class="inp" type="number" min="1" value="' + (Number(t.buyinPromoAteNivel) || 0) + '">' +
+                            '</div>' +
+                        '</div>' +
+                        '<div style="font-size:.68rem;color:#a1a1aa;line-height:1.5;padding:.55rem .7rem;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.15);border-radius:.35rem;">' +
+                            '<i class="fa-solid fa-circle-info" style="color:#22c55e;margin-right:.3rem;"></i>' +
+                            'Alterações aqui <strong style="color:#22c55e;">só afetam entradas futuras</strong>. Entradas já registradas mantêm o valor cobrado. Pra estender pra jogadores atrasados, aumente o "Até nível".' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
             // Setor: Breaks
             '<div class="edit-coll edit-coll-open" id="edit-coll-breaks">' +
                 '<div class="edit-coll-head" onclick="_editToggleColl(\'breaks\')">' +
@@ -26153,9 +26194,25 @@ function _fecharEditarTorneio() {
     _editBlinds = [];
 }
 
+// Show/hide dos campos do promo conforme o toggle
+function _editTogglePromoUI() {
+    const cb = document.getElementById('edit-promo-ativo');
+    const campos = document.getElementById('edit-promo-campos');
+    if (!cb || !campos) return;
+    campos.style.display = cb.checked ? 'block' : 'none';
+}
+
 async function _salvarEditarTorneio() {
     const t = torneios[_editTorneioIdx];
     if (!t) { _fecharEditarTorneio(); return; }
+
+    // === Snapshot ANTES pra diff da auditoria (Early Bird) ===
+    const promoAntes = {
+        ativo:    !!t.buyinPromoAtivo,
+        valor:    Number(t.buyinPromoValor) || 0,
+        fichas:   Number(t.buyinPromoFichas) || 0,
+        ateNivel: Number(t.buyinPromoAteNivel) || 0,
+    };
 
     // === Coleta dos valores editados ===
     const novoNome = (document.getElementById('edit-nome').value || '').trim() || t.nome;
@@ -26165,6 +26222,21 @@ async function _salvarEditarTorneio() {
     const impJackpot = document.getElementById('edit-imp-jackpot').checked;
     const impAssin = document.getElementById('edit-imp-assinatura').checked;
 
+    // FASE I.1: Early Bird (edição durante o torneio)
+    const promoAtivoEl    = document.getElementById('edit-promo-ativo');
+    const promoValorEl    = document.getElementById('edit-promo-valor');
+    const promoFichasEl   = document.getElementById('edit-promo-fichas');
+    const promoAteNivelEl = document.getElementById('edit-promo-ate-nivel');
+    const promoAtivo    = !!(promoAtivoEl && promoAtivoEl.checked);
+    const promoValor    = promoValorEl    ? (parseFloat(promoValorEl.value)    || 0) : 0;
+    const promoFichas   = promoFichasEl   ? (parseInt(promoFichasEl.value)     || 0) : 0;
+    const promoAteNivel = promoAteNivelEl ? (parseInt(promoAteNivelEl.value)   || 0) : 0;
+    // Validação: se marcou ativo, precisa ter até nível > 0 (senão nunca é elegível)
+    if (promoAtivo && promoAteNivel <= 0) {
+        showToast('⚠️ Early Bird ativo exige "Até nível" ≥ 1');
+        return;
+    }
+
     // === Aplica no objeto JS (memória) ===
     t.nome = novoNome;
     t.reentryAte = (isNaN(novoReentry) || novoReentry < 0) ? (t.reentryAte || 0) : novoReentry;
@@ -26173,6 +26245,11 @@ async function _salvarEditarTorneio() {
     t.imprimirComprovanteJackpot = impJackpot;
     t.comprovanteAssinatura = impAssin;
     t.blinds = JSON.parse(JSON.stringify(_editBlinds));
+    // FASE I.1: Early Bird
+    t.buyinPromoAtivo    = promoAtivo;
+    t.buyinPromoValor    = promoValor;
+    t.buyinPromoFichas   = promoFichas;
+    t.buyinPromoAteNivel = promoAteNivel;
 
     // === Persiste em localStorage ===
     try { saveData(); } catch(e) { console.warn('[edit] saveData falhou:', e); }
@@ -26187,6 +26264,11 @@ async function _salvarEditarTorneio() {
                 imprimir_comprovante_compra: t.imprimirComprovanteCompra,
                 imprimir_comprovante_jackpot: t.imprimirComprovanteJackpot,
                 comprovante_assinatura: t.comprovanteAssinatura,
+                // FASE I.1: Early Bird
+                buyin_promo_ativo:     t.buyinPromoAtivo,
+                buyin_promo_valor:     t.buyinPromoValor,
+                buyin_promo_fichas:    t.buyinPromoFichas,
+                buyin_promo_ate_nivel: t.buyinPromoAteNivel,
             };
             await sb.from('torneios').update(payload).eq('id', t.id);
         } catch(e) {
@@ -26201,6 +26283,26 @@ async function _salvarEditarTorneio() {
             logAudit('TORNEIO_EDITA', 'Editado: ' + t.nome, {
                 torneioId: t.id,
                 campos: ['nome', 'reentryAte', 'addonAte', 'blinds', 'flagsImpressao'],
+            });
+        } catch(_) {}
+    }
+
+    // === Audit específica pra Early Bird se algo mudou ===
+    const promoMudou = promoAntes.ativo    !== t.buyinPromoAtivo
+                   || promoAntes.valor    !== (Number(t.buyinPromoValor) || 0)
+                   || promoAntes.fichas   !== (Number(t.buyinPromoFichas) || 0)
+                   || promoAntes.ateNivel !== (Number(t.buyinPromoAteNivel) || 0);
+    if (promoMudou && typeof logAudit === 'function') {
+        try {
+            logAudit('TORNEIO_EDIT_PROMO', 'Early Bird alterado: ' + t.nome, {
+                torneioId: t.id,
+                antes: promoAntes,
+                depois: {
+                    ativo:    t.buyinPromoAtivo,
+                    valor:    Number(t.buyinPromoValor) || 0,
+                    fichas:   Number(t.buyinPromoFichas) || 0,
+                    ateNivel: Number(t.buyinPromoAteNivel) || 0,
+                },
             });
         } catch(_) {}
     }
@@ -26226,6 +26328,7 @@ window._editChangeTempo = _editChangeTempo;
 window._editToggleCompras = _editToggleCompras;
 window._editRemoveBreak = _editRemoveBreak;
 window._editAddBreak = _editAddBreak;
+window._editTogglePromoUI = _editTogglePromoUI;
 
 
 // ============================================================
