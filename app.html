@@ -27679,9 +27679,13 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
     // (regra: jogador no torneio só pode usar Rebuy/Add-on, não Buy-in de novo)
     if (!jogadorJaInscrito) {
         const buyinEfetivo = (typeof _getBuyinEfetivo === 'function') ? _getBuyinEfetivo(t) : (Number(t.buyin) || 0);
-        const ehFreeAtual = _isBuyinFree(t) && buyinEfetivo === 0;
-        const buyinLabel = ehFreeAtual ? 'GRÁTIS' : `R$ ${buyinEfetivo}`;
-        opts.push(addOpt('buyin', `Buy-in (entrada normal) — ${buyinLabel}`));
+        // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valor exibido se elegível
+        const valorPromoDisplay = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, 'buyin') : null;
+        const buyinValorExibido = (valorPromoDisplay !== null) ? valorPromoDisplay : buyinEfetivo;
+        const ehFreeAtual = _isBuyinFree(t) && buyinValorExibido === 0;
+        const buyinLabel = ehFreeAtual ? 'GRÁTIS' : `R$ ${buyinValorExibido}`;
+        const selo = (valorPromoDisplay !== null) ? ' ★ EARLY BIRD' : '';
+        opts.push(addOpt('buyin', `Buy-in (entrada normal)${selo} — ${buyinLabel}`));
     } else {
         opts.push(`<option value="buyin" disabled style="color:#71717a;">🔒 Buy-in — jogador já está no torneio</option>`);
     }
@@ -27784,13 +27788,23 @@ function _renderCheckboxesEntrada(t, jid, optsLegado, ctx) {
         const trBuyin = _tipoBloqueadoPorTrava(t, 'buyin');
         // Valor efetivo: respeita transição pós-FREE quando aplicável
         const valorBuyinEfetivo = (typeof _getBuyinEfetivo === 'function') ? _getBuyinEfetivo(t) : (Number(t.buyin) || 0);
-        const ehFreeAtual = _isBuyinFree(t) && valorBuyinEfetivo === 0;
+        const fichasBuyinBase = Number(t.stack) || 0;
+        // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valor E fichas exibidos se elegível.
+        // Consistência: mesmo cálculo usado em _registrarEntradasCombo (linhas 28174/28235).
+        const valorPromoDisplay  = (typeof _calcValorBuyinPromo  === 'function') ? _calcValorBuyinPromo(t,  'buyin') : null;
+        const fichasPromoDisplay = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, 'buyin') : null;
+        const valorFinal  = (valorPromoDisplay  !== null) ? valorPromoDisplay  : valorBuyinEfetivo;
+        const fichasFinal = (fichasPromoDisplay !== null) ? fichasPromoDisplay : fichasBuyinBase;
+        const ehPromoAtiva = (valorPromoDisplay !== null);
+        const ehFreeAtual = _isBuyinFree(t) && valorFinal === 0;
         tiposDisponiveis.push({
             tipo: 'buyin',
             label: 'Buy-in (entrada normal)',
-            valor: valorBuyinEfetivo,
-            valorLabel: ehFreeAtual ? 'GRÁTIS' : 'R$ ' + valorBuyinEfetivo.toFixed(2).replace('.', ','),
-            fichas: Number(t.stack) || 0,
+            valor: valorFinal,
+            valorLabel: ehFreeAtual ? 'GRÁTIS' : 'R$ ' + valorFinal.toFixed(2).replace('.', ','),
+            valorOriginal: ehPromoAtiva ? valorBuyinEfetivo : null, // pra riscar no card
+            fichas: fichasFinal,
+            promoAtiva: ehPromoAtiva,
             bloqueado: trBuyin.bloqueado,
             motivo: trBuyin.motivo,
             ancora: true // Buy-in sempre marcado e travado pra jogador novo
@@ -27878,13 +27892,20 @@ function _renderCheckboxesEntrada(t, jid, optsLegado, ctx) {
         const bgColor = ancora ? 'rgba(245,158,11,.08)' : 'rgba(255,255,255,.02)';
         const borderColor = ancora ? 'rgba(245,158,11,.3)' : '#27272a';
 
+        // FASE I.1: badge EARLY BIRD + valor original riscado quando promo ativa
+        const seloPromo = opt.promoAtiva
+            ? ' <span style="font-size:.55rem;background:var(--gold);color:#000;padding:.1rem .35rem;border-radius:.2rem;letter-spacing:.05em;font-weight:700;margin-left:.3rem;">★ EARLY BIRD</span>'
+            : '';
+        const valorOriginalRiscado = opt.promoAtiva
+            ? `<span style="font-size:.65rem;color:#71717a;text-decoration:line-through;margin-right:.35rem;">R$ ${Number(opt.valorOriginal).toFixed(2).replace('.', ',')}</span>`
+            : '';
         return `
             <label style="display:flex;align-items:flex-start;gap:.55rem;cursor:${disabled ? 'not-allowed' : 'pointer'};padding:.55rem .75rem;border:1px solid ${borderColor};border-radius:.4rem;background:${bgColor};opacity:${disabled ? '.5' : '1'};">
                 <input type="checkbox" id="${id}" data-tipo="${opt.tipo}" ${checked} ${inputAttrs} onchange="atualizarResumoEntrada()" style="width:16px;height:16px;cursor:${disabled ? 'not-allowed' : 'pointer'};accent-color:${ancora ? 'var(--gold)' : '#06b6d4'};margin-top:.15rem;">
                 <div style="flex:1;min-width:0;">
                     <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.85rem;">
-                        <span><strong>${opt.label}</strong>${ancora ? ' <span style="font-size:.6rem;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;">obrigatório</span>' : ''}${lockIcon}</span>
-                        <span style="font-weight:700;color:${opt.valor === 0 ? '#22c55e' : 'var(--gold)'};white-space:nowrap;">${opt.valorLabel}</span>
+                        <span><strong>${opt.label}</strong>${ancora ? ' <span style="font-size:.6rem;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;">obrigatório</span>' : ''}${seloPromo}${lockIcon}</span>
+                        <span style="white-space:nowrap;">${valorOriginalRiscado}<span style="font-weight:700;color:${opt.valor === 0 ? '#22c55e' : 'var(--gold)'};">${opt.valorLabel}</span></span>
                     </div>
                     <div style="font-size:.7rem;color:#71717a;margin-top:.15rem;">+ ${opt.fichas.toLocaleString('pt-BR')} fichas</div>
                     ${motivoHtml}
@@ -27941,6 +27962,12 @@ function atualizarResumoEntrada() {
         else if (tipo === 'rebuy_duplo')   v = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
         else if (tipo === 'addon')         v = Number(t.addonValor) || 0;
         else if (tipo === 'last_chance')   v = Number(t.lastChanceValor || t.last_chance_valor) || 0;
+        // FASE I.1: Buy-in PROMOCIONAL (Early Bird) — substitui valor exibido se elegível.
+        // Mesmo cálculo aplicado em _registrarEntradasCombo → garante que "Total a Cobrar" bate com o gravado.
+        if (typeof _calcValorBuyinPromo === 'function') {
+            const vp = _calcValorBuyinPromo(t, tipo);
+            if (vp !== null) v = vp;
+        }
         // FASE G: Em embutido + cobrarFree, buy-in free vira valor do staff (R$ 10)
         if (tipo === 'buyin' && v === 0
             && _staffFixoAtivo(t)
