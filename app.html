@@ -9853,6 +9853,68 @@ let _syncQueue = {
 let _syncTimer = null;
 let _syncEmAndamento = false;
 
+// ==========================================================
+// AÇÃO 1: SYNC DIFF-BASED — reduz Realtime Msgs do Supabase
+// Kill switch abaixo (_SYNC_DIFF_MODE = false reverte tudo)
+// ==========================================================
+let _SYNC_DIFF_MODE = true;
+let _syncSnapshots = {
+    torneios:       new Map(),
+    entries:        new Map(),
+    eliminados:     new Map(),
+    mesas:          new Map(),
+    jackpotCompras: new Map(),
+    cashMesas:      new Map(),
+    barProdutos:    new Map(),
+    barComandas:    new Map(),
+    barItens:       new Map(),
+};
+let _syncLastFullTs = 0;
+let _syncFullNextRun = false;
+const _SYNC_FULL_INTERVAL_MS = 5 * 60 * 1000;
+
+function _syncHash(row) {
+    try { return JSON.stringify(row); }
+    catch (_) { return String(Date.now()); }
+}
+function _syncDeveFull() {
+    if (_syncFullNextRun) return true;
+    if (!_syncLastFullTs)  return true;
+    return (Date.now() - _syncLastFullTs) >= _SYNC_FULL_INTERVAL_MS;
+}
+async function _syncUpsertDiff(rows, tabela, snapshotKey, opts) {
+    opts = opts || {};
+    const isFull = !!opts.forcarFull;
+    const snap = _syncSnapshots[snapshotKey];
+    const upsertOpts = opts.upsertOpts;
+
+    if (isFull || !_SYNC_DIFF_MODE || !snap) {
+        const q = upsertOpts ? sb.from(tabela).upsert(rows, upsertOpts) : sb.from(tabela).upsert(rows);
+        const resp = opts.withSelect ? await q.select() : await q;
+        if (resp.error) throw resp.error;
+        if (snap) rows.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
+        return { data: resp.data, enviados: rows.length, total: rows.length, full: true };
+    }
+    const dirty = rows.filter(r => {
+        if (!r || !r.id) return true;
+        return snap.get(r.id) !== _syncHash(r);
+    });
+    if (dirty.length === 0) {
+        console.log('[SYNC:diff] ' + tabela + ': 0 de ' + rows.length + ' (nada mudou, pulou upsert)');
+        return { data: null, enviados: 0, total: rows.length, full: false };
+    }
+    const q = upsertOpts ? sb.from(tabela).upsert(dirty, upsertOpts) : sb.from(tabela).upsert(dirty);
+    const resp = opts.withSelect ? await q.select() : await q;
+    if (resp.error) throw resp.error;
+    dirty.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
+    console.log('[SYNC:diff] ' + tabela + ': ' + dirty.length + ' de ' + rows.length + ' mudaram');
+    return { data: resp.data, enviados: dirty.length, total: rows.length, full: false };
+}
+window.forcarFullSyncNoProximo = () => {
+    _syncFullNextRun = true;
+    console.log('[SYNC] 🛡️ Full-sync forçado no próximo ciclo');
+};
+
 // ============================================================
 // CONFIG: TV PÚBLICA — gerar/copiar/regenerar URL
 // ============================================================
@@ -11107,6 +11169,10 @@ async function sincronizarEstado() {
     _migrarIdsAntigos();
 
     _syncEmAndamento = true;
+    const _isFullSync = _syncDeveFull();
+    if (_isFullSync) console.log('[SYNC] 🔄 Modo FULL (safety net 5min ou forçado)');
+    else             console.log('[SYNC] ⚡ Modo DIFF (só envia rows que mudaram)');
+
     console.log('[SYNC] Iniciando. Queue:', {
         torneios: _syncQueue.torneios.size,
         cashMesas: _syncQueue.cashMesas.size,
@@ -11140,12 +11206,15 @@ async function sincronizarEstado() {
                 console.log('[SYNC] Payload torneios:', JSON.stringify(payload[0]).substring(0, 500));
 
                 // 1. Sync torneios principais
-                const { data: dataT, error: errT } = await sb.from('torneios').upsert(payload).select();
-                if (errT) {
+                let dataT;
+                try {
+                    const resTor = await _syncUpsertDiff(payload, 'torneios', 'torneios', { withSelect: true, forcarFull: _isFullSync });
+                    dataT = resTor.data;
+                } catch (errT) {
                     console.error('[SYNC] ❌ Erro torneios:', errT);
-                    showToast('⚠️ Erro sync torneio: ' + errT.message);
+                    showToast('⚠️ Erro sync torneio: ' + (errT.message || errT));
                 }
-                else {
+                {
                     console.log('[SYNC] ✅ Torneios sincronizados:', dataT ? dataT.length : 0);
                     // 2. Sync tabelas filhas — UPSERT + DELETE SELETIVO (à prova de falhas)
                     //
@@ -11186,8 +11255,11 @@ async function sincronizarEstado() {
                                     fichas_override: Number(e.fichasOverride) || 0,
                                     is_promo: !!e.isPromo,
                                 }));
-                                const { error: errE } = await sb.from('torneio_entries').upsert(entryRows);
-                                if (errE) throw new Error('Upsert entries: ' + errE.message);
+                                try {
+                                    await _syncUpsertDiff(entryRows, 'torneio_entries', 'entries', { forcarFull: _isFullSync });
+                                } catch (errE) {
+                                    throw new Error('Upsert entries: ' + (errE.message || errE));
+                                }
 
                                 // DELETE seletivo: remove do banco IDs que não estão mais no estado local
                                 const idsLocais = t.entries.map(e => e.id);
@@ -11219,8 +11291,11 @@ async function sincronizarEstado() {
                                     ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
                                     operador: e.operador || null,
                                 }));
-                                const { error: errEl } = await sb.from('torneio_eliminados').upsert(elimRows);
-                                if (errEl) throw new Error('Upsert eliminados: ' + errEl.message);
+                                try {
+                                    await _syncUpsertDiff(elimRows, 'torneio_eliminados', 'eliminados', { forcarFull: _isFullSync });
+                                } catch (errEl) {
+                                    throw new Error('Upsert eliminados: ' + (errEl.message || errEl));
+                                }
 
                                 const idsLocais = t.eliminados.map(e => e.id);
                                 if (idsLocais.length) {
@@ -11246,8 +11321,11 @@ async function sincronizarEstado() {
                                     fichas: j.fichas,
                                     ts: j.ts ? new Date(j.ts).toISOString() : new Date().toISOString(),
                                 }));
-                                const { error: errJ } = await sb.from('torneio_jackpot_compras').upsert(jackRows);
-                                if (errJ) throw new Error('Upsert jackpots: ' + errJ.message);
+                                try {
+                                    await _syncUpsertDiff(jackRows, 'torneio_jackpot_compras', 'jackpotCompras', { forcarFull: _isFullSync });
+                                } catch (errJ) {
+                                    throw new Error('Upsert jackpots: ' + (errJ.message || errJ));
+                                }
 
                                 const idsLocais = t.jackpotCompras.map(j => j.id);
                                 if (idsLocais.length) {
@@ -11274,9 +11352,14 @@ async function sincronizarEstado() {
                                     numero: m.numero,
                                     jogadores: m.jogadores || [],
                                 }));
-                                const { error: errM } = await sb.from('torneio_mesas')
-                                    .upsert(mesaRows, { onConflict: 'torneio_id,numero' });
-                                if (errM) throw new Error('Upsert mesas: ' + errM.message);
+                                try {
+                                    await _syncUpsertDiff(mesaRows, 'torneio_mesas', 'mesas', {
+                                        upsertOpts: { onConflict: 'torneio_id,numero' },
+                                        forcarFull: _isFullSync,
+                                    });
+                                } catch (errM) {
+                                    throw new Error('Upsert mesas: ' + (errM.message || errM));
+                                }
 
                                 const idsLocais = t.mesas.map(m => m.id);
                                 if (idsLocais.length) {
@@ -11309,8 +11392,12 @@ async function sincronizarEstado() {
                             .filter(Boolean)
                             .map(_cashToDb);
             if (rows.length) {
-                const { error } = await sb.from('cash_mesas').upsert(rows);
-                if (!error) _syncQueue.cashMesas.clear();
+                try {
+                    await _syncUpsertDiff(rows, 'cash_mesas', 'cashMesas', { forcarFull: _isFullSync });
+                    _syncQueue.cashMesas.clear();
+                } catch (error) {
+                    console.warn('[SYNC] cash_mesas falhou:', error.message || error);
+                }
             }
         }
 
@@ -11383,8 +11470,12 @@ async function sincronizarEstado() {
                             .filter(Boolean)
                             .map(_produtoToDb);
             if (rows.length) {
-                const { error } = await sb.from('bar_produtos').upsert(rows);
-                if (!error) _syncQueue.barProdutos.clear();
+                try {
+                    await _syncUpsertDiff(rows, 'bar_produtos', 'barProdutos', { forcarFull: _isFullSync });
+                    _syncQueue.barProdutos.clear();
+                } catch (error) {
+                    console.warn('[SYNC] bar_produtos falhou:', error.message || error);
+                }
             }
         }
 
@@ -11393,8 +11484,15 @@ async function sincronizarEstado() {
             const ids = [..._syncQueue.barComandas];
             const comandasUI = ids.map(id => barComandas.find(c => c.id === id)).filter(Boolean);
             if (comandasUI.length) {
-                const { error: errC } = await sb.from('bar_comandas').upsert(comandasUI.map(_comandaToDb));
-                if (errC) { console.warn('Sync bar_comandas:', errC); }
+                let errC = null;
+                try {
+                    const comandaRows = comandasUI.map(_comandaToDb);
+                    await _syncUpsertDiff(comandaRows, 'bar_comandas', 'barComandas', { forcarFull: _isFullSync });
+                } catch (err) {
+                    errC = err;
+                    console.warn('Sync bar_comandas:', err);
+                }
+                if (errC) { /* mantém queue pra retry */ }
                 else {
                     // Sync itens — UPSERT + DELETE SELETIVO (à prova de falhas)
                     //
@@ -11437,8 +11535,11 @@ async function sincronizarEstado() {
                                         ts: it.ts ? new Date(it.ts).toISOString() : new Date().toISOString(),
                                     };
                                 });
-                                const { error: errIt } = await sb.from('bar_comanda_itens').upsert(itensRows);
-                                if (errIt) throw new Error('Upsert itens: ' + errIt.message);
+                                try {
+                                    await _syncUpsertDiff(itensRows, 'bar_comanda_itens', 'barItens', { forcarFull: _isFullSync });
+                                } catch (errIt) {
+                                    throw new Error('Upsert itens: ' + (errIt.message || errIt));
+                                }
 
                                 // DELETE seletivo: remove só os IDs que sumiram do estado local
                                 const idsLocais = c.itens.map(it => it.id);
@@ -11498,6 +11599,13 @@ async function sincronizarEstado() {
                 const { error } = await sb.from(tableName).delete().in('id', ids);
                 if (!error) _syncQueue.deletes[tipo].clear();
             }
+        }
+
+        // AÇÃO 1: marca full-sync como executado (próximo em 5min)
+        if (_isFullSync) {
+            _syncLastFullTs = Date.now();
+            _syncFullNextRun = false;
+            console.log('[SYNC] ✓ Full-sync concluído. Próximo em 5min.');
         }
 
     } catch (e) {
