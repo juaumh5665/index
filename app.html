@@ -6744,6 +6744,21 @@ document.addEventListener('DOMContentLoaded', function(){
                         <i class="fa-solid fa-circle-info"></i> 0% = sem brilho · 100% = brilho máximo · 25% recomendado pra leitura confortável
                     </div>
                 </div>
+
+                <!-- Slider de transparência do texto -->
+                <div style="border-top:1px solid #27272a;padding-top:1rem;">
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.85rem;">Transparência do texto</div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">
+                            <span style="font-size:.72rem;color:#d4d4d8;">Opacidade geral (timer, blinds, informações)</span>
+                            <span id="pers-text-opacity-label" style="font-family:var(--font-mono);font-size:.78rem;color:#a78bfa;font-weight:700;">100%</span>
+                        </div>
+                        <input id="pers-text-opacity" type="range" min="30" max="100" value="100" style="width:100%;" oninput="_persUpdateTextOpacity(this.value)">
+                    </div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.55rem;line-height:1.4;">
+                        <i class="fa-solid fa-circle-info"></i> 100% = totalmente visível · 30% = muito sutil · 70-80% recomendado pra integrar com o fundo
+                    </div>
+                </div>
             </div>
 
             <!-- ABA 2: MARCA DO CLUBE (logo + frase) -->
@@ -11047,7 +11062,7 @@ function _torneioToDb(t) {
         // Personalização avançada (logo, marca d'água custom, galeria, frase rodapé) — premium.
         // Empacotado num único JSON pra evitar criar 5 colunas novas no banco.
         // Só salva se houver pelo menos um campo preenchido (mantém compatibilidade com torneios antigos).
-        tv_prolive_custom: (t.tvProLiveLogoUrl || t.tvProLiveBgCustomUrl || t.tvProLiveBgGalleryKey || t.tvProLiveFraseRodape || t.tvProLiveBgCustomOpacity != null || t.tvProLiveGlowDestaques != null || t.tvProLiveGlowInfo != null || t.tvProLiveInfoColor) ? {
+        tv_prolive_custom: (t.tvProLiveLogoUrl || t.tvProLiveBgCustomUrl || t.tvProLiveBgGalleryKey || t.tvProLiveFraseRodape || t.tvProLiveBgCustomOpacity != null || t.tvProLiveGlowDestaques != null || t.tvProLiveGlowInfo != null || t.tvProLiveInfoColor || t.tvProLiveTextOpacity != null) ? {
             logo_url: t.tvProLiveLogoUrl || null,
             bg_custom_url: t.tvProLiveBgCustomUrl || null,
             bg_gallery_key: t.tvProLiveBgGalleryKey || null,
@@ -11056,6 +11071,7 @@ function _torneioToDb(t) {
             glow_destaques: (t.tvProLiveGlowDestaques != null) ? Number(t.tvProLiveGlowDestaques) : null,
             glow_info: (t.tvProLiveGlowInfo != null) ? Number(t.tvProLiveGlowInfo) : null,
             info_color: t.tvProLiveInfoColor || null,
+            text_opacity: (t.tvProLiveTextOpacity != null) ? Number(t.tvProLiveTextOpacity) : null,
         } : null,
         tv_show_prize: t.tvShowPrize !== false,
         pw_stats_visiveis: t.pwStatsVisiveis || null,
@@ -12071,6 +12087,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         tvProLiveGlowDestaques: (r.tv_prolive_custom && r.tv_prolive_custom.glow_destaques != null) ? Number(r.tv_prolive_custom.glow_destaques) : 0.25,
         tvProLiveGlowInfo: (r.tv_prolive_custom && r.tv_prolive_custom.glow_info != null) ? Number(r.tv_prolive_custom.glow_info) : 0.25,
         tvProLiveInfoColor: (r.tv_prolive_custom && r.tv_prolive_custom.info_color) || 'dourado',
+        tvProLiveTextOpacity: (r.tv_prolive_custom && r.tv_prolive_custom.text_opacity != null) ? Number(r.tv_prolive_custom.text_opacity) : 1,
         tvShowPrize: r.tv_show_prize !== false,
         pwStatsVisiveis: r.pw_stats_visiveis,
         premiacaoProjetada: r.premiacao_proj,
@@ -29507,6 +29524,7 @@ function updateTV(idx) {
         proLiveFraseRodape: t.tvProLiveFraseRodape || null,
         proLiveGlowDestaques: (t.tvProLiveGlowDestaques != null) ? Number(t.tvProLiveGlowDestaques) : 0.25,
         proLiveGlowInfo: (t.tvProLiveGlowInfo != null) ? Number(t.tvProLiveGlowInfo) : 0.25,
+        proLiveTextOpacity: (t.tvProLiveTextOpacity != null) ? Number(t.tvProLiveTextOpacity) : 1,
         // Patrocinadores ativos do clube — o popup não tem acesso ao Supabase,
         // então mandamos a lista já filtrada pra ele renderizar no carrossel do break.
         patrocinadores: window._tvPatrocinadoresAtivos || [],
@@ -31050,6 +31068,7 @@ function abrirPersonalizarProLive() {
         fraseRodape: t.tvProLiveFraseRodape || '',
         glowDestaques: (t.tvProLiveGlowDestaques != null) ? Number(t.tvProLiveGlowDestaques) : 0.25,
         glowInfo: (t.tvProLiveGlowInfo != null) ? Number(t.tvProLiveGlowInfo) : 0.25,
+        textOpacity: (t.tvProLiveTextOpacity != null) ? Number(t.tvProLiveTextOpacity) : 1,
     };
 
     // Renderiza grid de cores (cores existentes)
@@ -31121,6 +31140,11 @@ function abrirPersonalizarProLive() {
     if (glowInfoSlider) {
         glowInfoSlider.value = Math.round(window._persPendente.glowInfo * 100);
         _persUpdateGlowInfo(glowInfoSlider.value);
+    }
+    const textOpSlider = document.getElementById('pers-text-opacity');
+    if (textOpSlider) {
+        textOpSlider.value = Math.round(window._persPendente.textOpacity * 100);
+        _persUpdateTextOpacity(textOpSlider.value);
     }
 
     // Volta pra aba "Cores" como padrão
@@ -31218,6 +31242,12 @@ function _persUpdateGlowInfo(val) {
     if (lbl) lbl.innerText = val + '%';
 }
 
+function _persUpdateTextOpacity(val) {
+    window._persPendente.textOpacity = Number(val) / 100;
+    const lbl = document.getElementById('pers-text-opacity-label');
+    if (lbl) lbl.innerText = val + '%';
+}
+
 function _selProLiveBg(key) {
     window._proLiveBgSel = key;
     document.querySelectorAll('.prolive-bg-opt').forEach(el => {
@@ -31263,6 +31293,7 @@ function salvarPersonalizarProLive() {
     // Intensidade do brilho (glow)
     t.tvProLiveGlowDestaques = (p.glowDestaques != null) ? Number(p.glowDestaques) : 0.25;
     t.tvProLiveGlowInfo = (p.glowInfo != null) ? Number(p.glowInfo) : 0.25;
+    t.tvProLiveTextOpacity = (p.textOpacity != null) ? Number(p.textOpacity) : 1;
     saveData();
     updateTV(activeTorneioIdx);
     closeModal('modal-personalizar-prolive');

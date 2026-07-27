@@ -593,6 +593,7 @@
             font-size: clamp(.75rem, 1.2vw, 1.1rem);
             font-weight: 700;
             color: #f5d572;
+            opacity: var(--pw-text-opacity, 1);
             text-transform: uppercase;
             letter-spacing: .06em;
             display:flex; align-items:center; gap:.5rem;
@@ -607,6 +608,7 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
             color: transparent;
+            opacity: var(--pw-text-opacity, 1);
             font-family: 'Manrope', sans-serif;
             letter-spacing: -.01em;
             line-height: 1;
@@ -640,6 +642,7 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
             color: transparent;
+            opacity: var(--pw-text-opacity, 1);
             font-family: var(--font-mono);
             font-feature-settings: var(--font-mono-features);
             letter-spacing: -.03em;
@@ -673,6 +676,7 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
             color: transparent;
+            opacity: var(--pw-text-opacity, 1);
             font-variant-numeric: tabular-nums;
             font-family: var(--font-mono);
             font-feature-settings: var(--font-mono-features);
@@ -2753,6 +2757,9 @@ function montarCarouselPremiacao(d) {
             const glowInfo = (d.proLiveGlowInfo != null) ? Number(d.proLiveGlowInfo) : 0.25;
             document.documentElement.style.setProperty('--pw-glow-destaques', String(glowDestaques));
             document.documentElement.style.setProperty('--pw-glow-info', String(glowInfo));
+            // Transparência do texto (opacidade geral de todos os textos)
+            const textOpacity = (d.proLiveTextOpacity != null) ? Number(d.proLiveTextOpacity) : 1;
+            document.documentElement.style.setProperty('--pw-text-opacity', String(textOpacity));
             // Logo
             if (elLogo) {
                 if (d.proLiveLogoUrl) {
@@ -3908,6 +3915,7 @@ function montarCarouselPremiacao(d) {
       proLiveFraseRodape: cust.frase_rodape || null,
       proLiveGlowDestaques: (cust.glow_destaques != null) ? Number(cust.glow_destaques) : 0.25,
       proLiveGlowInfo: (cust.glow_info != null) ? Number(cust.glow_info) : 0.25,
+      proLiveTextOpacity: (cust.text_opacity != null) ? Number(cust.text_opacity) : 1,
       showPrize: t.tv_show_prize !== false,
       timer: timer,
       nivel: nivelJogo || 1,
