@@ -6711,7 +6711,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div style="margin-bottom:1.25rem;">
                     <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Cor do texto (timer)</div>
-                    <div id="prolive-text-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;"></div>
+                    <div id="prolive-text-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
+                </div>
+                <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:.7rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Cor das informações (nível, jogadores, blinds, tempo, chipcount)</div>
+                    <div id="prolive-info-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;"></div>
                 </div>
 
                 <!-- Sliders de intensidade de brilho (glow) -->
@@ -11043,7 +11047,7 @@ function _torneioToDb(t) {
         // Personalização avançada (logo, marca d'água custom, galeria, frase rodapé) — premium.
         // Empacotado num único JSON pra evitar criar 5 colunas novas no banco.
         // Só salva se houver pelo menos um campo preenchido (mantém compatibilidade com torneios antigos).
-        tv_prolive_custom: (t.tvProLiveLogoUrl || t.tvProLiveBgCustomUrl || t.tvProLiveBgGalleryKey || t.tvProLiveFraseRodape || t.tvProLiveBgCustomOpacity != null || t.tvProLiveGlowDestaques != null || t.tvProLiveGlowInfo != null) ? {
+        tv_prolive_custom: (t.tvProLiveLogoUrl || t.tvProLiveBgCustomUrl || t.tvProLiveBgGalleryKey || t.tvProLiveFraseRodape || t.tvProLiveBgCustomOpacity != null || t.tvProLiveGlowDestaques != null || t.tvProLiveGlowInfo != null || t.tvProLiveInfoColor) ? {
             logo_url: t.tvProLiveLogoUrl || null,
             bg_custom_url: t.tvProLiveBgCustomUrl || null,
             bg_gallery_key: t.tvProLiveBgGalleryKey || null,
@@ -11051,6 +11055,7 @@ function _torneioToDb(t) {
             frase_rodape: t.tvProLiveFraseRodape || null,
             glow_destaques: (t.tvProLiveGlowDestaques != null) ? Number(t.tvProLiveGlowDestaques) : null,
             glow_info: (t.tvProLiveGlowInfo != null) ? Number(t.tvProLiveGlowInfo) : null,
+            info_color: t.tvProLiveInfoColor || null,
         } : null,
         tv_show_prize: t.tvShowPrize !== false,
         pw_stats_visiveis: t.pwStatsVisiveis || null,
@@ -12065,6 +12070,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         tvProLiveFraseRodape: (r.tv_prolive_custom && r.tv_prolive_custom.frase_rodape) || null,
         tvProLiveGlowDestaques: (r.tv_prolive_custom && r.tv_prolive_custom.glow_destaques != null) ? Number(r.tv_prolive_custom.glow_destaques) : 0.25,
         tvProLiveGlowInfo: (r.tv_prolive_custom && r.tv_prolive_custom.glow_info != null) ? Number(r.tv_prolive_custom.glow_info) : 0.25,
+        tvProLiveInfoColor: (r.tv_prolive_custom && r.tv_prolive_custom.info_color) || 'dourado',
         tvShowPrize: r.tv_show_prize !== false,
         pwStatsVisiveis: r.pw_stats_visiveis,
         premiacaoProjetada: r.premiacao_proj,
@@ -29492,6 +29498,7 @@ function updateTV(idx) {
         clubeId:  (sbClube && sbClube.id) || null, // pra carregar patrocinadores no break
         proLiveBg: t.tvProLiveBg || 'verde',
         proLiveText: t.tvProLiveText || 'dourado',
+        proLiveInfoColor: t.tvProLiveInfoColor || 'dourado',
         // Personalização avançada (premium) — TV decide se usa (ignora quando ausente)
         proLiveLogoUrl: t.tvProLiveLogoUrl || null,
         proLiveBgCustomUrl: t.tvProLiveBgCustomUrl || null,
@@ -30948,6 +30955,22 @@ const PROLIVE_TEXTS = [
     { key:'dourado', nome:'Dourado', cor:'#f5d572' },
     { key:'branco',  nome:'Branco',  cor:'#ffffff' },
     { key:'ciano',   nome:'Ciano',   cor:'#22d3ee' },
+    { key:'verde',   nome:'Verde',   cor:'#4ade80' },
+    { key:'vermelho',nome:'Vermelho',cor:'#f87171' },
+    { key:'roxo',    nome:'Roxo',    cor:'#c084fc' },
+    { key:'rosa',    nome:'Rosa',    cor:'#f472b6' },
+    { key:'laranja', nome:'Laranja', cor:'#fb923c' },
+];
+
+const PROLIVE_INFO_COLORS = [
+    { key:'dourado', nome:'Dourado', cor:'#f5d572' },
+    { key:'branco',  nome:'Branco',  cor:'#ffffff' },
+    { key:'ciano',   nome:'Ciano',   cor:'#22d3ee' },
+    { key:'verde',   nome:'Verde',   cor:'#4ade80' },
+    { key:'vermelho',nome:'Vermelho',cor:'#f87171' },
+    { key:'roxo',    nome:'Roxo',    cor:'#c084fc' },
+    { key:'rosa',    nome:'Rosa',    cor:'#f472b6' },
+    { key:'laranja', nome:'Laranja', cor:'#fb923c' },
 ];
 
 // Galeria de fundos pré-prontos (marca d'água SVG embutida — sem custo de storage)
@@ -31013,11 +31036,13 @@ function abrirPersonalizarProLive() {
 
     const bgAtual = t.tvProLiveBg || 'verde';
     const txtAtual = t.tvProLiveText || 'dourado';
+    const infoColorAtual = t.tvProLiveInfoColor || 'dourado';
 
     // Snapshot dos valores atuais pra estado temporário (só persiste em "Aplicar")
     window._persPendente = {
         bg: bgAtual,
         text: txtAtual,
+        infoColor: infoColorAtual,
         logoUrl: t.tvProLiveLogoUrl || null,
         bgCustomUrl: t.tvProLiveBgCustomUrl || null,
         bgCustomOpacity: (t.tvProLiveBgCustomOpacity != null) ? Number(t.tvProLiveBgCustomOpacity) : 0.15,
@@ -31056,6 +31081,22 @@ function abrirPersonalizarProLive() {
     }
     window._proLiveBgSel = bgAtual;
     window._proLiveTextSel = txtAtual;
+    window._proLiveInfoColorSel = infoColorAtual;
+
+    // Renderiza grid de cores das informações
+    const infoGrid = document.getElementById('prolive-info-grid');
+    if (infoGrid) {
+        infoGrid.innerHTML = PROLIVE_INFO_COLORS.map(ic => {
+            const sel = (ic.key === infoColorAtual);
+            return `<button onclick="_selProLiveInfoColor('${ic.key}')" data-infokey="${ic.key}" class="prolive-info-opt" style="
+                cursor:pointer;border-radius:.5rem;padding:.5rem;background:#0f0f12;
+                border:2px solid ${sel ? '#a78bfa' : '#27272a'};
+                box-shadow:${sel ? '0 0 0 2px rgba(167,139,250,.3)' : 'none'};">
+                <div style="font-size:.85rem;font-weight:800;color:${ic.cor};font-family:monospace;">N1 · 0/12</div>
+                <div style="font-size:.6rem;color:#d4d4d8;margin-top:.2rem;">${ic.nome}</div>
+            </button>`;
+        }).join('');
+    }
 
     // Renderiza galeria de fundos pré-prontos
     _persRenderGaleria();
@@ -31194,6 +31235,15 @@ function _selProLiveText(key) {
     });
 }
 
+function _selProLiveInfoColor(key) {
+    window._proLiveInfoColorSel = key;
+    document.querySelectorAll('.prolive-info-opt').forEach(el => {
+        const on = el.getAttribute('data-infokey') === key;
+        el.style.border = '2px solid ' + (on ? '#a78bfa' : '#27272a');
+        el.style.boxShadow = on ? '0 0 0 2px rgba(167,139,250,.3)' : 'none';
+    });
+}
+
 function salvarPersonalizarProLive() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
@@ -31201,6 +31251,7 @@ function salvarPersonalizarProLive() {
     // Aba cores
     t.tvProLiveBg = window._proLiveBgSel || p.bg || 'verde';
     t.tvProLiveText = window._proLiveTextSel || p.text || 'dourado';
+    t.tvProLiveInfoColor = window._proLiveInfoColorSel || p.infoColor || 'dourado';
     // Aba marca
     t.tvProLiveLogoUrl = p.logoUrl || null;
     const fraseEl = document.getElementById('pers-frase-rodape');

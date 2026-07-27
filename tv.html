@@ -351,11 +351,109 @@
         }
 
         /* ─── Cores de destaque do texto (timer, números) ─── */
-        /* Dourado é o padrão (cor herdada). Estas sobrescrevem o timer/destaques. */
+        /* Dourado é o padrão (cor herdada via gradiente). Estas sobrescrevem o timer. */
+        /* BUGFIX: o timer usa background-clip:text + -webkit-text-fill-color:transparent,
+           então precisamos sobrescrever TUDO, não só color. */
         body.pw-text-branco.layout-pokerweb .pw-timer,
-        body.pw-text-branco.layout-pokerweb #pw-timer { color:#ffffff !important; }
+        body.pw-text-branco.layout-pokerweb #pw-timer {
+            background: #ffffff !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
         body.pw-text-ciano.layout-pokerweb .pw-timer,
-        body.pw-text-ciano.layout-pokerweb #pw-timer { color:#22d3ee !important; }
+        body.pw-text-ciano.layout-pokerweb #pw-timer {
+            background: #22d3ee !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-text-verde.layout-pokerweb .pw-timer,
+        body.pw-text-verde.layout-pokerweb #pw-timer {
+            background: #4ade80 !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-text-vermelho.layout-pokerweb .pw-timer,
+        body.pw-text-vermelho.layout-pokerweb #pw-timer {
+            background: #f87171 !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-text-roxo.layout-pokerweb .pw-timer,
+        body.pw-text-roxo.layout-pokerweb #pw-timer {
+            background: #c084fc !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-text-rosa.layout-pokerweb .pw-timer,
+        body.pw-text-rosa.layout-pokerweb #pw-timer {
+            background: #f472b6 !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-text-laranja.layout-pokerweb .pw-timer,
+        body.pw-text-laranja.layout-pokerweb #pw-timer {
+            background: #fb923c !important;
+            -webkit-background-clip: text !important;
+            background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+
+        /* ─── Cores separadas das informações (nível, jogadores, blinds, etc.) ─── */
+        body.pw-info-branco.layout-pokerweb .pw-stat-value,
+        body.pw-info-branco.layout-pokerweb .pw-blinds-main,
+        body.pw-info-branco.layout-pokerweb .pw-level {
+            background: #ffffff !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-info-ciano.layout-pokerweb .pw-stat-value,
+        body.pw-info-ciano.layout-pokerweb .pw-blinds-main,
+        body.pw-info-ciano.layout-pokerweb .pw-level {
+            background: #22d3ee !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-info-verde.layout-pokerweb .pw-stat-value,
+        body.pw-info-verde.layout-pokerweb .pw-blinds-main,
+        body.pw-info-verde.layout-pokerweb .pw-level {
+            background: #4ade80 !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-info-vermelho.layout-pokerweb .pw-stat-value,
+        body.pw-info-vermelho.layout-pokerweb .pw-blinds-main,
+        body.pw-info-vermelho.layout-pokerweb .pw-level {
+            background: #f87171 !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-info-roxo.layout-pokerweb .pw-stat-value,
+        body.pw-info-roxo.layout-pokerweb .pw-blinds-main,
+        body.pw-info-roxo.layout-pokerweb .pw-level {
+            background: #c084fc !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-info-rosa.layout-pokerweb .pw-stat-value,
+        body.pw-info-rosa.layout-pokerweb .pw-blinds-main,
+        body.pw-info-rosa.layout-pokerweb .pw-level {
+            background: #f472b6 !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
+        body.pw-info-laranja.layout-pokerweb .pw-stat-value,
+        body.pw-info-laranja.layout-pokerweb .pw-blinds-main,
+        body.pw-info-laranja.layout-pokerweb .pw-level {
+            background: #fb923c !important;
+            -webkit-background-clip: text !important; background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+        }
 
         body.layout-pokerweb.pw-layout-active #main-tv { display:none !important; }
         body.layout-pokerweb #pw-screen { display:flex !important; }
@@ -2626,7 +2724,8 @@ function montarCarouselPremiacao(d) {
         if (layout === 'pokerweb') {
             const bg = d.proLiveBg || 'verde';
             const txt = d.proLiveText || 'dourado';
-            proLiveClasses = ' pw-bg-' + bg + (txt !== 'dourado' ? ' pw-text-' + txt : '');
+            const infoColor = d.proLiveInfoColor || 'dourado';
+            proLiveClasses = ' pw-bg-' + bg + (txt !== 'dourado' ? ' pw-text-' + txt : '') + (infoColor !== 'dourado' ? ' pw-info-' + infoColor : '');
             // Marca pra dar padding-left no título quando há logo
             if (d.proLiveLogoUrl) hasLogoClass = ' has-logo';
             // Marca pra ativar vinheta escura quando há marca d'água (preserva leitura do texto)
@@ -3800,6 +3899,7 @@ function montarCarouselPremiacao(d) {
       clubeId: pubState.clubeId, // necessário pra carregar patrocinadores do clube no break
       proLiveBg: t.tv_prolive_bg || 'verde',
       proLiveText: t.tv_prolive_text || 'dourado',
+      proLiveInfoColor: cust.info_color || 'dourado',
       // Personalização premium (TV pública lê do Supabase via select periódico/realtime)
       proLiveLogoUrl: cust.logo_url || null,
       proLiveBgCustomUrl: cust.bg_custom_url || null,
