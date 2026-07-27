@@ -3703,6 +3703,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <button id="flt-aguardando" onclick="toggleFiltroTorneios('aguardando')" class="flt-btn"><i class="fa-solid fa-clock"></i> Aguardando</button>
                                 <button id="flt-todos" onclick="toggleFiltroTorneios('todos')" class="flt-btn">Todos</button>
                             </div>
+                            <button onclick="abrirRepetirTorneio()" class="btn-ghost" title="Clonar um dos últimos torneios" style="display:flex;align-items:center;gap:.35rem;"><i class="fa-solid fa-copy" style="font-size:.75rem;"></i> Repetir</button>
                             <button onclick="abrirNovoTorneioComTemplates()" class="btn-gold">+ Novo Torneio</button>
                         </div>
                     </div>
@@ -8091,6 +8092,44 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="display:flex;gap:.5rem;">
                 <button onclick="closeModal('modal-novo-torneio')" class="btn-ghost" style="padding:.65rem 1.1rem;font-size:.85rem;">Cancelar</button>
                 <button onclick="saveTournament()" class="btn-gold" style="padding:.65rem 1.5rem;font-size:.9rem;font-weight:600;">Criar torneio</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     MODAL: REPETIR TORNEIO (clone picker)
+     ═══════════════════════════════════════════════════════════════════ -->
+<div id="modal-repetir-torneio" class="modal-overlay" style="z-index:1100;">
+    <div style="background:var(--bg-card,#111113);border:1px solid #1e1e23;border-radius:1rem;width:100%;max-width:560px;box-shadow:0 25px 60px rgba(0,0,0,.6);overflow:hidden;max-height:90vh;display:flex;flex-direction:column;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem .5rem;">
+            <h2 style="font-size:1.15rem;font-weight:800;display:flex;align-items:center;gap:.5rem;">
+                <i class="fa-solid fa-copy" style="color:#f59e0b;font-size:.95rem;"></i> Repetir Torneio
+            </h2>
+            <button onclick="closeModal('modal-repetir-torneio')" style="background:none;border:none;color:#71717a;font-size:1.3rem;cursor:pointer;padding:.25rem;border-radius:.35rem;">&times;</button>
+        </div>
+        <div style="padding:0 1.5rem .75rem;font-size:.78rem;color:#71717a;line-height:1.5;">
+            Escolha um torneio recente pra abrir uma cópia no editor completo. Confira tudo antes de criar.
+        </div>
+        <!-- Cards -->
+        <div id="repetir-torneio-list" style="flex:1;overflow-y:auto;padding:0 1.5rem .75rem;display:flex;flex-direction:column;gap:.5rem;"></div>
+        <!-- Empty state -->
+        <div id="repetir-torneio-vazio" style="display:none;text-align:center;padding:2.5rem 1.5rem;color:#52525b;">
+            <i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:.75rem;display:block;"></i>
+            <div style="font-weight:700;font-size:.85rem;">Nenhum torneio finalizado</div>
+            <div style="font-size:.75rem;margin-top:.25rem;">Crie seu primeiro torneio e ele aparecerá aqui na próxima vez.</div>
+        </div>
+        <!-- Footer -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.5rem;border-top:1px solid #1e1e23;">
+            <span style="font-size:.7rem;color:#52525b;display:flex;align-items:center;gap:.35rem;">
+                <i class="fa-solid fa-shield-halved" style="opacity:.5;"></i> Abre o editor completo pra revisão
+            </span>
+            <div style="display:flex;gap:.5rem;">
+                <button onclick="closeModal('modal-repetir-torneio')" class="btn-ghost" style="font-size:.82rem;">Cancelar</button>
+                <button id="btn-clonar-torneio" onclick="_executarCloneTorneio()" class="btn-gold" style="font-size:.82rem;display:flex;align-items:center;gap:.4rem;opacity:.35;pointer-events:none;">
+                    <i class="fa-solid fa-copy"></i> Abrir cópia no editor
+                </button>
             </div>
         </div>
     </div>
@@ -19293,6 +19332,87 @@ function _aplicarConfigTorneio(cfg) {
         if (typeof t2AtualizarStatusStaff === 'function') t2AtualizarStatusStaff();
     }
     set('t-staff-fixo-valor', cfg.staffFixoValor);
+
+    // ── Clone-safe: campos adicionais pra clonar torneio completo ──
+
+    // Nome
+    if (cfg.nome) set('t-nome', cfg.nome);
+
+    // Formato / Série
+    set('t-formato', cfg.formato);
+    if (typeof onFormatoChange === 'function') onFormatoChange();
+    if (cfg.seriesId) set('t-series-id', cfg.seriesId);
+    if (cfg.diaLabel) set('t-dia-label', cfg.diaLabel);
+    if (cfg.seriesNome) set('t-series-nome', cfg.seriesNome);
+
+    // Buy-in FREE (buy-in = 0)
+    set('t-buyin-free-ate-nivel', cfg.buyinFreeAteNivel);
+    set('t-buyin-pos-free-valor', cfg.buyinPosFreeValor);
+    if (typeof atualizarBuyinFreeUI === 'function') atualizarBuyinFreeUI();
+
+    // Bônus de registro antecipado
+    const cbBonus = document.getElementById('t-bonus-registro-ativo');
+    if (cbBonus) {
+        cbBonus.checked = !!cfg.bonusRegistroAtivo;
+        if (typeof atualizarBonusRegistroUI === 'function') atualizarBonusRegistroUI();
+    }
+    set('t-bonus-registro-fichas', cfg.bonusRegistroFichas);
+    set('t-bonus-registro-ate-nivel', cfg.bonusRegistroAteNivel);
+
+    // Add-on nível trava
+    set('t-addon-nivel', cfg.addonAte);
+
+    // Last Chance nível trava
+    set('t-last-chance-ate', cfg.last_chance_ate);
+
+    // Passaporte
+    const cbPass = document.getElementById('t-passaporte-ativo');
+    if (cbPass) {
+        cbPass.checked = !!cfg.passaporteAtivo;
+        if (typeof atualizarPassaporteUI === 'function') atualizarPassaporteUI();
+    }
+    set('t-passaporte-valor', cfg.passaporteValor);
+    if (cfg.passaporteFichas) {
+        set('t-passaporte-fichas-avulso', cfg.passaporteFichas.avulso);
+        set('t-passaporte-fichas-buyin', cfg.passaporteFichas.buyin);
+        set('t-passaporte-fichas-rebuy-simples', cfg.passaporteFichas.rebuy_simples);
+        set('t-passaporte-fichas-rebuy-duplo', cfg.passaporteFichas.rebuy_duplo);
+        set('t-passaporte-fichas-reentry', cfg.passaporteFichas.reentry);
+        set('t-passaporte-fichas-addon', cfg.passaporteFichas.addon);
+    }
+
+    // Comprovantes de impressão
+    const cbImpCompra = document.getElementById('t-imprimir-compra');
+    if (cbImpCompra) cbImpCompra.checked = !!cfg.imprimirComprovanteCompra;
+    const cbImpJack = document.getElementById('t-imprimir-jackpot');
+    if (cbImpJack) cbImpJack.checked = !!cfg.imprimirComprovanteJackpot;
+    set('t-comprovante-vias', cfg.comprovanteVias);
+    const cbCompAssin = document.getElementById('t-comprovante-assinatura');
+    if (cbCompAssin) cbCompAssin.checked = cfg.comprovanteAssinatura !== false;
+    if (typeof atualizarComprovanteUI === 'function') atualizarComprovanteUI();
+
+    // Staff fixo — ações e modo
+    if (cfg.staffFixoAcoes) {
+        const sfBuyin = document.getElementById('t-staff-fixo-buyin');
+        const sfRebuy = document.getElementById('t-staff-fixo-rebuy');
+        const sfReentry = document.getElementById('t-staff-fixo-reentry');
+        const sfAddon = document.getElementById('t-staff-fixo-addon');
+        const sfLC = document.getElementById('t-staff-fixo-last-chance');
+        if (sfBuyin) sfBuyin.checked = cfg.staffFixoAcoes.buyin !== false;
+        if (sfRebuy) sfRebuy.checked = cfg.staffFixoAcoes.rebuy !== false;
+        if (sfReentry) sfReentry.checked = cfg.staffFixoAcoes.reentry !== false;
+        if (sfAddon) sfAddon.checked = cfg.staffFixoAcoes.addon !== false;
+        if (sfLC) sfLC.checked = !!cfg.staffFixoAcoes.last_chance;
+    }
+    if (cfg.staffFixoModo) {
+        const radio = document.getElementById('t-staff-fixo-modo-' + cfg.staffFixoModo);
+        if (radio) radio.checked = true;
+    }
+    const cbCobrarFree = document.getElementById('t-staff-fixo-cobrar-free');
+    if (cbCobrarFree) cbCobrarFree.checked = !!cfg.staffFixoCobrarFree;
+
+    // Ranking
+    set('t-ranking-id', cfg.rankingId);
 
     // Aplica blinds
     if (cfg.blinds && cfg.blinds.length && typeof blindStructure !== 'undefined') {
@@ -45947,6 +46067,7 @@ function renderDashQuickActions() {
     if (!el) return;
     const acoes = [];
     if (userHasAccess('torneios')) acoes.push({ icon:'fa-trophy', cor:'var(--gold)', label:'Novo Torneio', fn:() => { showPage('torneios'); setTimeout(() => abrirNovoTorneioComTemplates(), 200); } });
+    if (userHasAccess('torneios')) acoes.push({ icon:'fa-copy', cor:'#a1a1aa', label:'Repetir Torneio', fn:() => { showPage('torneios'); setTimeout(() => abrirRepetirTorneio(), 200); } });
     if (userHasAccess('cash'))     acoes.push({ icon:'fa-coins', cor:'#22c55e', label:'Nova Mesa Cash', fn:() => { showPage('cash'); setTimeout(() => openModal('modal-nova-cash-mesa'), 200); } });
     if (userHasAccess('bar')) {
         if (barCaixa.status === 'fechado') acoes.push({ icon:'fa-key', cor:'#06b6d4', label:'Abrir Caixa Bar', fn:() => { showPage('bar'); setTimeout(abrirBarCaixa, 300); } });
@@ -46809,6 +46930,206 @@ function atualizarComprovanteUI() {
   // ─── Comando do console (mantido por compatibilidade, no-op) ──
   window.stackosTorneioV2 = function (ligar) {
     console.log('%cℹ️ Modal V1 foi removido — agora só existe o V2.', 'color:#a78bfa;font-weight:600;');
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // REPETIR TORNEIO — clone picker
+  // ═══════════════════════════════════════════════════════════════════
+
+  let _repetirSelecionado = null;
+
+  window.abrirRepetirTorneio = function () {
+    _repetirSelecionado = null;
+    _renderRepetirList();
+    openModal('modal-repetir-torneio');
+  };
+
+  function _renderRepetirList() {
+    const el = document.getElementById('repetir-torneio-list');
+    const elVazio = document.getElementById('repetir-torneio-vazio');
+    const btn = document.getElementById('btn-clonar-torneio');
+    if (!el) return;
+
+    // Últimos 3 torneios (qualquer status, excluindo rascunhos vazios)
+    const recentes = (typeof torneios !== 'undefined' ? torneios : [])
+      .filter(t => t && t.nome)
+      .slice(-3)
+      .reverse();
+
+    if (recentes.length === 0) {
+      el.innerHTML = '';
+      if (elVazio) elVazio.style.display = '';
+      return;
+    }
+    if (elVazio) elVazio.style.display = 'none';
+
+    el.innerHTML = recentes.map(t => {
+      const sel = _repetirSelecionado === t.id;
+      const dt = t.createdAt ? new Date(t.createdAt) : null;
+      const dataStr = dt ? (String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0') + ' às ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0')) : '';
+
+      // Tags
+      const tipoMap = { normal:'🏆 Normal', bounty:'🎯 Bounty', pko:'💀 PKO', knockout:'⚡ KO' };
+      let tags = '<span style="font-size:.6rem;font-weight:700;padding:.15rem .45rem;border-radius:.25rem;background:rgba(245,158,11,.1);color:#f59e0b;text-transform:uppercase;">' + (tipoMap[t.tipo] || t.tipo) + '</span>';
+      if ((t.rebuySimples || t.rebuyValor) > 0) tags += _rtTag('Rebuy');
+      if (t.addonValor > 0) tags += _rtTag('Add-on');
+      if (t.jackpotValor > 0) tags += _rtTag('Jackpot');
+      if (t.last_chance_ativo) tags += _rtTag('Last Chance');
+      if (t.bountyValor > 0) tags += _rtTag('Bounty R$' + t.bountyValor);
+      if (t.passaporteAtivo) tags += _rtTag('Passaporte');
+      if (t.bonusRegistroAtivo) tags += _rtTag('Bônus');
+      if (t.buyinPromoAtivo) tags += _rtTag('Early Bird');
+      if ((t.rankingRakePct || 0) > 0) tags += _rtTag('Ranking ' + t.rankingRakePct + '%');
+
+      // Stats
+      const totalMin = (t.blinds ? t.blinds.length : 0) * (t.tempoNivel || 15);
+      const hh = Math.floor(totalMin / 60);
+      const mm = totalMin % 60;
+
+      // Feature detail (expanded)
+      let feats = '';
+      feats += _rtFeat(!!((t.rebuySimples || t.rebuyValor) > 0), 'Rebuy simples', (t.rebuySimples || t.rebuyValor) > 0 ? ('R$ ' + (t.rebuySimples || t.rebuyValor) + ' → ' + ((t.rebuySimplesFichas || t.rebuyFichas) || 0).toLocaleString('pt-BR') + ' fichas') : 'Desativado');
+      feats += _rtFeat(!!(t.rebuyDuplo > 0 || t.rebuyDuploValor > 0), 'Rebuy duplo', (t.rebuyDuplo > 0 || t.rebuyDuploValor > 0) ? ('R$ ' + (t.rebuyDuplo || t.rebuyDuploValor) + ' → ' + (t.rebuyDuploFichas || 0).toLocaleString('pt-BR') + ' fichas') : 'Desativado');
+      feats += _rtFeat(!!(t.addonValor > 0), 'Add-on', t.addonValor > 0 ? ('R$ ' + t.addonValor + ' → ' + (t.addonFichas || 0).toLocaleString('pt-BR') + ' fichas' + (t.addonAte ? ' (até N' + t.addonAte + ')' : '')) : 'Desativado');
+      feats += _rtFeat(!!(t.jackpotValor > 0), 'Jackpot', t.jackpotValor > 0 ? ('R$ ' + t.jackpotValor + ' → ' + (t.jackpotFichas || 0).toLocaleString('pt-BR') + ' fichas') : 'Desativado');
+      feats += _rtFeat(!!t.last_chance_ativo, 'Last Chance', t.last_chance_ativo ? ('R$ ' + (t.last_chance_valor || 0) + ' → ' + (t.last_chance_fichas || 0).toLocaleString('pt-BR') + ' fichas') : 'Desativado');
+      feats += _rtFeat(!!t.passaporteAtivo, 'Passaporte', t.passaporteAtivo ? ('R$ ' + (t.passaporteValor || 0)) : 'Desativado');
+      feats += _rtFeat(!!t.bonusRegistroAtivo, 'Bônus registro', t.bonusRegistroAtivo ? ('+' + (t.bonusRegistroFichas || 0).toLocaleString('pt-BR') + ' fichas até N' + (t.bonusRegistroAteNivel || '?')) : 'Desativado');
+      feats += _rtFeat(!!t.buyinPromoAtivo, 'Early Bird', t.buyinPromoAtivo ? ('R$ ' + (t.buyinPromoValor || 0) + ' até N' + (t.buyinPromoAteNivel || '?')) : 'Desativado');
+      feats += _rtFeat(!!t.staffCascataAtivo, 'Staff cascata', t.staffCascataAtivo ? ((t.staffPct || 0) + '%') : 'Desativado');
+      feats += _rtFeat(!!t.staffFixoAtivo, 'Staff fixo', t.staffFixoAtivo ? ('R$ ' + (t.staffFixoValor || 0)) : 'Desativado');
+      feats += _rtFeat(!!((t.rankingRakePct || 0) > 0), 'Ranking mensal', (t.rankingRakePct || 0) > 0 ? (t.rankingRakePct + '% do rake') : 'Desativado');
+
+      return '<div onclick="_selecionarRepetir(\'' + t.id + '\')" style="background:#18181b;border:1.5px solid ' + (sel ? '#f59e0b' : '#1e1e23') + ';border-radius:.7rem;padding:1rem 1.1rem;cursor:pointer;position:relative;transition:all .18s;' + (sel ? 'box-shadow:0 0 0 1px rgba(245,158,11,.5);background:rgba(245,158,11,.03);' : '') + '">'
+        // Check indicator
+        + '<div style="position:absolute;top:.75rem;right:.75rem;width:20px;height:20px;border-radius:50%;border:2px solid ' + (sel ? '#f59e0b' : '#3f3f46') + ';display:flex;align-items:center;justify-content:center;font-size:.65rem;' + (sel ? 'background:#f59e0b;color:#000;' : 'color:transparent;') + '"><i class="fa-solid fa-check"></i></div>'
+        // Name + date
+        + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.65rem;padding-right:2rem;">'
+        + '<div style="font-size:.88rem;font-weight:700;">' + (t.nome || 'Torneio') + '</div>'
+        + '<div style="font-size:.68rem;font-weight:600;color:#52525b;white-space:nowrap;margin-left:.75rem;font-family:\'JetBrains Mono\',monospace;">' + dataStr + '</div>'
+        + '</div>'
+        // Tags
+        + '<div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.7rem;">' + tags + '</div>'
+        // Stats row
+        + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;">'
+        + _rtStat('Buy-in', 'R$ ' + (t.buyin ?? 100))
+        + _rtStat('Stack', (t.stack || 20000).toLocaleString('pt-BR'))
+        + _rtStat('Nível', (t.tempoNivel || 15) + 'min')
+        + _rtStat('Re-entry', (t.reentryAte || 0) > 0 ? 'N' + t.reentryAte : '—', !(t.reentryAte > 0))
+        + _rtStat('Duração', '~' + hh + 'h' + (mm ? mm + 'm' : ''))
+        + '</div>'
+        // Expanded features (only when selected)
+        + (sel ? '<div style="margin-top:.65rem;padding-top:.6rem;border-top:1px solid #1e1e23;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem .75rem;">' + feats + '</div></div>' : '')
+        + '</div>';
+    }).join('');
+  }
+
+  function _rtTag(label) {
+    return ' <span style="font-size:.6rem;font-weight:700;padding:.15rem .45rem;border-radius:.25rem;background:rgba(34,197,94,.08);color:#22c55e;text-transform:uppercase;">' + label + '</span>';
+  }
+
+  function _rtStat(label, value, dim) {
+    return '<div style="display:flex;flex-direction:column;gap:.1rem;">'
+      + '<span style="font-size:.52rem;font-weight:700;color:#52525b;text-transform:uppercase;letter-spacing:.05em;">' + label + '</span>'
+      + '<span style="font-size:.78rem;font-weight:700;font-family:\'JetBrains Mono\',monospace;color:' + (dim ? '#52525b' : '#a1a1aa') + ';">' + value + '</span>'
+      + '</div>';
+  }
+
+  function _rtFeat(on, label, val) {
+    return '<div style="display:flex;align-items:center;gap:.35rem;font-size:.7rem;color:#71717a;padding:.2rem 0;">'
+      + '<span style="width:14px;text-align:center;font-size:.65rem;color:' + (on ? '#22c55e' : '#52525b') + ';"><i class="fa-solid fa-' + (on ? 'check' : 'minus') + '"></i></span>'
+      + '<span style="font-weight:600;">' + label + '</span>'
+      + '<span style="margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.65rem;font-weight:500;color:' + (on ? '#a1a1aa' : '#52525b') + ';">' + val + '</span>'
+      + '</div>';
+  }
+
+  window._selecionarRepetir = function (id) {
+    _repetirSelecionado = _repetirSelecionado === id ? null : id;
+    const btn = document.getElementById('btn-clonar-torneio');
+    if (btn) {
+      btn.style.opacity = _repetirSelecionado ? '1' : '.35';
+      btn.style.pointerEvents = _repetirSelecionado ? 'auto' : 'none';
+    }
+    _renderRepetirList();
+  };
+
+  window._executarCloneTorneio = function () {
+    if (!_repetirSelecionado) return;
+    const original = (typeof torneios !== 'undefined' ? torneios : []).find(t => t.id === _repetirSelecionado);
+    if (!original) { showToast('⚠️ Torneio não encontrado'); return; }
+
+    // Fecha picker
+    closeModal('modal-repetir-torneio');
+
+    // Monta config pra _aplicarConfigTorneio — só campos de configuração, SEM estado de runtime
+    const cfg = {
+      nome: (original.nome || 'Torneio') + ' (cópia)',
+      tipo: original.tipo,
+      formato: original.formato || 'unico',
+      diaLabel: original.diaLabel || '',
+      seriesId: '',   // NÃO copia seriesId (novo torneio, nova série se for dia1)
+      seriesNome: original.seriesNome || '',
+      buyin: original.buyin,
+      rake: original.rake,
+      taxaAdm: original.taxaAdm || 0,
+      stack: original.stack,
+      tempoNivel: original.tempoNivel,
+      reentryAte: original.reentryAte || 0,
+      buyinFreeAteNivel: original.buyinFreeAteNivel,
+      buyinPosFreeValor: original.buyinPosFreeValor || 0,
+      bonusRegistroAtivo: !!original.bonusRegistroAtivo,
+      bonusRegistroFichas: original.bonusRegistroFichas || 0,
+      bonusRegistroAteNivel: original.bonusRegistroAteNivel,
+      buyinPromoAtivo: !!original.buyinPromoAtivo,
+      buyinPromoValor: original.buyinPromoValor || 0,
+      buyinPromoFichas: original.buyinPromoFichas || 0,
+      buyinPromoAteNivel: original.buyinPromoAteNivel,
+      addonValor: original.addonValor || 0,
+      addonFichas: original.addonFichas || 0,
+      addonAte: original.addonAte || 0,
+      rebuyValor: original.rebuyValor || original.rebuySimples || 0,
+      rebuyFichas: original.rebuyFichas || original.rebuySimplesFichas || 0,
+      rebuyDuploValor: original.rebuyDuploValor || original.rebuyDuplo || 0,
+      rebuyDuploFichas: original.rebuyDuploFichas || 0,
+      jackpotValor: original.jackpotValor || 0,
+      jackpotFichas: original.jackpotFichas || 0,
+      jackpot_paga_rake: original.jackpot_paga_rake,
+      last_chance_ativo: !!original.last_chance_ativo,
+      last_chance_valor: original.last_chance_valor || 0,
+      last_chance_fichas: original.last_chance_fichas || 0,
+      last_chance_ate: original.last_chance_ate || null,
+      last_chance_paga_rake: original.last_chance_paga_rake,
+      bountyValor: original.bountyValor || 0,
+      bountyKoSplit: original.pkoSplit || 50,
+      passaporteAtivo: !!original.passaporteAtivo,
+      passaporteValor: original.passaporteValor || 0,
+      passaporteFichas: original.passaporteFichas || null,
+      staffPct: original.staffPct || 0,
+      staffCascataAtivo: !!original.staffCascataAtivo,
+      staffFixoAtivo: !!original.staffFixoAtivo,
+      staffFixoValor: original.staffFixoValor || 0,
+      staffFixoModo: original.staffFixoModo || 'embutido',
+      staffFixoCobrarFree: !!original.staffFixoCobrarFree,
+      staffFixoAcoes: original.staffFixoAcoes || null,
+      rankingId: original.rankingId || '',
+      rankingRakePct: original.rankingRakePct || 0,
+      imprimirComprovanteCompra: !!original.imprimirComprovanteCompra,
+      imprimirComprovanteJackpot: !!original.imprimirComprovanteJackpot,
+      comprovanteVias: original.comprovanteVias || 1,
+      comprovanteAssinatura: original.comprovanteAssinatura !== false,
+      blinds: original.blinds ? JSON.parse(JSON.stringify(original.blinds)) : [],
+    };
+
+    // Abre modal Novo Torneio V2
+    abrirNovoTorneioV2();
+
+    // Aplica config após o modal abrir (respeitando o setTimeout interno de 80ms)
+    setTimeout(function () {
+      _aplicarConfigTorneio(cfg);
+      // Recalcula todos os status das seções colapsáveis
+      if (typeof t2RecalcularTodosStatus === 'function') t2RecalcularTodosStatus();
+      showToast('📋 Cópia de "' + original.nome + '" carregada — confira e clique em Criar');
+    }, 150);
   };
 
 })();
