@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StackOS — Conectar TV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #0a0a0b;
+  color: #e4e4e7;
+  font-family: 'Manrope', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Subtle animated gradient background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(245,158,11,.06) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 50%, rgba(168,85,247,.04) 0%, transparent 60%);
+  z-index: 0;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 2rem;
+  max-width: 700px;
+  width: 100%;
+}
+
+/* Logo/brand */
+.brand {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  color: #52525b;
+  text-transform: uppercase;
+  margin-bottom: 2rem;
+}
+.brand span { color: #f59e0b; }
+
+/* States */
+.state { display: none; }
+.state.active { display: block; }
+
+/* ===== LOADING STATE ===== */
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #27272a;
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 2rem auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  font-size: 1rem;
+  color: #71717a;
+  font-weight: 600;
+}
+
+/* ===== CODE STATE ===== */
+.instruction {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  margin-bottom: .5rem;
+  line-height: 1.5;
+}
+
+.instruction-detail {
+  font-size: .85rem;
+  color: #52525b;
+  margin-bottom: 2.5rem;
+}
+
+.code-box {
+  display: inline-flex;
+  gap: .65rem;
+  padding: 1.5rem 2.5rem;
+  background: #111113;
+  border: 2px solid #27272a;
+  border-radius: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.code-digit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 4.5rem;
+  font-weight: 800;
+  color: #fafafa;
+  line-height: 1;
+  min-width: 3.2rem;
+  text-align: center;
+}
+
+.code-separator {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 4.5rem;
+  font-weight: 800;
+  color: #3f3f46;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Timer bar */
+.timer-area {
+  margin: 1.5rem auto 0;
+  max-width: 360px;
+}
+
+.timer-bar-bg {
+  width: 100%;
+  height: 4px;
+  background: #1e1e23;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.timer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  border-radius: 2px;
+  transition: width 1s linear;
+  width: 100%;
+}
+
+.timer-text {
+  font-size: .75rem;
+  color: #52525b;
+  margin-top: .5rem;
+  font-weight: 600;
+}
+
+/* Waiting pulse */
+.waiting-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-right: .5rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: .3; transform: scale(.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.waiting-text {
+  font-size: .85rem;
+  color: #71717a;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+/* ===== SUCCESS STATE ===== */
+.success-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(34,197,94,.1);
+  border: 3px solid #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  font-size: 2.2rem;
+  color: #22c55e;
+  animation: scaleIn .4s cubic-bezier(.22,1,.36,1);
+}
+@keyframes scaleIn {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fafafa;
+  margin-bottom: .5rem;
+}
+
+.success-sub {
+  font-size: .9rem;
+  color: #71717a;
+  font-weight: 600;
+}
+
+/* ===== EXPIRED STATE ===== */
+.expired-icon {
+  font-size: 2.5rem;
+  color: #52525b;
+  margin-bottom: 1rem;
+}
+
+.expired-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  margin-bottom: .5rem;
+}
+
+.expired-sub {
+  font-size: .85rem;
+  color: #52525b;
+  margin-bottom: 1.5rem;
+}
+
+.btn-retry {
+  font-family: 'Manrope', sans-serif;
+  padding: .7rem 2rem;
+  border-radius: .5rem;
+  border: none;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #000;
+  font-size: .9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s;
+}
+.btn-retry:hover { transform: translateY(-1px); }
+
+/* ===== ERROR STATE ===== */
+.error-text {
+  font-size: .9rem;
+  color: #ef4444;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* ===== TV-optimized: larger on big screens ===== */
+@media (min-width: 1200px) {
+  .code-digit { font-size: 7rem; min-width: 5rem; }
+  .code-separator { font-size: 7rem; }
+  .code-box { padding: 2rem 3rem; gap: 1rem; }
+  .instruction { font-size: 1.4rem; }
+  .brand { font-size: 1.3rem; }
+}
+
+/* Small screens (phones) */
+@media (max-width: 500px) {
+  .code-digit { font-size: 2.8rem; min-width: 2rem; }
+  .code-separator { font-size: 2.8rem; }
+  .code-box { padding: 1rem 1.5rem; gap: .4rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="brand">Stack<span>OS</span> — Conectar TV</div>
+
+  <!-- STATE: Loading -->
+  <div class="state active" id="state-loading">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Gerando código de pareamento...</div>
+  </div>
+
+  <!-- STATE: Code shown -->
+  <div class="state" id="state-code">
+    <div class="instruction">Digite este código no painel do clube</div>
+    <div class="instruction-detail">Configurações → TV Pública → Parear TV</div>
+    <div class="code-box" id="code-box"></div>
+    <div class="waiting-text">
+      <span class="waiting-dot"></span> Aguardando pareamento...
+    </div>
+    <div class="timer-area">
+      <div class="timer-bar-bg"><div class="timer-bar-fill" id="timer-fill"></div></div>
+      <div class="timer-text" id="timer-text">Expira em 5:00</div>
+    </div>
+  </div>
+
+  <!-- STATE: Success -->
+  <div class="state" id="state-success">
+    <div class="success-icon">✓</div>
+    <div class="success-title">TV Conectada!</div>
+    <div class="success-sub">Redirecionando pra tela do torneio...</div>
+  </div>
+
+  <!-- STATE: Expired -->
+  <div class="state" id="state-expired">
+    <div class="expired-icon">⏱️</div>
+    <div class="expired-title">Código expirado</div>
+    <div class="expired-sub">Gere um novo código pra continuar</div>
+    <button class="btn-retry" onclick="iniciar()">Gerar novo código</button>
+  </div>
+
+  <!-- STATE: Error -->
+  <div class="state" id="state-error">
+    <div class="expired-icon">⚠️</div>
+    <div class="error-text" id="error-msg">Erro ao conectar</div>
+    <button class="btn-retry" onclick="iniciar()">Tentar novamente</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Check if already paired (has token saved)
+const tokenSalvo = localStorage.getItem('stackos_tv_token');
+if (tokenSalvo) {
+  // Already paired — redirect to TV
+  window.location.href = window.location.origin + '/tv/' + tokenSalvo;
+}
+
+let codigoId = null;
+let pollInterval = null;
+let timerInterval = null;
+let expiresAt = null;
+
+function showState(name) {
+  document.querySelectorAll('.state').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('state-' + name);
+  if (el) el.classList.add('active');
+}
+
+function renderCode(codigo) {
+  const box = document.getElementById('code-box');
+  // Format: 3 digits + separator + 3 digits
+  const d = codigo.split('');
+  box.innerHTML = d.slice(0, 3).map(c => '<span class="code-digit">' + c + '</span>').join('')
+    + '<span class="code-separator">&middot;</span>'
+    + d.slice(3).map(c => '<span class="code-digit">' + c + '</span>').join('');
+}
+
+function startTimer() {
+  const totalSec = 300; // 5 min
+  expiresAt = Date.now() + totalSec * 1000;
+
+  timerInterval = setInterval(() => {
+    const remaining = Math.max(0, expiresAt - Date.now());
+    const sec = Math.ceil(remaining / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+
+    const fill = document.getElementById('timer-fill');
+    const text = document.getElementById('timer-text');
+    if (fill) fill.style.width = ((remaining / (totalSec * 1000)) * 100) + '%';
+    if (text) text.textContent = 'Expira em ' + m + ':' + String(s).padStart(2, '0');
+
+    if (sec <= 0) {
+      clearInterval(timerInterval);
+      clearInterval(pollInterval);
+      showState('expired');
+    }
+  }, 1000);
+}
+
+async function poll() {
+  if (!codigoId) return;
+  try {
+    const { data, error } = await sb.rpc('tv_verificar_pareamento', { p_id: codigoId });
+    if (error) { console.error('[POLL]', error); return; }
+
+    if (data.expirado) {
+      clearInterval(pollInterval);
+      clearInterval(timerInterval);
+      showState('expired');
+      return;
+    }
+
+    if (data.pareado && data.tv_token) {
+      clearInterval(pollInterval);
+      clearInterval(timerInterval);
+      // Save token and redirect
+      localStorage.setItem('stackos_tv_token', data.tv_token);
+      showState('success');
+      setTimeout(() => {
+        window.location.href = window.location.origin + '/tv/' + data.tv_token;
+      }, 2000);
+    }
+  } catch (e) {
+    console.error('[POLL] error:', e);
+  }
+}
+
+async function iniciar() {
+  // Clear previous intervals
+  if (pollInterval) clearInterval(pollInterval);
+  if (timerInterval) clearInterval(timerInterval);
+
+  showState('loading');
+
+  try {
+    const { data, error } = await sb.rpc('tv_gerar_codigo_pareamento');
+    if (error) throw error;
+
+    codigoId = data.id;
+    renderCode(data.codigo);
+    showState('code');
+    startTimer();
+
+    // Poll every 3 seconds
+    pollInterval = setInterval(poll, 3000);
+  } catch (e) {
+    console.error('[INIT]', e);
+    document.getElementById('error-msg').textContent = 'Erro: ' + (e.message || e);
+    showState('error');
+  }
+}
+
+// Start
+iniciar();
+</script>
+
+</body>
+</html>

@@ -4748,6 +4748,31 @@ document.addEventListener('DOMContentLoaded', function(){
                                 </button>
                             </div>
                             
+                            <!-- ── PAREAR TV (código de 6 dígitos) ── -->
+                            <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid #27272a;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;">
+                                    <i class="fa-solid fa-link" style="color:#a855f7;font-size:1rem;"></i>
+                                    <div>
+                                        <div style="font-size:.95rem;font-weight:700;">Parear TV por código</div>
+                                        <div style="font-size:.75rem;color:#71717a;">Conecte a TV sem digitar URL longa — só um código de 6 dígitos</div>
+                                    </div>
+                                </div>
+                                <div style="background:#0d0d0f;border:1px solid #27272a;border-radius:.5rem;padding:1rem;margin-bottom:.75rem;">
+                                    <div style="font-size:.78rem;color:#a1a1aa;line-height:1.6;margin-bottom:1rem;">
+                                        <strong>1.</strong> Na TV, abra <code style="background:#18181b;padding:.15rem .4rem;border-radius:.25rem;color:#f59e0b;font-weight:600;">stackos.com.br/parear-tv</code> (fácil de digitar)<br>
+                                        <strong>2.</strong> A TV mostra um código de 6 dígitos<br>
+                                        <strong>3.</strong> Digite o código abaixo e clique em Parear
+                                    </div>
+                                    <div style="display:flex;gap:.5rem;align-items:stretch;">
+                                        <input type="text" id="cfg-parear-codigo" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000 000" style="flex:1;max-width:200px;padding:.7rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;font-size:1.2rem;font-family:'JetBrains Mono',monospace;font-weight:700;text-align:center;letter-spacing:.3rem;">
+                                        <button onclick="parearTVPorCodigo()" id="btn-parear-tv" class="btn-gold" style="padding:.6rem 1.2rem;border-radius:.4rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;white-space:nowrap;">
+                                            <i class="fa-solid fa-link"></i> Parear
+                                        </button>
+                                    </div>
+                                    <div id="parear-tv-status" style="font-size:.75rem;margin-top:.5rem;color:#71717a;min-height:1.1rem;"></div>
+                                </div>
+                            </div>
+
                             <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid #27272a;">
                                 <div style="font-size:.85rem;color:#a1a1aa;font-weight:700;margin-bottom:.75rem;">📺 Como usar</div>
                                 <ol style="color:#71717a;font-size:.85rem;line-height:1.7;padding-left:1.25rem;display:flex;flex-direction:column;gap:.4rem;">
@@ -10113,6 +10138,64 @@ function abrirTVNovaAba() {
         return;
     }
     window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+// ── Parear TV por código de 6 dígitos ──────────────────────
+async function parearTVPorCodigo() {
+    if (!_gateTvPublicaOk()) return;
+    const input = document.getElementById('cfg-parear-codigo');
+    const status = document.getElementById('parear-tv-status');
+    const btn = document.getElementById('btn-parear-tv');
+    if (!input || !status) return;
+
+    const codigo = input.value.replace(/\s/g, '').trim();
+    if (!codigo || codigo.length !== 6 || !/^\d{6}$/.test(codigo)) {
+        status.innerHTML = '<span style="color:#ef4444;">⚠️ Digite os 6 dígitos que aparecem na TV</span>';
+        input.focus();
+        return;
+    }
+
+    if (!sbClube?.id || !_tvSlugCache) {
+        status.innerHTML = '<span style="color:#ef4444;">⚠️ Clube ou token da TV não carregado. Recarregue a página.</span>';
+        return;
+    }
+
+    // Disable while processing
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Pareando...';
+    status.innerHTML = '<span style="color:#71717a;">Verificando código...</span>';
+
+    try {
+        const { data, error } = await sb.rpc('tv_parear_codigo', {
+            p_codigo: codigo,
+            p_tv_token: _tvSlugCache,
+            p_clube_id: sbClube.id
+        });
+
+        if (error) throw error;
+
+        if (data.ok) {
+            status.innerHTML = '<span style="color:#22c55e;">✓ TV pareada com sucesso! A TV vai carregar automaticamente.</span>';
+            input.value = '';
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Pareado!';
+            btn.style.background = '#10b981';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fa-solid fa-link"></i> Parear';
+                btn.style.background = '';
+                btn.disabled = false;
+            }, 3000);
+            if (typeof showToast === 'function') showToast('✓ TV pareada com sucesso!');
+        } else {
+            status.innerHTML = '<span style="color:#ef4444;">⚠️ ' + (data.erro || 'Código inválido') + '</span>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-link"></i> Parear';
+        }
+    } catch (e) {
+        console.error('[PAREAR TV]', e);
+        status.innerHTML = '<span style="color:#ef4444;">Erro: ' + (e.message || e) + '</span>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-link"></i> Parear';
+    }
 }
 
 // ============================================================
