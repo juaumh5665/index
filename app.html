@@ -23267,7 +23267,19 @@ async function adminEstenderTrialRapido(clubeId, nome, dias) {
             .eq('id', clubeId);
         if (errStatus) {
             console.warn('[ADMIN] estender_validade OK mas falhou ao sincronizar clubes.status:', errStatus);
-            // Não bloqueia — apenas avisa. O painel ainda mostra atualizado pela RPC.
+        }
+
+        // =====================================================================
+        // FIX: sincroniza assinaturas.status e assinaturas.data_validade também.
+        // Sem isso, _bloqueioAtivo continua true se assinaturas.status === 'expirada',
+        // mesmo com clubes.data_validade atualizada.
+        // =====================================================================
+        const statusAssinatura = novoStatus === 'ativo' ? 'ativa' : 'expirada';
+        const { error: errAss } = await sb.from('assinaturas')
+            .update({ status: statusAssinatura, data_validade: novaData })
+            .eq('clube_id', clubeId);
+        if (errAss) {
+            console.warn('[ADMIN] falhou ao sincronizar assinaturas:', errAss);
         }
         
         // Feedback visual
@@ -23316,6 +23328,11 @@ async function adminAcoesClube(clubeId, nome) {
             const novaData = base.toISOString().split('T')[0];
             const { error } = await sb.rpc('estender_validade', { p_clube_id: clubeId, p_nova_data: novaData });
             if (error) throw error;
+            // Sincroniza clubes.status + assinaturas (mesma correção dos botões rápidos)
+            const _novoStatus = new Date(novaData) >= new Date(new Date().toISOString().split('T')[0]) ? 'ativo' : 'expirado';
+            await sb.from('clubes').update({ status: _novoStatus }).eq('id', clubeId);
+            const _statusAss = _novoStatus === 'ativo' ? 'ativa' : 'expirada';
+            await sb.from('assinaturas').update({ status: _statusAss, data_validade: novaData }).eq('clube_id', clubeId);
             alert(`✓ Validade estendida até ${new Date(novaData).toLocaleDateString('pt-BR')}`);
             await adminCarregarClubes();
             await adminCarregarDashboard();
