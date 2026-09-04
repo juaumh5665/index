@@ -9956,6 +9956,293 @@ let _syncLastFullTs = 0;
 let _syncFullNextRun = false;
 const _SYNC_FULL_INTERVAL_MS = 5 * 60 * 1000;
 
+// ============================================================
+// FILA DE PENDÊNCIAS OFFLINE — persiste _syncQueue no localStorage
+// Garante que dados NÃO se percam se o usuário der F5 durante
+// queda de internet (a _syncQueue em memória seria zerada).
+// Zero impacto no Realtime — usa apenas upserts REST.
+// ============================================================
+function _persistirFilaPendencias() {
+    try {
+        const pending = {};
+        Object.keys(_syncQueue).forEach(k => {
+            if (k === 'deletes') {
+                pending.deletes = {};
+                Object.keys(_syncQueue.deletes).forEach(dk => {
+                    const arr = [...(_syncQueue.deletes[dk] || [])];
+                    if (arr.length) pending.deletes[dk] = arr;
+                });
+            } else if (_syncQueue[k] && typeof _syncQueue[k].size === 'number') {
+                const arr = [..._syncQueue[k]];
+                if (arr.length) pending[k] = arr;
+            }
+        });
+        // Só persiste se há algo pendente; limpa se não há
+        const temAlgo = Object.keys(pending).some(k => {
+            if (k === 'deletes') return Object.keys(pending.deletes || {}).length > 0;
+            return (pending[k] || []).length > 0;
+        });
+        if (temAlgo) {
+            localStorage.setItem('ps_sync_pending', JSON.stringify(pending));
+        } else {
+            localStorage.removeItem('ps_sync_pending');
+        }
+    } catch(e) { console.warn('[OFFLINE-QUEUE] erro persistir:', e); }
+}
+
+function _restaurarFilaPendencias() {
+    try {
+        const raw = localStorage.getItem('ps_sync_pending');
+        if (!raw) return 0;
+        const pending = JSON.parse(raw);
+        let total = 0;
+        Object.keys(pending).forEach(k => {
+            if (k === 'deletes') {
+                Object.keys(pending.deletes || {}).forEach(dk => {
+                    if (_syncQueue.deletes[dk]) {
+                        (pending.deletes[dk] || []).forEach(id => _syncQueue.deletes[dk].add(id));
+                        total += (pending.deletes[dk] || []).length;
+                    }
+                });
+            } else if (_syncQueue[k]) {
+                (pending[k] || []).forEach(id => _syncQueue[k].add(id));
+                total += (pending[k] || []).length;
+            }
+        });
+        if (total > 0) console.log('[OFFLINE-QUEUE] Restauradas ' + total + ' pendência(s) do localStorage');
+        return total;
+    } catch(e) {
+        console.warn('[OFFLINE-QUEUE] erro restaurar:', e);
+        return 0;
+    }
+}
+
+// Converte uma entry do formato localStorage (camelCase) pro formato DB
+function _entryToDbOffline(e, torneioId, clubeId) {
+    return {
+        id: e.id || _genUuid(),
+        torneio_id: torneioId,
+        clube_id: clubeId,
+        jogador_id: e.jogadorId,
+        tipo: e.tipo,
+        valor: e.valor || 0,
+        fichas: e.fichas || 0,
+        nivel: e.nivel || null,
+        ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
+        operador: e.operador || null,
+        staff: e.staff || 0,
+        taxa_adm: e.taxaAdm || 0,
+        passaporte: (e.passaporte && e.passaporte.cobrado) ? e.passaporte : null,
+        combo_id: e.comboId || null,
+        bonus_fichas: Number(e.bonusFichas) || 0,
+        fichas_override: Number(e.fichasOverride) || 0,
+        is_promo: !!e.isPromo,
+    };
+}
+
+// Converte um eliminado do formato localStorage pro formato DB
+function _eliminadoToDbOffline(e, torneioId, clubeId) {
+    return {
+        id: e.id || _genUuid(),
+        torneio_id: torneioId,
+        clube_id: clubeId,
+        jogador_id: e.jogadorId,
+        eliminador_id: e.eliminadorId || null,
+        posicao: e.posicao,
+        bounty_pago: e.bountyPago || 0,
+        ts: e.ts ? new Date(e.ts).toISOString() : new Date().toISOString(),
+        operador: e.operador || null,
+    };
+}
+
+// Converte uma compra de jackpot do formato localStorage pro formato DB
+function _jackpotToDbOffline(j, torneioId, clubeId) {
+    return {
+        id: j.id || _genUuid(),
+        torneio_id: torneioId,
+        clube_id: clubeId,
+        jogador_id: j.jogadorId,
+        valor: j.valor,
+        fichas: j.fichas,
+        ts: j.ts ? new Date(j.ts).toISOString() : new Date().toISOString(),
+    };
+}
+
+// Converte uma mesa do formato localStorage pro formato DB
+function _mesaToDbOffline(m, torneioId, clubeId) {
+    return {
+        id: m.id || _genUuid(),
+        torneio_id: torneioId,
+        clube_id: clubeId,
+        numero: m.numero,
+        jogadores: m.jogadores || [],
+    };
+}
+
+// Sincroniza pendências que ficaram no localStorage após F5 offline.
+// Chamada ANTES de carregarEstadoDoSupabase sobrescrever os dados locais.
+// Usa upsert direto (sem diff) pra máxima segurança — o dado TEM que chegar.
+async function _sincronizarPendenciasOffline() {
+    if (!sbClube || !dbOnline) return;
+    try {
+        const raw = localStorage.getItem('ps_sync_pending');
+        if (!raw) return;
+        const pending = JSON.parse(raw);
+
+        // Conta total
+        let total = 0;
+        Object.keys(pending).forEach(k => {
+            if (k === 'deletes') {
+                Object.values(pending.deletes || {}).forEach(arr => { total += (arr || []).length; });
+            } else {
+                total += (pending[k] || []).length;
+            }
+        });
+        if (total === 0) { localStorage.removeItem('ps_sync_pending'); return; }
+
+        console.log('[OFFLINE-QUEUE] 🔄 ' + total + ' pendência(s) encontradas — recuperando antes de carregar...');
+        showToast('🔄 Recuperando ' + total + ' registro(s) pendente(s)...');
+
+        const cid = sbClube.id;
+        let erros = 0;
+
+        // === TORNEIOS + TABELAS FILHAS ===
+        if (pending.torneios && pending.torneios.length) {
+            try {
+                const torneiosLocal = JSON.parse(localStorage.getItem('ps_torneios') || '[]');
+                const pendentes = pending.torneios
+                    .map(id => torneiosLocal.find(t => t.id === id))
+                    .filter(Boolean);
+
+                if (pendentes.length) {
+                    // 1. Upsert torneios principais
+                    const payload = pendentes.map(_torneioToDb).filter(p => _isUuid(p.id));
+                    if (payload.length) {
+                        const { error } = await sb.from('torneios').upsert(payload);
+                        if (error) throw error;
+                        console.log('[OFFLINE-QUEUE] ✅ ' + payload.length + ' torneio(s)');
+                    }
+
+                    // 2. Upsert tabelas filhas de cada torneio
+                    for (const t of pendentes) {
+                        try {
+                            // Entries (buy-ins, rebuys, addons...)
+                            if (t.entries && t.entries.length) {
+                                const rows = t.entries.map(e => _entryToDbOffline(e, t.id, cid));
+                                const { error } = await sb.from('torneio_entries').upsert(rows);
+                                if (error) console.warn('[OFFLINE-QUEUE] entries ' + t.id + ':', error.message);
+                                else console.log('[OFFLINE-QUEUE] ✅ ' + rows.length + ' entry(s) torneio ' + (t.nome || t.id));
+                            }
+                            // Eliminados
+                            if (t.eliminados && t.eliminados.length) {
+                                const rows = t.eliminados.map(e => _eliminadoToDbOffline(e, t.id, cid));
+                                const { error } = await sb.from('torneio_eliminados').upsert(rows);
+                                if (error) console.warn('[OFFLINE-QUEUE] eliminados ' + t.id + ':', error.message);
+                            }
+                            // Jackpot compras
+                            if (t.jackpotCompras && t.jackpotCompras.length) {
+                                const rows = t.jackpotCompras.map(j => _jackpotToDbOffline(j, t.id, cid));
+                                const { error } = await sb.from('torneio_jackpot_compras').upsert(rows);
+                                if (error) console.warn('[OFFLINE-QUEUE] jackpot ' + t.id + ':', error.message);
+                            }
+                            // Mesas
+                            if (t.mesas && t.mesas.length) {
+                                const rows = t.mesas.map(m => _mesaToDbOffline(m, t.id, cid));
+                                const { error } = await sb.from('torneio_mesas').upsert(rows, { onConflict: 'torneio_id,numero' });
+                                if (error) console.warn('[OFFLINE-QUEUE] mesas ' + t.id + ':', error.message);
+                            }
+                        } catch(e) {
+                            console.error('[OFFLINE-QUEUE] ❌ filhas torneio ' + t.id + ':', e);
+                            erros++;
+                        }
+                    }
+                }
+            } catch(e) { console.error('[OFFLINE-QUEUE] ❌ torneios:', e); erros++; }
+        }
+
+        // === CASH MESAS ===
+        if (pending.cashMesas && pending.cashMesas.length) {
+            try {
+                const cmLocal = JSON.parse(localStorage.getItem('ps_cash_mesas') || '[]');
+                const rows = pending.cashMesas
+                    .map(id => cmLocal.find(m => m.id === id))
+                    .filter(Boolean)
+                    .map(_cashToDb);
+                if (rows.length) {
+                    const { error } = await sb.from('cash_mesas').upsert(rows);
+                    if (error) throw error;
+                    console.log('[OFFLINE-QUEUE] ✅ ' + rows.length + ' cash mesa(s)');
+                }
+            } catch(e) { console.error('[OFFLINE-QUEUE] ❌ cash:', e); erros++; }
+        }
+
+        // === TRANSAÇÕES ===
+        if (pending.transacoes && pending.transacoes.length) {
+            try {
+                const txLocal = JSON.parse(localStorage.getItem('ps_transacoes') || '[]');
+                const rows = pending.transacoes
+                    .map(id => txLocal.find(t => t.id === id || String(t.id) === String(id)))
+                    .filter(Boolean)
+                    .map(_transacaoToDb);
+                if (rows.length) {
+                    const { error } = await sb.from('transacoes').upsert(rows);
+                    if (error) throw error;
+                    console.log('[OFFLINE-QUEUE] ✅ ' + rows.length + ' transação(ões)');
+                }
+            } catch(e) { console.error('[OFFLINE-QUEUE] ❌ transações:', e); erros++; }
+        }
+
+        // === AUDITORIA ===
+        if (pending.auditoria && pending.auditoria.length) {
+            try {
+                const audLocal = (typeof auditoria !== 'undefined') ? auditoria : [];
+                const rows = pending.auditoria
+                    .map(id => audLocal.find(l => l.id === id || String(l.id) === String(id)))
+                    .filter(Boolean)
+                    .map(_auditoriaToDb);
+                if (rows.length) {
+                    const { error } = await sb.from('auditoria').upsert(rows);
+                    if (error) console.warn('[OFFLINE-QUEUE] auditoria:', error.message);
+                    else console.log('[OFFLINE-QUEUE] ✅ ' + rows.length + ' log(s) auditoria');
+                }
+            } catch(e) { console.warn('[OFFLINE-QUEUE] auditoria:', e); }
+        }
+
+        // === DELETES ===
+        if (pending.deletes) {
+            const tableMap = { torneios: 'torneios', cashMesas: 'cash_mesas',
+                               barProdutos: 'bar_produtos', barComandas: 'bar_comandas' };
+            for (const tipo of Object.keys(pending.deletes)) {
+                const ids = pending.deletes[tipo];
+                const tableName = tableMap[tipo];
+                if (ids && ids.length && tableName) {
+                    try {
+                        const { error } = await sb.from(tableName).delete().in('id', ids);
+                        if (error) console.warn('[OFFLINE-QUEUE] delete ' + tipo + ':', error.message);
+                        else console.log('[OFFLINE-QUEUE] ✅ ' + ids.length + ' delete(s) ' + tipo);
+                    } catch(e) { console.warn('[OFFLINE-QUEUE] delete ' + tipo + ':', e); }
+                }
+            }
+        }
+
+        // Limpa fila persistida (só se não teve erros críticos)
+        if (erros === 0) {
+            localStorage.removeItem('ps_sync_pending');
+            console.log('[OFFLINE-QUEUE] ✅ Todas as pendências recuperadas — fila limpa');
+            showToast('✅ Registros pendentes recuperados com sucesso!');
+        } else {
+            console.warn('[OFFLINE-QUEUE] ⚠️ ' + erros + ' erro(s) — fila mantida pra retry');
+            showToast('⚠️ Alguns registros não puderam ser recuperados — tentando novamente...');
+            // Agenda retry em 5s
+            setTimeout(() => {
+                if (dbOnline) _sincronizarPendenciasOffline().catch(e => console.warn('[OFFLINE-QUEUE] retry:', e));
+            }, 5000);
+        }
+    } catch(e) {
+        console.error('[OFFLINE-QUEUE] ❌ Erro geral:', e);
+    }
+}
+
 function _syncHash(row) {
     try { return JSON.stringify(row); }
     catch (_) { return String(Date.now()); }
@@ -10949,6 +11236,7 @@ function _markDirty(tipo, id) {
     }
     // Marcar como "mudança nossa" pro anti-loop do realtime
     if (typeof _marcarIdRecente === 'function') _marcarIdRecente(id);
+    _persistirFilaPendencias(); // OFFLINE-QUEUE: persiste no localStorage pra sobreviver F5
     _agendarSync();
     return true;
 }
@@ -10967,6 +11255,7 @@ function _markDelete(tipo, id) {
         return false;
     }
     if (_syncQueue.deletes[tipo]) _syncQueue.deletes[tipo].add(id);
+    _persistirFilaPendencias(); // OFFLINE-QUEUE: persiste no localStorage pra sobreviver F5
     _agendarSync();
     return true;
 }
@@ -11755,6 +12044,7 @@ async function sincronizarEstado() {
         console.warn('Sync falhou:', e.message);
     } finally {
         _syncEmAndamento = false;
+        _persistirFilaPendencias(); // OFFLINE-QUEUE: atualiza fila persistida (limpa os que já sincronizaram)
     }
 }
 
@@ -11770,6 +12060,15 @@ const _saveDataOriginal = (typeof saveData === 'function') ? saveData : null;
 async function carregarEstadoDoSupabase() {
     if (!sbClube) return;
     const clubeIdEsperado = sbClube.id;
+    
+    // OFFLINE-QUEUE: ANTES de sobrescrever o localStorage com dados do banco,
+    // verifica se há pendências de sync que ficaram pra trás (ex: F5 durante queda de internet).
+    // O localStorage ainda tem os dados corretos do último saveData(), então precisamos
+    // empurrar essas pendências pro Supabase AGORA, antes que sejam sobrescritas.
+    try {
+        _restaurarFilaPendencias(); // restaura _syncQueue do localStorage
+        await _sincronizarPendenciasOffline(); // envia ao Supabase
+    } catch(e) { console.warn('[OFFLINE-QUEUE] erro no boot:', e); }
     
     // Sincronizar relógio com servidor ANTES de carregar dados
     // Garante que tempoAlvo seja calculado com referência correta
