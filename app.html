@@ -8011,21 +8011,66 @@ document.addEventListener('DOMContentLoaded', function(){
 
                             <div style="font-size:.68rem;color:#71717a;margin-top:.75rem;margin-bottom:.35rem;">Como cobrar o staff?</div>
                             <div style="display:flex;flex-direction:column;gap:.3rem;">
-                                <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.72rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
+                                <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.72rem;padding:.55rem .65rem;border-radius:.4rem;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.12);">
                                     <input type="radio" name="t-staff-fixo-modo" value="embutido" id="t-staff-fixo-modo-embutido" checked style="accent-color:#38bdf8;margin-top:.15rem;">
                                     <div style="flex:1;">
-                                        <div><strong>Embutido</strong> no preço (recomendado)</div>
-                                        <div style="font-size:.62rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60. Internamente, R$ 50 vai pro rake e R$ 10 é staff.</div>
+                                        <div><strong>Embutido</strong> no preço <span style="color:#38bdf8;font-size:.6rem;font-weight:700;background:rgba(56,189,248,.12);padding:.1rem .35rem;border-radius:.25rem;margin-left:.3rem;">RECOMENDADO</span></div>
+                                        <div style="font-size:.62rem;color:#a1a1aa;margin-top:.3rem;line-height:1.5;">O staff já está <strong style="color:#e4e4e7;">dentro</strong> do preço do buy-in. O jogador paga somente o valor configurado.</div>
+                                        <div id="t-staff-fixo-hint-embutido" style="font-size:.62rem;color:#71717a;margin-top:.35rem;padding:.35rem .5rem;background:rgba(0,0,0,.3);border-radius:.3rem;line-height:1.55;"></div>
                                     </div>
                                 </label>
-                                <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.72rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(56,189,248,.05);">
+                                <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer;font-size:.72rem;padding:.55rem .65rem;border-radius:.4rem;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.12);">
                                     <input type="radio" name="t-staff-fixo-modo" value="adicional" id="t-staff-fixo-modo-adicional" style="accent-color:#38bdf8;margin-top:.15rem;">
                                     <div style="flex:1;">
                                         <div><strong>Adicional</strong> (transparente)</div>
-                                        <div style="font-size:.62rem;color:#71717a;margin-top:.15rem;">Cliente paga R$ 60 + R$ 10 staff = R$ 70.</div>
+                                        <div style="font-size:.62rem;color:#a1a1aa;margin-top:.3rem;line-height:1.5;">O staff é cobrado <strong style="color:#e4e4e7;">por fora</strong>. O jogador paga o buy-in + staff separadamente.</div>
+                                        <div id="t-staff-fixo-hint-adicional" style="font-size:.62rem;color:#71717a;margin-top:.35rem;padding:.35rem .5rem;background:rgba(0,0,0,.3);border-radius:.3rem;line-height:1.55;"></div>
                                     </div>
                                 </label>
                             </div>
+                            <script>
+                            // Atualiza hints dinâmicos com os valores reais do formulário
+                            function _atualizarHintsStaffModo() {
+                                const buyin = Number(document.getElementById('t-buyin')?.value) || 0;
+                                const staffVal = Number(document.getElementById('t-staff-fixo-valor')?.value) || 0;
+                                const rakePct = Number(document.getElementById('t-rake')?.value) || 0;
+                                const hEmb = document.getElementById('t-staff-fixo-hint-embutido');
+                                const hAdi = document.getElementById('t-staff-fixo-hint-adicional');
+                                if (!hEmb || !hAdi) return;
+
+                                if (buyin <= 0 || staffVal <= 0) {
+                                    hEmb.innerHTML = '<span style="color:#71717a;">Preencha buy-in e staff pra ver o exemplo.</span>';
+                                    hAdi.innerHTML = '<span style="color:#71717a;">Preencha buy-in e staff pra ver o exemplo.</span>';
+                                    return;
+                                }
+
+                                const fmt = v => 'R$ ' + v.toFixed(2).replace('.', ',');
+
+                                // EMBUTIDO: staff sai de dentro do buy-in
+                                const baseEmb = buyin - staffVal;
+                                const rakeEmb = baseEmb * (rakePct / 100);
+                                hEmb.innerHTML =
+                                    '💡 <strong style="color:#e4e4e7;">Jogador paga: ' + fmt(buyin) + '</strong><br>' +
+                                    'Dentro disso: ' + fmt(staffVal) + ' é staff → base pro rake = ' + fmt(baseEmb) + '<br>' +
+                                    'Rake ' + rakePct + '% sobre ' + fmt(baseEmb) + ' = <span style="color:#fbbf24;">' + fmt(rakeEmb) + '</span>';
+
+                                // ADICIONAL: staff vem por fora
+                                const rakeAdi = buyin * (rakePct / 100);
+                                const totalAdi = buyin + staffVal;
+                                hAdi.innerHTML =
+                                    '💡 <strong style="color:#e4e4e7;">Jogador paga: ' + fmt(totalAdi) + '</strong> (' + fmt(buyin) + ' + ' + fmt(staffVal) + ' staff)<br>' +
+                                    'Rake ' + rakePct + '% sobre ' + fmt(buyin) + ' = <span style="color:#fbbf24;">' + fmt(rakeAdi) + '</span><br>' +
+                                    '<span style="color:#a78bfa;">⚠ O total cobrado do jogador é maior que o buy-in configurado.</span>';
+                            }
+                            // Listeners pra atualizar em tempo real
+                            ['t-buyin', 't-rake', 't-staff-fixo-valor'].forEach(id => {
+                                const el = document.getElementById(id);
+                                if (el) { el.addEventListener('input', _atualizarHintsStaffModo); el.addEventListener('change', _atualizarHintsStaffModo); }
+                            });
+                            document.querySelectorAll('input[name="t-staff-fixo-modo"]').forEach(r => r.addEventListener('change', _atualizarHintsStaffModo));
+                            // Atualiza na carga inicial
+                            setTimeout(_atualizarHintsStaffModo, 300);
+                            </script>
 
                             <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.75rem;margin-top:.55rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);">
                                 <input type="checkbox" id="t-staff-fixo-cobrar-free" style="accent-color:var(--gold);">
