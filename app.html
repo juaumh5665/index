@@ -9105,23 +9105,35 @@ document.addEventListener('DOMContentLoaded', function(){
 // ============================================================
 // DATA
 // ============================================================
-let jogadores  = JSON.parse(localStorage.getItem('ps_jogadores'))  || [];
-let torneios   = JSON.parse(localStorage.getItem('ps_torneios'))   || [];
+// FIX: try-catch em todos os JSON.parse do boot — pico de energia pode
+// corromper o localStorage (escrita parcial, JSON truncado)
+function _safeParseLS(key, fallback) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw === null || raw === undefined) return fallback;
+        return JSON.parse(raw) || fallback;
+    } catch(e) {
+        console.warn('[BOOT] localStorage corrompido para ' + key + ', usando fallback:', e.message);
+        return fallback;
+    }
+}
+let jogadores  = _safeParseLS('ps_jogadores', []);
+let torneios   = _safeParseLS('ps_torneios', []);
 // Cache de movimentações do jackpot (carteira do clube). Carregado do Supabase no boot.
 let jackpotMovimentacoesCache = [];
-let barGrupos  = JSON.parse(localStorage.getItem('ps_bar_grupos')) || ['Refrigerantes','Cervejas','Salgados','Picolés','Outros'];
-let _barGruposMap = JSON.parse(localStorage.getItem('ps_bar_grupos_map') || 'null') || { nomeParaId: {}, idParaNome: {} };
-let barProdutos= JSON.parse(localStorage.getItem('ps_bar_produtos'))|| [];
-let barComandas= JSON.parse(localStorage.getItem('ps_bar_comandas'))|| [];
+let barGrupos  = _safeParseLS('ps_bar_grupos', ['Refrigerantes','Cervejas','Salgados','Picolés','Outros']);
+let _barGruposMap = _safeParseLS('ps_bar_grupos_map', { nomeParaId: {}, idParaNome: {} });
+let barProdutos= _safeParseLS('ps_bar_produtos', []);
+let barComandas= _safeParseLS('ps_bar_comandas', []);
 // Contas a Pagar (carregado do Supabase no boot)
 let contasPagar = [];
-let cashMesas  = JSON.parse(localStorage.getItem('ps_cash_mesas'))  || [];
-let usuarios   = JSON.parse(localStorage.getItem('ps_usuarios'))    || [];
-let config     = JSON.parse(localStorage.getItem('ps_config'))      || {};
-let transacoes = JSON.parse(localStorage.getItem('ps_transacoes'))  || [];
-let fechamentos= JSON.parse(localStorage.getItem('ps_fechamentos')) || [];
-let barCaixa   = JSON.parse(localStorage.getItem('ps_bar_caixa'))   || { status:'fechado', abertoEm:null, abertoPor:null, historico:[] };
-let rankings   = JSON.parse(localStorage.getItem('ps_rankings'))    || [];
+let cashMesas  = _safeParseLS('ps_cash_mesas', []);
+let usuarios   = _safeParseLS('ps_usuarios', []);
+let config     = _safeParseLS('ps_config', {});
+let transacoes = _safeParseLS('ps_transacoes', []);
+let fechamentos= _safeParseLS('ps_fechamentos', []);
+let barCaixa   = _safeParseLS('ps_bar_caixa', { status:'fechado', abertoEm:null, abertoPor:null, historico:[] });
+let rankings   = _safeParseLS('ps_rankings', []);
 let auditoria  = (function(){ try { return JSON.parse(localStorage.getItem('ps_auditoria')) || []; } catch(e){ return []; } })();
 // FUNCIONÁRIOS / DEALERS (Etapa Extra)
 let funcionarios   = JSON.parse(localStorage.getItem('ps_funcionarios'))   || [];
@@ -9251,7 +9263,10 @@ function _saveDataInner() {
 function saveData() {
     _saveDataInner();
     // Marca tudo como dirty pra próximo sync (estratégia simples mas eficaz)
-    if (sbClube && dbOnline) {
+    // FIX CRÍTICO: marca dirty MESMO offline — o _persistirFilaPendencias() dentro
+    // do _markDirty salva no ps_sync_pending, garantindo recuperação após F5/pico de energia.
+    // O sync só dispara se dbOnline, mas a FILA é salva sempre.
+    if (sbClube) {
         // Marca todos os torneios como dirty (vai fazer upsert dos que mudaram)
         torneios.forEach(t => _markDirty('torneios', t.id));
         if (typeof cashMesas !== 'undefined') cashMesas.forEach(m => _markDirty('cashMesas', m.id));
@@ -10305,8 +10320,28 @@ async function _syncUpsertDiff(rows, tabela, snapshotKey, opts) {
 
     if (isFull || !_SYNC_DIFF_MODE || !snap) {
         const q = upsertOpts ? sb.from(tabela).upsert(rows, upsertOpts) : sb.from(tabela).upsert(rows);
-        const resp = opts.withSelect ? await q.select() : await q;
+        // FIX CRÍTICO: SEMPRE usa .select() no full-sync pra validar se as rows realmente chegaram no banco.
+        // Sem .select(), RLS pode bloquear silenciosamente (retorna { data: null, error: null }).
+        const resp = await q.select();
         if (resp.error) throw resp.error;
+
+        // FIX: Detecta RLS silenciosa — mandou N rows, banco confirmou M < N
+        const confirmados = resp.data ? resp.data.length : 0;
+        if (confirmados < rows.length) {
+            console.error('[SYNC:RLS] ⚠️ ' + tabela + ': enviou ' + rows.length + ', banco confirmou apenas ' + confirmados + ' — possível bloqueio de RLS!');
+            // NÃO alimenta snapshot dos que não foram confirmados
+            if (resp.data && resp.data.length > 0) {
+                const idsConfirmados = new Set(resp.data.map(r => r.id));
+                if (snap) resp.data.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
+                // Log quais IDs falharam pra debug
+                const falharam = rows.filter(r => r && r.id && !idsConfirmados.has(r.id));
+                if (falharam.length > 0) {
+                    console.warn('[SYNC:RLS] IDs não gravados em ' + tabela + ':', falharam.slice(0, 5).map(r => r.id));
+                }
+            }
+            return { data: resp.data, enviados: confirmados, total: rows.length, full: true, rlsBlocked: rows.length - confirmados };
+        }
+
         if (snap) rows.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
         return { data: resp.data, enviados: rows.length, total: rows.length, full: true };
     }
@@ -10319,8 +10354,21 @@ async function _syncUpsertDiff(rows, tabela, snapshotKey, opts) {
         return { data: null, enviados: 0, total: rows.length, full: false };
     }
     const q = upsertOpts ? sb.from(tabela).upsert(dirty, upsertOpts) : sb.from(tabela).upsert(dirty);
-    const resp = opts.withSelect ? await q.select() : await q;
+    // FIX: Também usa .select() no diff pra validar
+    const resp = await q.select();
     if (resp.error) throw resp.error;
+
+    // FIX: Detecta RLS silenciosa no diff também
+    const confirmados = resp.data ? resp.data.length : 0;
+    if (confirmados < dirty.length) {
+        console.error('[SYNC:RLS] ⚠️ ' + tabela + ': diff enviou ' + dirty.length + ', banco confirmou ' + confirmados);
+        if (resp.data && resp.data.length > 0) {
+            const idsConfirmados = new Set(resp.data.map(r => r.id));
+            resp.data.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
+        }
+        return { data: resp.data, enviados: confirmados, total: rows.length, full: false, rlsBlocked: dirty.length - confirmados };
+    }
+
     dirty.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
     console.log('[SYNC:diff] ' + tabela + ': ' + dirty.length + ' de ' + rows.length + ' mudaram');
     return { data: resp.data, enviados: dirty.length, total: rows.length, full: false };
@@ -12460,6 +12508,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
             fichas: j.fichas, ts: new Date(j.ts).getTime(),
         })),
         mesas: tMesas.map(m => ({ id: m.id, numero: m.numero, jogadores: m.jogadores || [] })),
+        bounties: {},  // FIX: inicializa bounties pra torneios KO não explodirem no renderBountyPanel
     };
 }
 
@@ -25884,6 +25933,9 @@ function renderBountyPanel(t) {
     const ativos = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))]
         .filter(id => !t.eliminados.some(e=>e.jogadorId===id));
 
+    // FIX: garante que bounties existe (pode não vir do Supabase em torneios carregados)
+    if (!t.bounties) t.bounties = {};
+
     // Totalizadores
     const totalBountiesNaMesa = ativos.reduce((s,id) => s + (t.bounties[id]||0), 0);
     const totalBountiesPagos = t.eliminados.filter(e=>e.bountyPago).reduce((s,e)=>s+e.bountyPago, 0);
@@ -29077,6 +29129,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
 
         // Bounty (PKO/Knockout) — só uma vez no buy-in
         if (tipo === 'buyin' && ['bounty','pko','knockout'].includes(t.tipo)) {
+            if (!t.bounties) t.bounties = {}; // FIX: garante que bounties existe
             if (t.tipo === 'pko' || t.tipo === 'knockout') {
                 const bountyInicial = _isBuyinFree(t) ? 0 : (t.tipo === 'knockout' ? t.buyin * (1 - t.rake/100) : t.buyin * (t.pkoSplit/100));
                 t.bounties[jid] = (t.bounties[jid] || 0) + bountyInicial;
@@ -29334,6 +29387,7 @@ function _registrarEntradaImpl() {
 
     // Para torneios KO: cada entrada paga também bounty (exceto add-on)
     if (['bounty','pko','knockout'].includes(t.tipo) && tipo !== 'addon') {
+        if (!t.bounties) t.bounties = {}; // FIX: garante que bounties existe
         // Inicializa bounty na cabeça do jogador se for PKO ou knockout
         if (t.tipo === 'pko' || t.tipo === 'knockout') {
             // BUY-IN FREE: bounty = 0 (sem fundo do buy-in pra alimentar bounty)
@@ -29547,6 +29601,7 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
 
     // Lógica de bounty
     if (['bounty','pko','knockout'].includes(t.tipo) && eliminadorId && eliminadorId !== jid) {
+        if (!t.bounties) t.bounties = {}; // FIX: garante que bounties existe
         const bountyEliminado = t.bounties[jid] || 0;
         elim.eliminadorId = eliminadorId;
         elim.bountyPago   = bountyEliminado;
