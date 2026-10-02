@@ -26995,6 +26995,42 @@ function abrirEditarTorneio(idx) {
                 '</div>' +
             '</div>' +
 
+            // Setor: Valores financeiros (SOMENTE se torneio ainda não tem entries)
+            (!temEntries ? (
+            '<div class="edit-coll edit-coll-open" id="edit-coll-financeiro">' +
+                '<div class="edit-coll-head" onclick="_editToggleColl(\'financeiro\')">' +
+                    '<div style="display:flex;align-items:center;gap:.5rem;"><span class="edit-chev">▶</span><i class="fa-solid fa-dollar-sign" style="color:#f59e0b;font-size:.8rem;"></i><span>Valores financeiros</span></div>' +
+                    '<span class="edit-coll-status" style="color:#f59e0b;font-size:.7rem;">Editável antes de iniciar</span>' +
+                '</div>' +
+                '<div class="edit-coll-body">' +
+                    '<div style="padding:.55rem .7rem;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:.4rem;margin-bottom:.85rem;font-size:.7rem;color:#fbbf24;line-height:1.5;">' +
+                        '<i class="fa-solid fa-triangle-exclamation" style="margin-right:.3rem;"></i>' +
+                        'Editável porque o torneio ainda não iniciou (sem entradas). Após a <strong>primeira entrada</strong>, esses campos serão travados.' +
+                    '</div>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.55rem;margin-bottom:.65rem;">' +
+                        '<div><label class="inp-label">Buy-in R$</label><input id="edit-fin-buyin" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.buyin)||0) + '"></div>' +
+                        '<div><label class="inp-label">Taxa adm R$</label><input id="edit-fin-taxa" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.taxaAdm)||0) + '"></div>' +
+                        '<div><label class="inp-label">Rake %</label><input id="edit-fin-rake" class="inp" type="number" min="0" max="100" value="' + (Number(t.rake)||0) + '"></div>' +
+                    '</div>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.85rem;">' +
+                        '<div><label class="inp-label">Stack inicial</label><input id="edit-fin-stack" class="inp" type="number" min="0" value="' + (Number(t.stack)||0) + '"></div>' +
+                        '<div><label class="inp-label">Nível (min)</label><input id="edit-fin-tempo" class="inp" type="number" min="1" value="' + (Number(t.tempoNivel)||15) + '"></div>' +
+                    '</div>' +
+                    '<div style="font-size:.68rem;color:#a1a1aa;font-weight:600;margin-bottom:.45rem;text-transform:uppercase;letter-spacing:.05em;">Rebuy e Add-on</div>' +
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">' +
+                        '<div><label class="inp-label">Rebuy simples R$</label><input id="edit-fin-rebuy" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.rebuyValor||t.rebuySimples)||0) + '"></div>' +
+                        '<div><label class="inp-label">Fichas (simples)</label><input id="edit-fin-rebuy-fichas" class="inp" type="number" min="0" value="' + (Number(t.rebuyFichas)||0) + '"></div>' +
+                        '<div><label class="inp-label">Rebuy duplo R$</label><input id="edit-fin-rebuy-duplo" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.rebuyDuploValor||t.rebuyDuplo)||0) + '"></div>' +
+                        '<div><label class="inp-label">Fichas (duplo)</label><input id="edit-fin-rebuy-duplo-fichas" class="inp" type="number" min="0" value="' + (Number(t.rebuyDuploFichas)||0) + '"></div>' +
+                        '<div><label class="inp-label">Add-on R$</label><input id="edit-fin-addon" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.addonValor)||0) + '"></div>' +
+                        '<div><label class="inp-label">Add-on fichas</label><input id="edit-fin-addon-fichas" class="inp" type="number" min="0" value="' + (Number(t.addonFichas)||0) + '"></div>' +
+                        '<div><label class="inp-label">Buy-in duplo R$</label><input id="edit-fin-buyin-duplo" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.buyinDuploValor)||0) + '"></div>' +
+                        '<div><label class="inp-label">Buy-in duplo fichas</label><input id="edit-fin-buyin-duplo-fichas" class="inp" type="number" min="0" value="' + (Number(t.buyinDuploFichas)||0) + '"></div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>'
+            ) : '') +
+
             // Setor: Travas
             '<div class="edit-coll edit-coll-open" id="edit-coll-travas">' +
                 '<div class="edit-coll-head" onclick="_editToggleColl(\'travas\')">' +
@@ -27097,18 +27133,20 @@ function abrirEditarTorneio(idx) {
                 '</div>' +
             '</div>' +
 
-            // Aviso de não-editáveis
+            // Aviso de não-editáveis (só quando torneio JÁ tem entries)
+            (temEntries ? (
             '<div style="margin-top:1rem;padding:.75rem;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:.5rem;">' +
                 '<div style="font-size:.72rem;color:#ef4444;font-weight:700;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em;">' +
-                    '<i class="fa-solid fa-lock"></i> Não editável após criar' +
+                    '<i class="fa-solid fa-lock"></i> Valores travados (torneio em andamento)' +
                 '</div>' +
                 '<div style="font-size:.72rem;color:#71717a;line-height:1.5;">' +
                     'Valores financeiros e fichas: <strong style="color:#a1a1aa;">Buy-in R$ ' + (Number(t.buyin)||0).toFixed(2).replace('.',',') + ', Rake ' + (Number(t.rake)||0) + '%</strong>' +
                     (Number(t.taxaAdm) > 0 ? ', Taxa adm R$ ' + Number(t.taxaAdm).toFixed(2).replace('.',',') : '') +
                     (Number(t.addonValor) > 0 ? ', Add-on R$ ' + Number(t.addonValor).toFixed(2).replace('.',',') : '') +
-                    '. Pra alterar, seria necessário criar um novo torneio.' +
+                    '. Já existem entradas registradas — não é possível alterar.' +
                 '</div>' +
-            '</div>' +
+            '</div>'
+            ) : '') +
         '</div>' +
 
         // Footer
@@ -27288,6 +27326,85 @@ async function _salvarEditarTorneio() {
         return;
     }
 
+    // === EDIÇÃO FINANCEIRA (somente torneios sem entries — aguardando início) ===
+    const _editTemEntries = (t.entries && t.entries.length > 0);
+    let _finAlterado = false;
+    const _finAntes = {};
+    const _finDepois = {};
+
+    if (!_editTemEntries) {
+        const elBuyin  = document.getElementById('edit-fin-buyin');
+        const elRake   = document.getElementById('edit-fin-rake');
+        const elTaxa   = document.getElementById('edit-fin-taxa');
+        const elStack  = document.getElementById('edit-fin-stack');
+        const elTempo  = document.getElementById('edit-fin-tempo');
+        const elRebuy  = document.getElementById('edit-fin-rebuy');
+        const elRebuyF = document.getElementById('edit-fin-rebuy-fichas');
+        const elRD     = document.getElementById('edit-fin-rebuy-duplo');
+        const elRDF    = document.getElementById('edit-fin-rebuy-duplo-fichas');
+        const elAddon  = document.getElementById('edit-fin-addon');
+        const elAddonF = document.getElementById('edit-fin-addon-fichas');
+        const elBD     = document.getElementById('edit-fin-buyin-duplo');
+        const elBDF    = document.getElementById('edit-fin-buyin-duplo-fichas');
+
+        if (elBuyin) {
+            const novos = {
+                buyin:            parseFloat(elBuyin.value)  || 0,
+                rake:             parseFloat(elRake.value)   || 0,
+                taxaAdm:          parseFloat(elTaxa.value)   || 0,
+                stack:            parseInt(elStack.value)     || 0,
+                tempoNivel:       parseInt(elTempo.value)     || 15,
+                rebuyValor:       parseFloat(elRebuy.value)  || 0,
+                rebuyFichas:      parseInt(elRebuyF.value)   || 0,
+                rebuyDuploValor:  parseFloat(elRD.value)     || 0,
+                rebuyDuploFichas: parseInt(elRDF.value)       || 0,
+                addonValor:       parseFloat(elAddon.value)  || 0,
+                addonFichas:      parseInt(elAddonF.value)   || 0,
+                buyinDuploValor:  parseFloat(elBD.value)     || 0,
+                buyinDuploFichas: parseInt(elBDF.value)       || 0,
+            };
+
+            // Detecta mudanças
+            const campos = ['buyin','rake','taxaAdm','stack','tempoNivel','rebuyValor','rebuyFichas',
+                'rebuyDuploValor','rebuyDuploFichas','addonValor','addonFichas','buyinDuploValor','buyinDuploFichas'];
+            for (const c of campos) {
+                const antes = Number(t[c] || (c === 'rebuyValor' ? t.rebuySimples : 0) || (c === 'rebuyDuploValor' ? t.rebuyDuplo : 0)) || 0;
+                if (antes !== novos[c]) {
+                    _finAlterado = true;
+                    _finAntes[c] = antes;
+                    _finDepois[c] = novos[c];
+                }
+            }
+
+            // Confirmação de segurança se algo financeiro mudou
+            if (_finAlterado) {
+                let msgConfirm = 'Você está alterando valores financeiros do torneio:\n\n';
+                for (const c of Object.keys(_finAntes)) {
+                    msgConfirm += '• ' + c + ': ' + _finAntes[c] + ' → ' + _finDepois[c] + '\n';
+                }
+                msgConfirm += '\nConfirmar alteração?';
+                if (!confirm(msgConfirm)) return;
+
+                // Aplica os novos valores no objeto
+                t.buyin            = novos.buyin;
+                t.rake             = novos.rake;
+                t.taxaAdm          = novos.taxaAdm;
+                t.stack            = novos.stack;
+                t.tempoNivel       = novos.tempoNivel;
+                t.rebuyValor       = novos.rebuyValor;
+                t.rebuySimples     = novos.rebuyValor;  // espelho compat
+                t.rebuyFichas      = novos.rebuyFichas;
+                t.rebuyDuploValor  = novos.rebuyDuploValor;
+                t.rebuyDuplo       = novos.rebuyDuploValor;  // espelho compat
+                t.rebuyDuploFichas = novos.rebuyDuploFichas;
+                t.addonValor       = novos.addonValor;
+                t.addonFichas      = novos.addonFichas;
+                t.buyinDuploValor  = novos.buyinDuploValor;
+                t.buyinDuploFichas = novos.buyinDuploFichas;
+            }
+        }
+    }
+
     // === Aplica no objeto JS (memória) ===
     t.nome = novoNome;
     t.reentryAte = (isNaN(novoReentry) || novoReentry < 0) ? (t.reentryAte || 0) : novoReentry;
@@ -27321,6 +27438,22 @@ async function _salvarEditarTorneio() {
                 buyin_promo_fichas:    t.buyinPromoFichas,
                 buyin_promo_ate_nivel: t.buyinPromoAteNivel,
             };
+            // Campos financeiros (somente se editados em torneio aguardando)
+            if (_finAlterado) {
+                payload.buyin              = t.buyin;
+                payload.rake               = t.rake;
+                payload.taxa_administrativa = t.taxaAdm;
+                payload.stack              = t.stack;
+                payload.tempo_nivel        = t.tempoNivel;
+                payload.rebuy_valor        = t.rebuyValor;
+                payload.rebuy_fichas       = t.rebuyFichas;
+                payload.rebuy_duplo_valor  = t.rebuyDuploValor;
+                payload.rebuy_duplo_fichas = t.rebuyDuploFichas;
+                payload.addon_valor        = t.addonValor;
+                payload.addon_fichas       = t.addonFichas;
+                payload.buyin_duplo_valor  = t.buyinDuploValor;
+                payload.buyin_duplo_fichas = t.buyinDuploFichas;
+            }
             await sb.from('torneios').update(payload).eq('id', t.id);
         } catch(e) {
             console.warn('[edit] sync supabase falhou:', e);
@@ -27334,6 +27467,17 @@ async function _salvarEditarTorneio() {
             logAudit('TORNEIO_EDITA', 'Editado: ' + t.nome, {
                 torneioId: t.id,
                 campos: ['nome', 'reentryAte', 'addonAte', 'blinds', 'flagsImpressao'],
+            });
+        } catch(_) {}
+    }
+
+    // === Audit específica pra valores financeiros (torneio aguardando) ===
+    if (_finAlterado && typeof logAudit === 'function') {
+        try {
+            logAudit('TORNEIO_EDIT_FINANCEIRO', 'Valores financeiros alterados (pré-início): ' + t.nome, {
+                torneioId: t.id,
+                antes: _finAntes,
+                depois: _finDepois,
             });
         } catch(_) {}
     }
@@ -27366,7 +27510,7 @@ async function _salvarEditarTorneio() {
         try { renderTabInfo(); } catch(_) {}
     }
 
-    showToast('✅ Torneio "' + t.nome + '" atualizado');
+    showToast('✅ Torneio "' + t.nome + '" atualizado' + (_finAlterado ? ' (valores financeiros alterados)' : ''));
     _fecharEditarTorneio();
 }
 
