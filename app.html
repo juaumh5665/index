@@ -9297,6 +9297,13 @@ const PAYMENT_METHODS = {
 };
 let currentUser = null;  // Populado por inicializarAuth() no boot via Supabase
 
+// Helper: verifica se currentUser é admin (aceita 'admin' ou 'administrador')
+function _isCurrentAdmin() {
+    if (!currentUser) return false;
+    const p = (currentUser.papel || currentUser.role || '').toLowerCase();
+    return p === 'admin' || p === 'administrador';
+}
+
 // Default config
 const DEFAULT_CONFIG = {
     clube: { nome:'StackOS', cnpj:'', fone:'', endereco:'', cidade:'', uf:'', email:'', logo:null },
@@ -12278,15 +12285,62 @@ const _saveDataOriginal = (typeof saveData === 'function') ? saveData : null;
 async function carregarEstadoDoSupabase() {
     if (!sbClube) return;
     const clubeIdEsperado = sbClube.id;
-    
+
+    // =========================================================
+    // PROTEÇÃO CONTRA RE-SYNC PÓS-RESET
+    // Se um reset financeiro aconteceu (via admin ou pelo próprio clube),
+    // o localStorage pode ter dados antigos que a sync offline reinserira
+    // no banco. Detecta isso comparando o último reset com o último boot.
+    // =========================================================
+    let _resetDetectado = false;
+    try {
+        const { data: ultimoReset } = await sb
+            .from('reset_financeiro_log')
+            .select('executado_em')
+            .eq('clube_id', clubeIdEsperado)
+            .order('executado_em', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (ultimoReset) {
+            const tsReset = new Date(ultimoReset.executado_em).getTime();
+            const tsLastBoot = parseInt(localStorage.getItem('ps_last_boot_ts') || '0', 10);
+
+            if (tsReset > tsLastBoot) {
+                console.warn('[RESET-GUARD] 🛡️ Reset detectado após último boot — limpando cache local');
+                _RESET_FIN_LOCALSTORAGE_APAGAR.forEach(key => localStorage.removeItem(key));
+                // Limpa também filas de sync pendentes para não reinserir dados antigos
+                localStorage.removeItem('ps_offline_queue');
+                localStorage.removeItem('ps_sync_queue');
+                _resetDetectado = true;
+            }
+        }
+    } catch(e) { console.warn('[RESET-GUARD] check:', e); }
+
+    // Grava timestamp deste boot
+    localStorage.setItem('ps_last_boot_ts', String(Date.now()));
+
     // OFFLINE-QUEUE: ANTES de sobrescrever o localStorage com dados do banco,
     // verifica se há pendências de sync que ficaram pra trás (ex: F5 durante queda de internet).
     // O localStorage ainda tem os dados corretos do último saveData(), então precisamos
     // empurrar essas pendências pro Supabase AGORA, antes que sejam sobrescritas.
-    try {
-        _restaurarFilaPendencias(); // restaura _syncQueue do localStorage
-        await _sincronizarPendenciasOffline(); // envia ao Supabase
-    } catch(e) { console.warn('[OFFLINE-QUEUE] erro no boot:', e); }
+    // EXCETO se um reset foi detectado — nesse caso pular sync pra não reinserir dados deletados.
+    if (!_resetDetectado) {
+        try {
+            _restaurarFilaPendencias(); // restaura _syncQueue do localStorage
+            await _sincronizarPendenciasOffline(); // envia ao Supabase
+        } catch(e) { console.warn('[OFFLINE-QUEUE] erro no boot:', e); }
+    } else {
+        console.warn('[RESET-GUARD] 🛡️ Sync offline PULADA — dados limpos pelo reset');
+        // Limpa sync queue em memória também
+        if (typeof _syncQueue !== 'undefined') {
+            _syncQueue.torneios.clear(); _syncQueue.cashMesas.clear();
+            _syncQueue.barGrupos.clear(); _syncQueue.barProdutos.clear();
+            _syncQueue.barComandas.clear(); _syncQueue.transacoes.clear();
+            _syncQueue.auditoria.clear();
+            Object.values(_syncQueue.deletes).forEach(s => s.clear());
+        }
+    }
     
     // Sincronizar relógio com servidor ANTES de carregar dados
     // Garante que tempoAlvo seja calculado com referência correta
@@ -21670,7 +21724,7 @@ async function renderMeuClubeCard() {
     document.getElementById('mc-plano').textContent = planoLabels[sbClube.plano] || sbClube.plano || '—';
 
     // Carrega convites pendentes do clube
-    if (currentUser && currentUser.papel === 'admin') {
+    if (currentUser && _isCurrentAdmin()) {
         try {
             const { data: convites } = await sb
                 .from('convites')
@@ -21776,7 +21830,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================
 
 function openModalConvite() {
-    if (!sbClube || !currentUser || currentUser.papel !== 'admin') {
+    if (!sbClube || !_isCurrentAdmin()) {
         showToast('⚠️ Apenas admin pode convidar operadores');
         return;
     }
@@ -38378,7 +38432,7 @@ async function renderUsuarios() {
             const role = ROLES[u.papel] || { label: u.papel, color: '#71717a', icon: '👤' };
             const isMe = currentUser && u.id === currentUser.id;
             const isAtivo = (u.status || 'ativo') === 'ativo';
-            const sou_admin = currentUser && currentUser.papel === 'admin';
+            const sou_admin = currentUser && _isCurrentAdmin();
 
             // Iniciais pro avatar
             const iniciais = (u.nome || '?').split(' ').map(w => w[0] || '').slice(0, 2).join('').toUpperCase();
@@ -38439,7 +38493,7 @@ async function renderUsuarios() {
 // ============================================================
 
 function openModalCadastrarOperador() {
-    if (!sbClube || !currentUser || currentUser.papel !== 'admin') {
+    if (!sbClube || !_isCurrentAdmin()) {
         showToast('⚠️ Apenas admin pode cadastrar operadores');
         return;
     }
@@ -38514,7 +38568,7 @@ async function cadastrarOperadorDireto() {
 // ============================================================
 
 function abrirModalResetarSenha(operadorId, nomeOperador) {
-    if (!currentUser || currentUser.papel !== 'admin') {
+    if (!_isCurrentAdmin()) {
         showToast('⚠️ Apenas admin pode resetar senhas');
         return;
     }
