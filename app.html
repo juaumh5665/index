@@ -28700,6 +28700,22 @@ function _renderCheckboxesEntrada(t, jid, optsLegado, ctx) {
             motivo: trBuyin.motivo,
             ancora: true // Buy-in sempre marcado e travado pra jogador novo
         });
+
+        // BUY-IN DUPLO: só pra jogador novo (mesma regra do buyin normal), valor e fichas fixos, sem promo
+        const buyinDupVal = Number(t.buyinDuploValor || 0);
+        const buyinDupFichas = Number(t.buyinDuploFichas || 0);
+        if (buyinDupVal > 0 && buyinDupFichas > 0) {
+            const trDuplo = _tipoBloqueadoPorTrava(t, 'buyin_duplo');
+            tiposDisponiveis.push({
+                tipo: 'buyin_duplo',
+                label: 'Buy-in Duplo',
+                valor: buyinDupVal,
+                valorLabel: 'R$ ' + buyinDupVal.toFixed(2).replace('.', ','),
+                fichas: buyinDupFichas,
+                bloqueado: trDuplo.bloqueado,
+                motivo: trDuplo.motivo
+            });
+        }
     }
 
     // REBUY SIMPLES
