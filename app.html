@@ -7838,6 +7838,18 @@ document.addEventListener('DOMContentLoaded', function(){
                             <div><label class="inp-label">Add-on R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(0=grátis)</span></label><input id="t-addon-valor" type="number" step="0.01" value="0" class="inp" onchange="t2AtualizarStatusRebuy()"></div>
                             <div><label class="inp-label">Add-on fichas</label><input id="t-addon" type="number" value="0" class="inp"></div>
                         </div>
+                        <!-- Buy-in Duplo (entrada dupla com valor e fichas fixos) -->
+                        <div style="margin-top:.75rem;padding:.65rem .8rem;background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.15);border-radius:.45rem;">
+                            <div style="font-size:.62rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;"><i class="fa-solid fa-layer-group"></i> Buy-in Duplo (Entrada Dupla)</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+                                <div><label class="inp-label">Valor fixo R$ <span style="color:#71717a;font-weight:400;text-transform:none;font-size:.6rem;">(0=desabilita)</span></label><input id="t-buyin-duplo-valor" type="number" step="0.01" value="0" class="inp" onchange="t2AtualizarStatusRebuy()"></div>
+                                <div><label class="inp-label">Fichas</label><input id="t-buyin-duplo-fichas" type="number" value="0" class="inp"></div>
+                            </div>
+                            <div style="font-size:.62rem;color:#71717a;margin-top:.35rem;line-height:1.4;">
+                                <i class="fa-solid fa-circle-info" style="color:#a855f7;"></i>
+                                Valor fixo independente de promoção. Conta como <strong>1 ação</strong> pra staff. Jogador só pode usar se ainda não entrou no torneio.
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -11408,6 +11420,8 @@ function _torneioToDb(t) {
         rebuy_fichas: t.rebuyFichas || t.rebuySimplesFichas || 0,
         rebuy_duplo_valor: t.rebuyDuploValor || t.rebuyDuplo || 0,
         rebuy_duplo_fichas: t.rebuyDuploFichas || 0,
+        buyin_duplo_valor: t.buyinDuploValor || 0,
+        buyin_duplo_fichas: t.buyinDuploFichas || 0,
         jackpot_valor: t.jackpotValor || 0,
         jackpot_fichas: t.jackpotFichas || 0,
         jackpot_paga_rake: (t.jackpot_paga_rake === null || t.jackpot_paga_rake === undefined) ? null : (t.jackpot_paga_rake ? 1 : 0),
@@ -12435,6 +12449,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         rebuyDuploValor: parseFloat(r.rebuy_duplo_valor || 0),
         rebuyDuplo: parseFloat(r.rebuy_duplo_valor || 0),  // espelho compat
         rebuyDuploFichas: r.rebuy_duplo_fichas || 0,
+        buyinDuploValor: parseFloat(r.buyin_duplo_valor || 0),
+        buyinDuploFichas: parseInt(r.buyin_duplo_fichas || 0),
         jackpotValor: parseFloat(r.jackpot_valor || 0),
         jackpotFichas: r.jackpot_fichas || 0,
         jackpot_paga_rake: r.jackpot_paga_rake === null || r.jackpot_paga_rake === undefined ? null : Number(r.jackpot_paga_rake),
@@ -15639,6 +15655,7 @@ function testarSuite() {
         (t.entries || []).forEach(e => {
             if (e.tipo === 'rebuy_simples')  total += rebuySimplesFichas;
             else if (e.tipo === 'rebuy_duplo') total += rebuyDuploFichas;
+            else if (e.tipo === 'buyin_duplo') total += Number(t.buyinDuploFichas) || 0;
             else if (e.tipo === 'addon')       total += addonFichas;
             else                                total += stack;
         });
@@ -16034,6 +16051,7 @@ function diagTorneio(idx) {
     (t.entries || []).forEach(e => {
         // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
         if (Number(e.fichasOverride) > 0)    totalFichas += Number(e.fichasOverride);
+        else if (e.tipo === 'buyin_duplo')   totalFichas += (Number(t.buyinDuploFichas) || 0);
         else if (e.tipo === 'rebuy_simples') totalFichas += (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         else if (e.tipo === 'rebuy_duplo')   totalFichas += (t.rebuyDuploFichas || t.stack*2);
         else if (e.tipo === 'addon')         totalFichas += (t.addonFichas || 0);
@@ -17384,6 +17402,7 @@ function _printFooter() {
 function _labelTipoEntry(tipo) {
     const map = {
         'buyin': 'Buy-in',
+        'buyin_duplo': 'Buy-in Duplo',
         'reentry': 'Re-entry',
         'rebuy_simples': 'Rebuy Simples',
         'rebuy_duplo': 'Rebuy Duplo',
@@ -17395,6 +17414,7 @@ function _labelTipoEntry(tipo) {
 
 // Calcula fichas do stack base entregue pra cada tipo
 function _fichasStackPorTipo(t, tipo) {
+    if (tipo === 'buyin_duplo')   return Number(t.buyinDuploFichas) || 0;
     if (tipo === 'rebuy_simples') return Number(t.rebuyFichas || t.rebuySimplesFichas || t.stack) || 0;
     if (tipo === 'rebuy_duplo')   return Number(t.rebuyDuploFichas || t.stack * 2) || 0;
     if (tipo === 'addon')         return Number(t.addonFichas) || 0;
@@ -17513,10 +17533,10 @@ function _isTipoStaffFixoElegivel(t, tipo, valorEntry) {
     if (!t || !_staffFixoAtivo(t)) return false;
     const acoes = t.staffFixoAcoes || { buyin: true, rebuy: true, reentry: true, addon: true, last_chance: false };
     if (tipo === 'last_chance') return !!acoes.last_chance;
-    const key = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
+    const key = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : (tipo === 'buyin_duplo' ? 'buyin' : tipo);
     if (!acoes[key]) return false;
     // FASE G: buy-in free só conta se cobrarFree=true
-    if (tipo === 'buyin' && valorEntry !== undefined && Number(valorEntry) === 0 && !t.staffFixoCobrarFree) {
+    if ((tipo === 'buyin' || tipo === 'buyin_duplo') && valorEntry !== undefined && Number(valorEntry) === 0 && !t.staffFixoCobrarFree) {
         return false;
     }
     return true;
@@ -19729,6 +19749,8 @@ function _capturarConfigTorneio() {
         rebuyFichas:    parseInt((document.getElementById('t-rebuy-simples-fichas') || {}).value) || 0,
         rebuyDuploValor: parseFloat((document.getElementById('t-rebuy-duplo') || {}).value) || 0,
         rebuyDuploFichas: parseInt((document.getElementById('t-rebuy-duplo-fichas') || {}).value) || 0,
+        buyinDuploValor: parseFloat((document.getElementById('t-buyin-duplo-valor') || {}).value) || 0,
+        buyinDuploFichas: parseInt((document.getElementById('t-buyin-duplo-fichas') || {}).value) || 0,
         jackpotValor:   parseFloat((document.getElementById('t-jackpot-valor') || {}).value) || 0,
         jackpotFichas:  parseInt((document.getElementById('t-jackpot-fichas') || {}).value) || 0,
         jackpot_paga_rake: (function() {
@@ -19777,6 +19799,8 @@ function _aplicarConfigTorneio(cfg) {
     set('t-rebuy-simples-fichas', cfg.rebuyFichas);
     set('t-rebuy-duplo', cfg.rebuyDuploValor);
     set('t-rebuy-duplo-fichas', cfg.rebuyDuploFichas);
+    set('t-buyin-duplo-valor', cfg.buyinDuploValor);
+    set('t-buyin-duplo-fichas', cfg.buyinDuploFichas);
     set('t-jackpot-valor', cfg.jackpotValor);
     set('t-jackpot-fichas', cfg.jackpotFichas);
     // Paga rake do jackpot — tri-state
@@ -25422,6 +25446,8 @@ function saveTournament() {
         rebuyDuplo:         parseFloat(document.getElementById('t-rebuy-duplo').value)          || 0,
         rebuyDuploValor:    parseFloat(document.getElementById('t-rebuy-duplo').value)          || 0,
         rebuyDuploFichas:   parseInt(document.getElementById('t-rebuy-duplo-fichas').value)     || 0,
+        buyinDuploValor:    parseFloat(document.getElementById('t-buyin-duplo-valor')?.value)   || 0,
+        buyinDuploFichas:   parseInt(document.getElementById('t-buyin-duplo-fichas')?.value)    || 0,
         // Last Chance (3ª compra após add-on)
         last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
         last_chance_valor:  parseFloat(document.getElementById('t-last-chance-valor')?.value) || 0,
@@ -27898,14 +27924,14 @@ function _emJanelaBreakEspecial(t) {
 // Tipos que entram na trava de "entradas" (todos os tipos de compra pra continuar)
 // Tipos de compra que envolvem MOVIMENTAÇÃO FINANCEIRA do jogador.
 // Usado pra agrupar lógica (e.g. estatísticas, descrições, formatação).
-const _TIPOS_COMPRA = ['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
+const _TIPOS_COMPRA = ['buyin', 'buyin_duplo', 'reentry', 'rebuy_simples', 'rebuy_duplo'];
 
 // Tipos que ENTRAM na trava de "Entradas até nível N":
 // buy-in (jogador novo) e re-entry (jogador eliminado voltando).
 // Rebuy simples/duplo são compras de jogadores ATIVOS — não bloqueiam por nível.
 // (essa decisão é deliberada: a trava existe pra encerrar inscrições/reinscrições,
 //  não pra impedir jogador ativo de continuar comprando fichas)
-const _TIPOS_NOVA_ENTRADA = ['buyin', 'reentry'];
+const _TIPOS_NOVA_ENTRADA = ['buyin', 'buyin_duplo', 'reentry'];
 
 // Retorna o "nível humano" — só conta níveis de jogo, ignora breaks.
 // Por exemplo: se a estrutura é [N1, N2, BREAK, N3] e nivelAtual=2 (= BREAK),
@@ -27997,7 +28023,7 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     // (regra do poker: jogador eliminado/novo pode entrar no break com qualquer tipo de compra)
     // Inclui Buy-in pra novos jogadores que chegam só no intervalo do add-on
     if (_emJanelaBreakEspecial(t)) {
-        if (['buyin', 'reentry', 'rebuy_simples', 'rebuy_duplo', 'addon'].includes(tipo)) {
+        if (['buyin', 'buyin_duplo', 'reentry', 'rebuy_simples', 'rebuy_duplo', 'addon'].includes(tipo)) {
             return { bloqueado: false, motivo: '' };
         }
     }
@@ -28543,7 +28569,18 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
     } else {
         opts.push(`<option value="buyin" disabled style="color:#71717a;">🔒 Buy-in — jogador já está no torneio</option>`);
     }
-    
+
+    // BUY-IN DUPLO (entrada dupla — valor e fichas fixos, sem promo)
+    const buyinDupVal = Number(t.buyinDuploValor || 0);
+    const buyinDupFichas = Number(t.buyinDuploFichas || 0);
+    if (buyinDupVal > 0 && buyinDupFichas > 0) {
+        if (!jogadorJaInscrito) {
+            opts.push(addOpt('buyin_duplo', `Buy-in Duplo — R$ ${buyinDupVal} (${buyinDupFichas.toLocaleString()} fichas)`));
+        } else {
+            opts.push(`<option value="buyin_duplo" disabled style="color:#71717a;">🔒 Buy-in Duplo — jogador já está no torneio</option>`);
+        }
+    }
+
     // REBUY SIMPLES e DUPLO
     const rebuySimpVal = Number(t.rebuyValor || t.rebuySimples || 0);
     const rebuySimpFichas = Number(t.rebuyFichas || t.rebuySimplesFichas || 0);
@@ -28775,7 +28812,7 @@ function _getAcoesEntradaSelecionadas() {
     const container = document.getElementById('entrada-acoes-multi');
     // Multi mode?
     if (container && container.style.display !== 'none' && container.children.length > 0) {
-        const ordem = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
+        const ordem = ['buyin', 'buyin_duplo', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
         const acoes = [];
         ordem.forEach(tipo => {
             const cb = document.getElementById(`entrada-acao-${tipo}`);
@@ -28811,6 +28848,7 @@ function atualizarResumoEntrada() {
     acoes.forEach(tipo => {
         let v = 0;
         if (tipo === 'buyin')              v = Number(t.buyin) || 0;
+        else if (tipo === 'buyin_duplo')   v = Number(t.buyinDuploValor) || 0;
         else if (tipo === 'reentry')       v = (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.buyin) || 0);
         else if (tipo === 'rebuy_simples') v = Number(t.rebuyValor || t.rebuySimples) || 0;
         else if (tipo === 'rebuy_duplo')   v = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
@@ -28936,6 +28974,7 @@ async function _credValidarAntesDeEntradaImpl() {
         const tipo = tipoEl ? tipoEl.value : 'buyin';
         // Calcula valor estimado da venda (sem staff/passaporte por simplicidade — é estimativa)
         let valor = t.buyin || 0;
+        if (tipo === 'buyin_duplo')   valor = Number(t.buyinDuploValor) || 0;
         if (tipo === 'reentry')       valor = Number(t.reentryValor || t.buyin) || 0;
         if (tipo === 'rebuy_simples') valor = Number(t.rebuyValor || t.rebuySimples) || 0;
         if (tipo === 'rebuy_duplo')   valor = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
@@ -28965,6 +29004,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
             for (const tp of acoes) {
                 let v = 0;
                 if (tp === 'buyin')          v = Number(t.buyin) || 0;
+                else if (tp === 'buyin_duplo')   v = Number(t.buyinDuploValor) || 0;
                 else if (tp === 'reentry')   v = Number(t.reentryValor || t.buyin) || 0;
                 else if (tp === 'rebuy_simples') v = Number(t.rebuyValor || t.rebuySimples) || 0;
                 else if (tp === 'rebuy_duplo')   v = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
@@ -29000,15 +29040,15 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     }
 
     // Status do jogador (já inscrito? já tem add-on?)
-    const jaEntrou = t.entries.some(e => String(e.jogadorId) === String(jid) && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
+    const jaEntrou = t.entries.some(e => String(e.jogadorId) === String(jid) && ['buyin','buyin_duplo','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
     const jaTemAddon = t.entries.some(e => String(e.jogadorId) === String(jid) && e.tipo === 'addon');
 
     // Combo SEM buy-in: jogador precisa já estar inscrito (rebuy/addon/lc não criam inscrição)
-    if (!acoes.includes('buyin') && !jaEntrou) {
+    if (!acoes.includes('buyin') && !acoes.includes('buyin_duplo') && !jaEntrou) {
         return showToast('⚠️ Jogador precisa fazer Buy-in para entrar no torneio');
     }
-    // Combo COM buy-in: jogador não pode estar já inscrito
-    if (acoes.includes('buyin') && jaEntrou) {
+    // Combo COM buy-in (ou buyin_duplo): jogador não pode estar já inscrito
+    if ((acoes.includes('buyin') || acoes.includes('buyin_duplo')) && jaEntrou) {
         return showToast('⚠️ Jogador já inscrito. Desmarque o Buy-in.');
     }
     // Add-on: regra "1 por jogador"
@@ -29038,7 +29078,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
 
     // === Loop de criação das entries ===
     // Ordem natural: buy-in → rebuys → add-on → last_chance
-    const ordemFixa = ['buyin', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
+    const ordemFixa = ['buyin', 'buyin_duplo', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
     const acoesOrdenadas = ordemFixa.filter(tp => acoes.includes(tp));
 
     let i = 0;
@@ -29046,13 +29086,14 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         // Calcula valor base por tipo (mesma lógica do _registrarEntradaImpl single)
         let valorBase = 0;
         if (tipo === 'buyin')          valorBase = (typeof _getBuyinEfetivo === 'function') ? _getBuyinEfetivo(t) : (Number(t.buyin) || 0);
+        else if (tipo === 'buyin_duplo')   valorBase = Number(t.buyinDuploValor) || 0;
         else if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
         else if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
         else if (tipo === 'addon')     valorBase = Number(t.addonValor) || 0;
         else if (tipo === 'last_chance') valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
-        // FASE I.1: Buy-in PROMOCIONAL — substitui valorBase do buy-in se elegível
-        const valorPromoCombo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+        // FASE I.1: Buy-in PROMOCIONAL — substitui valorBase do buy-in se elegível (buyin_duplo nunca recebe promo)
+        const valorPromoCombo = (tipo !== 'buyin_duplo' && typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
         if (valorPromoCombo !== null) valorBase = valorPromoCombo;
 
         // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free vira valor do staff
@@ -29070,8 +29111,8 @@ async function _registrarEntradasCombo(t, jid, acoes) {
             valorBase = Number(t.staffFixoValor) || 0;
         }
 
-        // Taxa adm: só no buy-in
-        const taxaAdm = (tipo === 'buyin' && Number(t.taxaAdm) > 0) ? Number(t.taxaAdm) : 0;
+        // Taxa adm: só no buy-in/buyin_duplo
+        const taxaAdm = ((tipo === 'buyin' || tipo === 'buyin_duplo') && Number(t.taxaAdm) > 0) ? Number(t.taxaAdm) : 0;
 
         // Passaporte: anexar SÓ na primeira entry (buy-in geralmente) pra evitar duplicação
         // mas com TODAS as fichas extras somadas (do combo inteiro)
@@ -29124,11 +29165,11 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         t.entries.push(novaEntry);
         entriesCriadas.push(novaEntry);
 
-        // Aloca jogador na mesa apenas quando a ação é buy-in (jogador inscrito já tem mesa)
-        if (tipo === 'buyin') alocarJogadorMesa(t, jid);
+        // Aloca jogador na mesa apenas quando a ação é buy-in/buyin_duplo (jogador inscrito já tem mesa)
+        if (tipo === 'buyin' || tipo === 'buyin_duplo') alocarJogadorMesa(t, jid);
 
-        // Bounty (PKO/Knockout) — só uma vez no buy-in
-        if (tipo === 'buyin' && ['bounty','pko','knockout'].includes(t.tipo)) {
+        // Bounty (PKO/Knockout) — só uma vez no buy-in/buyin_duplo
+        if ((tipo === 'buyin' || tipo === 'buyin_duplo') && ['bounty','pko','knockout'].includes(t.tipo)) {
             if (!t.bounties) t.bounties = {}; // FIX: garante que bounties existe
             if (t.tipo === 'pko' || t.tipo === 'knockout') {
                 const bountyInicial = _isBuyinFree(t) ? 0 : (t.tipo === 'knockout' ? t.buyin * (1 - t.rake/100) : t.buyin * (t.pkoSplit/100));
@@ -29140,7 +29181,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
 
         // Transação do valor base
         // V2: usa valorEntryCombo (sem staff); staff vai em tx separada abaixo.
-        const descMap = { buyin:'Buy-in', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
+        const descMap = { buyin:'Buy-in', buyin_duplo:'Buy-in Duplo', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
         const valorTxCombo = isAdicionalV2Combo ? valorEntryCombo : valorBase;
         if (valorTxCombo > 0) {
             const tipoTx = tipo === 'buyin' ? 'buyin'
@@ -29270,10 +29311,11 @@ function _registrarEntradaImpl() {
         return showToast('🔒 ' + trava.motivo);
     }
 
-    const jaEntrou = t.entries.some(e => String(e.jogadorId) === String(jid) && ['buyin','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
+    const jaEntrou = t.entries.some(e => String(e.jogadorId) === String(jid) && ['buyin','buyin_duplo','reentry','rebuy_simples','rebuy_duplo'].includes(e.tipo));
     const eliminado = t.eliminados.some(e => String(e.jogadorId) === String(jid));
 
     if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Rebuy ou Re-entry.');
+    if (tipo === 'buyin_duplo' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Buy-in Duplo só pra entrada inicial.');
     // (validações de nível agora são feitas pela trava unificada acima — _tipoBloqueadoPorTrava)
     if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
 
@@ -29301,11 +29343,13 @@ function _registrarEntradaImpl() {
     if (tipo === 'reentry')       valorBase = _getReentryValor(t);
     if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
     if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+    if (tipo === 'buyin_duplo')   valorBase = Number(t.buyinDuploValor) || 0;
     if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
     if (tipo === 'last_chance')   valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
 
     // FASE I.1: Buy-in PROMOCIONAL — substitui valorBase se elegível
-    const valorPromo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+    // Buy-in Duplo NUNCA recebe promo (valor fixo configurado)
+    const valorPromo = (tipo !== 'buyin_duplo' && typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
     if (valorPromo !== null) valorBase = valorPromo;
 
     // FASE G: Em modo EMBUTIDO + cobrarFree=true, buy-in free passa a custar R$ staffFixoValor
@@ -29327,7 +29371,7 @@ function _registrarEntradaImpl() {
     // LOTE 5: Taxa Administrativa — cobrada APENAS no buy-in (1ª entrada)
     // Não entra no rake, mas vai pro caixa do clube (separada contabilmente).
     let taxaAdmCobrada = 0;
-    if (tipo === 'buyin' && Number(t.taxaAdm) > 0) {
+    if ((tipo === 'buyin' || tipo === 'buyin_duplo') && Number(t.taxaAdm) > 0) {
         taxaAdmCobrada = Number(t.taxaAdm);
     }
     
@@ -29402,10 +29446,10 @@ function _registrarEntradaImpl() {
     // Registra transação no caixa (valor BASE da inscrição — addon agora também tem valor)
     // V2: usa valorEntry (sem staff); staff vai em tx separada → soma das duas = valorBase pago.
     // Legado: usa valorBase (cliente paga base + staff por fora).
-    const descMap = { buyin:'Buy-in', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
+    const descMap = { buyin:'Buy-in', buyin_duplo:'Buy-in Duplo', reentry:'Re-entry', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance' };
     const valorTx = isAdicionalV2 ? valorEntry : valorBase;
     if (valorTx > 0) {
-        const tipoTx = tipo === 'buyin' ? 'buyin'
+        const tipoTx = (tipo === 'buyin' || tipo === 'buyin_duplo') ? 'buyin'
             : tipo === 'addon' ? 'addon'
             : tipo === 'last_chance' ? 'last_chance'
             : 'reentry';
@@ -29816,6 +29860,7 @@ function updateTV(idx) {
     const totalFichas = t.entries.reduce((s, e) => {
         // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
         if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
+        if (e.tipo === 'buyin_duplo')   return s + (Number(t.buyinDuploFichas) || 0);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -29837,6 +29882,7 @@ function updateTV(idx) {
 
     // Contadores de entradas por tipo
     const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
+    const buyinsDuploQtd = t.entries.filter(e => e.tipo === 'buyin_duplo').length;
     const reentriesQtd = t.entries.filter(e => e.tipo === 'reentry').length;
     const rebuysSimplesQtd = t.entries.filter(e => e.tipo === 'rebuy_simples').length;
     const rebuysDuplosQtd = t.entries.filter(e => e.tipo === 'rebuy_duplo').length;
@@ -29851,6 +29897,7 @@ function updateTV(idx) {
     const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true; // padrão: visível
     const statsStrip = [];
     if (defVis('buyin'))     statsStrip.push({ label:'BUY IN',   value:buyinsQtd });
+    if (defVis('buyin_duplo') && (Number(t.buyinDuploValor) > 0 || buyinsDuploQtd > 0)) statsStrip.push({ label:'BUY-IN DUPLO', value:buyinsDuploQtd });
     if (defVis('reentry') && reentriesQtd) statsStrip.push({ label:'RE-ENTRY', value:reentriesQtd });
     if (defVis('jackpot') && (t.jackpotValor > 0)) statsStrip.push({ label:'JACKPOT', value:jackpotsQtd });
     if (defVis('rebuy_simples') && (t.rebuyValor > 0 || t.rebuySimples > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label:'REBUY SIMPLES',  value:rebuysSimplesQtd });
@@ -30123,6 +30170,7 @@ function _computarDadosMiniTV(t) {
     const totalFichas = (t.entries || []).reduce((s, e) => {
         // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
         if (Number(e.fichasOverride) > 0) return s + Number(e.fichasOverride);
+        if (e.tipo === 'buyin_duplo')   return s + (Number(t.buyinDuploFichas) || 0);
         if (e.tipo === 'rebuy_simples') return s + (t.rebuyFichas || t.rebuySimplesFichas || t.stack);
         if (e.tipo === 'rebuy_duplo')   return s + (t.rebuyDuploFichas || t.stack*2);
         if (e.tipo === 'addon')         return s + (t.addonFichas || 0);
@@ -32339,7 +32387,7 @@ async function _persRemoverBgCustom() {
 function abrirConfigStatsTV() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    if (!t.pwStatsVisiveis) t.pwStatsVisiveis = { buyin:true, reentry:true, jackpot:true, rebuy_simples:true, rebuy_duplo:true, addon:true, last_chance:true };
+    if (!t.pwStatsVisiveis) t.pwStatsVisiveis = { buyin:true, buyin_duplo:true, reentry:true, jackpot:true, rebuy_simples:true, rebuy_duplo:true, addon:true, last_chance:true };
 
     // Conta entries do torneio (pra detectar uso real mesmo sem config preenchida)
     const ent = t.entries || [];
@@ -32988,13 +33036,13 @@ function _getStaffFixoTotal(t) {
     let qtd = 0;
     (t.entries || []).forEach(e => {
         const tipo = e.tipo;
-        // Mapa: rebuy_simples e rebuy_duplo apontam pra acoes.rebuy
-        const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
+        // Mapa: rebuy_simples e rebuy_duplo apontam pra acoes.rebuy; buyin_duplo pra acoes.buyin
+        const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : (tipo === 'buyin_duplo' ? 'buyin' : tipo);
         if (tipo === 'last_chance') {
             if (acoes.last_chance && lcPaga) qtd++;
         } else if (acoes[keyAcao]) {
             // FASE G: skipa buy-in free se config não cobra staff em free
-            if (tipo === 'buyin' && (Number(e.valor) || 0) === 0 && !cobrarFree) return;
+            if ((tipo === 'buyin' || tipo === 'buyin_duplo') && (Number(e.valor) || 0) === 0 && !cobrarFree) return;
             qtd++;
         }
     });
@@ -33017,15 +33065,15 @@ function _getStaffFixoEmbutidoPorTipo(t) {
     const out = { buyin: 0, reentry: 0, rebuys: 0, addon: 0, last_chance: 0, total: 0 };
     (t.entries || []).forEach(e => {
         const tipo = e.tipo;
-        const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : tipo;
+        const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : (tipo === 'buyin_duplo' ? 'buyin' : tipo);
         if (tipo === 'last_chance') {
             if (acoes.last_chance && lcPaga) { out.last_chance += valor; out.total += valor; }
             return;
         }
         if (!acoes[keyAcao]) return;
         // buy-in free só conta se cobrarFree
-        if (tipo === 'buyin' && (Number(e.valor) || 0) === 0 && !cobrarFree) return;
-        if (tipo === 'buyin')          { out.buyin += valor; }
+        if ((tipo === 'buyin' || tipo === 'buyin_duplo') && (Number(e.valor) || 0) === 0 && !cobrarFree) return;
+        if (tipo === 'buyin' || tipo === 'buyin_duplo') { out.buyin += valor; }
         else if (tipo === 'reentry')   { out.reentry += valor; }
         else if (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') { out.rebuys += valor; }
         else if (tipo === 'addon')     { out.addon += valor; }
@@ -41678,6 +41726,7 @@ function getClassificadosDaSerie(seriesId) {
                 let fichas = 0;
                 entriesJog.forEach(e => {
                     if (e.tipo === 'buyin' || e.tipo === 'reentry') fichas += t.stack;
+                    else if (e.tipo === 'buyin_duplo')   fichas += Number(t.buyinDuploFichas) || 0;
                     else if (e.tipo === 'rebuy_simples') fichas += t.rebuyFichas || t.rebuySimplesFichas || t.stack;
                     else if (e.tipo === 'rebuy_duplo')   fichas += t.rebuyDuploFichas || (t.stack*2);
                     else if (e.tipo === 'addon')         fichas += t.addonFichas || 0;
@@ -42302,6 +42351,7 @@ async function confirmarJackpot() {
 // Mapa de labels amigáveis por tipo
 const _ESTORNO_TIPO_LABELS = {
     buyin:          { label: 'Buy-in',        color: '#22c55e' },
+    buyin_duplo:    { label: 'Buy-in Duplo',  color: '#7c3aed' },
     reentry:        { label: 'Re-entry',      color: '#f59e0b' },
     rebuy_simples:  { label: 'Rebuy Simples', color: '#fbbf24' },
     rebuy_duplo:    { label: 'Rebuy Duplo',   color: '#fbbf24' },
@@ -42318,6 +42368,7 @@ function _getEstornoTipoLabel(tipo) {
 function _calcularFichasReverter(t, entry) {
     if (!entry) return 0;
     if (entry.tipo === 'buyin' || entry.tipo === 'reentry') return t.stack || 0;
+    if (entry.tipo === 'buyin_duplo') return Number(t.buyinDuploFichas) || 0;
     if (entry.tipo === 'rebuy_simples') return t.rebuyFichas || t.rebuySimplesFichas || t.stack || 0;
     if (entry.tipo === 'rebuy_duplo') return (t.rebuyDuploFichas || (t.stack||0) * 2);
     if (entry.tipo === 'addon') return t.addonFichas || 0;
@@ -43441,7 +43492,7 @@ function renderRelTorneios() {
         // Soma entradas por tipo
         t.entries.forEach(e => {
             const v = Number(e.valor) || 0;
-            if (e.tipo === 'buyin') buyins += v;
+            if (e.tipo === 'buyin' || e.tipo === 'buyin_duplo') buyins += v;
             else if (e.tipo === 'reentry') reentries += v;
             else if (e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo') rebuys += v;
             else if (e.tipo === 'addon') addons += v;
@@ -43450,7 +43501,7 @@ function renderRelTorneios() {
         // Jackpot (vem de jackpotCompras, fora de entries)
         jackpot = money(jackpot + (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0));
         // Taxa administrativa: cobrada só no buy-in × valor da taxa
-        const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
+        const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'buyin_duplo').length;
         taxaAdm = money(taxaAdm + buyinsQtd * (Number(t.taxaAdm) || 0));
     });
     
@@ -44085,14 +44136,14 @@ function exportRelTorneios() {
         let vBuyin = 0, vReentry = 0, vRebuy = 0, vAddon = 0, vLastChance = 0;
         t.entries.forEach(e => {
             const v = Number(e.valor) || 0;
-            if (e.tipo === 'buyin') vBuyin += v;
+            if (e.tipo === 'buyin' || e.tipo === 'buyin_duplo') vBuyin += v;
             else if (e.tipo === 'reentry') vReentry += v;
             else if (e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo') vRebuy += v;
             else if (e.tipo === 'addon') vAddon += v;
             else if (e.tipo === 'last_chance') vLastChance += v;
         });
         const vJackpot = (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0);
-        const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin').length;
+        const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'buyin_duplo').length;
         const vTaxaAdm = buyinsQtd * (Number(t.taxaAdm) || 0);
         
         rows.push([
@@ -45819,7 +45870,7 @@ function calcularResumoCaixaTorneio(t) {
     let buyinsQtd = 0, reentriesQtd = 0, rebuysQtd = 0, addonsQtd = 0, lastChanceQtd = 0;
     t.entries.forEach(e => {
         const v = e.valor || t.buyin;
-        if (e.tipo === 'buyin')         { buyins += v;    buyinsQtd++; }
+        if (e.tipo === 'buyin' || e.tipo === 'buyin_duplo') { buyins += v; buyinsQtd++; }
         else if (e.tipo === 'reentry')  { reentries += v; reentriesQtd++; }
         else if (e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo') { rebuys += v; rebuysQtd++; }
         else if (e.tipo === 'addon')    { addons += (e.valor || 0); addonsQtd++; }
@@ -46030,6 +46081,7 @@ function estimarStackJogador(t, jid) {
     let fichas = 0;
     entriesJog.forEach(e => {
         if (e.tipo === 'buyin' || e.tipo === 'reentry') fichas += t.stack;
+        else if (e.tipo === 'buyin_duplo')   fichas += Number(t.buyinDuploFichas) || 0;
         else if (e.tipo === 'rebuy_simples') fichas += t.rebuyFichas || t.rebuySimplesFichas || t.stack;
         else if (e.tipo === 'rebuy_duplo')   fichas += t.rebuyDuploFichas || (t.stack*2);
         else if (e.tipo === 'addon')         fichas += t.addonFichas || 0;
