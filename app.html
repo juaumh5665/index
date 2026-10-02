@@ -3664,15 +3664,27 @@ document.addEventListener('DOMContentLoaded', function(){
 
             <!-- JOGADORES -->
             <div id="page-jogadores" class="page-content fade-in" style="display:none;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-                    <input onkeyup="filtrarJogadores(this.value)" placeholder="Buscar jogador..." class="inp" style="width:280px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                    <input onkeyup="filtrarJogadores(this.value)" placeholder="Buscar jogador..." class="inp" style="width:280px;" id="jogadores-search-input">
                     <button onclick="openModal('modal-jogador')" class="btn-gold">+ Novo Jogador</button>
+                </div>
+                <div id="jogadores-filtros-perfil" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:1rem;align-items:center;">
+                    <span style="font-size:.65rem;color:#52525b;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-right:.25rem;">Filtrar:</span>
+                    <button class="jfiltro-chip" data-filtro="regular" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">♠ Regular</button>
+                    <button class="jfiltro-chip" data-filtro="highroller" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">♦ High Roller</button>
+                    <button class="jfiltro-chip" data-filtro="cash" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">💰 Cash</button>
+                    <button class="jfiltro-chip" data-filtro="sitandgo" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">⚡ Sit & Go</button>
+                    <span style="width:1px;height:16px;background:#2a2a3a;margin:0 .25rem;"></span>
+                    <button class="jfiltro-chip" data-filtro="semana" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">📅 Semana</button>
+                    <button class="jfiltro-chip" data-filtro="fds" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">🌙 Fds</button>
+                    <button class="jfiltro-chip" data-filtro="noturno" onclick="_toggleFiltroJogador(this)" style="display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:16px;font-size:.7rem;font-weight:500;cursor:pointer;border:1px solid #2a2a3a;background:#15151f;color:#71717a;transition:all .15s;">🌃 Noturno</button>
                 </div>
                 <div class="t-card">
                     <table style="width:100%;border-collapse:collapse;">
                         <thead>
                             <tr style="border-bottom:1px solid #1e1e23;">
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Jogador</th>
+                                <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Perfil</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Contato</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Cidade</th>
                                 <th style="padding:1rem 1.5rem;text-align:left;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Torneios</th>
@@ -7569,6 +7581,31 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div><label class="inp-label">UF</label><input id="j-uf" class="inp" placeholder="PR" maxlength="2" style="text-transform:uppercase;"></div>
             </div>
 
+            <!-- ────── PERFIL DE JOGO ────── -->
+            <div style="border-top:1px solid #1e1e23;padding-top:1rem;margin-top:.25rem;">
+                <div style="font-size:.7rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">
+                    <i class="fa-solid fa-bullseye"></i> Perfil de Jogo
+                </div>
+                <div style="margin-bottom:.75rem;">
+                    <label class="inp-label">Modalidades</label>
+                    <div id="j-chips-modalidades" style="display:flex;flex-wrap:wrap;gap:.4rem;">
+                        <span class="j-chip" data-group="modalidades" data-value="regular" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">♠ Torneio Regular</span>
+                        <span class="j-chip" data-group="modalidades" data-value="highroller" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">♦ High Roller</span>
+                        <span class="j-chip" data-group="modalidades" data-value="cash" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">💰 Cash Game</span>
+                        <span class="j-chip" data-group="modalidades" data-value="sitandgo" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">⚡ Sit & Go</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="inp-label">Disponibilidade</label>
+                    <div id="j-chips-disponibilidade" style="display:flex;flex-wrap:wrap;gap:.4rem;">
+                        <span class="j-chip" data-group="disponibilidade" data-value="semana" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">📅 Dias de semana</span>
+                        <span class="j-chip" data-group="disponibilidade" data-value="fds" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">🌙 Fins de semana</span>
+                        <span class="j-chip" data-group="disponibilidade" data-value="noturno" onclick="_toggleJChip(this)" style="display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;font-size:.78rem;font-weight:500;cursor:pointer;border:1px solid #333;background:#1a1a24;color:#8888a0;transition:all .15s;">🌃 Noturno</span>
+                    </div>
+                    <div style="font-size:.65rem;color:#52525b;margin-top:.35rem;">Selecione quando o jogador costuma frequentar</div>
+                </div>
+            </div>
+
             <!-- ────── CONTROLE DE CRÉDITO ────── -->
             <div style="border-top:1px solid #1e1e23;padding-top:1rem;margin-top:.25rem;">
                 <div style="font-size:.7rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">
@@ -9847,6 +9884,8 @@ function _jogadorFromDb(row) {
         categoriaCredito: row.categoria_credito || 'regular',
         bloqueado: !!row.bloqueado,
         motivoBloqueio: row.motivo_bloqueio || null,
+        modalidadesPreferidas: row.modalidades_preferidas || [],
+        disponibilidade: row.disponibilidade || [],
         criadoEm: row.criado_em ? new Date(row.criado_em).getTime() : Date.now(),
     };
 }
@@ -9869,6 +9908,8 @@ function _jogadorToDb(j) {
         categoria_credito: j.categoriaCredito || 'regular',
         bloqueado: !!j.bloqueado,
         motivo_bloqueio: j.motivoBloqueio || null,
+        modalidades_preferidas: j.modalidadesPreferidas || [],
+        disponibilidade: j.disponibilidade || [],
     };
 }
 
@@ -24805,16 +24846,30 @@ window.irParaAbaBlinds = irParaAbaBlinds;
 function renderJogadores(data = jogadores) {
     const tbody = document.getElementById('jogadores-tbody');
     if (!data.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador cadastrado</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhum jogador cadastrado</td></tr>`;
         return;
     }
     tbody.innerHTML = data.map(j => {
+        // Pills de modalidades + disponibilidade
+        const mods = (j.modalidadesPreferidas || []).map(m => {
+            const icons = {regular:'♠',highroller:'♦',cash:'💰',sitandgo:'⚡'};
+            const label = _MODALIDADE_LABELS[m] || m;
+            return `<span style="display:inline-block;padding:.15rem .45rem;border-radius:10px;font-size:.62rem;font-weight:600;background:rgba(240,180,41,.12);color:#f0b429;border:1px solid rgba(240,180,41,.2);white-space:nowrap;">${icons[m]||''} ${label}</span>`;
+        }).join('');
+        const disps = (j.disponibilidade || []).map(d => {
+            const icons = {semana:'📅',fds:'🌙',noturno:'🌃'};
+            const label = _DISPONIBILIDADE_LABELS[d] || d;
+            return `<span style="display:inline-block;padding:.15rem .45rem;border-radius:10px;font-size:.62rem;font-weight:600;background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.18);white-space:nowrap;">${icons[d]||''} ${label}</span>`;
+        }).join('');
+        const perfilHtml = (mods || disps) ? `<div style="display:flex;flex-wrap:wrap;gap:.25rem;">${mods}${disps}</div>` : '<span style="color:#3f3f46;font-size:.75rem;">—</span>';
+
         return `
         <tr style="border-bottom:1px solid #1a1a1e;">
             <td style="padding:.9rem 1.5rem;">
                 <div style="font-weight:700;">${j.nome}</div>
                 ${j.apelido ? `<div style="font-size:.75rem;color:#52525b;">${j.apelido}</div>` : ''}
             </td>
+            <td style="padding:.9rem 1.5rem;max-width:220px;">${perfilHtml}</td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#71717a;font-family:var(--font-mono);">${j.whatsapp || '—'}</td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#a1a1aa;">${j.cidade?`${j.cidade}${j.uf?' / '+j.uf:''}`:'<span style="color:#3f3f46;">—</span>'}</td>
             <td style="padding:.9rem 1.5rem;font-size:.85rem;color:#52525b;">${contarTorneiosJogador(j.id)}</td>
@@ -24829,6 +24884,51 @@ function renderJogadores(data = jogadores) {
 function contarTorneiosJogador(id) {
     return torneios.filter(t => t.entries.some(e => e.jogadorId === id)).length + ' torneio(s)';
 }
+
+// ── Perfil de Jogo — Chips toggle ──
+function _toggleJChip(el) {
+    el.classList.toggle('j-chip-active');
+    if (el.classList.contains('j-chip-active')) {
+        el.style.background = 'rgba(240,180,41,.15)';
+        el.style.borderColor = '#f0b429';
+        el.style.color = '#f0b429';
+    } else {
+        el.style.background = '#1a1a24';
+        el.style.borderColor = '#333';
+        el.style.color = '#8888a0';
+    }
+}
+function _getSelectedChips(containerId) {
+    return Array.from(document.querySelectorAll('#' + containerId + ' .j-chip-active')).map(c => c.dataset.value);
+}
+function _setSelectedChips(containerId, values) {
+    const arr = values || [];
+    document.querySelectorAll('#' + containerId + ' .j-chip').forEach(c => {
+        if (arr.includes(c.dataset.value)) {
+            c.classList.add('j-chip-active');
+            c.style.background = 'rgba(240,180,41,.15)';
+            c.style.borderColor = '#f0b429';
+            c.style.color = '#f0b429';
+        } else {
+            c.classList.remove('j-chip-active');
+            c.style.background = '#1a1a24';
+            c.style.borderColor = '#333';
+            c.style.color = '#8888a0';
+        }
+    });
+}
+function _clearChips(containerId) {
+    document.querySelectorAll('#' + containerId + ' .j-chip').forEach(c => {
+        c.classList.remove('j-chip-active');
+        c.style.background = '#1a1a24';
+        c.style.borderColor = '#333';
+        c.style.color = '#8888a0';
+    });
+}
+
+// Labels para exibição de chips na listagem
+const _MODALIDADE_LABELS = { regular:'Torneio Regular', highroller:'High Roller', cash:'Cash Game', sitandgo:'Sit & Go' };
+const _DISPONIBILIDADE_LABELS = { semana:'Dias de semana', fds:'Fins de semana', noturno:'Noturno' };
 
 async function salvarJogador() {
     if (bloquearSeExpirado('cadastrar/editar jogadores')) return;
@@ -24848,6 +24948,9 @@ async function salvarJogador() {
         whatsapp: document.getElementById('j-whatsapp').value.trim(),
         cidade:   document.getElementById('j-cidade').value.trim(),
         uf:       document.getElementById('j-uf').value.trim().toUpperCase(),
+        // Perfil de Jogo
+        modalidadesPreferidas: _getSelectedChips('j-chips-modalidades'),
+        disponibilidade:       _getSelectedChips('j-chips-disponibilidade'),
         // Controle de Crédito
         categoriaCredito: document.getElementById('j-categoria-credito')?.value || 'regular',
         limiteCredito:    parseFloat(document.getElementById('j-limite-credito')?.value) || 0,
@@ -24894,6 +24997,9 @@ function limparFormularioJogador() {
     document.getElementById('j-cidade').value = '';
     document.getElementById('j-uf').value = '';
     document.getElementById('j-edit-id').value = '';
+    // Perfil de Jogo (limpar chips)
+    _clearChips('j-chips-modalidades');
+    _clearChips('j-chips-disponibilidade');
     // Crédito (default Regular sem bloqueio)
     const selCat = document.getElementById('j-categoria-credito');
     if (selCat) selCat.value = 'regular';
@@ -24919,6 +25025,9 @@ function editarJogador(jogadorId) {
     document.getElementById('j-whatsapp').value = j.whatsapp || '';
     document.getElementById('j-cidade').value = j.cidade || '';
     document.getElementById('j-uf').value = j.uf || '';
+    // Perfil de Jogo
+    _setSelectedChips('j-chips-modalidades', j.modalidadesPreferidas);
+    _setSelectedChips('j-chips-disponibilidade', j.disponibilidade);
     // Crédito
     const selCat = document.getElementById('j-categoria-credito');
     if (selCat) selCat.value = j.categoriaCredito || 'regular';
@@ -24951,11 +25060,39 @@ async function removerJogador(id) {
     }
 }
 
+let _jogadoresFiltrosAtivos = [];
+
 function filtrarJogadores(val) {
-    const v = _normSearch(val);
-    renderJogadores(jogadores.filter(j =>
-        _normSearch(j.nome).includes(v) || _normSearch(j.apelido || '').includes(v)
-    ));
+    const v = _normSearch(val || '');
+    let lista = jogadores;
+    // Filtro por texto
+    if (v) lista = lista.filter(j => _normSearch(j.nome).includes(v) || _normSearch(j.apelido || '').includes(v));
+    // Filtro por perfil de jogo
+    if (_jogadoresFiltrosAtivos.length) {
+        lista = lista.filter(j => {
+            const tags = [...(j.modalidadesPreferidas || []), ...(j.disponibilidade || [])];
+            return _jogadoresFiltrosAtivos.every(f => tags.includes(f));
+        });
+    }
+    renderJogadores(lista);
+}
+
+function _toggleFiltroJogador(el) {
+    const filtro = el.dataset.filtro;
+    const idx = _jogadoresFiltrosAtivos.indexOf(filtro);
+    if (idx >= 0) {
+        _jogadoresFiltrosAtivos.splice(idx, 1);
+        el.style.background = '#15151f';
+        el.style.borderColor = '#2a2a3a';
+        el.style.color = '#71717a';
+    } else {
+        _jogadoresFiltrosAtivos.push(filtro);
+        el.style.background = 'rgba(240,180,41,.15)';
+        el.style.borderColor = '#f0b429';
+        el.style.color = '#f0b429';
+    }
+    const searchVal = document.getElementById('jogadores-search-input')?.value || '';
+    filtrarJogadores(searchVal);
 }
 
 // ============================================================
