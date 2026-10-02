@@ -3798,10 +3798,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
                     <div>
                         <h3 style="font-size:1.1rem;font-weight:800;">Operadores do Clube</h3>
-                        <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">Pessoas com acesso ao sistema. Convide operadores por e-mail.</div>
+                        <div style="font-size:.75rem;color:#52525b;margin-top:.2rem;">Pessoas com acesso ao sistema. Cadastre diretamente ou convide por e-mail.</div>
                     </div>
                     <div style="display:flex;gap:.5rem;">
-                        <button onclick="openModalConvite()" class="btn-gold" style="font-size:.85rem;padding:.5rem 1rem;"><i class="fa-solid fa-envelope"></i> Convidar Operador</button>
+                        <button onclick="openModalCadastrarOperador()" class="btn-gold" style="font-size:.85rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Cadastrar Operador</button>
+                        <button onclick="openModalConvite()" class="btn-ghost" style="font-size:.85rem;padding:.5rem 1rem;"><i class="fa-solid fa-envelope"></i> Convidar</button>
                     </div>
                 </div>
                 <div class="t-card">
@@ -7122,6 +7123,75 @@ document.addEventListener('DOMContentLoaded', function(){
                 <a id="cl-email-link" class="btn-ghost" style="padding:.7rem;text-align:center;font-size:.85rem;font-weight:700;"><i class="fa-solid fa-envelope" style="color:var(--gold);"></i> Abrir no E-mail</a>
             </div>
             <div style="font-size:.7rem;color:#52525b;text-align:center;margin-top:.5rem;">O convite expira em 7 dias.</div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: CADASTRAR OPERADOR (direto, sem convite) -->
+<div id="modal-cadastrar-operador" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-user-plus" style="color:var(--gold);"></i> Cadastrar Operador</h3>
+            <button onclick="closeModal('modal-cadastrar-operador')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="background:rgba(245,213,114,.05);border:1px solid rgba(245,213,114,.15);padding:.85rem 1rem;border-radius:.5rem;font-size:.75rem;color:#a1a1aa;">
+                <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Crie um acesso direto para o operador. Você define o email e a senha — ideal para contas compartilhadas (ex: bar1, dealer1).
+            </div>
+            <div><label class="inp-label">Nome *</label><input id="co-nome" class="inp" placeholder="Ex: João Recepção"></div>
+            <div><label class="inp-label">E-mail *</label><input id="co-email" type="email" class="inp" placeholder="bar@clube.com"></div>
+            <div>
+                <label class="inp-label">Papel *</label>
+                <select id="co-papel" class="inp">
+                    <option value="recepcao">📋 Recepção (jogadores, inscrições)</option>
+                    <option value="caixa">💰 Caixa (bar, pagamentos, comandas)</option>
+                    <option value="dealer">🃏 Dealer (torneios e cash game)</option>
+                    <option value="bar">🍺 Bar (comandas e estoque)</option>
+                    <option value="staff">⚙️ Staff (suporte geral)</option>
+                    <option value="admin">👑 Administrador (acesso total)</option>
+                </select>
+            </div>
+            <div><label class="inp-label">Senha *</label><input id="co-senha" type="password" class="inp" placeholder="Mínimo 6 caracteres"></div>
+            <div><label class="inp-label">Confirmar Senha *</label><input id="co-senha2" type="password" class="inp" placeholder="Repita a senha"></div>
+            <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem 0;">
+                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;color:#a1a1aa;">
+                    <input type="checkbox" id="co-trocar-senha" style="accent-color:var(--gold);width:16px;height:16px;">
+                    Exigir troca de senha no primeiro login
+                </label>
+            </div>
+            <button id="btn-cadastrar-operador" onclick="cadastrarOperadorDireto()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;"><i class="fa-solid fa-user-plus"></i> Cadastrar Operador</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: RESETAR SENHA DE OPERADOR -->
+<div id="modal-resetar-senha" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-key" style="color:#f59e0b;"></i> Resetar Senha</h3>
+            <button onclick="closeModal('modal-resetar-senha')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="font-size:.85rem;color:#a1a1aa;">Operador: <strong id="rs-nome" style="color:#fff;"></strong></div>
+            <input type="hidden" id="rs-operador-id">
+            <div><label class="inp-label">Nova Senha *</label><input id="rs-senha" type="password" class="inp" placeholder="Mínimo 6 caracteres"></div>
+            <div><label class="inp-label">Confirmar Nova Senha *</label><input id="rs-senha2" type="password" class="inp" placeholder="Repita a nova senha"></div>
+            <button id="btn-resetar-senha" onclick="resetarSenhaOperador()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;"><i class="fa-solid fa-key"></i> Resetar Senha</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: TROCA DE SENHA OBRIGATÓRIA (primeiro login) -->
+<div id="modal-trocar-senha-obrigatoria" class="modal-overlay" style="display:none;">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-shield-halved" style="color:var(--gold);"></i> Troca de Senha Obrigatória</h3>
+            <div style="font-size:.8rem;color:#a1a1aa;margin-top:.5rem;">Seu administrador exige que você defina uma nova senha antes de continuar.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div><label class="inp-label">Nova Senha *</label><input id="tso-senha" type="password" class="inp" placeholder="Mínimo 6 caracteres"></div>
+            <div><label class="inp-label">Confirmar Nova Senha *</label><input id="tso-senha2" type="password" class="inp" placeholder="Repita a nova senha"></div>
+            <button id="btn-trocar-senha-obrigatoria" onclick="_executarTrocaSenhaObrigatoria()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;margin-top:.25rem;"><i class="fa-solid fa-check"></i> Definir Nova Senha</button>
         </div>
     </div>
 </div>
@@ -13731,6 +13801,7 @@ async function carregarUsuarioEClube(authUser) {
         role: usuario.papel,
         papel: usuario.papel,
         clube_id: usuario.clube_id,
+        deve_trocar_senha: !!usuario.deve_trocar_senha,
     };
 
     // 👇 [STACKCLOCK] expõe globais pro stackclock-operador.js poder ler
@@ -14470,6 +14541,16 @@ async function _finalizarLoginComSucesso(authUser) {
     document.body.classList.remove('auth-active');
 
     applyPermissions();
+
+    // Se operador precisa trocar senha no primeiro login
+    if (currentUser.deve_trocar_senha) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'flex';
+        document.body.classList.remove('auth-active');
+        _mostrarModalTrocaSenhaObrigatoria();
+        return;
+    }
+
     renderDashboard();
     iniciarRelogio();
     logAudit('LOGIN', `Login: ${currentUser.nome}`);
@@ -21645,6 +21726,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ecFone) ecFone.addEventListener('input', e => { e.target.value = _formatarFone(e.target.value); });
     const cvEmail = document.getElementById('cv-email');
     if (cvEmail) cvEmail.addEventListener('input', e => { e.target.value = e.target.value.toLowerCase(); });
+    const coEmail = document.getElementById('co-email');
+    if (coEmail) coEmail.addEventListener('input', e => { e.target.value = e.target.value.toLowerCase(); });
 });
 
 // ============================================================
@@ -38167,6 +38250,9 @@ async function renderUsuarios() {
             let acoes = '—';
             if (sou_admin && !isMe) {
                 acoes = `
+                    <button onclick="abrirModalResetarSenha('${u.id}', ${JSON.stringify(u.nome).replace(/"/g,'&quot;')})" class="btn-ghost" style="padding:.35rem .55rem;font-size:.75rem;margin-right:.3rem;color:#f59e0b;" title="Resetar senha">
+                        <i class="fa-solid fa-key"></i>
+                    </button>
                     <button onclick="abrirModalMudarPapel('${u.id}', ${JSON.stringify(u.nome).replace(/"/g,'&quot;')}, '${u.papel}')" class="btn-ghost" style="padding:.35rem .55rem;font-size:.75rem;margin-right:.3rem;" title="Mudar papel">
                         <i class="fa-solid fa-user-shield"></i>
                     </button>
@@ -38209,6 +38295,223 @@ async function renderUsuarios() {
 
     // Matriz de permissões (didática, abaixo)
     renderMatrizPermissoes();
+}
+
+// ============================================================
+// CADASTRO DIRETO DE OPERADORES (sem convite)
+// ============================================================
+
+function openModalCadastrarOperador() {
+    if (!sbClube || !currentUser || currentUser.papel !== 'admin') {
+        showToast('⚠️ Apenas admin pode cadastrar operadores');
+        return;
+    }
+    document.getElementById('co-nome').value = '';
+    document.getElementById('co-email').value = '';
+    document.getElementById('co-papel').value = 'recepcao';
+    document.getElementById('co-senha').value = '';
+    document.getElementById('co-senha2').value = '';
+    document.getElementById('co-trocar-senha').checked = false;
+    openModal('modal-cadastrar-operador');
+    setTimeout(() => document.getElementById('co-nome').focus(), 100);
+}
+
+async function cadastrarOperadorDireto() {
+    const nome  = document.getElementById('co-nome').value.trim();
+    const email = document.getElementById('co-email').value.trim().toLowerCase();
+    const papel = document.getElementById('co-papel').value;
+    const senha = document.getElementById('co-senha').value;
+    const senha2 = document.getElementById('co-senha2').value;
+    const deveTrocarSenha = document.getElementById('co-trocar-senha').checked;
+
+    if (!nome) { showToast('⚠️ Preencha o nome'); return; }
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showToast('⚠️ E-mail inválido'); return; }
+    if (!senha || senha.length < 6) { showToast('⚠️ Senha deve ter no mínimo 6 caracteres'); return; }
+    if (senha !== senha2) { showToast('⚠️ As senhas não conferem'); return; }
+
+    // Verificar limite de usuários do plano
+    if (typeof _verificarLimiteUsuarios === 'function') {
+        const podeAdicionar = await _verificarLimiteUsuarios();
+        if (!podeAdicionar) return;
+    }
+
+    const btn = document.getElementById('btn-cadastrar-operador');
+    const txtOriginal = btn.innerHTML;
+    btn.disabled = true; btn.style.opacity = '.7';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cadastrando…';
+
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) throw new Error('Sessão expirada, faça login novamente');
+
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/criar-operador`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+            },
+            body: JSON.stringify({ nome, email, senha, papel, deve_trocar_senha: deveTrocarSenha }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            throw new Error(data.error || `Erro HTTP ${res.status}`);
+        }
+
+        showToast('✅ Operador cadastrado com sucesso!');
+        closeModal('modal-cadastrar-operador');
+        await renderUsuarios();
+
+    } catch (e) {
+        console.error('Erro cadastrar operador:', e);
+        showToast('❌ ' + (e.message || 'Erro ao cadastrar operador'));
+    } finally {
+        btn.disabled = false; btn.style.opacity = '1';
+        btn.innerHTML = txtOriginal;
+    }
+}
+
+// ============================================================
+// RESETAR SENHA DE OPERADOR
+// ============================================================
+
+function abrirModalResetarSenha(operadorId, nomeOperador) {
+    if (!currentUser || currentUser.papel !== 'admin') {
+        showToast('⚠️ Apenas admin pode resetar senhas');
+        return;
+    }
+    document.getElementById('rs-operador-id').value = operadorId;
+    document.getElementById('rs-nome').textContent = nomeOperador;
+    document.getElementById('rs-senha').value = '';
+    document.getElementById('rs-senha2').value = '';
+    openModal('modal-resetar-senha');
+    setTimeout(() => document.getElementById('rs-senha').focus(), 100);
+}
+
+async function resetarSenhaOperador() {
+    const operadorId = document.getElementById('rs-operador-id').value;
+    const novaSenha  = document.getElementById('rs-senha').value;
+    const novaSenha2 = document.getElementById('rs-senha2').value;
+
+    if (!novaSenha || novaSenha.length < 6) { showToast('⚠️ Senha deve ter no mínimo 6 caracteres'); return; }
+    if (novaSenha !== novaSenha2) { showToast('⚠️ As senhas não conferem'); return; }
+
+    const btn = document.getElementById('btn-resetar-senha');
+    const txtOriginal = btn.innerHTML;
+    btn.disabled = true; btn.style.opacity = '.7';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetando…';
+
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) throw new Error('Sessão expirada, faça login novamente');
+
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/resetar-senha-operador`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+            },
+            body: JSON.stringify({ operador_id: operadorId, nova_senha: novaSenha }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            throw new Error(data.error || `Erro HTTP ${res.status}`);
+        }
+
+        showToast('✅ ' + (data.mensagem || 'Senha resetada com sucesso!'));
+        closeModal('modal-resetar-senha');
+
+    } catch (e) {
+        console.error('Erro resetar senha:', e);
+        showToast('❌ ' + (e.message || 'Erro ao resetar senha'));
+    } finally {
+        btn.disabled = false; btn.style.opacity = '1';
+        btn.innerHTML = txtOriginal;
+    }
+}
+
+// ============================================================
+// TROCA DE SENHA OBRIGATÓRIA (primeiro login)
+// ============================================================
+
+function _mostrarModalTrocaSenhaObrigatoria() {
+    const overlay = document.getElementById('modal-trocar-senha-obrigatoria');
+    if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.background = 'rgba(0,0,0,.85)';
+        overlay.style.backdropFilter = 'blur(6px)';
+        overlay.style.zIndex = '99999';
+        overlay.style.padding = '1rem';
+    }
+    setTimeout(() => { const inp = document.getElementById('tso-senha'); if (inp) inp.focus(); }, 150);
+}
+
+async function _executarTrocaSenhaObrigatoria() {
+    const novaSenha  = document.getElementById('tso-senha').value;
+    const novaSenha2 = document.getElementById('tso-senha2').value;
+
+    if (!novaSenha || novaSenha.length < 6) { showToast('⚠️ Senha deve ter no mínimo 6 caracteres'); return; }
+    if (novaSenha !== novaSenha2) { showToast('⚠️ As senhas não conferem'); return; }
+
+    const btn = document.getElementById('btn-trocar-senha-obrigatoria');
+    const txtOriginal = btn.innerHTML;
+    btn.disabled = true; btn.style.opacity = '.7';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando…';
+
+    try {
+        // Atualizar senha via Supabase Auth
+        const { error: pwError } = await sb.auth.updateUser({ password: novaSenha });
+        if (pwError) throw pwError;
+
+        // Limpar flag deve_trocar_senha
+        const { error: dbError } = await sb
+            .from('usuarios')
+            .update({ deve_trocar_senha: false, atualizado_em: new Date().toISOString() })
+            .eq('id', currentUser.id);
+        if (dbError) console.warn('Erro ao limpar flag deve_trocar_senha:', dbError);
+
+        currentUser.deve_trocar_senha = false;
+
+        // Fechar modal e continuar login normal
+        const overlay = document.getElementById('modal-trocar-senha-obrigatoria');
+        if (overlay) overlay.style.display = 'none';
+
+        showToast('✅ Senha alterada com sucesso!');
+
+        // Continuar com o fluxo normal de login
+        renderDashboard();
+        iniciarRelogio();
+        logAudit('LOGIN', `Login: ${currentUser.nome} (senha trocada no 1º acesso)`);
+        iniciarBackupAutomatico();
+        atualizarStatusDB();
+        carregarAssinaturaAtual().then(() => renderBannerGlobalAssinatura()).catch(e => console.warn('[ASSINATURA]', e));
+        try { cred_carregarSupabase().catch(e => console.warn('[CRED] boot:', e)); } catch(e) {}
+        try { iniciarRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
+        (async () => {
+            try {
+                await db.jogadores.list();
+                await carregarEstadoDoSupabase();
+                renderJogadores();
+                renderTorneiosList();
+                renderDashboard();
+            } catch (e) { console.warn('Carregar estado:', e); }
+        })();
+        showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
+
+    } catch (e) {
+        console.error('Erro trocar senha obrigatória:', e);
+        showToast('❌ ' + (e.message || 'Erro ao trocar senha'));
+    } finally {
+        btn.disabled = false; btn.style.opacity = '1';
+        btn.innerHTML = txtOriginal;
+    }
 }
 
 // ============================================================
