@@ -11903,6 +11903,8 @@ async function sincronizarEstado() {
                     //
                     // Resultado: se qualquer passo falhar, NADA é perdido — só fica
                     // desatualizado por alguns segundos até o próximo sync.
+                    // FIX SYNC-TV: acumula IDs que falharam pra re-marcar APÓS o clear
+                    const _syncRetryIds = [];
                     for (const t of torneiosRows) {
                         try {
                             // === ENTRIES ===
@@ -11931,10 +11933,38 @@ async function sincronizarEstado() {
                                     fichas_override: Number(e.fichasOverride) || 0,
                                     is_promo: !!e.isPromo,
                                 }));
+                                // FIX SYNC-TV: tenta batch completo; se falhar, faz fallback
+                                // individual pra isolar entries problemáticas (ex: jogador_id FK inválido)
                                 try {
                                     await _syncUpsertDiff(entryRows, 'torneio_entries', 'entries', { forcarFull: _isFullSync });
                                 } catch (errE) {
-                                    throw new Error('Upsert entries: ' + (errE.message || errE));
+                                    console.warn('[SYNC] ⚠️ Batch entries falhou para torneio ' + t.id + ' (' + entryRows.length + ' entries): ' + errE.message);
+                                    console.warn('[SYNC] Tentando upsert individual para isolar entry problemática...');
+                                    let okCount = 0, failCount = 0;
+                                    for (const singleEntry of entryRows) {
+                                        try {
+                                            const { error: sErr } = await sb.from('torneio_entries')
+                                                .upsert(singleEntry, { onConflict: 'id' });
+                                            if (sErr) throw sErr;
+                                            okCount++;
+                                            // Atualiza snapshot pra entry que deu certo
+                                            const snapKey = 'entries';
+                                            if (_syncSnapshots[snapKey]) {
+                                                _syncSnapshots[snapKey].set(singleEntry.id, _syncHash(singleEntry));
+                                            }
+                                        } catch (singleErr) {
+                                            failCount++;
+                                            console.error('[SYNC] ❌ Entry individual FALHOU — id:', singleEntry.id,
+                                                '| jogador_id:', singleEntry.jogador_id,
+                                                '| tipo:', singleEntry.tipo,
+                                                '| erro:', singleErr.message || singleErr);
+                                        }
+                                    }
+                                    console.log('[SYNC] Fallback individual concluído: ' + okCount + ' OK, ' + failCount + ' falharam de ' + entryRows.length + ' total');
+                                    if (failCount > 0) {
+                                        showToast('⚠️ ' + failCount + ' entrada(s) com problema — restante sincronizado');
+                                    }
+                                    // Não faz throw — entries boas foram sincronizadas
                                 }
 
                                 // DELETE seletivo: remove do banco IDs que não estão mais no estado local
@@ -12050,12 +12080,21 @@ async function sincronizarEstado() {
                         } catch (e) {
                             // ⚠️ Erro de sync NÃO apaga dados locais — re-marca o torneio
                             // como sujo pra retentar no próximo sync (debounce de 800ms)
-                            console.error('[SYNC] ❌ Falha sync filhas do torneio ' + t.id + ':', e.message);
-                            if (typeof _markDirty === 'function') _markDirty('torneios', t.id);
+                            console.error('[SYNC] ❌ Falha sync filhas do torneio ' + t.id + ':', e.message, e);
+                            console.error('[SYNC] Torneio com erro — entries:', (t.entries || []).length,
+                                '| eliminados:', (t.eliminados || []).length,
+                                '| mesas:', (t.mesas || []).length);
+                            // FIX SYNC-TV: acumula torneios que falharam pra re-marcar DEPOIS do clear
+                            _syncRetryIds.push(t.id);
                             showToast('⚠️ Sync incompleto — retentando em segundos...');
                         }
                     }
                     _syncQueue.torneios.clear();
+                    // FIX SYNC-TV: re-marca torneios que falharam DEPOIS do clear
+                    if (_syncRetryIds.length) {
+                        console.log('[SYNC] Re-marcando ' + _syncRetryIds.length + ' torneio(s) com falha para retry');
+                        _syncRetryIds.forEach(id => _markDirty('torneios', id));
+                    }
                 }
             }
         }
