@@ -6072,6 +6072,25 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
         </div>
 
+        <!-- Toggle: cobrar tudo ou só este torneio (só aparece se há dívida histórica além deste torneio) -->
+        <div id="ap-cobranca-toggle-wrap" style="display:none;margin-bottom:1rem;padding:.65rem .8rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;">
+            <div style="font-size:.6rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.45rem;display:flex;align-items:center;gap:.35rem;">
+                <i class="fa-solid fa-filter-circle-dollar" style="font-size:.58rem;"></i>
+                Quanto cobrar?
+            </div>
+            <div style="display:flex;gap:.3rem;background:#0a0a0c;padding:.25rem;border-radius:.4rem;">
+                <button type="button" id="ap-cobranca-tab-tudo" onclick="_acertoTrocarCobranca('tudo')" style="flex:1;background:#a855f7;color:#fff;border:0;padding:.4rem .6rem;border-radius:.3rem;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.7rem;font-weight:700;text-align:center;">
+                    Cobrar tudo <span id="ap-cobranca-val-tudo" style="font-family:var(--font-mono);font-size:.65rem;opacity:.85;display:block;margin-top:.15rem;"></span>
+                </button>
+                <button type="button" id="ap-cobranca-tab-torneio" onclick="_acertoTrocarCobranca('torneio')" style="flex:1;background:transparent;color:#71717a;border:0;padding:.4rem .6rem;border-radius:.3rem;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.7rem;font-weight:700;text-align:center;">
+                    Só este torneio <span id="ap-cobranca-val-torneio" style="font-family:var(--font-mono);font-size:.65rem;opacity:.85;display:block;margin-top:.15rem;"></span>
+                </button>
+            </div>
+            <div style="font-size:.6rem;color:#71717a;margin-top:.4rem;text-align:center;font-style:italic;" id="ap-cobranca-dica">
+                "Só este torneio" desconta apenas o que foi gasto aqui (buy-in, rebuy, etc.)
+            </div>
+        </div>
+
         <!-- Editar valor (operador pode ajustar) -->
         <div style="margin-bottom:1rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
@@ -45792,6 +45811,115 @@ let _acertoExtratoJogadorAtual = null; // armazena pra trocar de modo sem reabri
 let _acertoExtratoDividaAtual = 0;
 let _acertoExtratoTorneioId = null;
 
+// =====================================================================
+// Modo de cobrança: 'tudo' (dívida total histórica) ou 'torneio' (só este torneio)
+// Não altera nenhum cálculo financeiro — apenas muda o valor SUGERIDO
+// no campo "Valor a movimentar agora" e a exibição do saldo líquido.
+// =====================================================================
+let _acertoCobrancaModo = 'tudo'; // default: cobra tudo (comportamento original)
+
+function _acertoCalcDividaTorneio(jogadorId, torneioId) {
+    // Soma apenas transações NEGATIVAS deste jogador neste torneio (buy-in, rebuy, comanda, etc.)
+    if (!Array.isArray(transacoes) || !torneioId) return 0;
+    let soma = 0;
+    for (const tx of transacoes) {
+        if (String(tx.jogadorId) === String(jogadorId) &&
+            String(tx.refId) === String(torneioId) &&
+            (tx.valor || 0) < 0) {
+            soma += tx.valor;
+        }
+    }
+    return Math.abs(Math.round(soma * 100) / 100);
+}
+
+function _acertoTrocarCobranca(modo) {
+    if (modo !== 'tudo' && modo !== 'torneio') return;
+    _acertoCobrancaModo = modo;
+
+    const ap = _acertoPremio;
+    const divida = (modo === 'torneio') ? (ap._dividaTorneio || 0) : (ap._dividaTotal || 0);
+    const liquido = Math.round((ap.valorPremio - divida) * 100) / 100;
+
+    // Atualiza state
+    ap.valorDivida = divida;
+    ap.valorLiquido = liquido;
+    ap.valorEditado = Math.abs(liquido);
+
+    // Atualiza UI — dívida
+    const dividaEl = document.getElementById('ap-valor-divida');
+    const dividaSub = document.getElementById('ap-divida-sub');
+    if (dividaEl) {
+        dividaEl.textContent = `- ${formatMoney(divida)}`;
+        dividaEl.style.color = divida > 0 ? '#ef4444' : '#52525b';
+    }
+    if (dividaSub) {
+        dividaSub.textContent = divida > 0
+            ? (modo === 'torneio' ? '(só este torneio)' : '(bar/buy-in/comanda)')
+            : '(nenhuma)';
+    }
+
+    // Atualiza UI — líquido + mensagem + botão
+    const liquidoEl = document.getElementById('ap-valor-liquido');
+    const msgEl = document.getElementById('ap-mensagem');
+    const btnConfirmar = document.getElementById('ap-btn-confirmar');
+    const j = jogadores.find(x => String(x.id) === String(ap.jogadorId));
+    const nome = j ? esc(j.nome) : '?';
+
+    if (liquido > 0) {
+        liquidoEl.textContent = `+ ${formatMoney(liquido)}`;
+        liquidoEl.style.color = '#22c55e';
+        msgEl.style.background = 'rgba(34,197,94,.08)';
+        msgEl.style.color = '#22c55e';
+        msgEl.innerHTML = `💰 <strong>${nome}</strong> recebe ${formatMoney(liquido)}`;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-arrow-up"></i> Confirmar Pagamento';
+        btnConfirmar.style.background = 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)';
+    } else if (liquido < 0) {
+        liquidoEl.textContent = `- ${formatMoney(Math.abs(liquido))}`;
+        liquidoEl.style.color = '#ef4444';
+        msgEl.style.background = 'rgba(239,68,68,.08)';
+        msgEl.style.color = '#ef4444';
+        msgEl.innerHTML = `💸 <strong>${nome}</strong> deve pagar ${formatMoney(Math.abs(liquido))}`;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-arrow-down"></i> Confirmar Recebimento';
+        btnConfirmar.style.background = 'linear-gradient(135deg,#f59e0b 0%,#d97706 100%)';
+    } else {
+        liquidoEl.textContent = formatMoney(0);
+        liquidoEl.style.color = '#a1a1aa';
+        msgEl.style.background = 'rgba(161,161,170,.08)';
+        msgEl.style.color = '#a1a1aa';
+        msgEl.innerHTML = `✓ Prêmio exatamente quita as dívidas`;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Quitação';
+        btnConfirmar.style.background = 'linear-gradient(135deg,#3b82f6 0%,#2563eb 100%)';
+    }
+
+    // Atualiza input editável
+    document.getElementById('ap-valor-editavel').value = Math.abs(liquido).toFixed(2);
+    acertoAtualizarSomaMisto();
+
+    // Atualiza visual dos botões toggle
+    _acertoAtualizarTabsCobranca();
+
+    // Re-renderiza extrato com a dívida correta
+    _acertoRenderDetalhesDivida(ap.jogadorId, divida);
+}
+window._acertoTrocarCobranca = _acertoTrocarCobranca;
+
+function _acertoAtualizarTabsCobranca() {
+    const btnTudo = document.getElementById('ap-cobranca-tab-tudo');
+    const btnTorneio = document.getElementById('ap-cobranca-tab-torneio');
+    if (!btnTudo || !btnTorneio) return;
+    if (_acertoCobrancaModo === 'tudo') {
+        btnTudo.style.background = '#a855f7';
+        btnTudo.style.color = '#fff';
+        btnTorneio.style.background = 'transparent';
+        btnTorneio.style.color = '#71717a';
+    } else {
+        btnTorneio.style.background = '#a855f7';
+        btnTorneio.style.color = '#fff';
+        btnTudo.style.background = 'transparent';
+        btnTudo.style.color = '#71717a';
+    }
+}
+
 function _acertoRenderDetalhesDivida(jogadorId, valorDivida) {
     const wrap = document.getElementById('ap-divida-detalhes-wrap');
     const list = document.getElementById('ap-divida-detalhes');
@@ -45900,11 +46028,18 @@ function abrirAcertoPremio(jogadorId, posicao) {
     
     // Saldo atual do jogador (negativo = devendo)
     const saldoAtual = getSaldoJogador(jogadorId);
-    const valorDivida = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
-    
+    const valorDividaTotal = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
+
+    // Dívida APENAS deste torneio (buy-in, rebuy, comanda com refId === t.id)
+    const valorDividaTorneio = _acertoCalcDividaTorneio(jogadorId, t.id);
+
+    // Decide dívida inicial conforme modo (default: tudo)
+    _acertoCobrancaModo = 'tudo';
+    const valorDivida = valorDividaTotal;
+
     // Líquido sugerido: prêmio - dívida
     const valorLiquido = Math.round((valorPremio - valorDivida) * 100) / 100;
-    
+
     _acertoPremio = {
         jogadorId,
         posicao,
@@ -45914,6 +46049,9 @@ function abrirAcertoPremio(jogadorId, posicao) {
         valorEditado: Math.abs(valorLiquido),
         metodo: 'pix',
         pagamentos: [],  // 🆕 modo misto começa vazio
+        // Armazena ambos pra toggle sem recalcular
+        _dividaTotal: valorDividaTotal,
+        _dividaTorneio: valorDividaTorneio,
     };
     
     // Reset UI: começa no modo SIMPLES (pagamento único)
@@ -45941,7 +46079,22 @@ function abrirAcertoPremio(jogadorId, posicao) {
     // (mostra todas as transações que compõem o saldo — buy-in, rebuy, comanda, pagamentos)
     _acertoExtratoModo = 'torneio'; // sempre começa filtrado por este torneio
     _acertoRenderDetalhesDivida(jogadorId, valorDivida);
-    
+
+    // 💰 Toggle "Cobrar tudo" vs "Só este torneio"
+    // Só mostra se há diferença entre dívida total e dívida do torneio (ou seja, há dívida histórica)
+    const toggleWrap = document.getElementById('ap-cobranca-toggle-wrap');
+    if (toggleWrap) {
+        const temDividaHistorica = valorDividaTotal > 0 && Math.abs(valorDividaTotal - valorDividaTorneio) > 0.01;
+        toggleWrap.style.display = temDividaHistorica ? 'block' : 'none';
+        if (temDividaHistorica) {
+            const valTudo = document.getElementById('ap-cobranca-val-tudo');
+            const valTorneio = document.getElementById('ap-cobranca-val-torneio');
+            if (valTudo) valTudo.textContent = `(${formatMoney(valorDividaTotal)})`;
+            if (valTorneio) valTorneio.textContent = `(${formatMoney(valorDividaTorneio)})`;
+            _acertoAtualizarTabsCobranca();
+        }
+    }
+
     // 🎫 VAGA EXTRA — se a posição tem vaga configurada, mostra card especial
     const vagas = (pp.vagas && Array.isArray(pp.vagas)) ? pp.vagas : [];
     const vagaPos = (vagas[posicao - 1] || '').trim();
@@ -46010,7 +46163,12 @@ function acertoSelecionarMetodo(metodo) {
 }
 
 function acertoUsarSugerido() {
-    document.getElementById('ap-valor-editavel').value = Math.abs(_acertoPremio.valorLiquido).toFixed(2);
+    // Usa o valor líquido conforme o modo de cobrança atual (tudo ou só torneio)
+    const divida = (_acertoCobrancaModo === 'torneio')
+        ? (_acertoPremio._dividaTorneio || 0)
+        : (_acertoPremio._dividaTotal || 0);
+    const liquido = Math.round((_acertoPremio.valorPremio - divida) * 100) / 100;
+    document.getElementById('ap-valor-editavel').value = Math.abs(liquido).toFixed(2);
     acertoAtualizarSomaMisto();
 }
 
@@ -46217,10 +46375,13 @@ async function acertoConfirmar() {
         : _metodoLabel(metodo);
     
     logAudit('ACERTO_PREMIO', `${nome} acertou ${posicao}º · prêmio ${formatMoney(valorPremio)} · dívida ${formatMoney(valorDivida)} · líquido ${formatMoney(valorLiquido)} · movimentado ${formatMoney(valorMovimentado)} via ${metodosLog}`, {
-        jogadorId, posicao, valorPremio, valorDivida, valorLiquido, valorMovimentado, 
+        jogadorId, posicao, valorPremio, valorDivida, valorLiquido, valorMovimentado,
         metodo: modoMisto ? 'misto' : metodo,
         pagamentos: modoMisto ? pagamentos : null,
         torneioId: t.id,
+        cobrancaModo: _acertoCobrancaModo,
+        dividaTotal: _acertoPremio._dividaTotal,
+        dividaTorneio: _acertoPremio._dividaTorneio,
     });
     
     saveData();
