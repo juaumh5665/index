@@ -27268,13 +27268,15 @@ function renderTabFinanceiro() {
     
     // Conta entradas por tipo (com valores reais)
     const buyinEntries = t.entries.filter(e => e.tipo === 'buyin');
+    const buyinDuploEntries = t.entries.filter(e => e.tipo === 'buyin_duplo');
     const reentryEntries = t.entries.filter(e => e.tipo === 'reentry');
     const rebuyS = t.entries.filter(e => e.tipo === 'rebuy_simples');
     const rebuyD = t.entries.filter(e => e.tipo === 'rebuy_duplo');
     const addonEntries = t.entries.filter(e => e.tipo === 'addon');
     const lcEntries = t.entries.filter(e => e.tipo === 'last_chance');
-    
+
     const buyinTotal   = buyinEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
+    const buyinDuploTotal = buyinDuploEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
     const reentryTotal = reentryEntries.reduce((s,e) => s + (Number(e.valor) || 0), 0);
     const rebuySTotal  = rebuyS.reduce((s,e) => s + (Number(e.valor) || 0), 0);
     const rebuyDTotal  = rebuyD.reduce((s,e) => s + (Number(e.valor) || 0), 0);
@@ -27294,8 +27296,29 @@ function renderTabFinanceiro() {
     const linhas = [];
     
     // === ENTRADAS (sempre mostra buy-in) ===
-    linhas.push({ label: 'Buy-ins', sub: `${buyinEntries.length} × ${formatMoney(t.buyin)}`, val: formatMoney(buyinTotal), tipo: 'normal' });
-    
+    // Buy-in: mostra detalhamento real (promo + normal separados quando houver)
+    const buyinPromoEntries = buyinEntries.filter(e => e.isPromo);
+    const buyinNormalEntries = buyinEntries.filter(e => !e.isPromo);
+    let buyinSub = '';
+    if (buyinPromoEntries.length > 0 && buyinNormalEntries.length > 0) {
+        // Misto: tem promo e normal
+        const promoVal = Number(t.buyinPromoValor || t.buyin_promo_valor || 0);
+        buyinSub = `${buyinPromoEntries.length} × ${formatMoney(promoVal)} <span style="color:#a78bfa;font-size:.65rem;">PROMO</span> + ${buyinNormalEntries.length} × ${formatMoney(t.buyin)}`;
+    } else if (buyinPromoEntries.length > 0) {
+        // Só promo
+        const promoVal = Number(t.buyinPromoValor || t.buyin_promo_valor || 0);
+        buyinSub = `${buyinPromoEntries.length} × ${formatMoney(promoVal)} <span style="color:#a78bfa;font-size:.65rem;">PROMO</span>`;
+    } else {
+        buyinSub = `${buyinEntries.length} × ${formatMoney(t.buyin)}`;
+    }
+    linhas.push({ label: 'Buy-ins', sub: buyinSub, val: formatMoney(buyinTotal), tipo: 'normal' });
+
+    // Buy-in Duplo: só mostra se configurado ou se tem entries
+    if ((Number(t.buyinDuploValor) > 0 && Number(t.buyinDuploFichas) > 0) || buyinDuploEntries.length > 0) {
+        const bdVal = Number(t.buyinDuploValor || 0);
+        linhas.push({ label: 'Buy-in Duplo', sub: `${buyinDuploEntries.length} × ${formatMoney(bdVal)}`, val: formatMoney(buyinDuploTotal), tipo: 'normal' });
+    }
+
     if (t.reentryAte > 0 || reentryEntries.length > 0) {
         linhas.push({ label: 'Re-entries', sub: `${reentryEntries.length} × ${formatMoney(t.buyin)}`, val: formatMoney(reentryTotal), tipo: 'normal' });
     }
