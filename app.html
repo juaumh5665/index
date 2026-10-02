@@ -27915,7 +27915,17 @@ function renderTabBlinds() {
         const bgColor = isAtual ? 'rgba(245,158,11,.1)' : jaPassou ? '#0a0a0c' : '#0f0f12';
         const borderColor = isAtual ? 'var(--gold)' : '#1e1e23';
         const numColor = isAtual ? 'var(--gold)' : jaPassou ? '#3f3f46' : '#71717a';
-        
+
+        // Botões de mover nível (só pendentes — não passados, não atual)
+        const nvPodeMover = !jaPassou && !isAtual;
+        const nvPodeCima = nvPodeMover && i > 0 && (i - 1) > t.nivelAtual;
+        const nvPodeBaixo = nvPodeMover && i < (t.blinds || []).length - 1;
+        const nvBotoesMove = nvPodeMover ? `
+            <div style="display:flex;gap:.15rem;align-items:center;justify-content:center;">
+                <button onclick="_moverBlindItem(${i},-1)" title="Mover pra cima" ${nvPodeCima ? '' : 'disabled'} style="background:transparent;border:1px solid ${nvPodeCima ? 'rgba(245,158,11,.4)' : '#1e1e23'};color:${nvPodeCima ? 'var(--gold)' : '#27272a'};padding:.1rem .25rem;font-size:.55rem;border-radius:.2rem;cursor:${nvPodeCima ? 'pointer' : 'default'};line-height:1;">↑</button>
+                <button onclick="_moverBlindItem(${i},1)" title="Mover pra baixo" ${nvPodeBaixo ? '' : 'disabled'} style="background:transparent;border:1px solid ${nvPodeBaixo ? 'rgba(245,158,11,.4)' : '#1e1e23'};color:${nvPodeBaixo ? 'var(--gold)' : '#27272a'};padding:.1rem .25rem;font-size:.55rem;border-radius:.2rem;cursor:${nvPodeBaixo ? 'pointer' : 'default'};line-height:1;">↓</button>
+            </div>` : '';
+
         return `
             <div style="display:grid;grid-template-columns:2.5rem 1fr 1fr 1fr 3.5rem 5rem;gap:.4rem;align-items:center;padding:.4rem .55rem;background:${bgColor};border:1px solid ${borderColor};border-radius:.4rem;opacity:${opacity};">
                 <span style="font-size:.78rem;font-weight:800;color:${numColor};text-align:center;">
@@ -27925,7 +27935,10 @@ function renderTabBlinds() {
                 <input type="number" data-idx="${i}" data-field="bb" value="${b.bb || 0}" ${disabled} min="0" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
                 <input type="number" data-idx="${i}" data-field="ante" value="${b.ante || 0}" ${disabled} min="0" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
                 <input type="number" data-idx="${i}" data-field="tempo" value="${b.tempo || t.tempoNivel || 15}" ${disabled} min="1" class="inp eba-inline-inp" oninput="_marcarBlindsDirty()" style="padding:.25rem .35rem;font-family:var(--font-mono);font-size:.75rem;text-align:center;">
-                <span style="font-size:.6rem;color:${isAtual ? 'var(--gold)' : jaPassou ? '#3f3f46' : '#71717a'};font-weight:600;text-align:center;">${isAtual ? 'rolando' : jaPassou ? 'passou' : 'pendente'}</span>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:.1rem;">
+                    <span style="font-size:.6rem;color:${isAtual ? 'var(--gold)' : jaPassou ? '#3f3f46' : '#71717a'};font-weight:600;">${isAtual ? 'rolando' : jaPassou ? 'passou' : 'pendente'}</span>
+                    ${nvBotoesMove}
+                </div>
             </div>`;
     }).join('');
 
@@ -28154,21 +28167,20 @@ window._addBlindNivelEmAndamento = _addBlindNivelEmAndamento;
 window._addBreakEmAndamento = _addBreakEmAndamento;
 
 // =====================================================================
-// MOVER INTERVALO (break) pra cima/baixo na estrutura de blinds
+// MOVER ITEM (nível ou intervalo) pra cima/baixo na estrutura de blinds
 // =====================================================================
-// Troca a posição do break com o elemento adjacente.
+// Troca a posição do item com o elemento adjacente.
 // Regras:
-//   - Só move breaks (isBreak), nunca níveis normais
 //   - Não pode mover pra antes/dentro de níveis já passados (i <= nivelAtual)
-//   - Marca dirty pra exigir "Salvar" antes de adicionar novos
+//   - Se há alterações pendentes, pede pra salvar primeiro
 // Não altera valores de blinds, cálculos financeiros ou premiação.
 // =====================================================================
-function _moverIntervalo(idx, direcao) {
+function _moverBlindItem(idx, direcao) {
     const t = torneios[activeTorneioIdx];
     if (!t || !Array.isArray(t.blinds)) return;
 
     const b = t.blinds[idx];
-    if (!b || !b.isBreak) return;
+    if (!b) return;
 
     const destino = idx + direcao; // -1 = cima, +1 = baixo
 
@@ -28180,7 +28192,7 @@ function _moverIntervalo(idx, direcao) {
         return showToast('⚠️ Não pode mover pra antes do nível atual');
     }
 
-    // Também o break em si não pode estar em posição <= nivelAtual (já validado por disabled, mas por segurança)
+    // O item em si não pode estar em posição <= nivelAtual
     if (idx <= t.nivelAtual) return;
 
     // Se há alterações pendentes nos inputs, pede pra salvar antes
@@ -28193,18 +28205,23 @@ function _moverIntervalo(idx, direcao) {
 
     saveData();
 
+    const tipo = b.isBreak ? 'Intervalo' : 'Nível';
     if (typeof logAudit === 'function') {
-        logAudit('MOVER_INTERVALO', `Intervalo movido de posição ${idx + 1} para ${destino + 1} · ${t.nome}`, {
-            torneioId: t.id, de: idx, para: destino,
+        logAudit('MOVER_BLIND_ITEM', `${tipo} movido de posição ${idx + 1} para ${destino + 1} · ${t.nome}`, {
+            torneioId: t.id, de: idx, para: destino, isBreak: !!b.isBreak,
         });
     }
 
-    showToast(`✓ Intervalo movido ${direcao < 0 ? 'pra cima ↑' : 'pra baixo ↓'}`);
+    showToast(`✓ ${tipo} movido ${direcao < 0 ? 'pra cima ↑' : 'pra baixo ↓'}`);
 
     renderTabBlinds();
     if (typeof renderTorneioControle === 'function') renderTorneioControle();
     if (typeof updateTV === 'function') updateTV(activeTorneioIdx);
 }
+window._moverBlindItem = _moverBlindItem;
+
+// Alias pra manter compatibilidade com botões de intervalo
+function _moverIntervalo(idx, direcao) { _moverBlindItem(idx, direcao); }
 window._moverIntervalo = _moverIntervalo;
 
 // Remover um intervalo pendente da estrutura
