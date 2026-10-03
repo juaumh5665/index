@@ -11221,13 +11221,13 @@ async function _processarMudancaRealtime(tipo, payload) {
                             isPromo: !!e.is_promo,
                         }));
                         t.eliminados = (elRows || []).filter(el => el.torneio_id === r.id).map(el => ({
-                            jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
+                            id: el.id, jogadorId: el.jogador_id, eliminadorId: el.eliminador_id,
                             posicao: el.posicao, bountyPago: parseFloat(el.bounty_pago || 0),
-                            ts: new Date(el.ts).getTime(),
+                            ts: new Date(el.ts).getTime(), operador: el.operador || null,
                         }));
                         t.jackpotCompras = (jpRows || []).filter(j => j.torneio_id === r.id).map(j => ({
-                            jogadorId: j.jogador_id, valor: parseFloat(j.valor),
-                            ts: new Date(j.ts).getTime(),
+                            id: j.id, jogadorId: j.jogador_id, valor: parseFloat(j.valor),
+                            fichas: j.fichas, ts: new Date(j.ts).getTime(),
                         }));
                         t.mesas = (tmRows || []).filter(m => m.torneio_id === r.id).map(m => ({
                             id: m.id, numero: m.numero, jogadores: m.jogadores || [],
