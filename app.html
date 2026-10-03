@@ -25961,7 +25961,7 @@ function atualizarVisibilidadeAbaEstornos() {
     const badge = document.getElementById('tab-estornos-badge');
     if (!t || !btn) return;
     const qtd = (t.estornos || []).length;
-    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.papel === 'admin');
     // Visível pra admin sempre; pra outros papéis só se houver estornos
     btn.style.display = (isAdmin || qtd > 0) ? 'inline-block' : 'none';
     if (badge) {
@@ -26713,7 +26713,7 @@ function renderTabLancamentosDetalhados() {
     const count = document.getElementById('mt-lancamentos-count');
     if (!t || !tbody) return;
 
-    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.papel === 'admin');
 
     // Junta entries + jackpot compras em uma única lista ordenada por ts desc
     // BUG-FIX combo: agrupa entries com mesmo comboId
@@ -43228,7 +43228,7 @@ function _calcularFichasReverter(t, entry) {
 // refId: id da entry ou jogadorId (no caso de jackpot)
 function abrirModalEstorno(kind, refId) {
     // Só admin pode estornar
-    if (!currentUser || currentUser.role !== 'admin') {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.papel !== 'admin')) {
         return showToast('🔒 Apenas administradores podem estornar lançamentos');
     }
 
