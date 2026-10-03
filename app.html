@@ -26955,7 +26955,7 @@ function _toggleComboRow(comboKey) {
 function _estornarComboInteiro(comboId) {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
-    const entries = (t.entries || []).filter(e => e.comboId === comboId).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const entries = (t.entries || []).filter(e => String(e.comboId) === String(comboId)).sort((a, b) => (a.ts || 0) - (b.ts || 0));
     if (!entries.length) return showToast('⚠️ Combo não encontrado');
     // Abre modal de estorno apontando pra primeira entry; usuário confirma e o ciclo continua
     if (!confirm(`Estornar combo completo de ${getJogadorNome(entries[0].jogadorId)}?\n\n${entries.length} ações no valor total de R$ ${entries.reduce((s,e)=>s+(Number(e.valor)||0),0).toFixed(2).replace('.',',')}.\n\nIsso vai abrir o modal de estorno para a 1ª ação. Após confirmá-la, repita para as demais.`)) return;
@@ -29809,7 +29809,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
             novaEntry.isPromo = true;
         }
         // Flag pra agrupar no comprovante
-        novaEntry.comboId = ts;
+        novaEntry.comboId = String(ts);
 
         t.entries.push(novaEntry);
         entriesCriadas.push(novaEntry);
@@ -30832,8 +30832,13 @@ function _computarDadosMiniTV(t) {
     const chipCount = totalFichas + jackpotFichas + passaporteFichas + bonusFichas;
     const avg = ativos > 0 ? Math.round(chipCount / ativos) : 0;
     const buyinsQtd  = (t.entries || []).filter(e => e.tipo === 'buyin').length;
+    const buyinsDuploQtd = (t.entries || []).filter(e => e.tipo === 'buyin_duplo').length;
     const reentriesQtd = (t.entries || []).filter(e => e.tipo === 'reentry').length;
+    const rebuysSimplesQtd = (t.entries || []).filter(e => e.tipo === 'rebuy_simples').length;
+    const rebuysDuplosQtd  = (t.entries || []).filter(e => e.tipo === 'rebuy_duplo').length;
     const addonsQtd  = (t.entries || []).filter(e => e.tipo === 'addon').length;
+    const lastChanceQtd = (t.entries || []).filter(e => e.tipo === 'last_chance').length;
+    const jackpotsQtd = (t.jackpotCompras || []).reduce((s, j) => s + (j.qtd || 1), 0);
     // Prize pool: usa a função do app (mesma usada em updateTV)
     let prize = 0;
     try {
@@ -30865,7 +30870,7 @@ function _computarDadosMiniTV(t) {
     }
     return {
         ativos, totalEntries, chipCount, avg, prize, elapsedStr,
-        proxStr, buyinsQtd, reentriesQtd, addonsQtd,
+        proxStr, buyinsQtd, buyinsDuploQtd, reentriesQtd, rebuysSimplesQtd, rebuysDuplosQtd, addonsQtd, lastChanceQtd, jackpotsQtd,
         nivelJogo: nivelJogo || 1,
         totalNiveis: totalNiveisJogo || t.blinds.length,
         clubeNome: (typeof sbClube !== 'undefined' && sbClube && sbClube.nome) ? sbClube.nome : '',
@@ -30943,11 +30948,19 @@ function _renderMiniLayoutComum(layout, t, d) {
 function _renderMiniProLive(t, d) {
     const gold = '#f5d572';
     const cream = '#fef3c7';
-    // Stats strip (BUY-IN, ADD-ON, REBUY, etc — só os relevantes)
+    // Stats strip (BUY-IN, BUY-IN DUPLO, RE-ENTRY, REBUY, ADD-ON, etc — só os relevantes)
+    // Espelha a mesma lógica do updateTV() statsStrip
+    const pwVis = t.pwStatsVisiveis || {};
+    const defVis = (k) => pwVis[k] !== undefined ? pwVis[k] : true;
     const stats = [];
-    if (d.buyinsQtd) stats.push({ label: 'BUY-IN', value: d.buyinsQtd });
-    if (d.reentriesQtd) stats.push({ label: 'RE-ENTRY', value: d.reentriesQtd });
-    if (d.addonsQtd) stats.push({ label: 'ADD-ON', value: d.addonsQtd });
+    if (defVis('buyin'))     stats.push({ label: 'BUY-IN', value: d.buyinsQtd });
+    if (defVis('buyin_duplo') && (Number(t.buyinDuploValor) > 0 || d.buyinsDuploQtd > 0)) stats.push({ label: 'BUY-IN DUPLO', value: d.buyinsDuploQtd });
+    if (defVis('reentry') && d.reentriesQtd) stats.push({ label: 'RE-ENTRY', value: d.reentriesQtd });
+    if (defVis('jackpot') && (t.jackpotValor > 0)) stats.push({ label: 'JACKPOT', value: d.jackpotsQtd });
+    if (defVis('rebuy_simples') && (t.rebuyValor > 0 || t.rebuySimples > 0 || d.rebuysSimplesQtd > 0)) stats.push({ label: 'REBUY SIMPLES', value: d.rebuysSimplesQtd });
+    if (defVis('rebuy_duplo')   && (t.rebuyDuploValor > 0 || t.rebuyDuplo   > 0 || d.rebuysDuplosQtd  > 0)) stats.push({ label: 'REBUY DUPLO', value: d.rebuysDuplosQtd });
+    if (defVis('addon') && (t.addonFichas > 0)) stats.push({ label: 'ADD-ON', value: d.addonsQtd });
+    if (defVis('last_chance') && (t.lastChanceValor > 0 || d.lastChanceQtd > 0)) stats.push({ label: 'LAST CHANCE', value: d.lastChanceQtd });
     const statsHtml = stats.slice(0, 4).map(s => `
         <div style="text-align:center;flex:1;">
             <div style="font-size:.5rem;color:rgba(254,243,199,.7);text-transform:uppercase;letter-spacing:.08em;font-weight:700;">${s.label}</div>
