@@ -3262,6 +3262,7 @@ function montarCarouselPremiacao(d) {
       rebuyDuploFichas: t.rebuy_duplo_fichas,
       addonFichas: t.addon_fichas,
       lastChanceFichas: t.last_chance_fichas,
+      buyinDuploFichas: t.buyin_duplo_fichas,
     });
   }
   
@@ -3361,7 +3362,7 @@ function montarCarouselPremiacao(d) {
         const ids = rodando.map(t => t.id);
         const { data: extras, error: errExtras } = await sb
           .from('torneios')
-          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_prolive_bg, tv_prolive_text, tv_prolive_custom, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor')
+          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_prolive_bg, tv_prolive_text, tv_prolive_custom, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor, buyin_duplo_fichas, buyin_duplo_valor')
           .in('id', ids);
         
         if (!errExtras && Array.isArray(extras)) {
@@ -3387,6 +3388,8 @@ function montarCarouselPremiacao(d) {
               if (ext.rebuy_valor != null && (t.rebuy_valor == null || t.rebuy_valor === 0)) t.rebuy_valor = ext.rebuy_valor;
               if (ext.rebuy_duplo_valor != null && (t.rebuy_duplo_valor == null || t.rebuy_duplo_valor === 0)) t.rebuy_duplo_valor = ext.rebuy_duplo_valor;
               if (ext.addon_valor != null && (t.addon_valor == null || t.addon_valor === 0)) t.addon_valor = ext.addon_valor;
+              if (ext.buyin_duplo_fichas != null && (t.buyin_duplo_fichas == null || t.buyin_duplo_fichas === 0)) t.buyin_duplo_fichas = ext.buyin_duplo_fichas;
+              if (ext.buyin_duplo_valor != null && (t.buyin_duplo_valor == null || t.buyin_duplo_valor === 0)) t.buyin_duplo_valor = ext.buyin_duplo_valor;
             }
           });
           if (window._debugTv) console.log('[TV PUBLIC] campos extras:', extras);
@@ -3753,11 +3756,12 @@ function montarCarouselPremiacao(d) {
     }
     const ativos = ativosIds.size;
     
-    // Total de entries (buy-ins + reentries únicos por jogador)
-    const totalEntries = new Set(entries.filter(e => e.tipo === 'buyin' || e.tipo === 'reentry').map(e => e.jogador_id)).size;
+    // Total de entries (buy-ins + buyin_duplo + reentries únicos por jogador)
+    const totalEntries = new Set(entries.filter(e => e.tipo === 'buyin' || e.tipo === 'buyin_duplo' || e.tipo === 'reentry').map(e => e.jogador_id)).size;
     
     // Contadores
     const buyinsQtd = entries.filter(e => e.tipo === 'buyin').length;
+    const buyinsDuploQtd = entries.filter(e => e.tipo === 'buyin_duplo').length;
     const reentriesQtd = entries.filter(e => e.tipo === 'reentry').length;
     const rebuysSimplesQtd = entries.filter(e => e.tipo === 'rebuy_simples').length;
     const rebuysDuplosQtd = entries.filter(e => e.tipo === 'rebuy_duplo').length;
@@ -3781,6 +3785,7 @@ function montarCarouselPremiacao(d) {
     
     const statsStrip = [];
     if (defVis('buyin')) statsStrip.push({ label: 'BUY IN', value: buyinsQtd });
+    if (defVis('buyin_duplo') && (Number(t.buyin_duplo_valor || 0) > 0 || buyinsDuploQtd > 0)) statsStrip.push({ label: 'BUY-IN DUPLO', value: buyinsDuploQtd });
     if (defVis('reentry') && reentriesQtd) statsStrip.push({ label: 'RE-ENTRY', value: reentriesQtd });
     if (defVis('jackpot') && Number(t.jackpot_valor || 0) > 0) statsStrip.push({ label: 'JACKPOT', value: jackpotsQtd });
     if (defVis('rebuy_simples') && (Number(t.rebuy_valor || 0) > 0 || rebuysSimplesQtd > 0)) statsStrip.push({ label: 'REBUY SIMPLES', value: rebuysSimplesQtd });
@@ -3798,13 +3803,15 @@ function montarCarouselPremiacao(d) {
     const stackInicial = Number(t.stack || 0);
     const rebuySimplesFichas = Number(t.rebuy_fichas || stackInicial);
     const rebuyDuploFichas = Number(t.rebuy_duplo_fichas || stackInicial * 2);
+    const buyinDuploFichas = Number(t.buyin_duplo_fichas || 0);
     const addonFichasQtd = Number(t.addon_fichas || 0);
     const lastChanceFichasQtd = Number(t.last_chance_fichas || 0);
-    
+
     let totalFichas = entries.reduce((s, e) => {
       // FASE I.1: se a entry tem fichas_override (buy-in PROMO), usa esse valor
       const override = Number(e.fichas_override || e.fichasOverride || 0);
       if (override > 0) return s + override;
+      if (e.tipo === 'buyin_duplo')   return s + buyinDuploFichas;
       if (e.tipo === 'rebuy_simples') return s + rebuySimplesFichas;
       if (e.tipo === 'rebuy_duplo')   return s + rebuyDuploFichas;
       if (e.tipo === 'addon')         return s + addonFichasQtd;
