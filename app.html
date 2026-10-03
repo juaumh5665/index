@@ -12257,16 +12257,38 @@ async function sincronizarEstado() {
                                 }
 
                                 // DELETE seletivo: remove só os IDs que sumiram do estado local
+                                // ⚠️ NUNCA deleta itens com origem='stackbar' — eles foram inseridos
+                                // pelo StackBar mobile via DB function e o estado local pode não tê-los ainda.
                                 const idsLocais = c.itens.map(it => it.id);
                                 if (idsLocais.length) {
                                     await sb.from('bar_comanda_itens')
                                         .delete()
                                         .eq('comanda_id', c.id)
-                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`)
+                                        .or('origem.is.null,origem.neq.stackbar');
                                 }
                             } else {
-                                // Estado local vazio — só aqui é seguro apagar tudo
-                                await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id);
+                                // Estado local vazio — apaga itens locais, mas PRESERVA itens do StackBar
+                                await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id)
+                                    .or('origem.is.null,origem.neq.stackbar');
+                            }
+
+                            // ⚡ Recalcula total da comanda a partir do banco real
+                            // (garante que itens do StackBar sejam contabilizados no total)
+                            try {
+                                const { data: somaItens } = await sb.from('bar_comanda_itens')
+                                    .select('subtotal')
+                                    .eq('comanda_id', c.id);
+                                if (somaItens && somaItens.length > 0) {
+                                    const totalReal = somaItens.reduce((s, r) => s + parseFloat(r.subtotal || 0), 0);
+                                    if (Math.abs(totalReal - (c.total || 0)) > 0.01) {
+                                        await sb.from('bar_comandas').update({ total: totalReal }).eq('id', c.id);
+                                        c.total = totalReal;
+                                        console.log('[SYNC] total comanda', c.id, 'recalculado:', totalReal);
+                                    }
+                                }
+                            } catch (eTotal) {
+                                console.warn('[SYNC] erro recalcular total comanda:', eTotal.message);
                             }
                         } catch (e) {
                             // ⚠️ Erro de sync NÃO apaga itens locais — re-marca a comanda
