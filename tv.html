@@ -3858,9 +3858,11 @@ function montarCarouselPremiacao(d) {
       pubState._ultimoEntriesCount = entries.length;
     }
     
+    // 🐛 FIX: exclui addons da contagem de jogadores (addon não é entrada no torneio)
+    // Alinhado com a lógica do app: entries.filter(e => e.tipo !== 'addon')
     const ativosIds = new Set();
     for (const e of entries) {
-      if (!eliminadosIds.has(e.jogador_id)) ativosIds.add(e.jogador_id);
+      if (e.tipo !== 'addon' && !eliminadosIds.has(e.jogador_id)) ativosIds.add(e.jogador_id);
     }
     const ativos = ativosIds.size;
     
