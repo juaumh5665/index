@@ -41843,12 +41843,13 @@ function renderCaixaFechamento() {
         }).join('');
     }
 
-    // Totalizador por método
+    // Totalizador por método — com detalhamento por jogador (clique para expandir)
     const porMetodo = {};
     abertas.filter(t => t.metodo).forEach(t => {
-        if (!porMetodo[t.metodo]) porMetodo[t.metodo] = { in: 0, out: 0 };
+        if (!porMetodo[t.metodo]) porMetodo[t.metodo] = { in: 0, out: 0, txs: [] };
         if (t.valor > 0) porMetodo[t.metodo].in  += t.valor;
         else              porMetodo[t.metodo].out += Math.abs(t.valor);
+        porMetodo[t.metodo].txs.push(t);
     });
 
     const totEl = document.getElementById('fechamento-totalizador');
@@ -41869,13 +41870,56 @@ function renderCaixaFechamento() {
             <span style="font-family:var(--font-mono);font-weight:800;color:${totalIn-totalOut>=0?'#22c55e':'#ef4444'};">${totalIn-totalOut>=0?'+':''}${formatMoney(totalIn-totalOut)}</span>
         </div>
         ${Object.keys(porMetodo).length ? `
-        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:.75rem;">Por forma de pagamento</div>
+        <div style="font-size:.65rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:.75rem;">Por forma de pagamento <span style="font-weight:400;opacity:.6;font-style:italic;">(clique para ver detalhes)</span></div>
         ${Object.entries(porMetodo).map(([k, d]) => {
-            const m = PAYMENT_METHODS[k];
+            const m = PAYMENT_METHODS[k] || { label: k, icon:'fa-circle', color:'#71717a' };
+            const saldoMetodo = d.in - d.out;
+            const detId = 'fech-detalhe-' + k;
+            const txsSorted = d.txs.sort((a, b) => (a.ts||0) - (b.ts||0));
             return `
-            <div style="display:flex;justify-content:space-between;padding:.5rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.75rem;">
-                <span><i class="fa-solid ${m.icon}" style="color:${m.color};"></i> ${m.label}</span>
-                <span style="font-family:var(--font-mono);color:${m.color};font-weight:700;">${formatMoney(d.in)}</span>
+            <div style="border:1px solid #1e1e23;border-radius:.5rem;overflow:hidden;">
+                <div onclick="const el=document.getElementById('` + detId + `');const ic=document.getElementById('` + detId + `_ic');if(el.style.display==='none'){el.style.display='block';ic.className='fa-solid fa-chevron-up';}else{el.style.display='none';ic.className='fa-solid fa-chevron-down';}" style="display:flex;justify-content:space-between;align-items:center;padding:.6rem .75rem;background:#0f0f12;cursor:pointer;font-size:.75rem;transition:background .15s;" onmouseover="this.style.background='#18181b'" onmouseout="this.style.background='#0f0f12'">
+                    <span style="display:flex;align-items:center;gap:.4rem;">
+                        <i class="fa-solid ${m.icon}" style="color:${m.color};width:14px;text-align:center;"></i>
+                        <strong>${m.label}</strong>
+                        <span style="color:#52525b;font-size:.65rem;">(${d.txs.length})</span>
+                    </span>
+                    <span style="display:flex;align-items:center;gap:.6rem;">
+                        <span style="font-family:var(--font-mono);color:${m.color};font-weight:700;">${d.in > 0 ? '+' + formatMoney(d.in) : ''}${d.in > 0 && d.out > 0 ? ' / ' : ''}${d.out > 0 ? '-' + formatMoney(d.out) : ''}</span>
+                        <i id="` + detId + `_ic" class="fa-solid fa-chevron-down" style="color:#52525b;font-size:.6rem;transition:transform .2s;"></i>
+                    </span>
+                </div>
+                <div id="` + detId + `" style="display:none;border-top:1px solid #1e1e23;">
+                    <table style="width:100%;font-size:.7rem;border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#0a0a0d;">
+                                <th style="padding:.4rem .6rem;text-align:left;color:#52525b;font-weight:700;">Data/Hora</th>
+                                <th style="padding:.4rem .6rem;text-align:left;color:#52525b;font-weight:700;">Jogador / Lançamento</th>
+                                <th style="padding:.4rem .6rem;text-align:right;color:#52525b;font-weight:700;">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${txsSorted.map(tx => {
+                                const dt = new Date(tx.ts);
+                                const dataStr = dt.toLocaleDateString('pt-BR') + ' - ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                                const jNome = getJogadorNome(tx.jogadorId);
+                                const desc = tx.descricao ? '<div style="color:#52525b;font-size:.6rem;margin-top:.1rem;">' + tx.descricao + '</div>' : '';
+                                const corValor = tx.valor >= 0 ? '#22c55e' : '#ef4444';
+                                return '<tr style="border-bottom:1px solid #1e1e23;">' +
+                                    '<td style="padding:.45rem .6rem;color:#a1a1aa;white-space:nowrap;">' + dataStr + '</td>' +
+                                    '<td style="padding:.45rem .6rem;"><div style="font-weight:600;color:#d4d4d8;">' + jNome + '</div>' + desc + '</td>' +
+                                    '<td style="padding:.45rem .6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:' + corValor + ';">' + (tx.valor >= 0 ? '' : '-') + formatMoney(Math.abs(tx.valor)) + '</td>' +
+                                '</tr>';
+                            }).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:#0a0a0d;">
+                                <td colspan="2" style="padding:.45rem .6rem;font-weight:700;color:#71717a;">Total ${m.label}</td>
+                                <td style="padding:.45rem .6rem;text-align:right;font-family:var(--font-mono);font-weight:800;color:${m.color};">${saldoMetodo >= 0 ? '+' : '-'}${formatMoney(Math.abs(saldoMetodo))}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>`;
         }).join('')}` : ''}
     `;
