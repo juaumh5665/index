@@ -26451,6 +26451,9 @@ function renderTabJogadores() {
             </div>
             ${btnAcerto}
             ${btnAddRetro}
+            <button onclick="_desfazerEliminacao('${e.jogadorId}')" title="Desfazer eliminação — jogador volta a ficar ativo (sem alterar valores financeiros)" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
+                <i class="fa-solid fa-rotate-left"></i> Desfazer
+            </button>
             <button onclick="_imprimirExtratoTorneioJogador('${e.jogadorId}')" title="Imprimir extrato deste jogador no torneio atual" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
                 <i class="fa-solid fa-receipt"></i> Extrato
             </button>
@@ -26960,6 +26963,55 @@ function _estornarComboInteiro(comboId) {
     // Abre modal de estorno apontando pra primeira entry; usuário confirma e o ciclo continua
     if (!confirm(`Estornar combo completo de ${getJogadorNome(entries[0].jogadorId)}?\n\n${entries.length} ações no valor total de R$ ${entries.reduce((s,e)=>s+(Number(e.valor)||0),0).toFixed(2).replace('.',',')}.\n\nIsso vai abrir o modal de estorno para a 1ª ação. Após confirmá-la, repita para as demais.`)) return;
     abrirModalEstorno('entry', entries[0].id);
+}
+
+// Desfazer eliminação — restaura jogador eliminado por engano (sem alterar valores financeiros)
+function _desfazerEliminacao(jogadorId) {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+
+    const elim = (t.eliminados || []).find(e => String(e.jogadorId) === String(jogadorId));
+    if (!elim) return showToast('⚠️ Registro de eliminação não encontrado.');
+
+    const nome = getJogadorNome(jogadorId);
+    if (!confirm(`Desfazer eliminação de ${nome}?\n\nO jogador voltará a ficar ativo no torneio.\nNenhum valor financeiro será alterado.`)) return;
+
+    // Suspender realtime durante a operação
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(5000);
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
+
+    const posicaoRemovida = elim.posicao;
+
+    // 1) Remove da lista de eliminados
+    t.eliminados = (t.eliminados || []).filter(e => String(e.jogadorId) !== String(jogadorId));
+
+    // 2) Recalcular posições: quem foi eliminado DEPOIS (posição menor = eliminado depois)
+    //    precisa ter posição incrementada (+1) pois agora há mais um jogador ativo
+    if (posicaoRemovida) {
+        t.eliminados.forEach(e => {
+            if (e.posicao && e.posicao < posicaoRemovida) {
+                e.posicao = e.posicao + 1;
+            }
+        });
+    }
+
+    // 3) Re-alocar jogador numa mesa
+    alocarJogadorMesa(t, jogadorId);
+
+    // 4) Audit log
+    logAudit('DESFAZER_ELIMINACAO', `Eliminação de ${nome} desfeita (jogador restaurado como ativo)`, {
+        torneioId: t.id,
+        jogadorId: jogadorId,
+        jogadorNome: nome,
+        posicaoOriginal: posicaoRemovida
+    });
+
+    // 5) Salvar e atualizar UI
+    saveData();
+    if (typeof updateModalTorneio === 'function') updateModalTorneio();
+    if (typeof renderTorneiosList === 'function') renderTorneiosList();
+
+    showToast(`✅ ${nome} restaurado — agora está ativo no torneio`);
 }
 
 function renderTabMesas() {
