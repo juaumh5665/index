@@ -3190,9 +3190,9 @@ function montarCarouselPremiacao(d) {
     
     await carregarPubData();
     
-    // Polling backup a cada 30s (realtime cuida do tempo real)
-    // Polling a cada 15s (era 30s, mas reduzido porque realtime via SDK não funciona em TVs antigas)
-    pubState.pollingInterval = setInterval(carregarPubData, 15000);
+    // Polling a cada 5s (fallback confiável — funciona em qualquer Smart TV)
+    // Realtime WebSocket cuida do tempo real quando disponível
+    pubState.pollingInterval = setInterval(carregarPubData, 5000);
     
     // Iniciar realtime
     iniciarPubRealtime();
@@ -3522,49 +3522,157 @@ function montarCarouselPremiacao(d) {
     }
   }
   
+  // ═══════════════════════════════════════════════════════════════
+  // REALTIME VIA WEBSOCKET NATIVO — sem depender do SDK Supabase
+  // Conecta direto ao endpoint Realtime do Supabase via WebSocket.
+  // Funciona em qualquer browser com WebSocket (IE10+, Smart TVs 2013+).
+  // Fallback: se WebSocket não existir, polling a cada 5s cuida de tudo.
+  // ═══════════════════════════════════════════════════════════════
+  let _rtWs = null;
+  let _rtHeartbeat = null;
+  let _rtRef = 0;
+  let _rtReconnectTimer = null;
+  let _rtReconnectDelay = 1000; // começa em 1s, dobra até 30s
+
   function iniciarPubRealtime() {
-    if (pubState.realtimeChannel) return;
-    pubState.realtimeChannel = sb.channel(`tv:${pubState.clubeId}`)
-      .on('postgres_changes', { 
-        event: '*', schema: 'public', table: 'torneios',
-        filter: `clube_id=eq.${pubState.clubeId}` 
-      }, () => {
-        agendarReload();
-      })
-      .on('postgres_changes', { 
-        event: '*', schema: 'public', table: 'torneio_entries',
-        filter: `clube_id=eq.${pubState.clubeId}` 
-      }, () => agendarReload())
-      .on('postgres_changes', { 
-        event: '*', schema: 'public', table: 'torneio_eliminados',
-        filter: `clube_id=eq.${pubState.clubeId}` 
-      }, () => agendarReload())
-      .on('postgres_changes', {
-        // Patrocinadores: invalida cache e re-renderiza carrossel se o break estiver visível.
-        // Não precisa de reload completo da TV (não muda dados do torneio).
-        event: '*', schema: 'public', table: 'patrocinadores',
-        filter: `clube_id=eq.${pubState.clubeId}`
-      }, () => {
-        if (typeof _bsInvalidarCachePatrocinadores === 'function') _bsInvalidarCachePatrocinadores();
-        if (typeof _bsAtualizarPatrocinadores === 'function') _bsAtualizarPatrocinadores(pubState.clubeId);
-      })
-      .subscribe((status) => {
-        console.log('[TV PUBLIC] realtime:', status);
+    if (pubState.realtimeChannel) return; // já conectado
+    if (typeof WebSocket === 'undefined') {
+      console.warn('[TV REALTIME] WebSocket não disponível — usando apenas polling');
+      return;
+    }
+
+    const wsUrl = SUPABASE_URL.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + SUPABASE_ANON + '&vsn=1.0.0';
+    console.log('[TV REALTIME] Conectando...', wsUrl.substring(0, 60) + '...');
+
+    try {
+      _rtWs = new WebSocket(wsUrl);
+    } catch(e) {
+      console.warn('[TV REALTIME] Erro ao criar WebSocket:', e);
+      return;
+    }
+
+    _rtWs.onopen = function() {
+      console.log('[TV REALTIME] ✅ WebSocket conectado');
+      _rtReconnectDelay = 1000; // reset backoff
+      pubState.realtimeChannel = _rtWs;
+
+      // Heartbeat a cada 30s (Supabase desconecta após ~60s sem atividade)
+      if (_rtHeartbeat) clearInterval(_rtHeartbeat);
+      _rtHeartbeat = setInterval(function() {
+        _rtSend('heartbeat', 'phoenix', {});
+      }, 30000);
+
+      // Assinar canal com filtro por clube_id
+      var clubeFilter = 'clube_id=eq.' + pubState.clubeId;
+
+      // 1) torneios — status, timer, blinds, etc
+      _rtSend('phx_join', 'realtime:public:torneios:' + clubeFilter, {
+        config: { postgres_changes: [{ event: '*', schema: 'public', table: 'torneios', filter: clubeFilter }] }
       });
+      // 2) torneio_entries — buy-ins, rebuys
+      _rtSend('phx_join', 'realtime:public:torneio_entries:' + clubeFilter, {
+        config: { postgres_changes: [{ event: '*', schema: 'public', table: 'torneio_entries', filter: clubeFilter }] }
+      });
+      // 3) torneio_eliminados — eliminações (causa raiz do bug 10/42)
+      _rtSend('phx_join', 'realtime:public:torneio_eliminados:' + clubeFilter, {
+        config: { postgres_changes: [{ event: '*', schema: 'public', table: 'torneio_eliminados', filter: clubeFilter }] }
+      });
+      // 4) patrocinadores
+      _rtSend('phx_join', 'realtime:public:patrocinadores:' + clubeFilter, {
+        config: { postgres_changes: [{ event: '*', schema: 'public', table: 'patrocinadores', filter: clubeFilter }] }
+      });
+    };
+
+    _rtWs.onmessage = function(evt) {
+      try {
+        var msg = JSON.parse(evt.data);
+        // Ignora heartbeat replies e join confirmations
+        if (msg.event === 'phx_reply' || msg.event === 'heartbeat') return;
+
+        // postgres_changes → recarregar dados
+        if (msg.event === 'postgres_changes' || msg.event === 'INSERT' || msg.event === 'UPDATE' || msg.event === 'DELETE') {
+          var table = '';
+          if (msg.payload && msg.payload.data && msg.payload.data.table) {
+            table = msg.payload.data.table;
+          } else if (msg.topic) {
+            table = msg.topic;
+          }
+          console.log('[TV REALTIME] 📡 Mudança detectada:', table || msg.event);
+
+          // Patrocinadores: atualiza carrossel sem reload completo
+          if (table === 'patrocinadores' || (msg.topic && msg.topic.indexOf('patrocinadores') !== -1)) {
+            if (typeof _bsInvalidarCachePatrocinadores === 'function') _bsInvalidarCachePatrocinadores();
+            if (typeof _bsAtualizarPatrocinadores === 'function') _bsAtualizarPatrocinadores(pubState.clubeId);
+          }
+
+          // Qualquer mudança em torneios/entries/eliminados → reload dados
+          agendarReload();
+        }
+      } catch(e) {
+        // mensagem não-JSON ou malformada — ignora
+      }
+    };
+
+    _rtWs.onclose = function(evt) {
+      console.warn('[TV REALTIME] ❌ WebSocket fechou (code=' + evt.code + '). Reconectando em ' + (_rtReconnectDelay/1000) + 's...');
+      _rtLimpar();
+      _rtAgendarReconexao();
+    };
+
+    _rtWs.onerror = function(err) {
+      console.warn('[TV REALTIME] Erro WebSocket:', err);
+      // onclose será chamado em seguida
+    };
+  }
+
+  function _rtSend(event, topic, payload) {
+    if (!_rtWs || _rtWs.readyState !== WebSocket.OPEN) return;
+    _rtRef++;
+    try {
+      _rtWs.send(JSON.stringify({
+        topic: topic,
+        event: event,
+        payload: payload || {},
+        ref: String(_rtRef)
+      }));
+    } catch(e) {
+      console.warn('[TV REALTIME] Erro ao enviar:', e);
+    }
+  }
+
+  function _rtLimpar() {
+    pubState.realtimeChannel = null;
+    if (_rtHeartbeat) { clearInterval(_rtHeartbeat); _rtHeartbeat = null; }
+    if (_rtWs) {
+      try { _rtWs.close(); } catch(e) {}
+      _rtWs = null;
+    }
+  }
+
+  function _rtAgendarReconexao() {
+    if (_rtReconnectTimer) clearTimeout(_rtReconnectTimer);
+    _rtReconnectTimer = setTimeout(function() {
+      _rtReconnectTimer = null;
+      console.log('[TV REALTIME] 🔄 Tentando reconectar...');
+      iniciarPubRealtime();
+    }, _rtReconnectDelay);
+    // Backoff exponencial: 1s → 2s → 4s → 8s → 16s → 30s (max)
+    _rtReconnectDelay = Math.min(_rtReconnectDelay * 2, 30000);
   }
   
   // Debounce + throttle: agrupa eventos próximos e limita freq de fetches
   let _reloadTimer = null;
   let _ultimoReload = 0;
-  const MIN_INTERVAL_MS = 2500; // mínimo 2.5s entre fetches
-  
+  const MIN_INTERVAL_MS = 2000; // mínimo 2s entre fetches
+
   function agendarReload() {
     if (_reloadTimer) clearTimeout(_reloadTimer);
-    
+
     const agora = Date.now();
     const tempoDesdeUltimo = agora - _ultimoReload;
-    const delay = tempoDesdeUltimo >= MIN_INTERVAL_MS ? 1200 : (MIN_INTERVAL_MS - tempoDesdeUltimo);
-    
+    // Se já passou o intervalo mínimo, recarrega rápido (500ms debounce pra agrupar eventos simultâneos)
+    const delay = tempoDesdeUltimo >= MIN_INTERVAL_MS ? 500 : (MIN_INTERVAL_MS - tempoDesdeUltimo);
+
     _reloadTimer = setTimeout(() => {
       _reloadTimer = null;
       _ultimoReload = Date.now();
