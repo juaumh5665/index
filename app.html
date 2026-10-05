@@ -47238,7 +47238,14 @@ function renderCaixaTorneio(t) {
 let _pagPositivoCtx = { jogadorId: null, valor: 0 };
 
 function abrirPagamentoPositivoCash(jogadorId, valor) {
-    _pagPositivoCtx = { jogadorId, valor };
+    // PROTEÇÃO: recalcula saldo REAL antes de abrir o modal (não confiar no valor passado)
+    const saldoReal = getSaldoJogador(jogadorId);
+    if (saldoReal <= 0) {
+        return showToast('⚠️ Jogador não tem saldo positivo — nada a pagar');
+    }
+    // Usa o saldo real em vez do valor passado (pode estar desatualizado)
+    const valorExibido = Math.min(valor, saldoReal);
+    _pagPositivoCtx = { jogadorId, valor: saldoReal };
     const j = jogadores.find(x => x.id === jogadorId);
     document.getElementById('pp-info').innerHTML = `
         <div style="display:flex;justify-content:space-between;margin-bottom:.4rem;">
@@ -47246,26 +47253,38 @@ function abrirPagamentoPositivoCash(jogadorId, valor) {
             <span style="font-weight:700;">${esc(j ? j.nome : '?')}</span>
         </div>
         <div style="display:flex;justify-content:space-between;">
-            <span style="color:#71717a;font-size:.8rem;">Valor a pagar</span>
-            <span style="font-family:var(--font-mono);font-weight:800;color:#22c55e;font-size:1.1rem;">${formatMoney(valor)}</span>
+            <span style="color:#71717a;font-size:.8rem;">Crédito disponível</span>
+            <span style="font-family:var(--font-mono);font-weight:800;color:#22c55e;font-size:1.1rem;">${formatMoney(saldoReal)}</span>
         </div>
     `;
-    document.getElementById('pp-valor').value = valor.toFixed(2);
+    document.getElementById('pp-valor').value = valorExibido.toFixed(2);
     renderMetodosPagamento('pp-metodos', 'pp', false);
     openModal('modal-pagamento-positivo');
 }
 
 function confirmarPagamentoPositivo() {
-    const { jogadorId, valor } = _pagPositivoCtx;
+    const { jogadorId } = _pagPositivoCtx;
     const valorPago = parseFloat(document.getElementById('pp-valor').value) || 0;
     const metodoSel = document.querySelector('input[name="metodo-pp"]:checked');
     const metodo = metodoSel ? metodoSel.value : 'dinheiro';
 
     if (valorPago <= 0) return showToast('⚠️ Valor inválido');
-    if (valorPago > valor) return showToast('⚠️ Valor maior que o devido ao jogador');
 
-    // Taxas não se aplicam a pagamento ao jogador (clube paga o jogador), mas se for necessário descontar
-    // (operador pode optar), isso pode ser implementado aqui. Por padrão, pagamento sai integral.
+    // PROTEÇÃO: recalcula saldo REAL no momento do pagamento (evita pagamento indevido)
+    const saldoAtual = getSaldoJogador(jogadorId);
+    if (saldoAtual <= 0) {
+        return showToast('⚠️ Jogador não tem saldo positivo — nada a pagar');
+    }
+    if (valorPago > saldoAtual) {
+        const jog = jogadores.find(x => x.id === jogadorId);
+        const confirmar = confirm(
+            `⚠️ ATENÇÃO: ${jog ? jog.nome : 'Jogador'} tem crédito de apenas ${formatMoney(saldoAtual)}, ` +
+            `mas o pagamento é de ${formatMoney(valorPago)}.\n\n` +
+            `Pagando ${formatMoney(valorPago)}, o jogador ficará DEVENDO ${formatMoney(valorPago - saldoAtual)} ao clube.\n\n` +
+            `Tem certeza que deseja continuar?`
+        );
+        if (!confirmar) return;
+    }
 
     registrarTransacao({
         jogadorId,
