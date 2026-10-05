@@ -25107,6 +25107,22 @@ async function salvarJogador() {
             logAudit('JOGADOR_EDITA', `Editado: ${nome}`, { id: editId, dados });
             showToast(`✅ ${nome} atualizado!`);
         } else {
+            // Anti-duplicata: verifica se já existe jogador com nome igual (case-insensitive)
+            const nomeNorm = nome.toUpperCase().trim();
+            const existente = jogadores.find(j =>
+                j.nome && j.nome.toUpperCase().trim() === nomeNorm && !j.bloqueado
+            );
+            if (existente) {
+                const confirmar = confirm(
+                    `⚠️ Já existe um jogador "${existente.nome}" cadastrado.\n\n` +
+                    `Deseja cadastrar outro com o mesmo nome?\n` +
+                    `(Clique "Cancelar" para evitar duplicata)`
+                );
+                if (!confirmar) {
+                    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+                    return;
+                }
+            }
             // Modo cadastro
             const criado = await db.jogadores.create(dados);
             logAudit('JOGADOR_CRIA', `Cadastrado: ${nome}`, { id: criado.id, dados });
@@ -40584,10 +40600,31 @@ function playBeep() {
 //   valor NEGATIVO = jogador DEVE (gastou/inscreveu)
 //   valor POSITIVO = jogador RECEBE/TEM CRÉDITO (pagou, depositou, ganhou cash)
 
+// Guard anti-duplicata: rejeita transações idênticas (mesmo jogador+tipo+valor) em < 2s
+const _txDedupMap = new Map(); // chave → timestamp
+const TX_DEDUP_WINDOW = 2000; // 2 segundos
+
 function registrarTransacao(dados) {
+    // Dedup: chave = jogadorId + tipo + valor
+    const dedupKey = `${dados.jogadorId}|${dados.tipo}|${dados.valor}`;
+    const now = Date.now();
+    const lastTs = _txDedupMap.get(dedupKey);
+    if (lastTs && (now - lastTs) < TX_DEDUP_WINDOW) {
+        console.warn('[DEDUP] Transação duplicada bloqueada:', dedupKey, `(${now - lastTs}ms)`);
+        return null; // Retorna null — chamadores que checam o retorno saberão
+    }
+    _txDedupMap.set(dedupKey, now);
+
+    // Limpa entradas antigas do map a cada 100 registros pra não vazar memória
+    if (_txDedupMap.size > 200) {
+        for (const [k, v] of _txDedupMap) {
+            if (now - v > TX_DEDUP_WINDOW * 5) _txDedupMap.delete(k);
+        }
+    }
+
     const t = {
         id: _genUuid(),
-        ts: Date.now(),
+        ts: now,
         fechamentoId: null,
         ...dados,
     };
