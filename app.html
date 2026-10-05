@@ -3956,6 +3956,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             <option value="bar">Bar & Vendas</option>
                             <option value="pagamento">Pagamentos</option>
                             <option value="deposito">Depósitos</option>
+                            <option value="estorno">↩ Estornos</option>
                         </select>
                     </div>
                     <div id="caixa-transacoes-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
@@ -40597,7 +40598,7 @@ function registrarTransacao(dados) {
 
 function getSaldoJogador(jogadorId) {
     return transacoes
-        .filter(t => t.jogadorId === jogadorId)
+        .filter(t => t.jogadorId === jogadorId && !t.estornada)
         .reduce((s, t) => s + t.valor, 0);
 }
 
@@ -40605,7 +40606,7 @@ function getSaldoJogador(jogadorId) {
 // Usado no CAIXA GERAL do clube (que não deve mostrar cash)
 function getSaldoJogadorCaixaGeral(jogadorId) {
     return transacoes
-        .filter(t => t.jogadorId === jogadorId && t.origem !== 'cash')
+        .filter(t => t.jogadorId === jogadorId && t.origem !== 'cash' && !t.estornada)
         .reduce((s, t) => s + t.valor, 0);
 }
 
@@ -40953,29 +40954,50 @@ function renderExtratoJogador() {
     el.innerHTML = ext.map(t => {
         const positivo = t.valor >= 0;
         const metodo = t.metodo ? PAYMENT_METHODS[t.metodo] : null;
-        // Botão "📱 Enviar recibo" só pra transações de PAGAMENTO (positivas, do caixa)
-        const ehPagamento = t.tipo === 'pagamento';
+        const isEstornada = !!t.estornada;
+        const isEstorno = t.tipo === 'estorno';
+        // Botão "📱 Enviar recibo" só pra transações de PAGAMENTO (positivas, do caixa) e não estornadas
+        const ehPagamento = t.tipo === 'pagamento' && !isEstornada;
         const jaEnviado = ehPagamento && typeof _reciboWhatsappJaEnviado === 'function' && _reciboWhatsappJaEnviado(t.id);
         const btnReciboWa = ehPagamento ? `
             <button onclick="_extratoEnviarReciboWa('${t.id}')" title="${jaEnviado ? 'Reenviar recibo via WhatsApp' : 'Enviar recibo via WhatsApp'}"
                 style="background:${jaEnviado?'transparent':'rgba(37,211,102,.1)'};border:1px solid ${jaEnviado?'#2a2a30':'rgba(37,211,102,.3)'};color:${jaEnviado?'#71717a':'#25d366'};padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
                 <i class="fa-brands fa-whatsapp"></i> ${jaEnviado?'Reenviar':'Enviar'}
             </button>` : '';
+        // Estilo visual: estornada = riscada + opaca; estorno = fundo âmbar
+        const estiloCard = isEstornada
+            ? 'opacity:.5;text-decoration:line-through;'
+            : isEstorno
+                ? 'border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05);'
+                : '';
+        // Ícone: estorno usa rotate-left
+        const icone = isEstorno ? 'fa-rotate-left' : getTipoIcon(t.tipo);
+        const corIcone = isEstorno ? '#f59e0b' : (positivo ? '#22c55e' : '#ef4444');
+        const bgIcone = isEstorno ? 'rgba(245,158,11,.1)' : (positivo ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)');
+        // Info extra do estorno
+        const infoEstorno = isEstornada
+            ? `<div style="font-size:.6rem;color:#f59e0b;margin-top:.2rem;text-decoration:none;"><i class="fa-solid fa-rotate-left"></i> Estornado em ${new Date(t.estornadaEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} por ${t.estornadaPor || '?'} — ${t.estornoMotivo || 'sem motivo'}</div>`
+            : isEstorno
+                ? `<div style="font-size:.6rem;color:#f59e0b;margin-top:.2rem;"><i class="fa-solid fa-shield-halved"></i> Operador: ${t.estornoPor || '?'} — Motivo: ${t.estornoMotivo || 'sem motivo'}</div>`
+                : '';
+        // Botão de estorno: só pra transações ativas (não estornadas, não estorno, não fechadas)
+        const podeEstornar = !isEstornada && !isEstorno && !t.fechamentoId;
         return `
-        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;">
-            <div style="width:32px;height:32px;border-radius:50%;background:${positivo?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${positivo?'#22c55e':'#ef4444'};display:flex;align-items:center;justify-content:center;font-size:.75rem;">
-                <i class="fa-solid ${getTipoIcon(t.tipo)}"></i>
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;${estiloCard}">
+            <div style="width:32px;height:32px;border-radius:50%;background:${bgIcone};color:${corIcone};display:flex;align-items:center;justify-content:center;font-size:.75rem;">
+                <i class="fa-solid ${icone}"></i>
             </div>
-            <div>
-                <div style="font-weight:700;font-size:.85rem;">${t.descricao}</div>
+            <div style="text-decoration:none;">
+                <div style="font-weight:700;font-size:.85rem;">${t.descricao}${isEstornada ? ' <span style="font-size:.6rem;background:#f59e0b;color:#000;padding:.1rem .3rem;border-radius:.2rem;font-weight:800;text-decoration:none;display:inline-block;">ESTORNADO</span>' : ''}</div>
                 <div style="font-size:.7rem;color:#52525b;margin-top:.1rem;">
                     ${new Date(t.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
                     ${metodo?` · <i class="fa-solid ${metodo.icon}" style="color:${metodo.color};"></i> ${metodo.label}`:''}
                 </div>
+                ${infoEstorno}
             </div>
-            <span style="font-family:var(--font-mono);font-weight:800;font-size:.9rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
+            <span style="font-family:var(--font-mono);font-weight:800;font-size:.9rem;color:${isEstornada ? '#71717a' : isEstorno ? '#f59e0b' : (positivo?'#22c55e':'#ef4444')};">${positivo?'+':''}${formatMoney(t.valor)}</span>
             ${btnReciboWa}
-            <button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar transação" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-rotate-left"></i></button>
+            ${podeEstornar ? `<button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar transação" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#3f3f46'"><i class="fa-solid fa-rotate-left"></i></button>` : '<span></span>'}
         </div>`;
     }).join('');
 }
@@ -41015,6 +41037,7 @@ function getTipoIcon(tipo) {
         cash_in:  'fa-coins',        cash_out:  'fa-right-from-bracket',
         cash_rec: 'fa-plus-circle',  bar:       'fa-utensils',
         pagamento:'fa-credit-card',  deposito:  'fa-wallet',
+        estorno:  'fa-rotate-left',
     };
     return icons[tipo] || 'fa-circle-dot';
 }
@@ -41789,15 +41812,43 @@ function removerTransacao(id) {
     const t = transacoes.find(x => x.id === id);
     if (!t) return;
     if (t.fechamentoId) return showToast('⚠️ Transação já faz parte de fechamento');
-    if (!confirm(`Estornar transação "${t.descricao}" de ${formatMoney(t.valor)}?`)) return;
-    transacoes = transacoes.filter(x => x.id !== id);
+    if (t.estornada) return showToast('⚠️ Transação já foi estornada');
+    if (t.tipo === 'estorno') return showToast('⚠️ Não é possível estornar um estorno');
+
+    const motivo = prompt(`Motivo do estorno de "${t.descricao}" (${formatMoney(Math.abs(t.valor))}):`);
+    if (motivo === null) return; // cancelou
+    if (!motivo.trim()) return showToast('⚠️ Informe o motivo do estorno');
+
+    // 1. Marca a transação original como estornada
+    t.estornada = true;
+    t.estornadaEm = Date.now();
+    t.estornadaPor = currentUser ? currentUser.nome : 'Sistema';
+    t.estornoMotivo = motivo.trim();
+
+    // 2. Cria transação de estorno (valor inverso) para manter o histórico
+    const estornoTx = {
+        id: _genUuid(),
+        jogadorId: t.jogadorId,
+        tipo: 'estorno',
+        valor: -t.valor,
+        descricao: `Estorno: ${t.descricao}`,
+        metodo: t.metodo || null,
+        origem: t.origem || null,
+        ts: Date.now(),
+        fechamentoId: null,
+        estornoRef: t.id,       // referência à transação original
+        estornoMotivo: motivo.trim(),
+        estornoPor: currentUser ? currentUser.nome : 'Sistema',
+    };
+    transacoes.push(estornoTx);
+
     saveData();
     if (pagamentoJogadorId) {
         renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
         renderExtratoJogador();
     }
     renderCaixaAberto();
-    showToast('↩️ Transação estornada');
+    showToast('↩️ Transação estornada — registro mantido no histórico');
 }
 
 // ============================================================
@@ -41808,8 +41859,8 @@ function renderCaixaFechamento() {
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
     document.getElementById('fechamento-data').innerText = hoje.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
 
-    // Transações do dia não fechadas — exclui cash (tem caixa próprio por mesa)
-    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t));
+    // Transações do dia não fechadas — exclui cash (tem caixa próprio por mesa) e estornadas
+    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t) && !t.estornada);
 
     // Resumo por jogador
     const porJogador = {};
@@ -41958,8 +42009,8 @@ function renderCaixaFechamento() {
 function confirmarFechamentoDia() {
     const hoje = new Date();
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
-    // Exclui cash do fechamento (tem caixa próprio)
-    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t));
+    // Exclui cash do fechamento (tem caixa próprio) e estornadas
+    const abertas = transacoes.filter(t => !t.fechamentoId && t.ts >= inicioHoje && !_isTransacaoCash(t) && !t.estornada);
 
     // 🆕 Detecta comandas do bar AINDA abertas no fim do dia
     // Elas vão ser auto-fechadas como "devedor" — viram saldo a pagar pro próximo dia
@@ -42118,20 +42169,44 @@ function renderCaixaTransacoes() {
         el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma transação neste filtro</div>`;
         return;
     }
+    // Adiciona filtro de estornos ao mapa
+    if (filtro === 'estorno') lista = transacoes.filter(t => !_isTransacaoCash(t) && (t.estornada || t.tipo === 'estorno')).sort((a,b) => b.ts - a.ts);
+
+    if (!lista.length) {
+        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma transação neste filtro</div>`;
+        return;
+    }
     el.innerHTML = lista.slice(0, 300).map(t => {
         const j = jogadores.find(x => x.id === t.jogadorId);
         const positivo = t.valor >= 0;
         const metodo = t.metodo ? PAYMENT_METHODS[t.metodo] : null;
+        const isEstornada = !!t.estornada;
+        const isEstorno = t.tipo === 'estorno';
+        const estiloCard = isEstornada
+            ? 'opacity:.5;text-decoration:line-through;'
+            : isEstorno
+                ? 'border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.05);'
+                : '';
+        const icone = isEstorno ? 'fa-rotate-left' : getTipoIcon(t.tipo);
+        const corIcone = isEstorno ? '#f59e0b' : (positivo ? '#22c55e' : '#ef4444');
+        const bgIcone = isEstorno ? 'rgba(245,158,11,.1)' : (positivo ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)');
+        const infoEstorno = isEstornada
+            ? `<div style="font-size:.6rem;color:#f59e0b;margin-top:.15rem;text-decoration:none;"><i class="fa-solid fa-rotate-left"></i> Estornado por ${t.estornadaPor || '?'} — ${t.estornoMotivo || ''}</div>`
+            : isEstorno
+                ? `<div style="font-size:.6rem;color:#f59e0b;margin-top:.15rem;"><i class="fa-solid fa-shield-halved"></i> ${t.estornoPor || '?'} — ${t.estornoMotivo || ''}</div>`
+                : '';
+        const podeEstornar = !isEstornada && !isEstorno && !t.fechamentoId;
         return `
-        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;">
-            <div style="width:28px;height:28px;border-radius:50%;background:${positivo?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)'};color:${positivo?'#22c55e':'#ef4444'};display:flex;align-items:center;justify-content:center;font-size:.7rem;"><i class="fa-solid ${getTipoIcon(t.tipo)}"></i></div>
-            <div>
-                <div style="font-weight:700;">${j?j.nome:'?'} — ${t.descricao}</div>
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.6rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;${estiloCard}">
+            <div style="width:28px;height:28px;border-radius:50%;background:${bgIcone};color:${corIcone};display:flex;align-items:center;justify-content:center;font-size:.7rem;"><i class="fa-solid ${icone}"></i></div>
+            <div style="text-decoration:none;">
+                <div style="font-weight:700;">${j?j.nome:'?'} — ${t.descricao}${isEstornada ? ' <span style="font-size:.55rem;background:#f59e0b;color:#000;padding:.08rem .25rem;border-radius:.2rem;font-weight:800;text-decoration:none;display:inline-block;">ESTORNADO</span>' : ''}</div>
                 <div style="font-size:.65rem;color:#52525b;margin-top:.1rem;">${new Date(t.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${metodo?' · '+metodo.label:''}</div>
+                ${infoEstorno}
             </div>
             ${t.fechamentoId?`<span class="tag tag-finished" style="font-size:.6rem;">Fechado</span>`:'<span></span>'}
-            <span style="font-family:var(--font-mono);font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(t.valor)}</span>
-            ${!t.fechamentoId ? `<button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar"><i class="fa-solid fa-rotate-left"></i></button>` : '<span></span>'}
+            <span style="font-family:var(--font-mono);font-weight:800;color:${isEstornada ? '#71717a' : isEstorno ? '#f59e0b' : (positivo?'#22c55e':'#ef4444')};">${positivo?'+':''}${formatMoney(t.valor)}</span>
+            ${podeEstornar ? `<button onclick="removerTransacao('${t.id}')" style="background:none;border:none;color:#3f3f46;cursor:pointer;font-size:.7rem;" title="Estornar"><i class="fa-solid fa-rotate-left"></i></button>` : '<span></span>'}
         </div>`;
     }).join('');
 }
