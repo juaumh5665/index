@@ -47104,10 +47104,20 @@ async function salvarCadastroRapido() {
         const sel = document.getElementById('entrada-jogador');
         if (sel) {
             openModalEntrada(activeTorneioIdx);
+            // Aguarda PlayerSearch sincronizar (MutationObserver) e então seleciona o jogador
             setTimeout(() => {
                 const newSel = document.getElementById('entrada-jogador');
-                if (newSel) newSel.value = novoJog.id;
-            }, 50);
+                if (newSel) {
+                    // Seta valor no select nativo
+                    newSel.__pickedByUser = true;
+                    newSel.value = novoJog.id;
+                    // Dispara change pra _renderOpcoesEntrada montar as opções corretas
+                    newSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    setTimeout(() => { newSel.__pickedByUser = false; }, 50);
+                    // Sincroniza o combobox visual do PlayerSearch (mostra nome no input)
+                    try { PlayerSearch.mount('entrada-jogador'); } catch(e) {}
+                }
+            }, 100);
         }
         renderJogadores();
         renderDashboard();
