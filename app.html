@@ -11304,12 +11304,31 @@ async function _processarMudancaRealtime(tipo, payload) {
                     localStorage.setItem('ps_bar_comandas', JSON.stringify(barComandas));
                 }
                 if (pRows) {
-                    barProdutos = pRows.map(_produtoFromDb);
+                    // FIX CRÍTICO: preserva produtos locais que ainda não sincronizaram
+                    // (evita perda de produto recém-cadastrado se realtime chegar antes do sync)
+                    const produtosDoBanco = pRows.map(_produtoFromDb);
+                    const idsDoBanco = new Set(produtosDoBanco.map(p => p.id));
+                    const idsPendentesSync = _syncQueue.barProdutos || new Set();
+                    const idsPendentesDelete = (_syncQueue.deletes && _syncQueue.deletes.barProdutos) || new Set();
+
+                    // Produtos locais que estão na fila de sync mas ainda não chegaram ao banco
+                    const locaisNaoSincronizados = (barProdutos || []).filter(p =>
+                        idsPendentesSync.has(p.id) && !idsDoBanco.has(p.id)
+                    );
+                    if (locaisNaoSincronizados.length) {
+                        console.log('[REALTIME] preservando', locaisNaoSincronizados.length, 'produto(s) local(is) ainda não sincronizado(s):', locaisNaoSincronizados.map(p => p.nome));
+                    }
+
+                    // Monta lista final: banco + locais não sincronizados, excluindo deletados localmente
+                    barProdutos = [
+                        ...produtosDoBanco.filter(p => !idsPendentesDelete.has(p.id)),
+                        ...locaisNaoSincronizados
+                    ];
                     localStorage.setItem('ps_bar_produtos', JSON.stringify(barProdutos));
                 }
             } catch(e) { console.warn('[REALTIME] reload bar:', e); }
         }
-        
+
         if (tipo === 'cash_mesa') {
             try {
                 const { data: cmRows } = await sb.from('cash_mesas').select('*').eq('clube_id', clubeId);
@@ -12509,7 +12528,21 @@ async function carregarEstadoDoSupabase() {
         }
         const { data: pRows } = await sb.from('bar_produtos').select('*').eq('clube_id', clubeIdEsperado);
         if (pRows) {
-            barProdutos = pRows.map(_produtoFromDb);
+            // FIX: preserva produtos locais pendentes de sync (proteção extra contra race no boot)
+            const produtosDoBanco = pRows.map(_produtoFromDb);
+            const idsDoBanco = new Set(produtosDoBanco.map(p => p.id));
+            const idsPendentesSync = _syncQueue.barProdutos || new Set();
+            const idsPendentesDelete = (_syncQueue.deletes && _syncQueue.deletes.barProdutos) || new Set();
+            const locaisNaoSincronizados = (barProdutos || []).filter(p =>
+                idsPendentesSync.has(p.id) && !idsDoBanco.has(p.id)
+            );
+            if (locaisNaoSincronizados.length) {
+                console.log('[BOOT] preservando', locaisNaoSincronizados.length, 'produto(s) local(is) pendente(s) de sync');
+            }
+            barProdutos = [
+                ...produtosDoBanco.filter(p => !idsPendentesDelete.has(p.id)),
+                ...locaisNaoSincronizados
+            ];
             localStorage.setItem('ps_bar_produtos', JSON.stringify(barProdutos));
         }
 
@@ -34821,6 +34854,9 @@ function editarProduto(id) {
 function removerProduto(id) {
     if (!confirm('Remover este produto?')) return;
     barProdutos = barProdutos.filter(p => p.id !== id);
+    // FIX CRÍTICO: marca para deletar no Supabase (antes só removia localmente,
+    // produto reaparecia no próximo boot/realtime porque não era deletado do banco)
+    _markDelete('barProdutos', id);
     saveData();
     renderProdutos();
     atualizarBadgeEstoqueBaixo && atualizarBadgeEstoqueBaixo();
