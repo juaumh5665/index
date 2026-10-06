@@ -6092,7 +6092,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 </button>
             </div>
             <div style="font-size:.6rem;color:#71717a;margin-top:.4rem;text-align:center;font-style:italic;" id="ap-cobranca-dica">
-                "Só este torneio" desconta apenas o que foi gasto aqui (buy-in, rebuy, etc.)
+                "Só este torneio" desconta apenas este torneio — dívidas anteriores ficam em aberto
             </div>
         </div>
 
@@ -41423,11 +41423,14 @@ function renderPagarConta() {
     const divida = Math.max(0, -saldo);
 
     // === TOGGLE SALDO TORNEIO vs TOTAL ===
-    // Detecta se há torneio ativo e calcula dívida apenas deste torneio
+    // Detecta se há torneio ativo e calcula cobranças deste torneio
     const t = torneios[activeTorneioIdx];
     const torneioId = t ? t.id : null;
-    const dividaTorneio = torneioId ? _acertoCalcDividaTorneio(pagamentoJogadorId, torneioId) : 0;
-    const temDividaHistorica = divida > 0 && dividaTorneio > 0 && Math.abs(divida - dividaTorneio) > 0.01;
+    const dividaTorneioBruto = torneioId ? _acertoCalcDividaTorneio(pagamentoJogadorId, torneioId) : 0;
+    // Cap: dívida do torneio não pode exceder a dívida total (pagamentos já reduziram)
+    const dividaTorneio = Math.min(dividaTorneioBruto, divida);
+    // Só mostra toggle quando torneio < total (existe dívida adicional de outras origens)
+    const temDividaHistorica = divida > 0 && dividaTorneio > 0 && (divida - dividaTorneio) > 0.01;
 
     // Armazena estado global pra toggle funcionar
     _pjCobrancaModo = 'tudo'; // default: cobra tudo
@@ -41461,19 +41464,20 @@ function renderPagarConta() {
 
     // Toggle de cobrança: "Saldo Total" vs "Só Torneio" (aparece só quando há diferença)
     const nomeTorneio = t ? t.nome : 'torneio';
+    const dividaExtra = Math.round((divida - dividaTorneio) * 100) / 100;
     const toggleCobranca = temDividaHistorica ? `
         <div id="pj-cobranca-toggle-wrap" style="margin-top:.75rem;padding:.65rem .85rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;">
             <div style="font-size:.62rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">O que cobrar?</div>
             <div style="display:flex;gap:.4rem;">
                 <button id="pj-cobranca-tab-tudo" onclick="_pjTrocarCobranca('tudo')" type="button" style="flex:1;padding:.45rem .5rem;border-radius:.4rem;border:1px solid rgba(168,85,247,.3);cursor:pointer;font-family:'Manrope',sans-serif;font-weight:700;font-size:.72rem;transition:all .15s;background:#a855f7;color:#fff;">
-                    Saldo Total <span id="pj-cobranca-val-tudo" style="font-family:var(--font-mono);font-weight:800;">(${formatMoney(divida)})</span>
+                    Tudo <span id="pj-cobranca-val-tudo" style="font-family:var(--font-mono);font-weight:800;">(${formatMoney(divida)})</span>
                 </button>
                 <button id="pj-cobranca-tab-torneio" onclick="_pjTrocarCobranca('torneio')" type="button" style="flex:1;padding:.45rem .5rem;border-radius:.4rem;border:1px solid rgba(168,85,247,.3);cursor:pointer;font-family:'Manrope',sans-serif;font-weight:700;font-size:.72rem;transition:all .15s;background:transparent;color:#71717a;">
                     Só Torneio <span id="pj-cobranca-val-torneio" style="font-family:var(--font-mono);font-weight:800;">(${formatMoney(dividaTorneio)})</span>
                 </button>
             </div>
             <div id="pj-cobranca-info" style="font-size:.62rem;color:#71717a;margin-top:.4rem;text-align:center;">
-                Cobrando saldo total (${formatMoney(divida)}) — inclui torneios/cash/bar anteriores
+                Cobrando tudo (${formatMoney(divida)}) — torneio ${formatMoney(dividaTorneio)} + dívidas anteriores ${formatMoney(dividaExtra)}
             </div>
         </div>` : '';
 
@@ -41718,10 +41722,11 @@ function _pjTrocarCobranca(modo) {
     if (infoEl) {
         const t = torneios[activeTorneioIdx];
         const nomeTorneio = t ? t.nome : 'torneio';
+        const dividaExtra = Math.round((_pjDividaTotal - _pjDividaTorneio) * 100) / 100;
         if (modo === 'tudo') {
-            infoEl.textContent = `Cobrando saldo total (${formatMoney(_pjDividaTotal)}) — inclui torneios/cash/bar anteriores`;
+            infoEl.textContent = `Cobrando tudo (${formatMoney(_pjDividaTotal)}) — torneio ${formatMoney(_pjDividaTorneio)} + dívidas anteriores ${formatMoney(dividaExtra)}`;
         } else {
-            infoEl.textContent = `Cobrando só ${nomeTorneio} (${formatMoney(_pjDividaTorneio)}) — dívidas anteriores ficam em aberto`;
+            infoEl.textContent = `Cobrando só ${nomeTorneio} (${formatMoney(_pjDividaTorneio)}) — restam ${formatMoney(dividaExtra)} de dívidas anteriores`;
         }
     }
 }
@@ -46716,9 +46721,16 @@ function _acertoTrocarCobranca(modo) {
         dividaEl.style.color = divida > 0 ? '#ef4444' : '#52525b';
     }
     if (dividaSub) {
-        dividaSub.textContent = divida > 0
-            ? (modo === 'torneio' ? '(só este torneio)' : '(bar/buy-in/comanda)')
-            : '(nenhuma)';
+        if (divida <= 0) {
+            dividaSub.textContent = '(nenhuma)';
+        } else if (modo === 'torneio') {
+            dividaSub.textContent = '(só este torneio)';
+        } else {
+            const extra = Math.round(((ap._dividaTotal || 0) - (ap._dividaTorneio || 0)) * 100) / 100;
+            dividaSub.textContent = extra > 0
+                ? `(torneio ${formatMoney(ap._dividaTorneio || 0)} + anteriores ${formatMoney(extra)})`
+                : '(buy-in/rebuy/comanda)';
+        }
     }
 
     // Atualiza UI — líquido + mensagem + botão
@@ -46894,7 +46906,9 @@ function abrirAcertoPremio(jogadorId, posicao) {
     const valorDividaTotal = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
 
     // Dívida APENAS deste torneio (buy-in, rebuy, comanda com refId === t.id)
-    const valorDividaTorneio = _acertoCalcDividaTorneio(jogadorId, t.id);
+    // Cap: não pode exceder a dívida total (pagamentos já reduziram)
+    const valorDividaTorneioBruto = _acertoCalcDividaTorneio(jogadorId, t.id);
+    const valorDividaTorneio = Math.min(valorDividaTorneioBruto, valorDividaTotal);
 
     // Decide dívida inicial conforme modo (default: tudo)
     _acertoCobrancaModo = 'tudo';
@@ -46947,7 +46961,7 @@ function abrirAcertoPremio(jogadorId, posicao) {
     // Só mostra se há diferença entre dívida total e dívida do torneio (ou seja, há dívida histórica)
     const toggleWrap = document.getElementById('ap-cobranca-toggle-wrap');
     if (toggleWrap) {
-        const temDividaHistorica = valorDividaTotal > 0 && Math.abs(valorDividaTotal - valorDividaTorneio) > 0.01;
+        const temDividaHistorica = valorDividaTotal > 0 && valorDividaTorneio > 0 && (valorDividaTotal - valorDividaTorneio) > 0.01;
         toggleWrap.style.display = temDividaHistorica ? 'block' : 'none';
         if (temDividaHistorica) {
             const valTudo = document.getElementById('ap-cobranca-val-tudo');
