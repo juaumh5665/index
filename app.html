@@ -10088,6 +10088,9 @@ const db = {
         async estornar(movimentacaoId, motivo) {
             const orig = jackpotMovimentacoesCache.find(m => m.id === movimentacaoId);
             if (!orig) throw new Error('Movimentação original não encontrada');
+            // Proteção contra duplo-estorno: verifica se já existe estorno pra esta movimentação
+            const jaEstornada = jackpotMovimentacoesCache.some(m => m.movimentacao_origem === movimentacaoId && m.tipo === 'estorno');
+            if (jaEstornada) throw new Error('Movimentação já foi estornada anteriormente');
             return this.create({
                 tipo: 'estorno',
                 valor: orig.valor,
@@ -40634,8 +40637,11 @@ function registrarTransacao(dados) {
 }
 
 function getSaldoJogador(jogadorId) {
+    // NÃO filtra por !t.estornada — a contra-transação (tipo='estorno') já cancela
+    // o valor da original naturalmente. Filtrar estornada + incluir contra-transação
+    // causa double-counting (ex: buy-in -100 estornado → saldo ficava +100 em vez de 0).
     return transacoes
-        .filter(t => t.jogadorId === jogadorId && !t.estornada)
+        .filter(t => t.jogadorId === jogadorId)
         .reduce((s, t) => s + t.valor, 0);
 }
 
@@ -40643,7 +40649,7 @@ function getSaldoJogador(jogadorId) {
 // Usado no CAIXA GERAL do clube (que não deve mostrar cash)
 function getSaldoJogadorCaixaGeral(jogadorId) {
     return transacoes
-        .filter(t => t.jogadorId === jogadorId && t.origem !== 'cash' && !t.estornada)
+        .filter(t => t.jogadorId === jogadorId && t.origem !== 'cash')
         .reduce((s, t) => s + t.valor, 0);
 }
 
@@ -41846,46 +41852,53 @@ function highlightMetodo(radio, suffix) {
 // ESTORNO (remover transação)
 // ============================================================
 function removerTransacao(id) {
-    const t = transacoes.find(x => x.id === id);
-    if (!t) return;
-    if (t.fechamentoId) return showToast('⚠️ Transação já faz parte de fechamento');
-    if (t.estornada) return showToast('⚠️ Transação já foi estornada');
-    if (t.tipo === 'estorno') return showToast('⚠️ Não é possível estornar um estorno');
+    // comLock previne double-click no botão de estorno
+    comLock('removerTransacao_' + id, () => {
+        const t = transacoes.find(x => x.id === id);
+        if (!t) return;
+        if (t.fechamentoId) return showToast('⚠️ Transação já faz parte de fechamento');
+        if (t.estornada) return showToast('⚠️ Transação já foi estornada');
+        if (t.tipo === 'estorno') return showToast('⚠️ Não é possível estornar um estorno');
 
-    const motivo = prompt(`Motivo do estorno de "${t.descricao}" (${formatMoney(Math.abs(t.valor))}):`);
-    if (motivo === null) return; // cancelou
-    if (!motivo.trim()) return showToast('⚠️ Informe o motivo do estorno');
+        // Verifica se já existe uma contra-transação de estorno pra esta (proteção extra)
+        const jaEstornada = transacoes.some(x => x.estornoRef === t.id && x.tipo === 'estorno');
+        if (jaEstornada) return showToast('⚠️ Transação já possui estorno registrado');
 
-    // 1. Marca a transação original como estornada
-    t.estornada = true;
-    t.estornadaEm = Date.now();
-    t.estornadaPor = currentUser ? currentUser.nome : 'Sistema';
-    t.estornoMotivo = motivo.trim();
+        const motivo = prompt(`Motivo do estorno de "${t.descricao}" (${formatMoney(Math.abs(t.valor))}):`);
+        if (motivo === null) return; // cancelou
+        if (!motivo.trim()) return showToast('⚠️ Informe o motivo do estorno');
 
-    // 2. Cria transação de estorno (valor inverso) para manter o histórico
-    const estornoTx = {
-        id: _genUuid(),
-        jogadorId: t.jogadorId,
-        tipo: 'estorno',
-        valor: -t.valor,
-        descricao: `Estorno: ${t.descricao}`,
-        metodo: t.metodo || null,
-        origem: t.origem || null,
-        ts: Date.now(),
-        fechamentoId: null,
-        estornoRef: t.id,       // referência à transação original
-        estornoMotivo: motivo.trim(),
-        estornoPor: currentUser ? currentUser.nome : 'Sistema',
-    };
-    transacoes.push(estornoTx);
+        // 1. Marca a transação original como estornada (pra display e proteção local)
+        t.estornada = true;
+        t.estornadaEm = Date.now();
+        t.estornadaPor = currentUser ? currentUser.nome : 'Sistema';
+        t.estornoMotivo = motivo.trim();
 
-    saveData();
-    if (pagamentoJogadorId) {
-        renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
-        renderExtratoJogador();
-    }
-    renderCaixaAberto();
-    showToast('↩️ Transação estornada — registro mantido no histórico');
+        // 2. Cria transação de estorno (valor inverso) para manter o histórico
+        const estornoTx = {
+            id: _genUuid(),
+            jogadorId: t.jogadorId,
+            tipo: 'estorno',
+            valor: -t.valor,
+            descricao: `Estorno: ${t.descricao}`,
+            metodo: t.metodo || null,
+            origem: t.origem || null,
+            ts: Date.now(),
+            fechamentoId: null,
+            estornoRef: t.id,       // referência à transação original
+            estornoMotivo: motivo.trim(),
+            estornoPor: currentUser ? currentUser.nome : 'Sistema',
+        };
+        transacoes.push(estornoTx);
+
+        saveData();
+        if (pagamentoJogadorId) {
+            renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+            renderExtratoJogador();
+        }
+        renderCaixaAberto();
+        showToast('↩️ Transação estornada — registro mantido no histórico');
+    }, 'Estorno já em andamento…');
 }
 
 // ============================================================
@@ -43596,6 +43609,7 @@ function abrirModalEstorno(kind, refId) {
 }
 
 async function confirmarEstorno() {
+    return comLock('confirmarEstorno', async () => {
     const dados = window._estornoEmAndamento;
     if (!dados) return showToast('⚠️ Nenhum estorno selecionado');
 
@@ -43611,6 +43625,15 @@ async function confirmarEstorno() {
 
     const t = torneios[activeTorneioIdx];
     if (!t) return showToast('⚠️ Torneio não encontrado');
+
+    // Verifica se a entry ainda existe (proteção contra duplo-estorno)
+    if (dados.kind !== 'jackpot') {
+        const entryAindaExiste = (t.entries || []).some(e => e.id === dados.entryId);
+        if (!entryAindaExiste) {
+            closeModal('modal-estorno');
+            return showToast('⚠️ Esta inscrição já foi estornada');
+        }
+    }
 
     // Desabilita botão pra evitar duplo clique
     const btn = document.getElementById('btn-confirmar-estorno');
@@ -43756,6 +43779,7 @@ async function confirmarEstorno() {
     } finally {
         if (btn) { btn.disabled = false; btn.innerText = 'Confirmar Estorno'; }
     }
+    }, 'Estorno já em andamento…');
 }
 
 // Renderiza a aba "Estornos" do torneio
