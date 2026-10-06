@@ -41394,6 +41394,12 @@ function getTipoIcon(tipo) {
 // ============================================================
 // PAGAR CONTA
 // ============================================================
+// Estado do toggle de cobrança no modal de pagamento (não-premiado)
+let _pjCobrancaModo = 'tudo'; // 'tudo' (saldo total) ou 'torneio' (só torneio ativo)
+let _pjDividaTotal = 0;
+let _pjDividaTorneio = 0;
+let _pjTotalComandas = 0;
+
 function renderPagarConta() {
     const saldo = getSaldoJogador(pagamentoJogadorId);
     const el = document.getElementById('pj-pagar-content');
@@ -41415,6 +41421,20 @@ function renderPagarConta() {
     }
 
     const divida = Math.max(0, -saldo);
+
+    // === TOGGLE SALDO TORNEIO vs TOTAL ===
+    // Detecta se há torneio ativo e calcula dívida apenas deste torneio
+    const t = torneios[activeTorneioIdx];
+    const torneioId = t ? t.id : null;
+    const dividaTorneio = torneioId ? _acertoCalcDividaTorneio(pagamentoJogadorId, torneioId) : 0;
+    const temDividaHistorica = divida > 0 && dividaTorneio > 0 && Math.abs(divida - dividaTorneio) > 0.01;
+
+    // Armazena estado global pra toggle funcionar
+    _pjCobrancaModo = 'tudo'; // default: cobra tudo
+    _pjDividaTotal = divida;
+    _pjDividaTorneio = dividaTorneio;
+    _pjTotalComandas = totalComandas;
+
     const totalSugerido = divida + totalComandas;
 
     // Dados do jogador (pra cabeçalho)
@@ -41439,6 +41459,24 @@ function renderPagarConta() {
             <span>Incluir comandas no acerto</span>
         </label>` : '';
 
+    // Toggle de cobrança: "Saldo Total" vs "Só Torneio" (aparece só quando há diferença)
+    const nomeTorneio = t ? t.nome : 'torneio';
+    const toggleCobranca = temDividaHistorica ? `
+        <div id="pj-cobranca-toggle-wrap" style="margin-top:.75rem;padding:.65rem .85rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;">
+            <div style="font-size:.62rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">O que cobrar?</div>
+            <div style="display:flex;gap:.4rem;">
+                <button id="pj-cobranca-tab-tudo" onclick="_pjTrocarCobranca('tudo')" type="button" style="flex:1;padding:.45rem .5rem;border-radius:.4rem;border:1px solid rgba(168,85,247,.3);cursor:pointer;font-family:'Manrope',sans-serif;font-weight:700;font-size:.72rem;transition:all .15s;background:#a855f7;color:#fff;">
+                    Saldo Total <span id="pj-cobranca-val-tudo" style="font-family:var(--font-mono);font-weight:800;">(${formatMoney(divida)})</span>
+                </button>
+                <button id="pj-cobranca-tab-torneio" onclick="_pjTrocarCobranca('torneio')" type="button" style="flex:1;padding:.45rem .5rem;border-radius:.4rem;border:1px solid rgba(168,85,247,.3);cursor:pointer;font-family:'Manrope',sans-serif;font-weight:700;font-size:.72rem;transition:all .15s;background:transparent;color:#71717a;">
+                    Só Torneio <span id="pj-cobranca-val-torneio" style="font-family:var(--font-mono);font-weight:800;">(${formatMoney(dividaTorneio)})</span>
+                </button>
+            </div>
+            <div id="pj-cobranca-info" style="font-size:.62rem;color:#71717a;margin-top:.4rem;text-align:center;">
+                Cobrando saldo total (${formatMoney(divida)}) — inclui torneios/cash/bar anteriores
+            </div>
+        </div>` : '';
+
     el.innerHTML = `
         <!-- Card do jogador -->
         <div class="pj-card-jogador">
@@ -41454,12 +41492,12 @@ function renderPagarConta() {
         <!-- Composição -->
         <div class="pj-composicao">
             <div class="pj-comp-lab">Composição</div>
-            <div class="pj-comp-linha">
+            <div id="pj-linha-saldo" class="pj-comp-linha">
                 <div class="pj-comp-left">
                     <i class="fa-solid fa-receipt" style="color:#ef4444;font-size:.85rem;"></i>
                     <span class="pj-comp-label">Saldo devedor${comandasAbertas.length > 0 ? ' <span class="pj-comp-sub">(buy-in/rebuy)</span>' : ''}</span>
                 </div>
-                <div class="pj-comp-val pj-comp-val-red">- ${formatMoney(divida)}</div>
+                <div id="pj-divida-display" class="pj-comp-val pj-comp-val-red">- ${formatMoney(divida)}</div>
             </div>
             ${linhaComandas}
             <div class="pj-comp-total">
@@ -41467,6 +41505,7 @@ function renderPagarConta() {
                 <div id="pj-total-display" class="pj-comp-total-val">${formatMoney(totalSugerido)}</div>
             </div>
             ${toggleComandas}
+            ${toggleCobranca}
         </div>
 
         <!-- Valor a movimentar -->
@@ -41584,8 +41623,8 @@ function renderPagarConta() {
 
 // Atualiza total quando toggle "incluir comandas" muda
 function atualizarTotalComComandas() {
-    const saldo = getSaldoJogador(pagamentoJogadorId);
-    const divida = Math.max(0, -saldo);
+    // Respeita o modo de cobrança selecionado (tudo vs torneio)
+    const divida = (_pjCobrancaModo === 'torneio') ? _pjDividaTorneio : _pjDividaTotal;
     const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
     const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
 
@@ -41617,6 +41656,76 @@ function atualizarTotalComComandas() {
         pjSelecionarMetodo(metodoAtual);
     }
 }
+
+// ============================================================
+// TOGGLE SALDO TORNEIO vs TOTAL — no modal de pagamento (não-premiado)
+// ============================================================
+function _pjTrocarCobranca(modo) {
+    if (modo !== 'tudo' && modo !== 'torneio') return;
+    _pjCobrancaModo = modo;
+
+    const divida = (modo === 'torneio') ? _pjDividaTorneio : _pjDividaTotal;
+
+    // Atualiza display da dívida na composição
+    const dividaEl = document.getElementById('pj-divida-display');
+    if (dividaEl) dividaEl.textContent = `- ${formatMoney(divida)}`;
+
+    // Atualiza total considerando comandas
+    const incluir = (document.getElementById('pj-incluir-comandas') || {}).checked;
+    const totalComandas = incluir ? _pjTotalComandas : 0;
+    const total = divida + totalComandas;
+
+    _pjTotalSugerido = total;
+
+    // Atualiza total display
+    const totalEl = document.getElementById('pj-total-display');
+    if (totalEl) totalEl.textContent = formatMoney(total);
+
+    // Atualiza input editável
+    const inp = document.getElementById('pj-valor-editavel');
+    if (inp) inp.value = total.toFixed(2);
+
+    // Reset splits
+    const metodoAtual = (_pjSplits && _pjSplits[0]) ? _pjSplits[0].metodo : 'dinheiro';
+    _pjSplits = [{ valor: total, metodo: metodoAtual }];
+
+    const blocoMisto = document.getElementById('pj-bloco-misto');
+    if (blocoMisto && blocoMisto.style.display !== 'none') {
+        pjRenderSplits();
+    } else {
+        pjSelecionarMetodo(metodoAtual);
+    }
+
+    // Atualiza visual dos botões toggle
+    const btnTudo = document.getElementById('pj-cobranca-tab-tudo');
+    const btnTorneio = document.getElementById('pj-cobranca-tab-torneio');
+    if (btnTudo && btnTorneio) {
+        if (modo === 'tudo') {
+            btnTudo.style.background = '#a855f7';
+            btnTudo.style.color = '#fff';
+            btnTorneio.style.background = 'transparent';
+            btnTorneio.style.color = '#71717a';
+        } else {
+            btnTorneio.style.background = '#a855f7';
+            btnTorneio.style.color = '#fff';
+            btnTudo.style.background = 'transparent';
+            btnTudo.style.color = '#71717a';
+        }
+    }
+
+    // Atualiza mensagem informativa
+    const infoEl = document.getElementById('pj-cobranca-info');
+    if (infoEl) {
+        const t = torneios[activeTorneioIdx];
+        const nomeTorneio = t ? t.nome : 'torneio';
+        if (modo === 'tudo') {
+            infoEl.textContent = `Cobrando saldo total (${formatMoney(_pjDividaTotal)}) — inclui torneios/cash/bar anteriores`;
+        } else {
+            infoEl.textContent = `Cobrando só ${nomeTorneio} (${formatMoney(_pjDividaTorneio)}) — dívidas anteriores ficam em aberto`;
+        }
+    }
+}
+window._pjTrocarCobranca = _pjTrocarCobranca;
 
 // ============================================================
 // PJ SPLITS — pagamento múltiplo no caixa
