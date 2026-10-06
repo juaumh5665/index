@@ -4955,6 +4955,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div id="cash-mesas" class="cashtab-content">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
                         <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Mesas de Cash Game</div>
+                        <button onclick="abrirResumoFinanceiroCash()" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;color:#f59e0b;border-color:rgba(245,158,11,.3);" title="Resumo financeiro do cash game"><i class="fa-solid fa-file-invoice-dollar"></i> Resumo</button>
                         <button onclick="openModal('modal-nova-cash-mesa')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-plus"></i> Nova Mesa</button>
                     </div>
                     <div id="cash-mesas-list" style="display:flex;flex-direction:column;gap:1rem;"></div>
@@ -8456,6 +8457,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
                 <button onclick="copiarLinkRanking()" class="btn-ghost" style="font-size:.8rem;" title="Copiar link público do ranking"><i class="fa-solid fa-share-nodes"></i> Copiar Link</button>
                 <button onclick="compartilharWhatsApp()" class="btn-ghost" style="font-size:.8rem;color:#25d366;border-color:rgba(37,211,102,.3);" title="Compartilhar no WhatsApp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                <button onclick="abrirResumoFinanceiroTorneio()" class="btn-ghost" style="font-size:.8rem;color:#f59e0b;border-color:rgba(245,158,11,.3);" title="Resumo financeiro para enviar ao dono"><i class="fa-solid fa-file-invoice-dollar"></i> Resumo</button>
                 <button onclick="ativarKioskTV()" class="btn-ghost" style="font-size:.8rem;" title="Modo apresentação (fullscreen)"><i class="fa-solid fa-expand"></i> Kiosk</button>
                 <button onclick="closeModal('modal-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
             </div>
@@ -13960,6 +13962,251 @@ function compartilharWhatsApp() {
     
     const wppUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(wppUrl, '_blank', 'noopener,noreferrer');
+}
+
+// ============================================================
+// RESUMO FINANCEIRO — TORNEIO
+// ============================================================
+function gerarResumoFinanceiroTorneio() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return null;
+
+    const entries = t.entries || [];
+    const buyinsQtd = entries.filter(e => e.tipo === 'buyin').length;
+    const buyinsDuploQtd = entries.filter(e => e.tipo === 'buyin_duplo').length;
+    const reentriesQtd = entries.filter(e => e.tipo === 'reentry').length;
+    const rebuysSimplesQtd = entries.filter(e => e.tipo === 'rebuy_simples').length;
+    const rebuysDuplosQtd = entries.filter(e => e.tipo === 'rebuy_duplo').length;
+    const addonsQtd = entries.filter(e => e.tipo === 'addon').length;
+    const lastChanceQtd = entries.filter(e => e.tipo === 'last_chance').length;
+    const totalEntries = entries.length;
+    const jogadoresUnicos = getJogadoresUnicos(t);
+    const ativos = getAtivos(t);
+    const eliminados = jogadoresUnicos - ativos;
+
+    const prize = getPrize(t);
+    const rake = getRake(t);
+    const staff = getStaff(t);
+    const staffCascata = getStaffCascata(t);
+    const staffFixo = getStaffFixo(t);
+    const passaporte = getPassaporteTotal(t);
+    const bruto = prize + rake + staffCascata; // bruto = prize + rake + staffCascata (staffFixo é por fora)
+
+    const agora = new Date();
+    const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const data = agora.toLocaleDateString('pt-BR');
+
+    let msg = `📊 *RESUMO FINANCEIRO*\n`;
+    msg += `🏆 *${t.nome}*\n`;
+    if (sbClube?.nome) msg += `🎰 ${sbClube.nome}\n`;
+    msg += `📅 ${data} às ${hora}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    // Entries
+    msg += `👥 *ENTRADAS* (${totalEntries} total)\n`;
+    msg += `• ${jogadoresUnicos} jogadores únicos\n`;
+    if (buyinsQtd > 0) msg += `• ${buyinsQtd} buy-in${buyinsQtd > 1 ? 's' : ''}\n`;
+    if (buyinsDuploQtd > 0) msg += `• ${buyinsDuploQtd} buy-in duplo${buyinsDuploQtd > 1 ? 's' : ''}\n`;
+    if (reentriesQtd > 0) msg += `• ${reentriesQtd} re-entr${reentriesQtd > 1 ? 'ies' : 'y'}\n`;
+    if (rebuysSimplesQtd > 0) msg += `• ${rebuysSimplesQtd} rebuy simples\n`;
+    if (rebuysDuplosQtd > 0) msg += `• ${rebuysDuplosQtd} rebuy duplo${rebuysDuplosQtd > 1 ? 's' : ''}\n`;
+    if (addonsQtd > 0) msg += `• ${addonsQtd} add-on${addonsQtd > 1 ? 's' : ''}\n`;
+    if (lastChanceQtd > 0) msg += `• ${lastChanceQtd} last chance${lastChanceQtd > 1 ? 's' : ''}\n`;
+    msg += `\n`;
+
+    // Status do jogo
+    msg += `🎯 *STATUS*\n`;
+    msg += `• ${ativos} jogador${ativos !== 1 ? 'es' : ''} na disputa\n`;
+    msg += `• ${eliminados} eliminado${eliminados !== 1 ? 's' : ''}\n\n`;
+
+    // Financeiro
+    msg += `💰 *FINANCEIRO*\n`;
+    msg += `• Arrecadação bruta: ${formatMoney(bruto)}\n`;
+    msg += `• Prize pool: ${formatMoney(prize)}\n`;
+    msg += `• Rake (${Number(t.rake || 0)}%): ${formatMoney(rake)}\n`;
+    if (staff > 0) {
+        msg += `• Staff total: ${formatMoney(staff)}\n`;
+        if (staffCascata > 0) msg += `  ↳ Cascata (${Number(t.staffPct || 0)}%): ${formatMoney(staffCascata)}\n`;
+        if (staffFixo > 0) msg += `  ↳ Fixo: ${formatMoney(staffFixo)}\n`;
+    }
+    if (passaporte > 0) msg += `• Passaporte: ${formatMoney(passaporte)}\n`;
+
+    // Receita do clube
+    const receitaClube = rake + staffFixo + passaporte;
+    msg += `\n🏦 *RECEITA DO CLUBE*: ${formatMoney(receitaClube)}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `_Gerado pelo StackOS_`;
+
+    return msg;
+}
+
+// ============================================================
+// RESUMO FINANCEIRO — CASH GAME
+// ============================================================
+function gerarResumoFinanceiroCash() {
+    const ativas = (cashMesas || []).filter(m => m.status === 'ativa' || m.status === 'aberta');
+    if (!ativas.length) return null;
+
+    const agora = new Date();
+    const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const data = agora.toLocaleDateString('pt-BR');
+
+    let msg = `📊 *RESUMO CASH GAME*\n`;
+    if (sbClube?.nome) msg += `🎰 ${sbClube.nome}\n`;
+    msg += `📅 ${data} às ${hora}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    let totalJogadoresAtivos = 0;
+    let totalVolume = 0;
+    let totalRakeSistema = 0;
+    let totalRakeDealer = 0;
+
+    ativas.forEach((m, idx) => {
+        const jogAtivos = m.jogadores.filter(j => j.status === 'ativo');
+        const investido = m.jogadores.reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
+        const saidas = m.jogadores.reduce((s, j) => s + (Number(j.saiuCom) || 0), 0);
+        const saldoNaMesa = investido - saidas;
+        const rakeSist = getCashRake(m);
+        const rakeDealer = (m.rakeLancamentos || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        const tsAbertura = m.abertoEm || m.aberturaTs || Date.now();
+        const tempoAberto = formatDuration(Date.now() - tsAbertura);
+
+        totalJogadoresAtivos += jogAtivos.length;
+        totalVolume += investido;
+        totalRakeSistema += rakeSist;
+        totalRakeDealer += rakeDealer;
+
+        msg += `🃏 *${m.nome}* (${m.bmin}/${m.bmax})\n`;
+        msg += `• ${jogAtivos.length} jogador${jogAtivos.length !== 1 ? 'es' : ''} ativo${jogAtivos.length !== 1 ? 's' : ''}\n`;
+        msg += `• Volume: ${formatMoney(investido)}\n`;
+        msg += `• Na mesa: ${formatMoney(saldoNaMesa)}\n`;
+        if (rakeSist > 0) msg += `• Rake sistema: ${formatMoney(rakeSist)}\n`;
+        if (rakeDealer > 0) msg += `• Rake dealer: ${formatMoney(rakeDealer)}\n`;
+        msg += `• Tempo: ${tempoAberto}\n`;
+        if (idx < ativas.length - 1) msg += `\n`;
+    });
+
+    const totalRake = totalRakeSistema + totalRakeDealer;
+
+    msg += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📈 *TOTAIS*\n`;
+    msg += `• ${ativas.length} mesa${ativas.length > 1 ? 's' : ''} ativa${ativas.length > 1 ? 's' : ''}\n`;
+    msg += `• ${totalJogadoresAtivos} jogador${totalJogadoresAtivos !== 1 ? 'es' : ''} jogando\n`;
+    msg += `• Volume total: ${formatMoney(totalVolume)}\n`;
+    msg += `• Rake total: ${formatMoney(totalRake)}\n`;
+    if (totalRakeSistema > 0 && totalRakeDealer > 0) {
+        msg += `  ↳ Sistema: ${formatMoney(totalRakeSistema)} | Dealer: ${formatMoney(totalRakeDealer)}\n`;
+    }
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `_Gerado pelo StackOS_`;
+
+    return msg;
+}
+
+// ============================================================
+// MODAL DE COMPARTILHAMENTO DO RESUMO FINANCEIRO
+// ============================================================
+function abrirResumoFinanceiroTorneio() {
+    const msg = gerarResumoFinanceiroTorneio();
+    if (!msg) return showToast('⚠️ Nenhum torneio ativo');
+    _abrirModalResumoFinanceiro(msg);
+}
+
+function abrirResumoFinanceiroCash() {
+    const msg = gerarResumoFinanceiroCash();
+    if (!msg) return showToast('⚠️ Nenhuma mesa de cash ativa');
+    _abrirModalResumoFinanceiro(msg);
+}
+
+function _abrirModalResumoFinanceiro(msg) {
+    // Remove modal anterior se existir
+    let modal = document.getElementById('modal-resumo-financeiro');
+    if (modal) modal.remove();
+
+    // Converte formatação WhatsApp para HTML para preview
+    const htmlPreview = msg
+        .replace(/\*/g, '') // remove bold markers
+        .replace(/━/g, '—')
+        .replace(/_Gerado pelo StackOS_/, '<em style="color:#71717a;">Gerado pelo StackOS</em>')
+        .replace(/\n/g, '<br>');
+
+    modal = document.createElement('div');
+    modal.id = 'modal-resumo-financeiro';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'display:flex;z-index:9999;';
+    modal.innerHTML = `
+        <div class="modal-box" style="max-width:520px;max-height:90vh;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1.25rem 1.5rem;border-bottom:1px solid #1e1e23;flex-shrink:0;">
+                <div style="font-weight:800;font-size:1rem;">📊 Resumo Financeiro</div>
+                <button onclick="document.getElementById('modal-resumo-financeiro').remove()" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+            </div>
+            <div style="padding:1.25rem 1.5rem;overflow-y:auto;flex:1;">
+                <div style="background:#0a0a0f;border:1px solid #1e1e23;border-radius:.75rem;padding:1rem 1.25rem;font-size:.8rem;line-height:1.6;color:#d4d4d8;font-family:var(--font-mono);">${htmlPreview}</div>
+            </div>
+            <div style="padding:1rem 1.5rem;border-top:1px solid #1e1e23;display:flex;gap:.75rem;flex-shrink:0;flex-wrap:wrap;">
+                <button onclick="_copiarResumoFinanceiro()" class="btn-gold" style="flex:1;font-size:.85rem;padding:.65rem 1rem;min-width:120px;">
+                    <i class="fa-regular fa-copy"></i> Copiar
+                </button>
+                <button onclick="_enviarResumoWhatsApp()" style="flex:1;font-size:.85rem;padding:.65rem 1rem;min-width:120px;background:#25d366;color:#fff;border:none;border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;">
+                    <i class="fa-brands fa-whatsapp"></i> WhatsApp
+                </button>
+                <button onclick="_compartilharResumoNativo()" id="btn-share-nativo" style="flex:1;font-size:.85rem;padding:.65rem 1rem;min-width:120px;background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3);border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;display:none;">
+                    <i class="fa-solid fa-share-from-square"></i> Compartilhar
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Mostra botão nativo se Web Share API disponível
+    if (navigator.share) {
+        document.getElementById('btn-share-nativo').style.display = '';
+    }
+
+    // Fecha ao clicar fora
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+
+    // Armazena texto para os botões
+    modal._resumoTexto = msg;
+}
+
+async function _copiarResumoFinanceiro() {
+    const modal = document.getElementById('modal-resumo-financeiro');
+    if (!modal?._resumoTexto) return;
+    try {
+        await navigator.clipboard.writeText(modal._resumoTexto);
+        showToast('✓ Resumo copiado!', 2500);
+    } catch(e) {
+        const ta = document.createElement('textarea');
+        ta.value = modal._resumoTexto;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast('✓ Resumo copiado!'); }
+        catch { showToast('⚠️ Não foi possível copiar'); }
+        document.body.removeChild(ta);
+    }
+}
+
+function _enviarResumoWhatsApp() {
+    const modal = document.getElementById('modal-resumo-financeiro');
+    if (!modal?._resumoTexto) return;
+    const wppUrl = `https://wa.me/?text=${encodeURIComponent(modal._resumoTexto)}`;
+    window.open(wppUrl, '_blank', 'noopener,noreferrer');
+}
+
+async function _compartilharResumoNativo() {
+    const modal = document.getElementById('modal-resumo-financeiro');
+    if (!modal?._resumoTexto) return;
+    try {
+        await navigator.share({
+            title: 'Resumo Financeiro — StackOS',
+            text: modal._resumoTexto
+        });
+    } catch(e) {
+        if (e.name !== 'AbortError') showToast('⚠️ Não foi possível compartilhar');
+    }
 }
 
 
