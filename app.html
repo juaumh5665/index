@@ -2848,6 +2848,17 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <!-- MAIN APP -->
 <div id="main-app" class="hidden" style="display:none;height:100vh;flex-direction:row;">
+    <!-- BANNER MODO SUPORTE (visível só quando super admin está espiando um clube) -->
+    <div id="suporte-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#4338ca,#6366f1);color:#fff;padding:.5rem 1rem;font-size:.8rem;font-weight:700;text-align:center;box-shadow:0 2px 12px rgba(99,102,241,.4);font-family:'Manrope',sans-serif;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap;">
+            <span>🔧 MODO SUPORTE — <span id="suporte-banner-clube">Clube</span></span>
+            <span style="font-weight:400;opacity:.8;font-size:.7rem;">| Somente leitura · Nenhuma alteração será salva</span>
+            <button onclick="adminSairModoSuporte()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:.25rem .75rem;border-radius:.3rem;cursor:pointer;font-size:.72rem;font-weight:700;font-family:'Manrope',sans-serif;">
+                <i class="fa-solid fa-arrow-left"></i> Voltar ao Admin
+            </button>
+        </div>
+    </div>
+
     <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu" type="button">
         <i class="fa-solid fa-bars"></i>
     </button>
@@ -9415,6 +9426,8 @@ function _saveDataInner() {
 
 // Wrapper público — chama original + dispara sync com debounce
 function saveData() {
+    // 🔒 MODO SUPORTE: não salva nada (nem local, nem remote)
+    if (window._modoSuporte) return;
     _saveDataInner();
     // Marca tudo como dirty pra próximo sync (estratégia simples mas eficaz)
     // FIX CRÍTICO: marca dirty MESMO offline — o _persistirFilaPendencias() dentro
@@ -11863,6 +11876,11 @@ function _auditoriaToDb(l) {
 // SYNC PRINCIPAL — manda mudanças pro Supabase
 // ============================================================
 async function sincronizarEstado() {
+    // 🔒 MODO SUPORTE: bloqueia sync pra não alterar dados do clube espiado
+    if (window._modoSuporte) {
+        console.log('[SYNC] Bloqueado — modo suporte ativo (somente leitura)');
+        return;
+    }
     if (_syncEmAndamento || !sbClube) {
         console.log('[SYNC] Pulando: emAndamento=' + _syncEmAndamento + ', sbClube=' + (sbClube ? 'OK' : 'NULL'));
         return;
@@ -24061,6 +24079,135 @@ function adminVoltarSistema() {
     window._goToAdmin = false;
 }
 
+// ============================================================
+// MODO SUPORTE — Super Admin espia um clube em somente leitura
+// ============================================================
+window._modoSuporte = false;
+window._suporteOriginal = null; // guarda { sbClube, currentUser } originais
+
+async function adminEspiarClube(clubeId) {
+    if (!clubeId) return;
+    const clube = _adminClubesCache.find(c => c.id === clubeId);
+    if (!clube) { showToast('❌ Clube não encontrado no cache'); return; }
+
+    if (!confirm(`Entrar no clube "${clube.nome}" em modo suporte (somente leitura)?\n\nVocê poderá ver torneios, transações, jogadores e caixa — nada será alterado.`)) return;
+
+    try {
+        showToast('🔄 Carregando dados do clube...');
+
+        // Salva estado original pra restaurar depois
+        window._suporteOriginal = {
+            sbClube: sbClube ? { ...sbClube } : null,
+            currentUser: currentUser ? { ...currentUser } : null,
+        };
+
+        // Busca dados completos do clube no Supabase
+        const { data: clubeFull, error: errClube } = await sb.from('clubes').select('*').eq('id', clubeId).single();
+        if (errClube) throw errClube;
+        if (!clubeFull) throw new Error('Clube não encontrado');
+
+        // Seta contexto pro clube alvo
+        sbClube = clubeFull;
+        window.sbClube = sbClube;
+
+        // Ativa flag de modo suporte ANTES de carregar dados
+        window._modoSuporte = true;
+
+        // Carrega todos os dados (torneios, transacoes, jogadores, etc.) deste clube
+        await carregarEstadoDoSupabase();
+
+        // Esconde admin, mostra app principal
+        document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'flex';
+        document.body.classList.remove('auth-active');
+
+        // Mostra banner de suporte
+        const banner = document.getElementById('suporte-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            document.getElementById('suporte-banner-clube').textContent = clube.nome || clubeId;
+            // Empurra o conteúdo pra baixo pra não ficar atrás do banner
+            document.getElementById('main-app').style.paddingTop = '40px';
+        }
+
+        // Cria currentUser fictício de suporte (owner) pra renders não quebrarem
+        currentUser = {
+            id: 'suporte-admin',
+            nome: 'Suporte StackOS',
+            role: 'owner',
+            clube_id: clubeId,
+            deve_trocar_senha: false
+        };
+        window.currentUser = currentUser;
+
+        // Renderiza igual ao fluxo pós-login
+        applyPermissions();
+        await db.jogadores.list();
+        renderJogadores();
+        if (typeof renderTorneiosList === 'function') renderTorneiosList();
+        renderDashboard();
+
+        showToast(`🔧 Modo Suporte: ${clube.nome} (somente leitura)`);
+        console.log('[SUPORTE] Entrou no clube:', clube.nome, clubeId);
+    } catch (e) {
+        console.error('[SUPORTE] Erro ao espiar clube:', e);
+        showToast('❌ Erro: ' + (e.message || e));
+        // Restaura estado original se deu erro
+        if (window._suporteOriginal) {
+            sbClube = window._suporteOriginal.sbClube;
+            window.sbClube = sbClube;
+            currentUser = window._suporteOriginal.currentUser;
+            window.currentUser = currentUser;
+            window._modoSuporte = false;
+            window._suporteOriginal = null;
+        }
+    }
+}
+window.adminEspiarClube = adminEspiarClube;
+
+function adminSairModoSuporte() {
+    if (!window._modoSuporte) return;
+
+    // Restaura estado original
+    if (window._suporteOriginal) {
+        sbClube = window._suporteOriginal.sbClube;
+        window.sbClube = sbClube;
+        currentUser = window._suporteOriginal.currentUser;
+        window.currentUser = currentUser;
+        window._suporteOriginal = null;
+    }
+
+    window._modoSuporte = false;
+
+    // Esconde banner
+    const banner = document.getElementById('suporte-banner');
+    if (banner) banner.style.display = 'none';
+    document.getElementById('main-app').style.paddingTop = '';
+
+    // Recarrega dados do clube original pra não ficar com dados do clube espiado
+    if (sbClube && sbClube.id) {
+        carregarEstadoDoSupabase().catch(e => console.warn('[SUPORTE] Erro ao recarregar dados originais:', e));
+    }
+
+    // Volta pro admin
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('admin-screen').style.display = 'block';
+
+    showToast('✅ Saiu do modo suporte');
+    console.log('[SUPORTE] Voltou ao painel admin');
+}
+window.adminSairModoSuporte = adminSairModoSuporte;
+
+// Helper: verifica modo suporte e bloqueia operações de escrita
+function _bloqueiaSeSuporteAtivo(nomeAcao) {
+    if (window._modoSuporte) {
+        showToast(`🔒 Modo Suporte: "${nomeAcao}" bloqueado (somente leitura)`);
+        return true;
+    }
+    return false;
+}
+window._bloqueiaSeSuporteAtivo = _bloqueiaSeSuporteAtivo;
+
 function adminMostrarTab(tab) {
     // Esconder todas
     document.querySelectorAll('.admin-content').forEach(el => el.style.display = 'none');
@@ -24207,8 +24354,13 @@ function adminRenderClubes(clubes) {
                             title="Adicionar 30 dias de validade (1 mês)">
                         +30d
                     </button>
-                    <button onclick="adminAcoesClube('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')" 
-                            style="padding:.3rem .55rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.3rem;font-size:.7rem;cursor:pointer;" 
+                    <button onclick="adminEspiarClube('${c.id}')"
+                            style="padding:.3rem .55rem;background:#1e1b4b;border:1px solid #6366f1;color:#a5b4fc;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;"
+                            title="Entrar no clube como suporte (somente leitura)">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button onclick="adminAcoesClube('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')"
+                            style="padding:.3rem .55rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.3rem;font-size:.7rem;cursor:pointer;"
                             title="Mais ações">
                         <i class="fa-solid fa-gear"></i>
                     </button>
@@ -40914,6 +41066,11 @@ const _txDedupMap = new Map(); // chave → timestamp
 const TX_DEDUP_WINDOW = 2000; // 2 segundos
 
 function registrarTransacao(dados) {
+    // 🔒 MODO SUPORTE: bloqueia transações
+    if (window._modoSuporte) {
+        showToast('🔒 Modo Suporte: transações bloqueadas (somente leitura)');
+        return null;
+    }
     // Dedup: chave = jogadorId + tipo + valor
     const dedupKey = `${dados.jogadorId}|${dados.tipo}|${dados.valor}`;
     const now = Date.now();
