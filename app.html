@@ -37721,12 +37721,19 @@ function abrirRetirar(mesaId, jogadorId) {
     const jog = jogadores.find(x => x.id === jogadorId);
     const recompras = j.movimentos.filter(mv => mv.tipo === 'recompra').length;
 
+    const saidasAnt = j.saidasAnteriores || 0;
+    const investidoAtual = j.totalInvestido - saidasAnt;
     document.getElementById('ret-info').innerHTML = `
         <div style="color:#71717a;margin-bottom:.5rem;"><strong style="color:#e4e4e7;">${esc(jog?jog.nome:'?')}</strong></div>
         <div style="display:flex;justify-content:space-between;"><span>Buy-in inicial:</span><span style="font-family:var(--font-mono);">${formatMoney(j.movimentos[0].valor)}</span></div>
         ${recompras>0?`<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Recompras:</span><span style="color:var(--gold);">${recompras}x</span></div>`:''}
-        <div style="display:flex;justify-content:space-between;margin-top:.25rem;border-top:1px solid #1e1e23;padding-top:.4rem;"><span style="font-weight:700;">Total investido:</span><span style="color:#22c55e;font-family:var(--font-mono);font-weight:800;">${formatMoney(j.totalInvestido)}</span></div>
-        ${(j.saidasAnteriores||0) > 0 ? `<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Já retirou antes:</span><span style="color:#3b82f6;font-family:var(--font-mono);font-weight:700;">${formatMoney(j.saidasAnteriores)}</span></div>` : ''}
+        ${saidasAnt > 0 ? `
+            <div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Total compras:</span><span style="font-family:var(--font-mono);">${formatMoney(j.totalInvestido)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Já acertado (retorno):</span><span style="color:#3b82f6;font-family:var(--font-mono);font-weight:700;">-${formatMoney(saidasAnt)}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:.25rem;border-top:1px solid #1e1e23;padding-top:.4rem;"><span style="font-weight:700;">Investido atual:</span><span style="color:#22c55e;font-family:var(--font-mono);font-weight:800;">${formatMoney(investidoAtual)}</span></div>
+        ` : `
+            <div style="display:flex;justify-content:space-between;margin-top:.25rem;border-top:1px solid #1e1e23;padding-top:.4rem;"><span style="font-weight:700;">Total investido:</span><span style="color:#22c55e;font-family:var(--font-mono);font-weight:800;">${formatMoney(j.totalInvestido)}</span></div>
+        `}
         <div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Tempo em jogo:</span><span style="font-family:var(--font-mono);">${formatDuration(Date.now() - j.entrouEm)}</span></div>
     `;
     document.getElementById('ret-valor').value = '';
@@ -37741,6 +37748,7 @@ function calcResultadoPreview() {
     const saidasAnt = j.saidasAnteriores || 0;
     const resultado = (valor + saidasAnt) - j.totalInvestido;
     const positivo = resultado >= 0;
+    const investidoAtual = j.totalInvestido - saidasAnt;
     document.getElementById('ret-resultado').innerHTML = `
         <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem;">Resultado da sessão</div>
         <div style="font-family:var(--font-mono);font-size:1.75rem;font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">
@@ -37749,7 +37757,10 @@ function calcResultadoPreview() {
         <div style="font-size:.7rem;color:#71717a;margin-top:.25rem;">
             ${positivo ? '🟢 Lucro' : resultado === 0 ? '⚪ Empate' : '🔴 Prejuízo'}
         </div>
-        ${saidasAnt > 0 ? `<div style="font-size:.65rem;color:#3b82f6;margin-top:.25rem;">Inclui ${formatMoney(saidasAnt)} de saída anterior</div>` : ''}
+        ${saidasAnt > 0 ? `<div style="font-size:.6rem;color:#3b82f6;margin-top:.35rem;padding:.35rem .5rem;background:rgba(59,130,246,.08);border-radius:.3rem;border:1px solid rgba(59,130,246,.15);">
+            Saindo com ${formatMoney(valor)} − Investido atual ${formatMoney(investidoAtual)}<br>
+            <span style="color:#71717a;">(${formatMoney(saidasAnt)} já acertado ao retornar)</span>
+        </div>` : ''}
     `;
 }
 
