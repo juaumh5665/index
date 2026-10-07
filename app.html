@@ -14133,7 +14133,7 @@ function gerarResumoFinanceiroCash() {
         const saidas = m.jogadores.reduce((s, j) => s + (Number(j.saiuCom) || 0), 0);
         const saldoNaMesa = investido - saidas;
         const rakeSist = getCashRake(m);
-        const rakeDealer = (m.rakeLancamentos || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        const rakeDealer = (m.rakeLancamentos || []).filter(l => !l.estornado).reduce((s, l) => s + (Number(l.valor) || 0), 0);
         const tsAbertura = m.abertoEm || m.aberturaTs || Date.now();
         const tempoAberto = formatDuration(Date.now() - tsAbertura);
 
@@ -36653,15 +36653,15 @@ function renderCashMesas() {
             ${(() => {
                 const lancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
                 if (lancs.length === 0) return '';
-                const totalRake = lancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+                const lancsAtivos = lancs.filter(l => !l.estornado);
+                const totalRake = lancsAtivos.reduce((s, l) => s + (Number(l.valor) || 0), 0);
                 const modo = _rakeDealerViewMode[m.id] || 'porDealer';
 
-                // === Visão 1: Por dealer (agrupado) ===
-                // Agrupa por dealerId; se algum lançamento não tem dealerId, usa dealerNome como chave fallback.
+                // === Visão 1: Por dealer (agrupado) — só ativos ===
                 let corpoHtml = '';
                 if (modo === 'porDealer') {
                     const grupos = {};
-                    lancs.forEach(l => {
+                    lancsAtivos.forEach(l => {
                         const chave = l.dealerId || ('nome:' + (l.dealerNome || '—'));
                         if (!grupos[chave]) grupos[chave] = { nome: l.dealerNome || '—', total: 0, count: 0 };
                         grupos[chave].total += Number(l.valor) || 0;
@@ -36678,21 +36678,35 @@ function renderCashMesas() {
                         </div>
                     `).join('');
                 } else {
-                    // === Visão 2: Últimos (histórico completo, sem corte, mais recente primeiro) ===
+                    // === Visão 2: Últimos (histórico completo com estornados riscados) ===
                     const ordenados = [...lancs].sort((a, b) => (b.ts || 0) - (a.ts || 0));
-                    const listaHtml = ordenados.map(l => `
-                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.3rem .5rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
+                    const listaHtml = ordenados.map(l => {
+                        const isEstornado = !!l.estornado;
+                        const valorStyle = isEstornado
+                            ? 'font-family:var(--font-mono);color:#52525b;font-weight:700;text-decoration:line-through;'
+                            : 'font-family:var(--font-mono);color:var(--gold);font-weight:700;';
+                        const nomeStyle = isEstornado ? 'color:#52525b;text-decoration:line-through;' : 'color:#e4e4e7;';
+                        const estornoInfo = isEstornado
+                            ? `<span style="font-size:.6rem;color:#ef4444;"> · ESTORNADO${l.estornadoPor ? ' por ' + esc(l.estornadoPor) : ''}${l.estornadoEm ? ' ' + new Date(l.estornadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</span>`
+                            : '';
+                        const editadoInfo = l.editadoEm
+                            ? `<span style="font-size:.6rem;color:#f59e0b;"> · editado${l.editadoPor ? ' por ' + esc(l.editadoPor) : ''}${l.valorAnterior != null ? ' (era ' + formatMoney(l.valorAnterior) + ')' : ''}</span>`
+                            : '';
+                        const btns = isEstornado ? '' : `
+                            <button onclick="editarLancRakeDealer('${m.id}','${l.id}')" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:.7rem;" title="Editar valor"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="estornarLancRakeDealer('${m.id}','${l.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:.7rem;" title="Estornar"><i class="fa-solid fa-rotate-left"></i></button>`;
+                        return `
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.3rem .5rem;background:rgba(0,0,0,.2);border-radius:.35rem;${isEstornado ? 'opacity:.6;' : ''}">
                             <div style="display:flex;flex-direction:column;">
-                                <span style="color:#e4e4e7;">${esc(l.dealerNome || '—')}</span>
-                                <span style="font-size:.65rem;color:#52525b;">${new Date(l.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${l.observacao ? ' · ' + esc(l.observacao).substring(0,30) : ''}</span>
+                                <span style="${nomeStyle}">${esc(l.dealerNome || '—')}</span>
+                                <span style="font-size:.65rem;color:#52525b;">${new Date(l.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${l.observacao ? ' · ' + esc(l.observacao).substring(0,30) : ''}${estornoInfo}${editadoInfo}</span>
                             </div>
                             <div style="display:flex;align-items:center;gap:.5rem;">
-                                <span style="font-family:var(--font-mono);color:var(--gold);font-weight:700;">${formatMoney(l.valor)}</span>
-                                <button onclick="removerLancRakeDealer('${m.id}','${l.id}')" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:.7rem;" title="Remover"><i class="fa-solid fa-xmark"></i></button>
+                                <span style="${valorStyle}">${formatMoney(l.valor)}</span>
+                                ${btns}
                             </div>
-                        </div>
-                    `).join('');
-                    // Scroll interno se passar de ~8 itens (evita a lista tomar a página inteira)
+                        </div>`;
+                    }).join('');
                     corpoHtml = ordenados.length > 8
                         ? `<div style="max-height:290px;overflow-y:auto;display:flex;flex-direction:column;gap:.25rem;padding-right:.25rem;">${listaHtml}</div>`
                         : listaHtml;
@@ -36727,11 +36741,12 @@ function renderCashMesas() {
             ${(() => {
                 const caps = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
                 if (caps.length === 0) return '';
-                const totalCapile = caps.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+                const capsAtivos = caps.filter(c => !c.estornado);
+                const totalCapile = capsAtivos.reduce((s, c) => s + (Number(c.valor) || 0), 0);
 
-                // Agrupa por dealer
+                // Agrupa por dealer (só ativos)
                 const grupos = {};
-                caps.forEach(c => {
+                capsAtivos.forEach(c => {
                     const chave = c.dealerNome || '—';
                     if (!grupos[chave]) grupos[chave] = { nome: chave, total: 0, count: 0 };
                     grupos[chave].total += Number(c.valor) || 0;
@@ -37051,11 +37066,12 @@ function abrirLancarRakeDealer(mesaId) {
     _rakeDealerCtx = { mesaId };
 
     const lancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
-    const total = lancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+    const lancsAtivos = lancs.filter(l => !l.estornado);
+    const total = lancsAtivos.reduce((s, l) => s + (Number(l.valor) || 0), 0);
     document.getElementById('rkd-info').innerHTML =
         `<div style="display:flex;justify-content:space-between;align-items:center;">` +
             `<span><strong style="color:#e4e4e7;">${esc(m.nome)}</strong></span>` +
-            `<span style="font-size:.7rem;color:#71717a;">${lancs.length} lançamento${lancs.length !== 1 ? 's' : ''}</span>` +
+            `<span style="font-size:.7rem;color:#71717a;">${lancsAtivos.length} lançamento${lancsAtivos.length !== 1 ? 's' : ''}</span>` +
         `</div>` +
         `<div style="display:flex;justify-content:space-between;margin-top:.35rem;">` +
             `<span style="color:#71717a;">Rake acumulado:</span>` +
@@ -37138,25 +37154,153 @@ function alternarViewRakeDealer(mesaId, modo) {
     renderCashMesas();
 }
 
-function removerLancRakeDealer(mesaId, lancId) {
+// Estorno seguro — marca como estornado com auditoria, NÃO remove
+function estornarLancRakeDealer(mesaId, lancId) {
     const m = cashMesas.find(x => x.id === mesaId);
     if (!m || !Array.isArray(m.rakeLancamentos)) return;
     const lanc = m.rakeLancamentos.find(l => l.id === lancId);
     if (!lanc) return;
-    if (!confirm(`Remover lançamento de ${formatMoney(lanc.valor)} (${lanc.dealerNome})?`)) return;
+    if (lanc.estornado) return showToast('⚠️ Lançamento já estornado');
 
-    m.rakeLancamentos = m.rakeLancamentos.filter(l => l.id !== lancId);
+    const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+    if (!confirm(
+        `⚠️ ESTORNO DE RAKE\n\n` +
+        `Dealer: ${lanc.dealerNome}\n` +
+        `Valor: ${formatMoney(lanc.valor)}\n\n` +
+        `O estorno será registrado com seu nome (${operador}).\n` +
+        `O lançamento ficará visível no histórico como estornado.\n\n` +
+        `Confirmar estorno?`
+    )) return;
+
+    lanc.estornado = true;
+    lanc.estornadoEm = Date.now();
+    lanc.estornadoPor = operador;
+    lanc.estornadoPorId = (currentUser && currentUser.id) || null;
+
     saveData();
 
     if (sbClube && typeof sb !== 'undefined') {
         sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
-            if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos:', error.message);
-        }).catch(e => console.warn('[CASH] update remover rake:', e));
+            if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos (estorno):', error.message);
+        }).catch(e => console.warn('[CASH] update estorno rake:', e));
     }
 
     renderCashMesas();
-    showToast('🗑️ Lançamento removido');
-    logAudit && logAudit('CASH_RAKE_DEALER_REMOVE', `Removido lançamento · ${lanc.dealerNome} · ${formatMoney(lanc.valor)}`);
+    showToast(`↩️ Rake de ${formatMoney(lanc.valor)} estornado · ${lanc.dealerNome}`);
+    logAudit && logAudit('CASH_RAKE_DEALER_ESTORNO', `Estorno rake: ${lanc.dealerNome} · ${formatMoney(lanc.valor)} · Mesa ${m.nome} · por ${operador}`);
+}
+
+// Editar valor de um lançamento de rake — registra valor anterior e quem editou
+function editarLancRakeDealer(mesaId, lancId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m || !Array.isArray(m.rakeLancamentos)) return;
+    const lanc = m.rakeLancamentos.find(l => l.id === lancId);
+    if (!lanc) return;
+    if (lanc.estornado) return showToast('⚠️ Lançamento estornado não pode ser editado');
+
+    const novoValorStr = prompt(
+        `Editar valor do rake\n\nDealer: ${lanc.dealerNome}\nValor atual: ${formatMoney(lanc.valor)}\n\nDigite o novo valor:`,
+        lanc.valor.toString()
+    );
+    if (novoValorStr === null) return; // cancelou
+    const novoValor = parseFloat(novoValorStr);
+    if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
+    if (novoValor === lanc.valor) return; // sem mudança
+
+    const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+    const valorAnterior = lanc.valor;
+
+    lanc.valorAnterior = valorAnterior;
+    lanc.valor = novoValor;
+    lanc.editadoEm = Date.now();
+    lanc.editadoPor = operador;
+    lanc.editadoPorId = (currentUser && currentUser.id) || null;
+
+    saveData();
+
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos (edição):', error.message);
+        }).catch(e => console.warn('[CASH] update edição rake:', e));
+    }
+
+    renderCashMesas();
+    showToast(`✏️ Rake editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · ${lanc.dealerNome}`);
+    logAudit && logAudit('CASH_RAKE_DEALER_EDIT', `Edição rake: ${lanc.dealerNome} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
+}
+
+// Estorno de capilé — mesmo padrão seguro
+function estornarLancCapile(mesaId, lancId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m || !Array.isArray(m.capileLancamentos)) return;
+    const lanc = m.capileLancamentos.find(c => c.id === lancId);
+    if (!lanc) return;
+    if (lanc.estornado) return showToast('⚠️ Capilé já estornado');
+
+    const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+    if (!confirm(
+        `⚠️ ESTORNO DE CAPILÉ\n\n` +
+        `Dealer: ${lanc.dealerNome}\n` +
+        `Valor: ${formatMoney(lanc.valor)}\n\n` +
+        `O estorno será registrado com seu nome (${operador}).\n\n` +
+        `Confirmar estorno?`
+    )) return;
+
+    lanc.estornado = true;
+    lanc.estornadoEm = Date.now();
+    lanc.estornadoPor = operador;
+    lanc.estornadoPorId = (currentUser && currentUser.id) || null;
+
+    saveData();
+
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao atualizar capile_lancamentos (estorno):', error.message);
+        }).catch(e => console.warn('[CASH] update estorno capile:', e));
+    }
+
+    renderCashMesas();
+    showToast(`↩️ Capilé de ${formatMoney(lanc.valor)} estornado · ${lanc.dealerNome}`);
+    logAudit && logAudit('CASH_CAPILE_ESTORNO', `Estorno capilé: ${lanc.dealerNome} · ${formatMoney(lanc.valor)} · Mesa ${m.nome} · por ${operador}`);
+}
+
+// Editar valor de capilé
+function editarLancCapile(mesaId, lancId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m || !Array.isArray(m.capileLancamentos)) return;
+    const lanc = m.capileLancamentos.find(c => c.id === lancId);
+    if (!lanc) return;
+    if (lanc.estornado) return showToast('⚠️ Capilé estornado não pode ser editado');
+
+    const novoValorStr = prompt(
+        `Editar valor do capilé\n\nDealer: ${lanc.dealerNome}\nValor atual: ${formatMoney(lanc.valor)}\n\nDigite o novo valor:`,
+        lanc.valor.toString()
+    );
+    if (novoValorStr === null) return;
+    const novoValor = parseFloat(novoValorStr);
+    if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
+    if (novoValor === lanc.valor) return;
+
+    const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+    const valorAnterior = lanc.valor;
+
+    lanc.valorAnterior = valorAnterior;
+    lanc.valor = novoValor;
+    lanc.editadoEm = Date.now();
+    lanc.editadoPor = operador;
+    lanc.editadoPorId = (currentUser && currentUser.id) || null;
+
+    saveData();
+
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao atualizar capile_lancamentos (edição):', error.message);
+        }).catch(e => console.warn('[CASH] update edição capile:', e));
+    }
+
+    renderCashMesas();
+    showToast(`✏️ Capilé editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · ${lanc.dealerNome}`);
+    logAudit && logAudit('CASH_CAPILE_EDIT', `Edição capilé: ${lanc.dealerNome} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
 }
 
 // =====================================================================
@@ -37170,11 +37314,12 @@ function abrirLancarCapile(mesaId) {
     _capileDealerCtx = { mesaId };
 
     const caps = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
-    const total = caps.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+    const capsAtivos = caps.filter(c => !c.estornado);
+    const total = capsAtivos.reduce((s, c) => s + (Number(c.valor) || 0), 0);
     document.getElementById('cap-info').innerHTML =
         `<div style="display:flex;justify-content:space-between;align-items:center;">` +
             `<span><strong style="color:#e4e4e7;">${esc(m.nome)}</strong></span>` +
-            `<span style="font-size:.7rem;color:#71717a;">${caps.length} capilé${caps.length !== 1 ? 's' : ''}</span>` +
+            `<span style="font-size:.7rem;color:#71717a;">${capsAtivos.length} capilé${capsAtivos.length !== 1 ? 's' : ''}</span>` +
         `</div>` +
         `<div style="display:flex;justify-content:space-between;margin-top:.35rem;">` +
             `<span style="color:#71717a;">Capilés acumulados:</span>` +
@@ -37260,8 +37405,8 @@ function abrirAcertoDealers(mesaId) {
     if (!m) return showToast('⚠️ Mesa não encontrada');
     _acertoDealersCtx = { mesaId };
 
-    const rakeLancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
-    const capileLancs = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
+    const rakeLancs = (Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : []).filter(l => !l.estornado);
+    const capileLancs = (Array.isArray(m.capileLancamentos) ? m.capileLancamentos : []).filter(c => !c.estornado);
     const totalRake = rakeLancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
     const totalCapile = capileLancs.reduce((s, c) => s + (Number(c.valor) || 0), 0);
 
@@ -39217,7 +39362,7 @@ function renderPainelDono() {
     cashEncerradas.forEach(m => {
         cashVolume += (m.jogadores || []).reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
         cashRakeSistema += getCashRake(m);
-        cashRakeDealer += (m.rakeLancamentos || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        cashRakeDealer += (m.rakeLancamentos || []).filter(l => !l.estornado).reduce((s, l) => s + (Number(l.valor) || 0), 0);
         cashSessoes += (m.jogadores || []).length;
         if (typeof m.fichasDiferenca === 'number') {
             if (m.fichasDiferenca > 0) cashSobra += m.fichasDiferenca;
@@ -39525,7 +39670,7 @@ function renderCashRelatorio() {
     let rakeSistema = 0, rakeDealer = 0;
     encerradasNoPeriodo.forEach(m => {
         rakeSistema += getCashRake(m);
-        rakeDealer += (m.rakeLancamentos || []).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        rakeDealer += (m.rakeLancamentos || []).filter(l => !l.estornado).reduce((s, l) => s + (Number(l.valor) || 0), 0);
     });
     const rakeTotal = rakeSistema + rakeDealer;
 
@@ -39669,7 +39814,7 @@ function renderCashRelatorio() {
     // ─── RANKING DEALERS (RAKE) ───────────────────────────────
     const porDealer = {};
     encerradasNoPeriodo.forEach(m => {
-        (m.rakeLancamentos || []).forEach(l => {
+        (m.rakeLancamentos || []).filter(l => !l.estornado).forEach(l => {
             const k = l.dealerNome || '—';
             if (!porDealer[k]) porDealer[k] = { total: 0, lancs: 0, mesas: new Set() };
             porDealer[k].total += (Number(l.valor) || 0);
