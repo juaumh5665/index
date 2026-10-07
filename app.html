@@ -24144,11 +24144,12 @@ async function adminEspiarClube(clubeId) {
             document.getElementById('main-app').style.paddingTop = '40px';
         }
 
-        // Cria currentUser fictício de suporte (owner) pra renders não quebrarem
+        // Cria currentUser fictício de suporte (admin = role mais alto do ROLES{})
+        // NÃO usar 'owner' — não existe no ROLES e applyPermissions() quebra
         currentUser = {
             id: 'suporte-admin',
             nome: 'Suporte StackOS',
-            role: 'owner',
+            role: 'admin',
             clube_id: clubeId,
             deve_trocar_senha: false
         };
@@ -24177,7 +24178,7 @@ async function adminEspiarClube(clubeId) {
         }
         // Tenta restaurar o clube_id no banco se já trocou
         if (window._suporteOriginalClubeIdDB) {
-            sb.rpc('admin_suporte_sair', { original_clube_id: window._suporteOriginalClubeIdDB }).catch(() => {});
+            try { await sb.rpc('admin_suporte_sair', { original_clube_id: window._suporteOriginalClubeIdDB }); } catch(_) {}
             window._suporteOriginalClubeIdDB = null;
         }
     }
