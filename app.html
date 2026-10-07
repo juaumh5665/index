@@ -15051,9 +15051,59 @@ async function _finalizarLoginComSucesso(authUser) {
             renderTorneiosList();
             renderDashboard();
             console.log('✅ Estado completo carregado');
+
+            // === ONE-TIME CLEANUP: fechar comandas abertas de jogadores já quitados (Spartan) ===
+            _cleanupComandasQuitados();
         } catch (e) { console.warn('Carregar estado:', e); }
     })();
     showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
+}
+
+// === CLEANUP: fecha comandas abertas de jogadores com saldo >= 0 ===
+// Roda uma vez após login. Apenas marca status='fechada', sem criar transações.
+function _cleanupComandasQuitados() {
+    try {
+        // Só roda no Spartan Arena Club
+        if (!sbClube || sbClube.id !== 'bc33d5d4-4c3b-4817-8d6b-ec14bee98c0a') return;
+        // Só roda uma vez por sessão
+        if (window._cleanupComandasDone) return;
+        window._cleanupComandasDone = true;
+
+        const comandasAbertas = (typeof barComandas !== 'undefined' ? barComandas : [])
+            .filter(c => c.status === 'aberta' && c.jogadorId);
+
+        if (!comandasAbertas.length) return;
+
+        let totalFechadas = 0;
+        const jogadoresAfetados = [];
+
+        comandasAbertas.forEach(c => {
+            const saldo = getSaldoJogador(c.jogadorId);
+            if (saldo >= -0.01) { // saldo quitado
+                c.status = 'fechada';
+                c.fechadoEm = Date.now();
+                c.autoFechada = true;
+                c.fechadaPeloCaixa = true;
+                c.descricaoFechamento = 'Cleanup: comanda fechada automaticamente (saldo já quitado)';
+                c.total = typeof calcTotalComanda === 'function' ? calcTotalComanda(c) : 0;
+                if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+                totalFechadas++;
+
+                const j = jogadores.find(j => j.id === c.jogadorId);
+                const nome = j ? j.nome : c.jogadorId;
+                if (!jogadoresAfetados.includes(nome)) jogadoresAfetados.push(nome);
+            }
+        });
+
+        if (totalFechadas > 0) {
+            console.log(`[CLEANUP] ${totalFechadas} comanda(s) fechada(s) automaticamente para: ${jogadoresAfetados.join(', ')}`);
+            showToast(`🧹 Limpeza: ${totalFechadas} comanda${totalFechadas > 1 ? 's' : ''} fechada${totalFechadas > 1 ? 's' : ''} (${jogadoresAfetados.join(', ')}) — saldo já quitado`);
+            saveData();
+            if (typeof renderComandas === 'function') renderComandas();
+        }
+    } catch (e) {
+        console.warn('[CLEANUP] Erro ao limpar comandas:', e);
+    }
 }
 
 // Mostra o passo de código 2FA na tela de login (esconde os campos de senha)
