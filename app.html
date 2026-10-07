@@ -36944,12 +36944,14 @@ function renderJogadoresCashMesa(m) {
             const jog = jogadores.find(x => x.id === j.jogadorId);
             const resultado = j.saiuCom - j.totalInvestido;
             const positivo = resultado >= 0;
+            const mesaCheia = m.jogadores.filter(jj => jj.status === 'ativo').length >= 9;
             return `
-            <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:1rem;align-items:center;padding:.6rem 1rem;background:#0a0a0b;border:1px solid #18181b;border-radius:.6rem;margin-bottom:.3rem;opacity:.75;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.6rem 1rem;background:#0a0a0b;border:1px solid #18181b;border-radius:.6rem;margin-bottom:.3rem;opacity:.75;">
                 <div style="width:28px;height:28px;border-radius:50%;background:#1e1e23;color:#71717a;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;">${(jog?jog.nome:'?').substring(0,2).toUpperCase()}</div>
                 <div style="font-weight:700;font-size:.85rem;color:#a1a1aa;">${jog ? jog.nome : '?'}</div>
                 <div style="font-family:var(--font-mono);font-size:.75rem;color:#52525b;">${formatMoney(j.totalInvestido)} → ${formatMoney(j.saiuCom)}</div>
                 <div style="font-family:var(--font-mono);font-weight:800;font-size:.85rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(resultado)}</div>
+                <button onclick="voltarJogadorCash('${m.id}', '${j.jogadorId}')" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .6rem;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;white-space:nowrap;${mesaCheia?'opacity:.4;pointer-events:none;':''}" title="${mesaCheia?'Mesa cheia':'Voltar à mesa'}"><i class="fa-solid fa-rotate-left"></i> Voltar</button>
             </div>`;
         }).join('');
     }
@@ -37749,13 +37751,81 @@ function confirmRetirar() {
     setTimeout(() => {
         const saldoAtual = getSaldoJogador(j.jogadorId);
         if (saldoAtual > 0) {
-            if (confirm(`${jog?jog.nome:'Jogador'} tem saldo positivo de ${formatMoney(saldoAtual)}.
-
-Deseja registrar o pagamento agora (escolhendo forma de pagamento)?`)) {
-                abrirPagamentoPositivoCash(j.jogadorId, saldoAtual);
-            }
+            showConfirmModal(
+                'PAGAMENTO PENDENTE',
+                `${jog?jog.nome:'Jogador'} tem saldo positivo de ${formatMoney(saldoAtual)}.\n\nDeseja registrar o pagamento agora (escolhendo forma de pagamento)?`,
+                () => { abrirPagamentoPositivoCash(j.jogadorId, saldoAtual); },
+                { confirmLabel: 'Pagar Agora', confirmColor: '#22c55e', icon: '💰', iconColor: '#22c55e' }
+            );
         }
     }, 300);
+}
+
+// --- VOLTAR JOGADOR QUE JÁ SAIU À MESA ---
+function voltarJogadorCash(mesaId, jogadorId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId && jj.status === 'saiu');
+    if (!j) return showToast('⚠️ Jogador não encontrado na lista de saídos');
+    if (m.jogadores.filter(jj => jj.status === 'ativo').length >= 9) return showToast('⚠️ Mesa cheia (9 lugares)');
+
+    const jog = jogadores.find(x => x.id === jogadorId);
+    const nomeJog = jog ? jog.nome : 'Jogador';
+
+    showConfirmModal(
+        'VOLTAR À MESA',
+        `${nomeJog} vai retornar à mesa com o histórico preservado.\n\nA transação de saída (cash-out) será revertida e ele voltará como jogador ativo.`,
+        () => {
+            // 1) Reverter a transação de cash_out desta saída
+            if (j.saiuCom > 0 && typeof transacoes !== 'undefined' && Array.isArray(transacoes)) {
+                const txIdx = transacoes.findIndex(t =>
+                    String(t.jogadorId) === String(jogadorId) &&
+                    t.tipo === 'cash_out' &&
+                    String(t.refId) === String(m.id) &&
+                    Math.abs(t.valor - j.saiuCom) < 0.01
+                );
+                if (txIdx !== -1) {
+                    transacoes.splice(txIdx, 1);
+                    // Remove do Supabase também
+                    if (sbClube && typeof sb !== 'undefined' && transacoes[txIdx - 1]) {
+                        // A transação já foi removida do array, tenta deletar pelo ID se existir
+                    }
+                }
+                // Registra transação reversa pra manter auditoria limpa
+                registrarTransacao({
+                    jogadorId: jogadorId,
+                    tipo: 'cash_out_reverso',
+                    valor: -j.saiuCom,
+                    descricao: `Retorno à mesa · ${m.nome} (cash-out revertido)`,
+                    origem: 'cash',
+                    refId: m.id,
+                });
+            }
+
+            // 2) Remover o movimento de 'saida' do array de movimentos
+            const saidaIdx = j.movimentos.findIndex(mv => mv.tipo === 'saida');
+            if (saidaIdx !== -1) j.movimentos.splice(saidaIdx, 1);
+
+            // 3) Restaurar status ativo
+            j.status = 'ativo';
+            j.saiuEm = null;
+            j.saiuCom = null;
+            j.fichasRetiradas = null;
+
+            // 4) Persistir no Supabase
+            if (sbClube && typeof sb !== 'undefined' && j.id) {
+                sb.from('cash_sessoes').update(_cashSessaoToDb(j, m.id)).eq('id', j.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar sessão (retorno):', error.message);
+                }).catch(e => console.warn('[CASH] update retorno falhou:', e));
+            }
+
+            saveData();
+            renderCashMesas();
+            showToast(`🔄 ${nomeJog} voltou à mesa · ${m.nome}`);
+            logAudit && logAudit('CASH_JOGADOR_RETORNO', `Retorno: ${nomeJog} · Mesa ${m.nome} · por ${(currentUser && currentUser.nome) || 'Desconhecido'}`);
+        },
+        { confirmLabel: 'Confirmar Retorno', confirmColor: '#22c55e', icon: '🔄', iconColor: '#22c55e' }
+    );
 }
 
 // --- ENCERRAR MESA ---
