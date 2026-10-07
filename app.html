@@ -7534,6 +7534,52 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
 </div>
 
+<!-- MODAL: LANÇAR CAPILÉ DO DEALER -->
+<div id="modal-capile-dealer" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #a78bfa;border-radius:1.25rem;padding:1.5rem;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-hand-holding-dollar" style="color:#a78bfa;"></i> Lançar Capilé (Gorjeta)</h3>
+            <button onclick="closeModal('modal-capile-dealer')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div id="cap-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;font-size:.8rem;color:#a1a1aa;"></div>
+
+        <div style="margin-bottom:.85rem;">
+            <label class="inp-label">Dealer que recebeu</label>
+            <input type="text" id="cap-dealer-nome" class="inp" list="cap-dealer-sugestoes" placeholder="Nome do dealer" autocomplete="off">
+            <datalist id="cap-dealer-sugestoes"></datalist>
+            <div style="font-size:.65rem;color:#71717a;margin-top:.25rem;">Sugere funcionários cadastrados</div>
+        </div>
+
+        <div style="margin-bottom:.85rem;">
+            <label class="inp-label">Valor do capilé (R$) *</label>
+            <input type="number" step="0.01" min="0" id="cap-valor" class="inp" placeholder="Ex: 50,00">
+        </div>
+
+        <div style="margin-bottom:1rem;">
+            <label class="inp-label">Quem deu / Observação (opcional)</label>
+            <input type="text" id="cap-observacao" class="inp" placeholder="Ex: jogador Fulano" maxlength="80">
+        </div>
+
+        <div style="display:flex;gap:.5rem;">
+            <button onclick="closeModal('modal-capile-dealer')" class="btn-ghost" style="flex:1;padding:.75rem;border-radius:.5rem;">Cancelar</button>
+            <button onclick="confirmarLancarCapile()" style="flex:2;padding:.75rem;border-radius:.5rem;background:#7c3aed;color:#fff;border:none;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;font-size:.85rem;border-radius:.5rem;"><i class="fa-solid fa-check"></i> Lançar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ACERTO DEALERS -->
+<div id="modal-acerto-dealers" class="modal-overlay">
+    <div style="background:#111113;border:1px solid var(--gold);border-radius:1.25rem;padding:1.5rem;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-calculator" style="color:var(--gold);"></i> Acerto dos Dealers</h3>
+            <button onclick="closeModal('modal-acerto-dealers')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div id="acerto-dealers-info" style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;font-size:.8rem;color:#a1a1aa;"></div>
+        <div id="acerto-dealers-body"></div>
+        <div id="acerto-dealers-total" style="margin-top:1rem;padding:.75rem;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;"></div>
+    </div>
+</div>
+
 <!-- MODAL: RECOMPRA -->
 <div id="modal-recompra" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;">
@@ -11676,6 +11722,7 @@ function _cashToDb(m) {
         fechamento_ts: m.fechamentoTs ? new Date(m.fechamentoTs).toISOString() : null,
         operador: m.operador || null,
         rake_lancamentos: Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [],
+        capile_lancamentos: Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [],
     };
 }
 
@@ -12872,6 +12919,7 @@ function _cashFromDb(r) {
         fechamentoTs: fechamentoMs, fechadoEm: fechamentoMs,
         operador: r.operador,
         rakeLancamentos: Array.isArray(r.rake_lancamentos) ? r.rake_lancamentos : [],
+        capileLancamentos: Array.isArray(r.capile_lancamentos) ? r.capile_lancamentos : [],
         jogadores: jogadoresExistentes,  // ← preservar
         sessoes: sessoesExistentes,        // ← preservar
     };
@@ -36559,6 +36607,8 @@ function renderCashMesas() {
                 <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
                     <button onclick="abrirAddJogadorCash('${m.id}')" class="btn-gold" style="font-size:.8rem;padding:.5rem 1rem;"><i class="fa-solid fa-user-plus"></i> Jogador</button>
                     <button onclick="abrirLancarRakeDealer('${m.id}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--gold);font-size:.8rem;padding:.5rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;" title="Registrar rake arrecadado pelo dealer"><i class="fa-solid fa-coins"></i> Rake Dealer</button>
+                    <button onclick="abrirLancarCapile('${m.id}')" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);color:#a78bfa;font-size:.8rem;padding:.5rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;" title="Registrar capilé (gorjeta) do dealer"><i class="fa-solid fa-hand-holding-dollar"></i> Capilé</button>
+                    <button onclick="abrirAcertoDealers('${m.id}')" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e;font-size:.8rem;padding:.5rem 1rem;border-radius:.5rem;cursor:pointer;font-weight:700;font-family:'Manrope',sans-serif;" title="Calcular acerto dos dealers"><i class="fa-solid fa-calculator"></i> Acerto Dealers</button>
                     <button onclick="encerrarMesaCash('${m.id}')" class="btn-ghost" style="font-size:.8rem;padding:.5rem 1rem;" title="Encerrar mesa"><i class="fa-solid fa-stop"></i> Encerrar</button>
                 </div>
             </div>
@@ -36669,6 +36719,45 @@ function renderCashMesas() {
                     </div>
                     <div style="display:flex;flex-direction:column;gap:.25rem;">
                         ${corpoHtml}
+                    </div>
+                </div>
+                `;
+            })()}
+
+            ${(() => {
+                const caps = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
+                if (caps.length === 0) return '';
+                const totalCapile = caps.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+
+                // Agrupa por dealer
+                const grupos = {};
+                caps.forEach(c => {
+                    const chave = c.dealerNome || '—';
+                    if (!grupos[chave]) grupos[chave] = { nome: chave, total: 0, count: 0 };
+                    grupos[chave].total += Number(c.valor) || 0;
+                    grupos[chave].count += 1;
+                });
+                const ranking = Object.values(grupos).sort((a, b) => b.total - a.total);
+                const corpoCapile = ranking.map(g => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.4rem .55rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
+                        <div style="display:flex;flex-direction:column;">
+                            <span style="color:#e4e4e7;font-weight:500;">${esc(g.nome)}</span>
+                            <span style="font-size:.65rem;color:#52525b;">${g.count} capilé${g.count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <span style="font-family:var(--font-mono);color:#a78bfa;font-weight:700;">${formatMoney(g.total)}</span>
+                    </div>
+                `).join('');
+
+                return `
+                <div style="padding:.85rem 1.5rem;background:rgba(124,58,237,.04);border-bottom:1px solid #1e1e23;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                        <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:.4rem;">
+                            <i class="fa-solid fa-hand-holding-dollar"></i> Capilés (Gorjetas)
+                        </div>
+                        <div style="font-size:.95rem;font-weight:800;color:#a78bfa;font-family:var(--font-mono);">${formatMoney(totalCapile)}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:.25rem;">
+                        ${corpoCapile}
                     </div>
                 </div>
                 `;
@@ -37070,6 +37159,248 @@ function removerLancRakeDealer(mesaId, lancId) {
     logAudit && logAudit('CASH_RAKE_DEALER_REMOVE', `Removido lançamento · ${lanc.dealerNome} · ${formatMoney(lanc.valor)}`);
 }
 
+// =====================================================================
+// CAPILÉ (GORJETA) DO DEALER — lançamento por dealer
+// =====================================================================
+let _capileDealerCtx = null;
+
+function abrirLancarCapile(mesaId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+    _capileDealerCtx = { mesaId };
+
+    const caps = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
+    const total = caps.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+    document.getElementById('cap-info').innerHTML =
+        `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<span><strong style="color:#e4e4e7;">${esc(m.nome)}</strong></span>` +
+            `<span style="font-size:.7rem;color:#71717a;">${caps.length} capilé${caps.length !== 1 ? 's' : ''}</span>` +
+        `</div>` +
+        `<div style="display:flex;justify-content:space-between;margin-top:.35rem;">` +
+            `<span style="color:#71717a;">Capilés acumulados:</span>` +
+            `<span style="color:#a78bfa;font-weight:700;font-family:var(--font-mono);">${formatMoney(total)}</span>` +
+        `</div>`;
+
+    // Sugestões de dealer: funcionários cadastrados
+    const datalist = document.getElementById('cap-dealer-sugestoes');
+    if (datalist) {
+        try {
+            const funcs = Array.isArray(funcionarios) ? funcionarios : [];
+            const sugestoes = funcs
+                .filter(f => f.ativo !== false && (
+                    (Array.isArray(f.funcoes) && f.funcoes.includes('dealer')) ||
+                    f.cargo === 'dealer' ||
+                    f.funcao === 'dealer' ||
+                    !f.funcoes
+                ))
+                .map(f => `<option value="${esc(f.nome)}">`)
+                .join('');
+            datalist.innerHTML = sugestoes;
+        } catch(e) {
+            datalist.innerHTML = '';
+        }
+    }
+
+    document.getElementById('cap-dealer-nome').value = '';
+    document.getElementById('cap-valor').value = '';
+    document.getElementById('cap-observacao').value = '';
+    openModal('modal-capile-dealer');
+    setTimeout(() => document.getElementById('cap-dealer-nome').focus(), 100);
+}
+
+function confirmarLancarCapile() {
+    if (!_capileDealerCtx) return;
+    const m = cashMesas.find(x => x.id === _capileDealerCtx.mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+
+    const dealerNome = document.getElementById('cap-dealer-nome').value.trim();
+    const valor = parseFloat(document.getElementById('cap-valor').value) || 0;
+    const observacao = document.getElementById('cap-observacao').value.trim();
+
+    if (!dealerNome) return showToast('⚠️ Informe o nome do dealer');
+    if (valor <= 0) return showToast('⚠️ Valor deve ser maior que zero');
+
+    if (!Array.isArray(m.capileLancamentos)) m.capileLancamentos = [];
+
+    const lanc = {
+        id: (typeof _genUuid === 'function' ? _genUuid() : ('cap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8))),
+        dealerNome,
+        valor,
+        observacao: observacao || null,
+        ts: Date.now(),
+        operadorId: (currentUser && currentUser.id) || null,
+        operadorNome: (currentUser && currentUser.nome) || null,
+    };
+    m.capileLancamentos.push(lanc);
+
+    saveData();
+
+    // Persiste no Supabase
+    if (sbClube && typeof sb !== 'undefined') {
+        sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
+            if (error) console.warn('[CASH] Falha ao salvar capile_lancamentos:', error.message);
+        }).catch(e => console.warn('[CASH] update capile dealer falhou:', e));
+    }
+
+    closeModal('modal-capile-dealer');
+    renderCashMesas();
+    showToast(`💵 Capilé de ${formatMoney(valor)} registrado · ${dealerNome}`);
+    logAudit && logAudit('CASH_CAPILE_DEALER', `Capilé: ${dealerNome} · ${formatMoney(valor)} · Mesa ${m.nome}`);
+    _capileDealerCtx = null;
+}
+
+// =====================================================================
+// ACERTO DOS DEALERS — cálculo final de pagamento por dealer
+// (rake_trazido × percentual%) + capilés
+// =====================================================================
+let _acertoDealersCtx = null;
+
+function abrirAcertoDealers(mesaId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+    _acertoDealersCtx = { mesaId };
+
+    const rakeLancs = Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [];
+    const capileLancs = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
+    const totalRake = rakeLancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+    const totalCapile = capileLancs.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+
+    // Info header
+    document.getElementById('acerto-dealers-info').innerHTML =
+        `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<span><strong style="color:#e4e4e7;">${esc(m.nome)}</strong></span>` +
+            `<span style="font-size:.7rem;color:#71717a;">Blinds ${m.sb || 0}/${m.bb || 0}</span>` +
+        `</div>` +
+        `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem;">` +
+            `<div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:.35rem;padding:.4rem .6rem;">` +
+                `<div style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;">Rake Total</div>` +
+                `<div style="font-size:.9rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">${formatMoney(totalRake)}</div>` +
+            `</div>` +
+            `<div style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:.35rem;padding:.4rem .6rem;">` +
+                `<div style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;">Capilés Total</div>` +
+                `<div style="font-size:.9rem;font-weight:800;color:#a78bfa;font-family:var(--font-mono);">${formatMoney(totalCapile)}</div>` +
+            `</div>` +
+        `</div>`;
+
+    // Agrupar por dealer — rake
+    const dealersMap = {};
+    rakeLancs.forEach(l => {
+        const chave = (l.dealerNome || '—').trim().toLowerCase();
+        if (!dealersMap[chave]) dealersMap[chave] = { nome: l.dealerNome || '—', rake: 0, capile: 0, pct: 0 };
+        dealersMap[chave].rake += Number(l.valor) || 0;
+    });
+    // Capilés
+    capileLancs.forEach(c => {
+        const chave = (c.dealerNome || '—').trim().toLowerCase();
+        if (!dealersMap[chave]) dealersMap[chave] = { nome: c.dealerNome || '—', rake: 0, capile: 0, pct: 0 };
+        dealersMap[chave].capile += Number(c.valor) || 0;
+    });
+
+    const dealers = Object.values(dealersMap).sort((a, b) => (b.rake + b.capile) - (a.rake + a.capile));
+
+    if (dealers.length === 0) {
+        document.getElementById('acerto-dealers-body').innerHTML =
+            `<div style="text-align:center;color:#52525b;padding:1.5rem;font-size:.85rem;">` +
+                `<i class="fa-solid fa-info-circle"></i> Nenhum lançamento de rake ou capilé registrado para esta mesa.` +
+            `</div>`;
+        document.getElementById('acerto-dealers-total').innerHTML = '';
+        openModal('modal-acerto-dealers');
+        return;
+    }
+
+    // Percentual padrão — tenta carregar de config.cash.dealerPctPadrao, senão 0
+    const pctPadrao = (config.cash && config.cash.dealerPctPadrao) ? parseFloat(config.cash.dealerPctPadrao) : 0;
+
+    // Render rows
+    const rows = dealers.map((d, i) => {
+        const pct = pctPadrao || 0;
+        return `
+        <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.75rem;margin-bottom:.5rem;" id="acerto-row-${i}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+                <span style="font-weight:700;color:#e4e4e7;font-size:.9rem;">${esc(d.nome)}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.75rem;margin-bottom:.6rem;">
+                <div style="display:flex;justify-content:space-between;padding:.3rem .5rem;background:rgba(245,158,11,.06);border-radius:.3rem;">
+                    <span style="color:#71717a;">Rake trazido:</span>
+                    <span style="color:var(--gold);font-family:var(--font-mono);font-weight:700;">${formatMoney(d.rake)}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:.3rem .5rem;background:rgba(124,58,237,.06);border-radius:.3rem;">
+                    <span style="color:#71717a;">Capilés:</span>
+                    <span style="color:#a78bfa;font-family:var(--font-mono);font-weight:700;">${formatMoney(d.capile)}</span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+                <label style="font-size:.7rem;color:#71717a;white-space:nowrap;">Percentual (%):</label>
+                <input type="number" step="0.5" min="0" max="100" value="${pct}" class="inp" style="width:80px;padding:.4rem .6rem;font-size:.85rem;text-align:center;"
+                    data-acerto-idx="${i}" data-dealer-rake="${d.rake}" data-dealer-capile="${d.capile}"
+                    oninput="_recalcAcertoDealer(this)">
+                <span style="font-size:.75rem;color:#52525b;">do rake</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .6rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:.35rem;">
+                <span style="font-size:.75rem;color:#71717a;">Total a pagar:</span>
+                <span id="acerto-dealer-total-${i}" style="font-size:1rem;font-weight:800;color:#22c55e;font-family:var(--font-mono);">${formatMoney((d.rake * pct / 100) + d.capile)}</span>
+            </div>
+        </div>
+        `;
+    }).join('');
+
+    document.getElementById('acerto-dealers-body').innerHTML = rows;
+
+    // Grand total
+    _recalcAcertoGrandTotal(dealers.length);
+
+    openModal('modal-acerto-dealers');
+}
+
+// Recalcula total individual de um dealer quando o % muda
+function _recalcAcertoDealer(input) {
+    const idx = parseInt(input.dataset.acertoIdx);
+    const rake = parseFloat(input.dataset.dealerRake) || 0;
+    const capile = parseFloat(input.dataset.dealerCapile) || 0;
+    const pct = parseFloat(input.value) || 0;
+    const total = (rake * pct / 100) + capile;
+    const el = document.getElementById(`acerto-dealer-total-${idx}`);
+    if (el) el.textContent = formatMoney(total);
+
+    // Recalcula grand total
+    const allInputs = document.querySelectorAll('[data-acerto-idx]');
+    _recalcAcertoGrandTotal(allInputs.length);
+}
+
+// Soma todos os totais individuais
+function _recalcAcertoGrandTotal(count) {
+    let grandTotal = 0;
+    let totalRakePagar = 0;
+    let totalCapilePagar = 0;
+    for (let i = 0; i < count; i++) {
+        const inp = document.querySelector(`[data-acerto-idx="${i}"]`);
+        if (!inp) continue;
+        const rake = parseFloat(inp.dataset.dealerRake) || 0;
+        const capile = parseFloat(inp.dataset.dealerCapile) || 0;
+        const pct = parseFloat(inp.value) || 0;
+        const rakeVal = rake * pct / 100;
+        totalRakePagar += rakeVal;
+        totalCapilePagar += capile;
+        grandTotal += rakeVal + capile;
+    }
+    const el = document.getElementById('acerto-dealers-total');
+    if (el) {
+        el.innerHTML =
+            `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">` +
+                `<span style="font-size:.7rem;color:#71717a;">% do Rake:</span>` +
+                `<span style="font-size:.85rem;font-weight:700;color:var(--gold);font-family:var(--font-mono);">${formatMoney(totalRakePagar)}</span>` +
+            `</div>` +
+            `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">` +
+                `<span style="font-size:.7rem;color:#71717a;">Capilés:</span>` +
+                `<span style="font-size:.85rem;font-weight:700;color:#a78bfa;font-family:var(--font-mono);">${formatMoney(totalCapilePagar)}</span>` +
+            `</div>` +
+            `<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(245,158,11,.2);padding-top:.5rem;">` +
+                `<span style="font-size:.8rem;font-weight:800;color:#e4e4e7;">TOTAL A PAGAR:</span>` +
+                `<span style="font-size:1.2rem;font-weight:900;color:#22c55e;font-family:var(--font-mono);">${formatMoney(grandTotal)}</span>` +
+            `</div>`;
+    }
+}
+
 // --- RETIRAR ---
 function abrirRetirar(mesaId, jogadorId) {
     activeCashContext = { mesaId, jogadorId };
@@ -37306,6 +37637,7 @@ function _cashrelPopularFiltros() {
     const dealersSet = new Set();
     (cashMesas || []).forEach(m => {
         (m.rakeLancamentos || []).forEach(l => { if (l.dealerNome) dealersSet.add(l.dealerNome); });
+        (m.capileLancamentos || []).forEach(c => { if (c.dealerNome) dealersSet.add(c.dealerNome); });
     });
     if (typeof funcionarios !== 'undefined' && Array.isArray(funcionarios)) {
         funcionarios.forEach(f => {
