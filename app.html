@@ -24101,19 +24101,33 @@ async function adminEspiarClube(clubeId) {
             currentUser: currentUser ? { ...currentUser } : null,
         };
 
-        // Busca dados completos do clube no Supabase
-        const { data: clubeFull, error: errClube } = await sb.from('clubes').select('*').eq('id', clubeId).single();
-        if (errClube) throw errClube;
-        if (!clubeFull) throw new Error('Clube não encontrado');
+        // =====================================================================
+        // RPC admin_suporte_entrar: troca temporariamente o clube_id do admin
+        // na tabela usuarios, para que current_clube_id() (usada em TODAS as
+        // RLS policies) retorne o clube alvo. Sem isso, todas as queries de
+        // carregarEstadoDoSupabase() retornam 0 rows.
+        // =====================================================================
+        const { data: originalClubeId, error: errEntrar } = await sb.rpc('admin_suporte_entrar', { target_clube_id: clubeId });
+        if (errEntrar) throw errEntrar;
 
-        // Seta contexto pro clube alvo
-        sbClube = clubeFull;
+        // Guarda o clube_id original retornado pela RPC pra restaurar depois
+        window._suporteOriginalClubeIdDB = originalClubeId;
+
+        // Guarda token pra uso no beforeunload (não pode ser async lá)
+        try {
+            const { data: { session: _s } } = await sb.auth.getSession();
+            window._suporteAccessToken = _s?.access_token || null;
+        } catch(e) { window._suporteAccessToken = null; }
+
+        // Seta contexto local pro clube alvo (usando cache admin, sem query direta)
+        sbClube = { ...clube };
         window.sbClube = sbClube;
 
         // Ativa flag de modo suporte ANTES de carregar dados
         window._modoSuporte = true;
 
         // Carrega todos os dados (torneios, transacoes, jogadores, etc.) deste clube
+        // Agora funciona porque current_clube_id() retorna o clube alvo
         await carregarEstadoDoSupabase();
 
         // Esconde admin, mostra app principal
@@ -24161,14 +24175,34 @@ async function adminEspiarClube(clubeId) {
             window._modoSuporte = false;
             window._suporteOriginal = null;
         }
+        // Tenta restaurar o clube_id no banco se já trocou
+        if (window._suporteOriginalClubeIdDB) {
+            sb.rpc('admin_suporte_sair', { original_clube_id: window._suporteOriginalClubeIdDB }).catch(() => {});
+            window._suporteOriginalClubeIdDB = null;
+        }
     }
 }
 window.adminEspiarClube = adminEspiarClube;
 
-function adminSairModoSuporte() {
+async function adminSairModoSuporte() {
     if (!window._modoSuporte) return;
 
-    // Restaura estado original
+    // =====================================================================
+    // PRIMEIRO: restaura o clube_id no banco (CRÍTICO — sem isso o admin
+    // fica "preso" no clube do cliente nas RLS policies)
+    // =====================================================================
+    if (window._suporteOriginalClubeIdDB) {
+        try {
+            await sb.rpc('admin_suporte_sair', { original_clube_id: window._suporteOriginalClubeIdDB });
+            console.log('[SUPORTE] clube_id restaurado no banco');
+        } catch (e) {
+            console.error('[SUPORTE] ERRO ao restaurar clube_id no banco:', e);
+            showToast('⚠️ Erro ao restaurar contexto — faça logout e login novamente');
+        }
+        window._suporteOriginalClubeIdDB = null;
+    }
+
+    // Restaura estado local
     if (window._suporteOriginal) {
         sbClube = window._suporteOriginal.sbClube;
         window.sbClube = sbClube;
@@ -24184,11 +24218,6 @@ function adminSairModoSuporte() {
     if (banner) banner.style.display = 'none';
     document.getElementById('main-app').style.paddingTop = '';
 
-    // Recarrega dados do clube original pra não ficar com dados do clube espiado
-    if (sbClube && sbClube.id) {
-        carregarEstadoDoSupabase().catch(e => console.warn('[SUPORTE] Erro ao recarregar dados originais:', e));
-    }
-
     // Volta pro admin
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('admin-screen').style.display = 'block';
@@ -24197,6 +24226,23 @@ function adminSairModoSuporte() {
     console.log('[SUPORTE] Voltou ao painel admin');
 }
 window.adminSairModoSuporte = adminSairModoSuporte;
+
+// Segurança: se o admin fechar a aba durante modo suporte, restaura o clube_id
+window.addEventListener('beforeunload', () => {
+    if (window._modoSuporte && window._suporteOriginalClubeIdDB) {
+        // Usa fetch keepalive (mais confiável que sendBeacon pra RPCs com auth)
+        try {
+            const token = window._suporteAccessToken;
+            const headers = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_suporte_sair`, {
+                method: 'POST', headers, keepalive: true,
+                body: JSON.stringify({ original_clube_id: window._suporteOriginalClubeIdDB })
+            }).catch(() => {});
+        } catch(e) {}
+        console.log('[SUPORTE] beforeunload: tentou restaurar clube_id');
+    }
+});
 
 // Helper: verifica modo suporte e bloqueia operações de escrita
 function _bloqueiaSeSuporteAtivo(nomeAcao) {
