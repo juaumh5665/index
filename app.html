@@ -34734,6 +34734,123 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('open');
 }
 
+// =====================================================================
+// MODAIS CUSTOMIZADOS — substituem confirm() e prompt() nativos
+// =====================================================================
+function showConfirmModal(title, message, onConfirm, opts) {
+    opts = opts || {};
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;
+        display:flex;align-items:center;justify-content:center;
+        animation:_cfmFadeIn .2s ease;
+    `;
+    const box = document.createElement('div');
+    box.style.cssText = `
+        background:#1a1a1e;border:1px solid ${opts.borderColor || '#a78bfa'};border-radius:1rem;
+        padding:1.5rem;max-width:380px;width:90%;color:#fff;font-family:'Manrope',sans-serif;
+        box-shadow:0 20px 60px rgba(0,0,0,.6);animation:_cfmSlideUp .25s ease;
+    `;
+    const iconColor = opts.iconColor || '#f59e0b';
+    box.innerHTML = `
+        <div style="text-align:center;margin-bottom:.8rem;">
+            <span style="font-size:2rem;">${opts.icon || '⚠️'}</span>
+        </div>
+        <h3 style="margin:0 0 .6rem;text-align:center;font-size:1.05rem;color:${iconColor};font-weight:700;">${title}</h3>
+        <div style="font-size:.88rem;color:#ccc;line-height:1.5;text-align:center;white-space:pre-line;margin-bottom:1.2rem;">${message}</div>
+        <div style="display:flex;gap:.6rem;justify-content:center;">
+            <button id="_cfm_cancel" style="
+                flex:1;padding:.65rem;border-radius:.6rem;border:1px solid #555;
+                background:#2a2a2e;color:#ccc;font-size:.88rem;cursor:pointer;font-family:'Manrope',sans-serif;
+                transition:background .15s;
+            ">Cancelar</button>
+            <button id="_cfm_ok" style="
+                flex:1;padding:.65rem;border-radius:.6rem;border:none;
+                background:${opts.confirmColor || '#dc2626'};color:#fff;font-size:.88rem;cursor:pointer;
+                font-weight:700;font-family:'Manrope',sans-serif;transition:background .15s;
+            ">${opts.confirmLabel || 'Confirmar'}</button>
+        </div>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    // Inject animation keyframes if not yet
+    if (!document.getElementById('_cfm_styles')) {
+        const st = document.createElement('style');
+        st.id = '_cfm_styles';
+        st.textContent = `
+            @keyframes _cfmFadeIn { from{opacity:0} to{opacity:1} }
+            @keyframes _cfmSlideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        `;
+        document.head.appendChild(st);
+    }
+    const close = () => { overlay.style.opacity='0'; setTimeout(() => overlay.remove(), 150); };
+    overlay.querySelector('#_cfm_cancel').onclick = close;
+    overlay.querySelector('#_cfm_ok').onclick = () => { close(); onConfirm(); };
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+
+function showPromptModal(title, message, defaultValue, onConfirm, opts) {
+    opts = opts || {};
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;
+        display:flex;align-items:center;justify-content:center;
+        animation:_cfmFadeIn .2s ease;
+    `;
+    const box = document.createElement('div');
+    box.style.cssText = `
+        background:#1a1a1e;border:1px solid ${opts.borderColor || '#a78bfa'};border-radius:1rem;
+        padding:1.5rem;max-width:380px;width:90%;color:#fff;font-family:'Manrope',sans-serif;
+        box-shadow:0 20px 60px rgba(0,0,0,.6);animation:_cfmSlideUp .25s ease;
+    `;
+    const iconColor = opts.iconColor || '#a78bfa';
+    box.innerHTML = `
+        <div style="text-align:center;margin-bottom:.8rem;">
+            <span style="font-size:2rem;">${opts.icon || '✏️'}</span>
+        </div>
+        <h3 style="margin:0 0 .6rem;text-align:center;font-size:1.05rem;color:${iconColor};font-weight:700;">${title}</h3>
+        <div style="font-size:.88rem;color:#ccc;line-height:1.5;text-align:center;white-space:pre-line;margin-bottom:.8rem;">${message}</div>
+        <div style="margin-bottom:1.2rem;text-align:center;">
+            <input id="_cfm_input" type="number" step="any" value="${defaultValue || ''}" style="
+                width:80%;padding:.65rem;border-radius:.6rem;border:1px solid #555;
+                background:#111113;color:#fff;font-size:1.1rem;text-align:center;
+                font-family:'Manrope',sans-serif;outline:none;
+            " />
+        </div>
+        <div style="display:flex;gap:.6rem;justify-content:center;">
+            <button id="_cfm_cancel" style="
+                flex:1;padding:.65rem;border-radius:.6rem;border:1px solid #555;
+                background:#2a2a2e;color:#ccc;font-size:.88rem;cursor:pointer;font-family:'Manrope',sans-serif;
+            ">Cancelar</button>
+            <button id="_cfm_ok" style="
+                flex:1;padding:.65rem;border-radius:.6rem;border:none;
+                background:#7c3aed;color:#fff;font-size:.88rem;cursor:pointer;
+                font-weight:700;font-family:'Manrope',sans-serif;
+            ">Salvar</button>
+        </div>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    // Inject keyframes if not yet
+    if (!document.getElementById('_cfm_styles')) {
+        const st = document.createElement('style');
+        st.id = '_cfm_styles';
+        st.textContent = `
+            @keyframes _cfmFadeIn { from{opacity:0} to{opacity:1} }
+            @keyframes _cfmSlideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        `;
+        document.head.appendChild(st);
+    }
+    const inp = overlay.querySelector('#_cfm_input');
+    setTimeout(() => { inp.focus(); inp.select(); }, 100);
+    const close = () => { overlay.style.opacity='0'; setTimeout(() => overlay.remove(), 150); };
+    const submit = () => { const v = inp.value; close(); onConfirm(v); };
+    overlay.querySelector('#_cfm_cancel').onclick = close;
+    overlay.querySelector('#_cfm_ok').onclick = submit;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+
 function showToast(msg) {
     const t = document.getElementById('toast');
     t.innerText = msg;
@@ -37163,31 +37280,29 @@ function estornarLancRakeDealer(mesaId, lancId) {
     if (lanc.estornado) return showToast('⚠️ Lançamento já estornado');
 
     const operador = (currentUser && currentUser.nome) || 'Desconhecido';
-    if (!confirm(
-        `⚠️ ESTORNO DE RAKE\n\n` +
-        `Dealer: ${lanc.dealerNome}\n` +
-        `Valor: ${formatMoney(lanc.valor)}\n\n` +
-        `O estorno será registrado com seu nome (${operador}).\n` +
-        `O lançamento ficará visível no histórico como estornado.\n\n` +
-        `Confirmar estorno?`
-    )) return;
+    showConfirmModal(
+        'ESTORNO DE RAKE',
+        `Dealer: ${lanc.dealerNome}\nValor: ${formatMoney(lanc.valor)}\n\nO estorno será registrado com seu nome (${operador}).\nO lançamento ficará visível no histórico.`,
+        () => {
+            lanc.estornado = true;
+            lanc.estornadoEm = Date.now();
+            lanc.estornadoPor = operador;
+            lanc.estornadoPorId = (currentUser && currentUser.id) || null;
 
-    lanc.estornado = true;
-    lanc.estornadoEm = Date.now();
-    lanc.estornadoPor = operador;
-    lanc.estornadoPorId = (currentUser && currentUser.id) || null;
+            saveData();
 
-    saveData();
+            if (sbClube && typeof sb !== 'undefined') {
+                sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos (estorno):', error.message);
+                }).catch(e => console.warn('[CASH] update estorno rake:', e));
+            }
 
-    if (sbClube && typeof sb !== 'undefined') {
-        sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
-            if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos (estorno):', error.message);
-        }).catch(e => console.warn('[CASH] update estorno rake:', e));
-    }
-
-    renderCashMesas();
-    showToast(`↩️ Rake de ${formatMoney(lanc.valor)} estornado · ${lanc.dealerNome}`);
-    logAudit && logAudit('CASH_RAKE_DEALER_ESTORNO', `Estorno rake: ${lanc.dealerNome} · ${formatMoney(lanc.valor)} · Mesa ${m.nome} · por ${operador}`);
+            renderCashMesas();
+            showToast(`↩️ Rake de ${formatMoney(lanc.valor)} estornado · ${lanc.dealerNome}`);
+            logAudit && logAudit('CASH_RAKE_DEALER_ESTORNO', `Estorno rake: ${lanc.dealerNome} · ${formatMoney(lanc.valor)} · Mesa ${m.nome} · por ${operador}`);
+        },
+        { confirmLabel: 'Estornar', confirmColor: '#dc2626', icon: '↩️', iconColor: '#f59e0b' }
+    );
 }
 
 // Editar valor de um lançamento de rake — registra valor anterior e quem editou
@@ -37198,35 +37313,38 @@ function editarLancRakeDealer(mesaId, lancId) {
     if (!lanc) return;
     if (lanc.estornado) return showToast('⚠️ Lançamento estornado não pode ser editado');
 
-    const novoValorStr = prompt(
-        `Editar valor do rake\n\nDealer: ${lanc.dealerNome}\nValor atual: ${formatMoney(lanc.valor)}\n\nDigite o novo valor:`,
-        lanc.valor.toString()
+    showPromptModal(
+        'Editar Rake',
+        `Dealer: ${lanc.dealerNome}\nValor atual: ${formatMoney(lanc.valor)}`,
+        lanc.valor,
+        (novoValorStr) => {
+            const novoValor = parseFloat(novoValorStr);
+            if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
+            if (novoValor === lanc.valor) return;
+
+            const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+            const valorAnterior = lanc.valor;
+
+            lanc.valorAnterior = valorAnterior;
+            lanc.valor = novoValor;
+            lanc.editadoEm = Date.now();
+            lanc.editadoPor = operador;
+            lanc.editadoPorId = (currentUser && currentUser.id) || null;
+
+            saveData();
+
+            if (sbClube && typeof sb !== 'undefined') {
+                sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos (edição):', error.message);
+                }).catch(e => console.warn('[CASH] update edição rake:', e));
+            }
+
+            renderCashMesas();
+            showToast(`✏️ Rake editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · ${lanc.dealerNome}`);
+            logAudit && logAudit('CASH_RAKE_DEALER_EDIT', `Edição rake: ${lanc.dealerNome} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
+        },
+        { icon: '✏️', iconColor: '#a78bfa' }
     );
-    if (novoValorStr === null) return; // cancelou
-    const novoValor = parseFloat(novoValorStr);
-    if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
-    if (novoValor === lanc.valor) return; // sem mudança
-
-    const operador = (currentUser && currentUser.nome) || 'Desconhecido';
-    const valorAnterior = lanc.valor;
-
-    lanc.valorAnterior = valorAnterior;
-    lanc.valor = novoValor;
-    lanc.editadoEm = Date.now();
-    lanc.editadoPor = operador;
-    lanc.editadoPorId = (currentUser && currentUser.id) || null;
-
-    saveData();
-
-    if (sbClube && typeof sb !== 'undefined') {
-        sb.from('cash_mesas').update({ rake_lancamentos: m.rakeLancamentos }).eq('id', m.id).then(({ error }) => {
-            if (error) console.warn('[CASH] Falha ao atualizar rake_lancamentos (edição):', error.message);
-        }).catch(e => console.warn('[CASH] update edição rake:', e));
-    }
-
-    renderCashMesas();
-    showToast(`✏️ Rake editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · ${lanc.dealerNome}`);
-    logAudit && logAudit('CASH_RAKE_DEALER_EDIT', `Edição rake: ${lanc.dealerNome} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
 }
 
 // Estorno de capilé — mesmo padrão seguro
@@ -37238,30 +37356,29 @@ function estornarLancCapile(mesaId, lancId) {
     if (lanc.estornado) return showToast('⚠️ Capilé já estornado');
 
     const operador = (currentUser && currentUser.nome) || 'Desconhecido';
-    if (!confirm(
-        `⚠️ ESTORNO DE CAPILÉ\n\n` +
-        `Dealer: ${lanc.dealerNome}\n` +
-        `Valor: ${formatMoney(lanc.valor)}\n\n` +
-        `O estorno será registrado com seu nome (${operador}).\n\n` +
-        `Confirmar estorno?`
-    )) return;
+    showConfirmModal(
+        'ESTORNO DE CAPILÉ',
+        `Dealer: ${lanc.dealerNome}\nValor: ${formatMoney(lanc.valor)}\n\nO estorno será registrado com seu nome (${operador}).\nO lançamento ficará visível no histórico.`,
+        () => {
+            lanc.estornado = true;
+            lanc.estornadoEm = Date.now();
+            lanc.estornadoPor = operador;
+            lanc.estornadoPorId = (currentUser && currentUser.id) || null;
 
-    lanc.estornado = true;
-    lanc.estornadoEm = Date.now();
-    lanc.estornadoPor = operador;
-    lanc.estornadoPorId = (currentUser && currentUser.id) || null;
+            saveData();
 
-    saveData();
+            if (sbClube && typeof sb !== 'undefined') {
+                sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar capile_lancamentos (estorno):', error.message);
+                }).catch(e => console.warn('[CASH] update estorno capile:', e));
+            }
 
-    if (sbClube && typeof sb !== 'undefined') {
-        sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
-            if (error) console.warn('[CASH] Falha ao atualizar capile_lancamentos (estorno):', error.message);
-        }).catch(e => console.warn('[CASH] update estorno capile:', e));
-    }
-
-    renderCashMesas();
-    showToast(`↩️ Capilé de ${formatMoney(lanc.valor)} estornado · ${lanc.dealerNome}`);
-    logAudit && logAudit('CASH_CAPILE_ESTORNO', `Estorno capilé: ${lanc.dealerNome} · ${formatMoney(lanc.valor)} · Mesa ${m.nome} · por ${operador}`);
+            renderCashMesas();
+            showToast(`↩️ Capilé de ${formatMoney(lanc.valor)} estornado · ${lanc.dealerNome}`);
+            logAudit && logAudit('CASH_CAPILE_ESTORNO', `Estorno capilé: ${lanc.dealerNome} · ${formatMoney(lanc.valor)} · Mesa ${m.nome} · por ${operador}`);
+        },
+        { confirmLabel: 'Estornar', confirmColor: '#dc2626', icon: '↩️', iconColor: '#f59e0b', borderColor: '#9333ea' }
+    );
 }
 
 // Editar valor de capilé
@@ -37272,35 +37389,38 @@ function editarLancCapile(mesaId, lancId) {
     if (!lanc) return;
     if (lanc.estornado) return showToast('⚠️ Capilé estornado não pode ser editado');
 
-    const novoValorStr = prompt(
-        `Editar valor do capilé\n\nDealer: ${lanc.dealerNome}\nValor atual: ${formatMoney(lanc.valor)}\n\nDigite o novo valor:`,
-        lanc.valor.toString()
+    showPromptModal(
+        'Editar Capilé',
+        `Dealer: ${lanc.dealerNome}\nValor atual: ${formatMoney(lanc.valor)}`,
+        lanc.valor,
+        (novoValorStr) => {
+            const novoValor = parseFloat(novoValorStr);
+            if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
+            if (novoValor === lanc.valor) return;
+
+            const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+            const valorAnterior = lanc.valor;
+
+            lanc.valorAnterior = valorAnterior;
+            lanc.valor = novoValor;
+            lanc.editadoEm = Date.now();
+            lanc.editadoPor = operador;
+            lanc.editadoPorId = (currentUser && currentUser.id) || null;
+
+            saveData();
+
+            if (sbClube && typeof sb !== 'undefined') {
+                sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar capile_lancamentos (edição):', error.message);
+                }).catch(e => console.warn('[CASH] update edição capile:', e));
+            }
+
+            renderCashMesas();
+            showToast(`✏️ Capilé editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · ${lanc.dealerNome}`);
+            logAudit && logAudit('CASH_CAPILE_EDIT', `Edição capilé: ${lanc.dealerNome} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
+        },
+        { icon: '✏️', iconColor: '#9333ea', borderColor: '#9333ea' }
     );
-    if (novoValorStr === null) return;
-    const novoValor = parseFloat(novoValorStr);
-    if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
-    if (novoValor === lanc.valor) return;
-
-    const operador = (currentUser && currentUser.nome) || 'Desconhecido';
-    const valorAnterior = lanc.valor;
-
-    lanc.valorAnterior = valorAnterior;
-    lanc.valor = novoValor;
-    lanc.editadoEm = Date.now();
-    lanc.editadoPor = operador;
-    lanc.editadoPorId = (currentUser && currentUser.id) || null;
-
-    saveData();
-
-    if (sbClube && typeof sb !== 'undefined') {
-        sb.from('cash_mesas').update({ capile_lancamentos: m.capileLancamentos }).eq('id', m.id).then(({ error }) => {
-            if (error) console.warn('[CASH] Falha ao atualizar capile_lancamentos (edição):', error.message);
-        }).catch(e => console.warn('[CASH] update edição capile:', e));
-    }
-
-    renderCashMesas();
-    showToast(`✏️ Capilé editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · ${lanc.dealerNome}`);
-    logAudit && logAudit('CASH_CAPILE_EDIT', `Edição capilé: ${lanc.dealerNome} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
 }
 
 // =====================================================================
