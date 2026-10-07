@@ -14130,7 +14130,7 @@ function gerarResumoFinanceiroCash() {
     ativas.forEach((m, idx) => {
         const jogAtivos = m.jogadores.filter(j => j.status === 'ativo');
         const investido = m.jogadores.reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
-        const saidas = m.jogadores.reduce((s, j) => s + (Number(j.saiuCom) || 0), 0);
+        const saidas = m.jogadores.reduce((s, j) => s + (Number(j.saiuCom) || 0) + (Number(j.saidasAnteriores) || 0), 0);
         const saldoNaMesa = investido - saidas;
         const rakeSist = getCashRake(m);
         const rakeDealer = (m.rakeLancamentos || []).filter(l => !l.estornado).reduce((s, l) => s + (Number(l.valor) || 0), 0);
@@ -36706,7 +36706,7 @@ function renderCashMesas() {
         const tsAbertura = m.abertoEm || m.aberturaTs || Date.now();
         const tempoAberto = formatDuration(Date.now() - tsAbertura);
         const totalInvestido = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
-        const totalSaidas    = m.jogadores.reduce((s, j) => s + (j.saiuCom || 0), 0);
+        const totalSaidas    = m.jogadores.reduce((s, j) => s + (j.saiuCom || 0) + (j.saidasAnteriores || 0), 0);
         const saldoNaMesa    = totalInvestido - totalSaidas;  // dinheiro vivo na mesa
         const ativos = m.jogadores.filter(j => j.status === 'ativo');
 
@@ -36915,14 +36915,16 @@ function renderJogadoresCashMesa(m) {
         html += ativos.map(j => {
             const jog = jogadores.find(x => x.id === j.jogadorId);
             const recompras = j.movimentos.filter(mv => mv.tipo === 'recompra').length;
+            const retornou = j.saidasAnteriores > 0;
             return `
-            <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.75rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;margin-bottom:.4rem;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:1rem;align-items:center;padding:.75rem 1rem;background:#0f0f12;border:1px solid ${retornou ? 'rgba(59,130,246,.3)' : '#1e1e23'};border-radius:.6rem;margin-bottom:.4rem;">
                 <div style="width:32px;height:32px;border-radius:50%;background:rgba(34,197,94,.15);border:1.5px solid rgba(34,197,94,.3);color:#22c55e;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;">${(jog?jog.nome:'?').substring(0,2).toUpperCase()}</div>
                 <div>
-                    <div style="font-weight:700;font-size:.9rem;">${jog ? jog.nome : '?'}</div>
+                    <div style="font-weight:700;font-size:.9rem;">${jog ? jog.nome : '?'}${retornou ? ' <span style="font-size:.6rem;color:#3b82f6;background:rgba(59,130,246,.1);padding:.1rem .4rem;border-radius:.3rem;font-weight:700;margin-left:.4rem;vertical-align:middle;"><i class="fa-solid fa-rotate-left"></i> Retornou</span>' : ''}</div>
                     <div style="font-size:.7rem;color:#52525b;margin-top:.15rem;">
                         <i class="fa-solid fa-clock"></i> ${formatDuration(Date.now() - j.entrouEm)}
                         ${recompras > 0 ? ` &bull; <span style="color:var(--gold);">${recompras} recompra${recompras>1?'s':''}</span>` : ''}
+                        ${retornou ? ` &bull; <span style="color:#3b82f6;">saiu com ${formatMoney(j.saidasAnteriores)}</span>` : ''}
                     </div>
                 </div>
                 <div style="text-align:right;">
@@ -36942,14 +36944,14 @@ function renderJogadoresCashMesa(m) {
         html += `<div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-top:.75rem;margin-bottom:.4rem;">Já saíram (${saidos.length})</div>`;
         html += saidos.map(j => {
             const jog = jogadores.find(x => x.id === j.jogadorId);
-            const resultado = j.saiuCom - j.totalInvestido;
+            const resultado = (j.saiuCom + (j.saidasAnteriores || 0)) - j.totalInvestido;
             const positivo = resultado >= 0;
             const mesaCheia = m.jogadores.filter(jj => jj.status === 'ativo').length >= 9;
             return `
             <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.6rem 1rem;background:#0a0a0b;border:1px solid #18181b;border-radius:.6rem;margin-bottom:.3rem;opacity:.75;">
                 <div style="width:28px;height:28px;border-radius:50%;background:#1e1e23;color:#71717a;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;">${(jog?jog.nome:'?').substring(0,2).toUpperCase()}</div>
                 <div style="font-weight:700;font-size:.85rem;color:#a1a1aa;">${jog ? jog.nome : '?'}</div>
-                <div style="font-family:var(--font-mono);font-size:.75rem;color:#52525b;">${formatMoney(j.totalInvestido)} → ${formatMoney(j.saiuCom)}</div>
+                <div style="font-family:var(--font-mono);font-size:.75rem;color:#52525b;">${formatMoney(j.totalInvestido)} → ${formatMoney(j.saiuCom)}${(j.saidasAnteriores||0) > 0 ? ` <span style="color:#3b82f6;">(+${formatMoney(j.saidasAnteriores)} ant.)</span>` : ''}</div>
                 <div style="font-family:var(--font-mono);font-weight:800;font-size:.85rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(resultado)}</div>
                 <button onclick="voltarJogadorCash('${m.id}', '${j.jogadorId}')" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .6rem;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;white-space:nowrap;${mesaCheia?'opacity:.4;pointer-events:none;':''}" title="${mesaCheia?'Mesa cheia':'Voltar à mesa'}"><i class="fa-solid fa-rotate-left"></i> Voltar</button>
             </div>`;
@@ -37681,6 +37683,7 @@ function abrirRetirar(mesaId, jogadorId) {
         <div style="display:flex;justify-content:space-between;"><span>Buy-in inicial:</span><span style="font-family:var(--font-mono);">${formatMoney(j.movimentos[0].valor)}</span></div>
         ${recompras>0?`<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Recompras:</span><span style="color:var(--gold);">${recompras}x</span></div>`:''}
         <div style="display:flex;justify-content:space-between;margin-top:.25rem;border-top:1px solid #1e1e23;padding-top:.4rem;"><span style="font-weight:700;">Total investido:</span><span style="color:#22c55e;font-family:var(--font-mono);font-weight:800;">${formatMoney(j.totalInvestido)}</span></div>
+        ${(j.saidasAnteriores||0) > 0 ? `<div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Já retirou antes:</span><span style="color:#3b82f6;font-family:var(--font-mono);font-weight:700;">${formatMoney(j.saidasAnteriores)}</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;margin-top:.25rem;"><span>Tempo em jogo:</span><span style="font-family:var(--font-mono);">${formatDuration(Date.now() - j.entrouEm)}</span></div>
     `;
     document.getElementById('ret-valor').value = '';
@@ -37692,7 +37695,8 @@ function calcResultadoPreview() {
     const m = cashMesas.find(x => x.id === activeCashContext.mesaId);
     const j = m.jogadores.find(jj => jj.jogadorId === activeCashContext.jogadorId && jj.status === 'ativo');
     const valor = parseFloat(document.getElementById('ret-valor').value) || 0;
-    const resultado = valor - j.totalInvestido;
+    const saidasAnt = j.saidasAnteriores || 0;
+    const resultado = (valor + saidasAnt) - j.totalInvestido;
     const positivo = resultado >= 0;
     document.getElementById('ret-resultado').innerHTML = `
         <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem;">Resultado da sessão</div>
@@ -37702,6 +37706,7 @@ function calcResultadoPreview() {
         <div style="font-size:.7rem;color:#71717a;margin-top:.25rem;">
             ${positivo ? '🟢 Lucro' : resultado === 0 ? '⚪ Empate' : '🔴 Prejuízo'}
         </div>
+        ${saidasAnt > 0 ? `<div style="font-size:.65rem;color:#3b82f6;margin-top:.25rem;">Inclui ${formatMoney(saidasAnt)} de saída anterior</div>` : ''}
     `;
 }
 
@@ -37743,7 +37748,7 @@ function confirmRetirar() {
     closeModal('modal-retirar');
     renderCashMesas();
 
-    const resultado = valor - j.totalInvestido;
+    const resultado = (valor + (j.saidasAnteriores || 0)) - j.totalInvestido;
     const jog = jogadores.find(x => x.id === j.jogadorId);
     showToast(`🚪 ${jog?jog.nome:'Jogador'} saiu com ${formatMoney(valor)} (${resultado>=0?'+':''}${formatMoney(resultado)})`);
 
@@ -37772,41 +37777,22 @@ function voltarJogadorCash(mesaId, jogadorId) {
     const jog = jogadores.find(x => x.id === jogadorId);
     const nomeJog = jog ? jog.nome : 'Jogador';
 
+    const valorSaiu = j.saiuCom || 0;
     showConfirmModal(
         'VOLTAR À MESA',
-        `${nomeJog} vai retornar à mesa com o histórico preservado.\n\nA transação de saída (cash-out) será revertida e ele voltará como jogador ativo.`,
+        `${nomeJog} vai retornar à mesa com o histórico preservado.\n\nComo ele já acertou ao sair (${formatMoney(valorSaiu)}), voltará precisando de uma nova recompra para jogar.`,
         () => {
-            // 1) Reverter a transação de cash_out desta saída
-            if (j.saiuCom > 0 && typeof transacoes !== 'undefined' && Array.isArray(transacoes)) {
-                const txIdx = transacoes.findIndex(t =>
-                    String(t.jogadorId) === String(jogadorId) &&
-                    t.tipo === 'cash_out' &&
-                    String(t.refId) === String(m.id) &&
-                    Math.abs(t.valor - j.saiuCom) < 0.01
-                );
-                if (txIdx !== -1) {
-                    transacoes.splice(txIdx, 1);
-                    // Remove do Supabase também
-                    if (sbClube && typeof sb !== 'undefined' && transacoes[txIdx - 1]) {
-                        // A transação já foi removida do array, tenta deletar pelo ID se existir
-                    }
-                }
-                // Registra transação reversa pra manter auditoria limpa
-                registrarTransacao({
-                    jogadorId: jogadorId,
-                    tipo: 'cash_out_reverso',
-                    valor: -j.saiuCom,
-                    descricao: `Retorno à mesa · ${m.nome} (cash-out revertido)`,
-                    origem: 'cash',
-                    refId: m.id,
-                });
-            }
+            // 1) NÃO reverter o cash_out — ele realmente aconteceu (fichas foram devolvidas)
+            //    O jogador volta "zerado" e precisa de recompra para continuar jogando.
 
-            // 2) Remover o movimento de 'saida' do array de movimentos
-            const saidaIdx = j.movimentos.findIndex(mv => mv.tipo === 'saida');
-            if (saidaIdx !== -1) j.movimentos.splice(saidaIdx, 1);
+            // 2) Adicionar movimento de retorno (marcador no histórico)
+            j.movimentos.push({ tipo: 'retorno', valor: 0, ts: Date.now() });
 
-            // 3) Restaurar status ativo
+            // 3) Acumular saída anterior para cálculos de caixa da mesa
+            //    saidasAnteriores guarda total que já foi pago em saídas passadas
+            j.saidasAnteriores = (j.saidasAnteriores || 0) + (j.saiuCom || 0);
+
+            // 4) Restaurar status ativo
             j.status = 'ativo';
             j.saiuEm = null;
             j.saiuCom = null;
@@ -37874,7 +37860,7 @@ function renderCashHistorico() {
             <div style="display:flex;flex-direction:column;gap:.3rem;">
                 ${m.jogadores.map(j => {
                     const jog = jogadores.find(x => x.id === j.jogadorId);
-                    const resultado = j.saiuCom - j.totalInvestido;
+                    const resultado = ((j.saiuCom || 0) + (j.saidasAnteriores || 0)) - j.totalInvestido;
                     const positivo = resultado >= 0;
                     return `
                     <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:1rem;align-items:center;padding:.45rem .75rem;background:#0f0f12;border-radius:.4rem;font-size:.8rem;">
@@ -39785,7 +39771,7 @@ function renderPainelDono() {
         (m.jogadores || []).forEach(j => {
             if (!porJogador[j.jogadorId]) porJogador[j.jogadorId] = { volume: 0, resultado: 0, sessoes: 0 };
             porJogador[j.jogadorId].volume += Number(j.totalInvestido) || 0;
-            porJogador[j.jogadorId].resultado += (Number(j.saiuCom) || 0) - (Number(j.totalInvestido) || 0);
+            porJogador[j.jogadorId].resultado += (Number(j.saiuCom) || 0) + (Number(j.saidasAnteriores) || 0) - (Number(j.totalInvestido) || 0);
             porJogador[j.jogadorId].sessoes++;
         });
     });
@@ -39967,7 +39953,7 @@ function renderCashRelatorio() {
         (m.jogadores || []).forEach(j => {
             if (!porJogador[j.jogadorId]) porJogador[j.jogadorId] = { invest: 0, saiu: 0, sessoes: 0 };
             porJogador[j.jogadorId].invest  += (Number(j.totalInvestido) || 0);
-            porJogador[j.jogadorId].saiu    += (Number(j.saiuCom) || 0);
+            porJogador[j.jogadorId].saiu    += (Number(j.saiuCom) || 0) + (Number(j.saidasAnteriores) || 0);
             porJogador[j.jogadorId].sessoes += 1;
         });
     });
@@ -45707,7 +45693,7 @@ function encerrarMesaCashModal(mesaId) {
 
     // Info da mesa
     const totalInvestido = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
-    const totalSaida = m.jogadores.reduce((s,j) => s + j.saiuCom, 0);
+    const totalSaida = m.jogadores.reduce((s,j) => s + (j.saiuCom || 0) + (j.saidasAnteriores || 0), 0);
     const rakeTotal = getCashRake(m);
 
     // Expected chip value = totalInvestido - saídas já feitas - rake
@@ -45755,7 +45741,7 @@ function conferirEncerramento() {
     const totalFinal = calcTotalFichasDict(_fichasContagemState.enc);
     const fichasInicialValor = calcTotalFichasDict(m.fichasInicio || {});
     const totalInvestido = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
-    const totalSaida = m.jogadores.reduce((s,j) => s + j.saiuCom, 0);
+    const totalSaida = m.jogadores.reduce((s,j) => s + (j.saiuCom || 0) + (j.saidasAnteriores || 0), 0);
     const rakeTotal = getCashRake(m);
     const esperado = fichasInicialValor + totalInvestido - totalSaida - rakeTotal;
     const diff = totalFinal - esperado;
@@ -45782,7 +45768,7 @@ function confirmarEncerrarMesa() {
     const totalFinal = calcTotalFichasDict(_fichasContagemState.enc);
     const fichasInicialValor = calcTotalFichasDict(m.fichasInicio || {});
     const totalInvestido = m.jogadores.reduce((s,j) => s + j.totalInvestido, 0);
-    const totalSaida = m.jogadores.reduce((s,j) => s + j.saiuCom, 0);
+    const totalSaida = m.jogadores.reduce((s,j) => s + (j.saiuCom || 0) + (j.saidasAnteriores || 0), 0);
     const rakeTotal = getCashRake(m);
     const esperado = fichasInicialValor + totalInvestido - totalSaida - rakeTotal;
     const diff = totalFinal - esperado;
