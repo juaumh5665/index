@@ -18460,13 +18460,24 @@ function gerarComprovanteCompraCash(dados) {
     // Total acumulado da sessão (se >1 compra, mostra o histórico)
     const totalAcumulado = Number(dados.totalAcumulado) || 0;
     const qtdCompras = Number(dados.qtdCompras) || 0;
+    const saidasAnt = Number(dados.saidasAnteriores) || 0;
     if (totalAcumulado > valor && qtdCompras > 1) {
         txt += _printLine('-', col) + '\n';
         txt += _printPad('Compras anteriores', formatMoney(totalAcumulado - valor), col) + '\n';
         txt += _printPad('+ Esta compra', formatMoney(valor), col) + '\n';
         txt += _printLine('-', col) + '\n';
-        txt += _printPad('TOTAL ACUMULADO', formatMoney(totalAcumulado), col) + '\n';
-        txt += _printCenter(`(${qtdCompras} compras nesta sessao)`, col) + '\n';
+        if (saidasAnt > 0) {
+            // Jogador retornou após acerto — mostrar dívida real
+            txt += _printPad('Total compras', formatMoney(totalAcumulado), col) + '\n';
+            txt += _printPad('Ja acertado (ret.)', '-' + formatMoney(saidasAnt), col) + '\n';
+            txt += _printLine('-', col) + '\n';
+            txt += _printPad('DIVIDA ATUAL', formatMoney(totalAcumulado - saidasAnt), col) + '\n';
+            txt += _printCenter('(Retornou a mesa - acerto', col) + '\n';
+            txt += _printCenter('anterior deduzido)', col) + '\n';
+        } else {
+            txt += _printPad('TOTAL ACUMULADO', formatMoney(totalAcumulado), col) + '\n';
+            txt += _printCenter(`(${qtdCompras} compras nesta sessao)`, col) + '\n';
+        }
         txt += '\n';
     }
 
@@ -18523,10 +18534,11 @@ function gerarExtratoCashJogador(mesa, sessao) {
     txt += _printCenter(nome.toUpperCase().substring(0, col), col) + '\n';
     txt += _printLine('-', col) + '\n';
 
-    // Lista de movimentos (compras + retiradas)
+    // Lista de movimentos (compras + retiradas + retornos)
     const movimentos = Array.isArray(sessao.movimentos) ? sessao.movimentos.slice().sort((a,b) => (a.ts||0) - (b.ts||0)) : [];
     const compras   = movimentos.filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
     const retiradas = movimentos.filter(mv => mv.tipo === 'retirar' || mv.tipo === 'saida' || mv.tipo === 'cashout');
+    const saidasAnt = Number(sessao.saidasAnteriores) || 0;
 
     txt += '\n';
     txt += 'COMPRAS' + '\n';
@@ -18534,10 +18546,25 @@ function gerarExtratoCashJogador(mesa, sessao) {
     if (compras.length === 0) {
         txt += _printCenter('(sem compras)', col) + '\n';
     } else {
-        compras.forEach((mv, i) => {
+        // Detectar onde o retorno aconteceu para marcar visualmente
+        let retornoIdx = -1;
+        for (let mi = 0; mi < movimentos.length; mi++) {
+            if (movimentos[mi].tipo === 'retorno') { retornoIdx = mi; break; }
+        }
+        let compraNum = 0;
+        movimentos.forEach((mv) => {
+            if (mv.tipo === 'retorno') {
+                txt += _printCenter('--- RETORNOU A MESA ---', col) + '\n';
+                if (saidasAnt > 0) {
+                    txt += _printCenter(`(acertou ${formatMoney(saidasAnt)} ao sair)`, col) + '\n';
+                }
+                return;
+            }
+            if (mv.tipo !== 'buyin' && mv.tipo !== 'recompra') return;
+            compraNum++;
             const dt = new Date(mv.ts || Date.now());
-            const dtFmt = dt.toLocaleString('pt-BR').substring(0, 16); // dd/mm hh:mm
-            const label = (mv.tipo === 'buyin' ? 'Buy-in' : 'Recompra') + ' #' + (i + 1);
+            const dtFmt = dt.toLocaleString('pt-BR').substring(0, 16);
+            const label = (mv.tipo === 'buyin' ? 'Buy-in' : 'Recompra') + ' #' + compraNum;
             txt += _printPad(label, formatMoney(Number(mv.valor) || 0), col) + '\n';
             txt += '   ' + dtFmt + '\n';
         });
@@ -18546,6 +18573,13 @@ function gerarExtratoCashJogador(mesa, sessao) {
     const totalComprado = compras.reduce((s, mv) => s + (Number(mv.valor) || 0), 0);
     txt += _printLine('-', col) + '\n';
     txt += _printPad('TOTAL COMPRADO', formatMoney(totalComprado), col) + '\n';
+
+    // Se retornou, mostra dívida atual separada
+    if (saidasAnt > 0) {
+        txt += _printPad('Ja acertado (ret.)', '-' + formatMoney(saidasAnt), col) + '\n';
+        txt += _printLine('-', col) + '\n';
+        txt += _printPad('DIVIDA ATUAL', formatMoney(totalComprado - saidasAnt), col) + '\n';
+    }
 
     // Retiradas (se houver)
     if (retiradas.length > 0) {
@@ -18566,10 +18600,15 @@ function gerarExtratoCashJogador(mesa, sessao) {
     // Saldo final (se a mesa já encerrou OU se o jogador já saiu)
     if (mesa.status === 'encerrada' || sessao.status === 'saiu') {
         const saiuCom = Number(sessao.saiuCom) || 0;
-        const resultado = saiuCom - totalComprado;
+        // Resultado considera saidasAnteriores: investimento real atual é totalComprado - saidasAnt
+        const investimentoAtual = totalComprado - saidasAnt;
+        const resultado = (saiuCom + saidasAnt) - totalComprado;
         txt += '\n';
         txt += _printLine('=', col) + '\n';
         txt += _printPad('Saiu com', formatMoney(saiuCom), col) + '\n';
+        if (saidasAnt > 0) {
+            txt += _printPad('Investido atual', formatMoney(investimentoAtual), col) + '\n';
+        }
         txt += _printPad((resultado >= 0 ? 'LUCRO' : 'PREJUIZO'), (resultado >= 0 ? '+' : '') + formatMoney(resultado), col) + '\n';
         txt += _printLine('=', col) + '\n';
     } else {
@@ -37174,6 +37213,7 @@ function confirmRecompra() {
                 ts: Date.now(),
                 totalAcumulado,
                 qtdCompras,
+                saidasAnteriores: j.saidasAnteriores || 0,
             });
         }
     } catch(e) { console.warn('[CASH] imprimir comprovante recompra:', e); }
