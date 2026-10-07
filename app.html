@@ -42266,6 +42266,45 @@ function _confirmarPagamentoContaImpl() {
         }
     }
 
+    // === AUTO-FECHAR COMANDAS: saldo quitado no caixa ===
+    // Se após o pagamento o saldo do jogador ficou >= 0,
+    // fecha comandas abertas restantes SEM gerar novas transações de débito.
+    // A dívida foi coberta pelo pagamento — marcar comanda como fechada evita cobrança dupla.
+    {
+        const saldoPosPayment = getSaldoJogador(pagamentoJogadorId);
+        if (saldoPosPayment >= -0.01) { // margem p/ float
+            const comandasAindaAbertas = barComandas.filter(
+                c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta'
+            );
+            if (comandasAindaAbertas.length > 0) {
+                let autoFechadas = 0;
+                comandasAindaAbertas.forEach(c => {
+                    comandasAlteradas.push({
+                        id: c.id,
+                        estadoAnterior: {
+                            status: c.status,
+                            fechadoEm: c.fechadoEm || null,
+                            pagamento: c.pagamento || null,
+                            total: c.total || 0,
+                            fechadaPeloCaixa: c.fechadaPeloCaixa || false,
+                            autoFechada: c.autoFechada || false,
+                            descricaoFechamento: c.descricaoFechamento || null,
+                        }
+                    });
+                    c.status = 'fechada';
+                    c.fechadoEm = Date.now();
+                    c.autoFechada = true;
+                    c.fechadaPeloCaixa = true;
+                    c.descricaoFechamento = 'Auto-fechada: saldo quitado no caixa';
+                    c.total = calcTotalComanda(c);
+                    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+                    autoFechadas++;
+                });
+                showToast(`🍔 ${autoFechadas} comanda${autoFechadas > 1 ? 's' : ''} de ${j.nome} fechada${autoFechadas > 1 ? 's' : ''} automaticamente — saldo quitado`);
+            }
+        }
+    }
+
     // Label amigável pra log/recibo
     const metodoLabel = metodosUsados.length === 1
         ? (PAYMENT_METHODS[metodosUsados[0]] && PAYMENT_METHODS[metodosUsados[0]].label) || metodo
@@ -42333,11 +42372,13 @@ function _confirmarPagamentoContaImpl() {
         comandasAlteradas.forEach(alt => {
             const c = barComandas.find(c => c.id === alt.id);
             if (c) {
-                c.status         = alt.estadoAnterior.status;
-                c.fechadoEm      = alt.estadoAnterior.fechadoEm;
-                c.pagamento      = alt.estadoAnterior.pagamento;
-                c.total          = alt.estadoAnterior.total;
-                c.fechadaPeloCaixa = alt.estadoAnterior.fechadaPeloCaixa;
+                c.status              = alt.estadoAnterior.status;
+                c.fechadoEm           = alt.estadoAnterior.fechadoEm;
+                c.pagamento           = alt.estadoAnterior.pagamento;
+                c.total               = alt.estadoAnterior.total;
+                c.fechadaPeloCaixa    = alt.estadoAnterior.fechadaPeloCaixa;
+                c.autoFechada         = alt.estadoAnterior.autoFechada || false;
+                c.descricaoFechamento = alt.estadoAnterior.descricaoFechamento || null;
             }
         });
 
@@ -43003,6 +43044,17 @@ function openFecharComanda() {
     const j = jogadores.find(j => j.id === c.jogadorId);
     const totalComanda = calcTotalComanda(c);
 
+    // === GUARD: alerta se jogador já quitou no caixa ===
+    const saldoPreCheck = getSaldoJogador(c.jogadorId);
+    if (saldoPreCheck >= -0.01) {
+        const nomeJ = j ? j.nome : 'Jogador';
+        if (!confirm(
+            `⚠️ ATENÇÃO: ${nomeJ} tem saldo ${saldoPreCheck >= 0 ? 'positivo' : 'zerado'} (${formatMoney(saldoPreCheck)}).\n\n` +
+            `Fechar esta comanda vai CRIAR um débito de ${formatMoney(totalComanda)}.\n\n` +
+            `Isso pode gerar cobrança duplicada se o bar já foi quitado no caixa.\n\nDeseja continuar mesmo assim?`
+        )) return;
+    }
+
     // Calcula pendências anteriores (saldo negativo excluindo esta comanda)
     // Importante: a comanda atual ainda não gerou transação; usaremos saldo atual como pendência
     const saldoAtual = getSaldoJogador(c.jogadorId);
@@ -43062,6 +43114,18 @@ function cobrarSomenteBar() {
 
     const j = jogadores.find(j => j.id === c.jogadorId);
     const totalComanda = calcTotalComanda(c);
+
+    // === GUARD: alerta se jogador já quitou no caixa ===
+    const saldoPreCheck = getSaldoJogador(c.jogadorId);
+    if (saldoPreCheck >= -0.01) {
+        const nomeJ = j ? j.nome : 'Jogador';
+        if (!confirm(
+            `⚠️ ATENÇÃO: ${nomeJ} tem saldo ${saldoPreCheck >= 0 ? 'positivo' : 'zerado'} (${formatMoney(saldoPreCheck)}).\n\n` +
+            `Cobrar esta comanda vai CRIAR um débito de ${formatMoney(totalComanda)}.\n\n` +
+            `Isso pode gerar cobrança duplicada se o bar já foi quitado no caixa.\n\nDeseja continuar mesmo assim?`
+        )) return;
+    }
+
     const saldoAtual = getSaldoJogador(c.jogadorId);
     const pendencias = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
 
