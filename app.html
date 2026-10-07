@@ -36929,7 +36929,10 @@ function renderJogadoresCashMesa(m) {
                 </div>
                 <div style="text-align:right;">
                     <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Investido</div>
-                    <div style="font-family:var(--font-mono);font-weight:700;font-size:.9rem;color:#22c55e;">${formatMoney(j.totalInvestido)}</div>
+                    <div style="display:flex;align-items:center;gap:.35rem;justify-content:flex-end;">
+                        <span style="font-family:var(--font-mono);font-weight:700;font-size:.9rem;color:#22c55e;">${formatMoney(j.totalInvestido)}</span>
+                        <button onclick="abrirEditarMovimentos('${m.id}','${j.jogadorId}')" style="background:none;border:none;color:#52525b;cursor:pointer;font-size:.65rem;padding:.15rem;line-height:1;" title="Editar compras"><i class="fa-solid fa-pen"></i></button>
+                    </div>
                 </div>
                 <div style="display:flex;gap:.35rem;">
                     <button onclick="abrirRecompra('${m.id}', '${j.jogadorId}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
@@ -37764,6 +37767,136 @@ function confirmRetirar() {
             );
         }
     }, 300);
+}
+
+// --- EDITAR MOVIMENTOS (BUY-IN / RECOMPRA) ---
+function abrirEditarMovimentos(mesaId, jogadorId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId);
+    if (!j) return;
+    const jog = jogadores.find(x => x.id === jogadorId);
+    const nomeJog = jog ? jog.nome : 'Jogador';
+
+    const movs = (j.movimentos || []).filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
+
+    let listaHtml = movs.map((mv, idx) => {
+        const label = mv.tipo === 'buyin' ? 'Buy-in' : `Recompra #${movs.filter((x, i) => i <= idx && x.tipo === 'recompra').length}`;
+        const hora = new Date(mv.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const editado = mv.valorAnterior != null;
+        return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.55rem .75rem;background:#0f0f12;border:1px solid ${editado ? 'rgba(59,130,246,.3)' : '#1e1e23'};border-radius:.5rem;margin-bottom:.3rem;">
+            <div>
+                <div style="font-weight:700;font-size:.8rem;color:#e4e4e7;">${label} <span style="color:#52525b;font-weight:400;">${hora}</span></div>
+                ${editado ? `<div style="font-size:.6rem;color:#3b82f6;margin-top:.15rem;"><i class="fa-solid fa-pen"></i> Editado de ${formatMoney(mv.valorAnterior)} por ${mv.editadoPor || '?'}</div>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;">
+                <span style="font-family:var(--font-mono);font-weight:800;font-size:.9rem;color:#22c55e;">${formatMoney(mv.valor)}</span>
+                <button onclick="editarMovimentoCash('${mesaId}','${jogadorId}',${idx})" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#3b82f6;border-radius:.35rem;padding:.3rem .5rem;cursor:pointer;font-size:.65rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Editar valor"><i class="fa-solid fa-pen"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Cria overlay com a lista
+    const ov = document.createElement('div');
+    ov.id = '_editMovOv';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;';
+    ov.innerHTML = `
+    <div style="background:#1a1a1e;border:1px solid #27272a;border-radius:.75rem;width:100%;max-width:400px;max-height:85vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid #27272a;">
+            <div style="font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:.3rem;">Editar Compras</div>
+            <div style="font-weight:800;font-size:1rem;color:#e4e4e7;">${esc(nomeJog)}</div>
+            <div style="font-size:.75rem;color:#52525b;margin-top:.15rem;">Total investido: <span style="color:#22c55e;font-family:var(--font-mono);font-weight:700;">${formatMoney(j.totalInvestido)}</span></div>
+        </div>
+        <div style="padding:1rem 1.25rem;" id="_editMovList">
+            ${listaHtml}
+        </div>
+        <div style="padding:.75rem 1.25rem;border-top:1px solid #27272a;text-align:right;">
+            <button onclick="document.getElementById('_editMovOv').remove()" style="background:#27272a;color:#a1a1aa;border:none;border-radius:.4rem;padding:.5rem 1.25rem;cursor:pointer;font-size:.8rem;font-weight:700;font-family:'Manrope',sans-serif;">Fechar</button>
+        </div>
+    </div>`;
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+}
+
+function editarMovimentoCash(mesaId, jogadorId, movIdx) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId);
+    if (!j) return;
+    const movs = (j.movimentos || []).filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
+    const mv = movs[movIdx];
+    if (!mv) return;
+    const label = mv.tipo === 'buyin' ? 'Buy-in' : 'Recompra';
+    const jog = jogadores.find(x => x.id === jogadorId);
+
+    // Fecha overlay de lista (se aberto)
+    const ov = document.getElementById('_editMovOv');
+    if (ov) ov.remove();
+
+    showPromptModal(
+        `Editar ${label}`,
+        `${jog ? jog.nome : 'Jogador'}\nValor atual: ${formatMoney(mv.valor)}`,
+        mv.valor,
+        (novoValorStr) => {
+            const novoValor = parseFloat(novoValorStr);
+            if (isNaN(novoValor) || novoValor <= 0) return showToast('⚠️ Valor inválido');
+            if (novoValor === mv.valor) return;
+
+            const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+            const valorAnterior = mv.valor;
+
+            // Atualiza movimento com auditoria
+            mv.valorAnterior = valorAnterior;
+            mv.valor = novoValor;
+            mv.editadoEm = Date.now();
+            mv.editadoPor = operador;
+            mv.editadoPorId = (currentUser && currentUser.id) || null;
+
+            // Recalcular totalInvestido
+            j.totalInvestido = (j.movimentos || [])
+                .filter(x => x.tipo === 'buyin' || x.tipo === 'recompra')
+                .reduce((s, x) => s + (Number(x.valor) || 0), 0);
+
+            // Atualizar transação correspondente (ajustar diferença)
+            const diff = novoValor - valorAnterior;
+            if (diff !== 0 && typeof transacoes !== 'undefined' && Array.isArray(transacoes)) {
+                const tipoTx = mv.tipo === 'buyin' ? 'cash_in' : 'cash_rec';
+                const tx = transacoes.find(t =>
+                    String(t.jogadorId) === String(jogadorId) &&
+                    t.tipo === tipoTx &&
+                    String(t.refId) === String(m.id) &&
+                    Math.abs(Math.abs(t.valor) - valorAnterior) < 0.01
+                );
+                if (tx) {
+                    tx.valor = -novoValor; // negativo = jogador deve
+                } else {
+                    // Registra ajuste se não encontrar transação original
+                    registrarTransacao({
+                        jogadorId: jogadorId,
+                        tipo: 'cash_ajuste',
+                        valor: -diff,
+                        descricao: `Ajuste ${label.toLowerCase()} · ${m.nome} (${formatMoney(valorAnterior)} → ${formatMoney(novoValor)})`,
+                        origem: 'cash',
+                        refId: m.id,
+                    });
+                }
+            }
+
+            // Persistir no Supabase
+            if (sbClube && typeof sb !== 'undefined' && j.id) {
+                sb.from('cash_sessoes').update(_cashSessaoToDb(j, m.id)).eq('id', j.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar sessão (edição movimento):', error.message);
+                }).catch(e => console.warn('[CASH] update edição mov falhou:', e));
+            }
+
+            saveData();
+            renderCashMesas();
+            showToast(`✏️ ${label} editado: ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)}`);
+            logAudit && logAudit('CASH_MOVIMENTO_EDIT', `Edição ${label}: ${jog?jog.nome:'?'} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
+        },
+        { borderColor: '#3b82f6' }
+    );
 }
 
 // --- VOLTAR JOGADOR QUE JÁ SAIU À MESA ---
