@@ -11759,6 +11759,8 @@ function _cashSessaoToDb(j, mesaId) {
         entrou_ts: j.entrouEm ? new Date(j.entrouEm).toISOString() : new Date().toISOString(),
         saiu_ts: j.saiuEm ? new Date(j.saiuEm).toISOString() : null,
         operador: j.operador || (currentUser && currentUser.nome) || null,
+        saidas_anteriores: Number(j.saidasAnteriores) || 0,
+        retornou_ts: j.retornouEm ? new Date(j.retornouEm).toISOString() : null,
     };
 }
 
@@ -11810,6 +11812,8 @@ function _cashSessaoFromDb(r) {
         fichasInicial: r.entrada_fichas || null,  // ✨ alias direto pras fichas do buy-in
         fichasRetiradas: r.saida_fichas || null,
         operador: r.operador || null,
+        saidasAnteriores: Number(r.saidas_anteriores) || 0,
+        retornouEm: r.retornou_ts ? new Date(r.retornou_ts).getTime() : null,
     };
 }
 
