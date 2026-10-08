@@ -42371,12 +42371,19 @@ function abrirPagamentoJogador(jogadorId) {
     document.getElementById('pj-info').innerText = `${j.apelido?j.apelido+' · ':''}${j.whatsapp || ''}`;
 
     renderSaldoCard(saldo);
-    renderExtratoJogador();
     // reset tabs
     document.querySelectorAll('.pj-tab-content').forEach(t => t.style.display = 'none');
     document.querySelectorAll('#modal-pagamento-jogador .tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('pj-extrato').style.display = 'block';
-    document.getElementById('pjtab-btn-extrato').classList.add('active');
+    // Se jogador deve ou tem crédito, abre direto na aba "Pagar Conta"
+    if (saldo !== 0) {
+        renderPagarConta();
+        document.getElementById('pj-pagar').style.display = 'block';
+        document.getElementById('pjtab-btn-pagar').classList.add('active');
+    } else {
+        renderExtratoJogador();
+        document.getElementById('pj-extrato').style.display = 'block';
+        document.getElementById('pjtab-btn-extrato').classList.add('active');
+    }
     openModal('modal-pagamento-jogador');
 }
 
@@ -42505,6 +42512,7 @@ function getTipoIcon(tipo) {
         cash_in:  'fa-coins',        cash_out:  'fa-right-from-bracket',
         cash_rec: 'fa-plus-circle',  bar:       'fa-utensils',
         pagamento:'fa-credit-card',  deposito:  'fa-wallet',
+        pagamento_credito: 'fa-hand-holding-dollar',  pagamento_cash: 'fa-hand-holding-dollar',
         estorno:  'fa-rotate-left',
     };
     return icons[tipo] || 'fa-circle-dot';
@@ -42529,7 +42537,46 @@ function renderPagarConta() {
     const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
     const totalItens = comandasAbertas.reduce((s, c) => s + c.itens.length, 0);
 
-    if (saldo >= 0 && !comandasAbertas.length) {
+    if (saldo > 0 && !comandasAbertas.length) {
+        // Jogador tem CRÉDITO — mostrar opção de pagar o crédito ao jogador
+        const jogador = jogadores.find(j => j.id === pagamentoJogadorId);
+        const nomeJogador = jogador ? jogador.nome : 'Jogador';
+        el.innerHTML = `
+            <div style="padding:1rem 0;">
+                <!-- Info do crédito -->
+                <div style="text-align:center;padding:1.25rem;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:.6rem;margin-bottom:1.25rem;">
+                    <div style="font-size:.6rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem;">Crédito do Jogador</div>
+                    <div style="font-family:var(--font-mono);font-size:1.6rem;font-weight:900;color:#22c55e;">+${formatMoney(saldo)}</div>
+                    <div style="font-size:.7rem;color:#71717a;margin-top:.3rem;">Valor que o clube deve a ${esc(nomeJogador)}</div>
+                </div>
+
+                <!-- Valor a pagar -->
+                <div style="margin-bottom:1rem;">
+                    <label class="inp-label">Valor a pagar ao jogador R$</label>
+                    <input type="number" id="pj-pagar-credito-valor" step="0.01" min="0" value="${saldo.toFixed(2)}" class="inp" style="font-size:1.1rem;font-weight:700;font-family:var(--font-mono);">
+                </div>
+
+                <!-- Forma de pagamento -->
+                <div style="margin-bottom:1rem;">
+                    <label class="inp-label" style="margin-bottom:.5rem;">Forma de Pagamento</label>
+                    <div id="pj-pagar-credito-metodos" style="display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem;"></div>
+                </div>
+
+                <!-- Observação -->
+                <div style="margin-bottom:1.25rem;">
+                    <label class="inp-label">Observação</label>
+                    <input id="pj-pagar-credito-obs" class="inp" placeholder="Opcional">
+                </div>
+
+                <!-- Confirmar -->
+                <button onclick="confirmarPagarCredito()" style="width:100%;background:#22c55e;color:#fff;border:none;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;">
+                    <i class="fa-solid fa-hand-holding-dollar"></i> Pagar Crédito ao Jogador
+                </button>
+            </div>`;
+        renderMetodosPagamento('pj-pagar-credito-metodos', 'pgcred', true);
+        return;
+    }
+    if (saldo === 0 && !comandasAbertas.length) {
         el.innerHTML = `
             <div style="padding:2.5rem;text-align:center;color:#52525b;">
                 <i class="fa-solid fa-circle-check" style="font-size:2.5rem;color:#22c55e;margin-bottom:.75rem;display:block;"></i>
@@ -43313,6 +43360,59 @@ function _confirmarPagamentoContaImpl() {
     renderCaixaAberto();
     renderComandas && renderComandas();  // atualiza lista do bar
     renderDashboard();
+}
+
+// ============================================================
+// PAGAR CRÉDITO AO JOGADOR (quando jogador tem saldo positivo)
+// ============================================================
+function confirmarPagarCredito() {
+    return comLock('confirmarPagarCredito', function() {
+        const valorPago = parseFloat(document.getElementById('pj-pagar-credito-valor').value) || 0;
+        const metodoSel = document.querySelector('input[name="metodo-pgcred"]:checked');
+        const metodo = metodoSel ? metodoSel.value : 'dinheiro';
+        const obs = document.getElementById('pj-pagar-credito-obs').value.trim();
+
+        if (valorPago <= 0) return showToast('⚠️ Valor inválido');
+
+        // Proteção: recalcula saldo real
+        const saldoAtual = getSaldoJogador(pagamentoJogadorId);
+        if (saldoAtual <= 0) {
+            return showToast('⚠️ Jogador não tem crédito disponível');
+        }
+        if (valorPago > saldoAtual + 0.01) {
+            const jog = jogadores.find(x => x.id === pagamentoJogadorId);
+            showConfirmModal(
+                'VALOR EXCEDE CRÉDITO',
+                `${jog ? jog.nome : 'Jogador'} tem crédito de ${formatMoney(saldoAtual)}, mas o pagamento é de ${formatMoney(valorPago)}.\n\nPagando ${formatMoney(valorPago)}, o jogador ficará DEVENDO ${formatMoney(valorPago - saldoAtual)} ao clube.\n\nContinuar?`,
+                () => { _executarPagarCredito(valorPago, metodo, obs); },
+                { confirmLabel: 'Pagar Mesmo Assim', confirmColor: '#f59e0b', icon: '⚠️' }
+            );
+            return;
+        }
+        _executarPagarCredito(valorPago, metodo, obs);
+    }, '⏳ Processando pagamento...');
+}
+
+function _executarPagarCredito(valorPago, metodo, obs) {
+    const jog = jogadores.find(x => x.id === pagamentoJogadorId);
+
+    registrarTransacao({
+        jogadorId: pagamentoJogadorId,
+        tipo: 'pagamento_credito',
+        valor: -valorPago,
+        descricao: `Pagamento ao jogador via ${PAYMENT_METHODS[metodo] ? PAYMENT_METHODS[metodo].label : metodo}${obs ? ' — ' + obs : ''}`,
+        metodo,
+        origem: 'caixa',
+    });
+
+    saveData();
+    // Atualiza UI
+    const saldoNovo = getSaldoJogador(pagamentoJogadorId);
+    renderSaldoCard(saldoNovo);
+    renderPagarConta();
+    renderCaixa();
+    renderDashboard();
+    showToast(`💰 ${formatMoney(valorPago)} pagos a ${jog ? jog.nome : 'jogador'} via ${PAYMENT_METHODS[metodo] ? PAYMENT_METHODS[metodo].label : metodo}`);
 }
 
 // ============================================================
