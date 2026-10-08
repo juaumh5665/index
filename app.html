@@ -7640,6 +7640,11 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
 
             <div id="ret-resultado" style="padding:1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;text-align:center;"></div>
+            <!-- Forma de pagamento da retirada -->
+            <div id="ret-metodo-wrap" style="display:none;">
+                <label class="inp-label" style="margin-bottom:.4rem;">Forma de pagamento</label>
+                <div id="ret-metodos" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+            </div>
             <button onclick="confirmRetirar()" style="width:100%;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.6rem;padding:.85rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:.95rem;cursor:pointer;" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
                 Confirmar Retirada
             </button>
@@ -37742,6 +37747,9 @@ function abrirRetirar(mesaId, jogadorId) {
     `;
     document.getElementById('ret-valor').value = '';
     document.getElementById('ret-resultado').innerHTML = '<div style="color:#52525b;font-size:.8rem;">Digite o valor de saída para ver o resultado</div>';
+    // Esconde seletor de forma de pagamento até digitar valor
+    const retMetodoWrap = document.getElementById('ret-metodo-wrap');
+    if (retMetodoWrap) retMetodoWrap.style.display = 'none';
     openModal('modal-retirar');
 }
 
@@ -37766,6 +37774,18 @@ function calcResultadoPreview() {
             <span style="color:#71717a;">(${formatMoney(saidasAnt)} já acertado ao retornar)</span>
         </div>` : ''}
     `;
+    // Mostra seletor de forma de pagamento quando há valor de saída
+    const metodoWrap = document.getElementById('ret-metodo-wrap');
+    if (metodoWrap) {
+        if (valor > 0) {
+            if (metodoWrap.style.display === 'none') {
+                renderMetodosPagamento('ret-metodos', 'ret', true);
+            }
+            metodoWrap.style.display = '';
+        } else {
+            metodoWrap.style.display = 'none';
+        }
+    }
 }
 
 function confirmRetirar() {
@@ -37785,11 +37805,14 @@ function confirmRetirar() {
 
     // Registra saída no caixa (positivo — jogador recebe)
     if (valor > 0) {
+        const metodoSel = document.querySelector('input[name="metodo-ret"]:checked');
+        const metodo = metodoSel ? metodoSel.value : 'dinheiro';
         registrarTransacao({
             jogadorId: j.jogadorId,
             tipo: 'cash_out',
             valor: valor,
-            descricao: `Retirada cash · ${m.nome}`,
+            descricao: `Retirada cash · ${m.nome} · ${PAYMENT_METHODS[metodo] ? PAYMENT_METHODS[metodo].label : metodo}`,
+            metodo,
             origem: 'cash',
             refId: m.id,
         });
