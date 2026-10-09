@@ -30456,6 +30456,7 @@ async function _consumirTicketVoucher(tv, jogadorId, valorEntrada, torneioId, to
         descricao: `${tv.tipo === 'ticket' ? 'Ticket' : 'Voucher'} usado · ${torneioNome}`,
         origem: 'caixa',
         refId: torneioId,
+        tvRef: tv.obj.id,  // referência ao ticket/voucher (pra restaurar no estorno)
     });
 
     return abatido;
@@ -43521,6 +43522,7 @@ async function _confirmarPagamentoContaImpl() {
                     valor: abatir,
                     descricao: `Voucher usado · abatimento de dívida`,
                     origem: 'caixa',
+                    tvRef: v.id,  // referência ao voucher (pra restaurar no estorno)
                 });
                 voucherAbatido = abatir;
                 showToast(`🎫 Voucher: R$ ${abatir.toFixed(2).replace('.',',')} abatido da dívida`);
@@ -44087,7 +44089,7 @@ function highlightMetodo(radio, suffix) {
 // ============================================================
 function removerTransacao(id) {
     // comLock previne double-click no botão de estorno
-    comLock('removerTransacao_' + id, () => {
+    comLock('removerTransacao_' + id, async () => {
         const t = transacoes.find(x => x.id === id);
         if (!t) return;
         if (t.fechamentoId) return showToast('⚠️ Transação já faz parte de fechamento');
@@ -44125,14 +44127,93 @@ function removerTransacao(id) {
         };
         transacoes.push(estornoTx);
 
+        // LOTE 6: Restaura ticket/voucher ao estado anterior quando estorno de uso
+        let tvRestaurado = '';
+        if ((t.tipo === 'ticket_uso' || t.tipo === 'voucher_uso') && t.tvRef) {
+            try {
+                tvRestaurado = await _restaurarTicketVoucher(t.tipo, t.tvRef, t.valor, t.jogadorId, motivo);
+            } catch(e) {
+                console.error('[ESTORNO TV] Falha ao restaurar ticket/voucher:', e);
+                tvRestaurado = ' (⚠️ voucher/ticket não restaurado)';
+            }
+        }
+
         saveData();
         if (pagamentoJogadorId) {
             renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
             renderExtratoJogador();
         }
         renderCaixaAberto();
-        showToast('↩️ Transação estornada — registro mantido no histórico');
+        showToast(`↩️ Transação estornada — registro mantido no histórico${tvRestaurado}`);
     }, 'Estorno já em andamento…');
+}
+
+// LOTE 6: Restaura ticket ou voucher ao estado anterior após estorno de uso
+async function _restaurarTicketVoucher(tipoTx, tvRefId, valorAbatido, jogadorId, motivo) {
+    if (tipoTx === 'ticket_uso') {
+        // Restaura ticket
+        const tk = (tickets || []).find(t => t.id === tvRefId);
+        if (!tk) return ' (ticket não encontrado)';
+        if (tk.status !== 'usado') return ''; // já restaurado ou outro estado
+
+        // Se tinha voucher de sobra, cancela ele
+        if (tk.sobraVoucherId) {
+            const vSobra = (vouchers || []).find(v => v.id === tk.sobraVoucherId);
+            if (vSobra && vSobra.status === 'ativo' && vSobra.saldoAtual > 0) {
+                vSobra.status = 'cancelado';
+                vSobra.saldoAtual = 0;
+                vSobra.observacoes = (vSobra.observacoes || '') + ` · Cancelado por estorno do ticket em ${new Date().toLocaleDateString('pt-BR')}`;
+                try { await syncVoucher(vSobra); } catch(e) { console.error('[ESTORNO TV] sync voucher sobra:', e); }
+            }
+            tk.sobraVoucherId = null;
+        }
+
+        // Restaura ticket ao estado disponível
+        tk.status = 'disponivel';
+        tk.usadoTorneioId = null;
+        tk.usadoEm = null;
+        tk.valorUsado = null;
+        try { await syncTicket(tk); } catch(e) { console.error('[ESTORNO TV] sync ticket:', e); }
+        localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        return ' · 🎟️ Ticket restaurado';
+
+    } else if (tipoTx === 'voucher_uso') {
+        // Restaura saldo do voucher
+        const v = (vouchers || []).find(v => v.id === tvRefId);
+        if (!v) return ' (voucher não encontrado)';
+
+        const saldoAntes = v.saldoAtual;
+        v.saldoAtual = Math.min(v.valorOriginal, v.saldoAtual + valorAbatido);
+        if (v.status === 'esgotado') v.status = 'ativo';
+
+        // Registra movimento de reversão
+        const mov = {
+            id: _genUuid(),
+            voucherId: v.id,
+            clubeId: sbClube?.id || null,
+            tipo: 'estorno',
+            valor: +valorAbatido,
+            saldoAntes: saldoAntes,
+            saldoDepois: v.saldoAtual,
+            descricao: `Estorno de uso: ${motivo}`,
+            refTorneioId: null,
+            ts: Date.now(),
+        };
+        voucherMovimentos.push(mov);
+        try {
+            await sb.from('voucher_movimentos').upsert({
+                id: mov.id, voucher_id: mov.voucherId, clube_id: mov.clubeId,
+                tipo: mov.tipo, valor: mov.valor, saldo_antes: mov.saldoAntes,
+                saldo_depois: mov.saldoDepois, descricao: mov.descricao,
+            });
+        } catch(e) { console.error('[ESTORNO TV] sync voucher mov:', e); }
+        try { await syncVoucher(v); } catch(e) { console.error('[ESTORNO TV] sync voucher:', e); }
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        localStorage.setItem('ps_voucher_movimentos', JSON.stringify(voucherMovimentos));
+        return ' · 🎫 Voucher restaurado';
+    }
+    return '';
 }
 
 // ============================================================
@@ -45966,6 +46047,46 @@ async function confirmarEstorno() {
                 origem: 'torneio',
                 refId: t.id,
             });
+        }
+
+        // 2e. LOTE 6: Estorna ticket/voucher associado à entrada (se existir)
+        // Procura transação ticket_uso ou voucher_uso do mesmo jogador + torneio que não foi estornada
+        if (dados.kind !== 'jackpot') {
+            const tvTx = transacoes.find(tx =>
+                (tx.tipo === 'ticket_uso' || tx.tipo === 'voucher_uso') &&
+                tx.jogadorId === dados.jogadorId &&
+                tx.refId === t.id &&
+                !tx.estornada &&
+                !transacoes.some(ex => ex.estornoRef === tx.id && ex.tipo === 'estorno')
+            );
+            if (tvTx) {
+                // Marca como estornada
+                tvTx.estornada = true;
+                tvTx.estornadaEm = Date.now();
+                tvTx.estornadaPor = currentUser ? currentUser.nome : 'Sistema';
+                tvTx.estornoMotivo = motivo;
+                // Cria contra-transação
+                transacoes.push({
+                    id: _genUuid(),
+                    jogadorId: tvTx.jogadorId,
+                    tipo: 'estorno',
+                    valor: -tvTx.valor,
+                    descricao: `Estorno: ${tvTx.descricao}`,
+                    metodo: tvTx.metodo || null,
+                    origem: tvTx.origem || null,
+                    ts: Date.now(),
+                    fechamentoId: null,
+                    estornoRef: tvTx.id,
+                    estornoMotivo: motivo,
+                    estornoPor: currentUser ? currentUser.nome : 'Sistema',
+                });
+                // Restaura o ticket/voucher ao estado anterior
+                if (tvTx.tvRef) {
+                    try {
+                        await _restaurarTicketVoucher(tvTx.tipo, tvTx.tvRef, tvTx.valor, tvTx.jogadorId, motivo);
+                    } catch(e) { console.error('[ESTORNO] Falha ao restaurar ticket/voucher:', e); }
+                }
+            }
         }
 
         // 3. Adiciona à lista local de estornos do torneio (auditoria)
