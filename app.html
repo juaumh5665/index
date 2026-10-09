@@ -10015,16 +10015,27 @@ function _jogadorToDb(j) {
 const db = {
     jogadores: {
         // Lista todos os jogadores do clube (do Supabase). Atualiza cache local "jogadores".
+        // Usa paginação pra garantir que carrega TODOS (Supabase max_rows=1000)
         async list() {
             if (!sbClube) return jogadores;  // 🛡️ não tenta sem clube
             try {
-                const { data, error } = await sb
-                    .from('jogadores')
-                    .select('*')
-                    .eq('clube_id', sbClube.id)  // 🛡️ defesa em profundidade
-                    .order('nome');
-                if (error) throw error;
-                jogadores = (data || []).map(_jogadorFromDb);
+                let allRows = [];
+                let from = 0;
+                const PAGE = 1000;
+                while (true) {
+                    const { data: page, error } = await sb
+                        .from('jogadores')
+                        .select('*')
+                        .eq('clube_id', sbClube.id)
+                        .order('nome')
+                        .range(from, from + PAGE - 1);
+                    if (error) throw error;
+                    if (!page || !page.length) break;
+                    allRows = allRows.concat(page);
+                    if (page.length < PAGE) break;
+                    from += PAGE;
+                }
+                jogadores = allRows.map(_jogadorFromDb);
                 localStorage.setItem('ps_jogadores', JSON.stringify(jogadores));
                 return jogadores;
             } catch (e) {
@@ -11273,11 +11284,23 @@ async function _processarMudancaRealtime(tipo, payload) {
                 const { data: tRows } = await sb.from('torneios').select('*').eq('clube_id', clubeId).order('criado_em', { ascending: false });
                 if (tRows) {
                     const ids = tRows.map(r => r.id);
-                    const [{ data: eRows }, { data: elRows }, { data: jpRows }, { data: tmRows }] = await Promise.all([
-                        sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
-                        sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
-                        sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
-                        sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeId),
+                    // Usa paginação pra não perder dados (max_rows=1000)
+                    async function _rtLoadAll(query) {
+                        let all = [], from = 0;
+                        while (true) {
+                            const { data: pg } = await query.range(from, from + 999);
+                            if (!pg || !pg.length) break;
+                            all = all.concat(pg);
+                            if (pg.length < 1000) break;
+                            from += 1000;
+                        }
+                        return all;
+                    }
+                    const [eRows, elRows, jpRows, tmRows] = await Promise.all([
+                        _rtLoadAll(sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
+                        _rtLoadAll(sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
+                        _rtLoadAll(sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
+                        _rtLoadAll(sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
                     ]);
                     
                     torneios = tRows.map(r => {
@@ -12535,23 +12558,52 @@ async function carregarEstadoDoSupabase() {
     
     try {
         // Torneios — sempre filtra pelo clube_id atual (defesa em profundidade)
-        const { data: tRowsRaw } = await sb.from('torneios').select('*').eq('clube_id', clubeIdEsperado).order('criado_em', { ascending: false });
-        const tRows = (tRowsRaw || []).filter(r => r.clube_id === clubeIdEsperado);
+        // Paginado pra garantir que carrega TODOS (Supabase max_rows=1000)
+        let tRowsRaw = [];
+        {
+            let from = 0;
+            const PAGE = 1000;
+            while (true) {
+                const { data: pg } = await sb.from('torneios').select('*').eq('clube_id', clubeIdEsperado).order('criado_em', { ascending: false }).range(from, from + PAGE - 1);
+                if (!pg || !pg.length) break;
+                tRowsRaw = tRowsRaw.concat(pg);
+                if (pg.length < PAGE) break;
+                from += PAGE;
+            }
+        }
+        const tRows = tRowsRaw.filter(r => r.clube_id === clubeIdEsperado);
         if (tRows && tRows.length) {
+            // Helper: carrega TODAS as linhas de uma tabela com paginação
+            // Supabase default max_rows=1000, então paginamos sempre
+            async function _loadAllPages(query) {
+                let all = [];
+                let from = 0;
+                const PAGE = 1000;
+                while (true) {
+                    const { data: page, error } = await query.range(from, from + PAGE - 1);
+                    if (error) { console.warn('_loadAllPages erro:', error); break; }
+                    if (!page || !page.length) break;
+                    all = all.concat(page);
+                    if (page.length < PAGE) break;
+                    from += PAGE;
+                }
+                return all;
+            }
             // Buscar entries, eliminados, jackpot, mesas, estornos em paralelo (filtrado por clube_id)
+            // Usa paginação pra garantir que carrega TODOS os registros
             const ids = tRows.map(t => t.id);
-            const [eRes, elRes, jRes, mRes, esRes] = await Promise.all([
-                sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
-                sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
-                sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
-                sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado),
-                sb.from('torneio_estornos').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado).then(r => r).catch(() => ({ data: [] })),
+            const [eData, elData, jData, mData, esData] = await Promise.all([
+                _loadAllPages(sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado)),
+                _loadAllPages(sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado)),
+                _loadAllPages(sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado)),
+                _loadAllPages(sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado)),
+                _loadAllPages(sb.from('torneio_estornos').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado)).catch(() => []),
             ]);
             // Reconstruir torneios em formato de UI
-            torneios = tRows.map(r => _torneioFromDb(r, eRes.data || [], elRes.data || [], jRes.data || [], mRes.data || []));
+            torneios = tRows.map(r => _torneioFromDb(r, eData, elData, jData, mData));
             // Anexa estornos a cada torneio
             const estornosByT = {};
-            (esRes && esRes.data ? esRes.data : []).forEach(es => {
+            esData.forEach(es => {
                 (estornosByT[es.torneio_id] ||= []).push({
                     id: es.id,
                     entry_id: es.entry_id,
