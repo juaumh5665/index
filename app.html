@@ -9012,10 +9012,18 @@ document.addEventListener('DOMContentLoaded', function(){
                     Opcional. <span id="entrada-passaporte-fichas-label">+0 fichas extras</span>
                 </div>
             </div>
+            <!-- Ticket / Voucher (LOTE 6 integração) -->
+            <div id="entrada-ticketvoucher-wrap" style="display:none;padding:.75rem 1rem;background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.2);border-radius:.5rem;">
+                <div style="font-size:.7rem;color:#3b82f6;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-ticket"></i> Ticket / Voucher disponível</div>
+                <div id="entrada-ticketvoucher-opcoes" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+            </div>
             <!-- Resumo do total -->
-            <div id="entrada-resumo" style="padding:.85rem 1rem;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:.75rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Total a cobrar</span>
-                <span id="entrada-resumo-valor" style="font-size:1.4rem;font-weight:800;color:var(--gold);font-family:monospace;">R$ 0,00</span>
+            <div id="entrada-resumo" style="padding:.85rem 1rem;background:#0a0a0c;border:1px solid #1e1e23;border-radius:.5rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:.75rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Total a cobrar</span>
+                    <span id="entrada-resumo-valor" style="font-size:1.4rem;font-weight:800;color:var(--gold);font-family:monospace;">R$ 0,00</span>
+                </div>
+                <div id="entrada-desconto-tv" style="display:none;margin-top:.4rem;padding-top:.4rem;border-top:1px solid #1e1e23;font-size:.75rem;color:#3b82f6;"></div>
             </div>
             <button onclick="registrarEntrada()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Entrada</button>
         </div>
@@ -30082,6 +30090,9 @@ function _renderOpcoesEntrada(t, jogadorSelecionadoId) {
         if (primeiraOpcaoValida) tipoSel.value = primeiraOpcaoValida.value;
     }
     
+    // LOTE 6: Renderiza ticket/voucher se torneio aceita e jogador tem disponível
+    _renderTicketVoucherEntrada(t, jogadorSelecionadoId);
+
     atualizarResumoEntrada();
 }
 
@@ -30268,6 +30279,188 @@ function _getAcoesEntradaSelecionadas() {
 }
 window._renderOpcoesEntrada = _renderOpcoesEntrada;
 
+// ============================================================
+// LOTE 6 INTEGRAÇÃO — Ticket/Voucher no modal de entrada
+// ============================================================
+
+// Renderiza opções de ticket/voucher disponíveis pro jogador selecionado
+function _renderTicketVoucherEntrada(torneio, jogadorId) {
+    const wrap = document.getElementById('entrada-ticketvoucher-wrap');
+    const container = document.getElementById('entrada-ticketvoucher-opcoes');
+    if (!wrap || !container) return;
+
+    if (!jogadorId || !torneio) {
+        wrap.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    const opcoes = [];
+
+    // Tickets disponíveis (se torneio aceita)
+    const tksDisp = _torneioAceitaTicket(torneio) ? getTicketsDisponiveis(jogadorId) : [];
+    tksDisp.forEach(tk => {
+        // Respeita torneio destino se especificado
+        if (tk.torneioDestinoId && tk.torneioDestinoId !== torneio.id) return;
+        opcoes.push({
+            tipo: 'ticket',
+            id: tk.id,
+            label: tk.descricao || 'Ticket',
+            valor: tk.valor,
+            detalhe: tk.validade ? `Válido até ${new Date(tk.validade).toLocaleDateString('pt-BR')}` : '',
+        });
+    });
+
+    // Vouchers disponíveis (se torneio aceita)
+    const vchDisp = _torneioAceitaVoucher(torneio) ? getVouchersDisponiveis(jogadorId) : [];
+    vchDisp.forEach(v => {
+        opcoes.push({
+            tipo: 'voucher',
+            id: v.id,
+            label: v.descricao || 'Voucher',
+            valor: v.saldoAtual,
+            detalhe: v.validade ? `Válido até ${new Date(v.validade).toLocaleDateString('pt-BR')}` : '',
+        });
+    });
+
+    if (opcoes.length === 0) {
+        wrap.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    wrap.style.display = '';
+    container.innerHTML = opcoes.map(opt => {
+        const cor = opt.tipo === 'ticket' ? '#3b82f6' : '#a855f7';
+        const icon = opt.tipo === 'ticket' ? 'fa-ticket' : 'fa-gift';
+        return `
+            <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;padding:.5rem .65rem;border:1px solid ${cor}33;border-radius:.4rem;background:${cor}08;">
+                <input type="radio" name="entrada-tv-uso" value="${opt.tipo}|${opt.id}" onchange="atualizarResumoEntrada()" style="accent-color:${cor};width:16px;height:16px;cursor:pointer;">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;">
+                        <span><i class="fa-solid ${icon}" style="color:${cor};margin-right:.3rem;"></i>${esc(opt.label)}</span>
+                        <span style="font-weight:700;color:${cor};">R$ ${opt.valor.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                    ${opt.detalhe ? `<div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">${opt.detalhe}</div>` : ''}
+                </div>
+            </label>`;
+    }).join('') + `
+        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;padding:.35rem .65rem;font-size:.75rem;color:#71717a;">
+            <input type="radio" name="entrada-tv-uso" value="" onchange="atualizarResumoEntrada()" style="width:14px;height:14px;cursor:pointer;" checked>
+            Não usar ticket/voucher
+        </label>`;
+}
+
+// Retorna o ticket ou voucher selecionado no modal, ou null
+function _getTicketVoucherSelecionado() {
+    const radio = document.querySelector('input[name="entrada-tv-uso"]:checked');
+    if (!radio || !radio.value) return null;
+    const [tipo, id] = radio.value.split('|');
+    if (tipo === 'ticket') {
+        const tk = (tickets || []).find(t => t.id === id);
+        if (!tk) return null;
+        return { tipo: 'ticket', id, valor: tk.valor, obj: tk };
+    }
+    if (tipo === 'voucher') {
+        const v = (vouchers || []).find(v => v.id === id);
+        if (!v) return null;
+        return { tipo: 'voucher', id, valor: v.saldoAtual, obj: v };
+    }
+    return null;
+}
+
+// Consome ticket/voucher após confirmar entrada.
+// Cria transação de abatimento e atualiza status.
+// Retorna o valor efetivamente abatido (pra exibir no comprovante).
+async function _consumirTicketVoucher(tv, jogadorId, valorEntrada, torneioId, torneioNome) {
+    if (!tv) return 0;
+    const abatido = Math.min(tv.valor, valorEntrada);
+    if (abatido <= 0) return 0;
+
+    if (tv.tipo === 'ticket') {
+        const tk = tv.obj;
+        // Marca ticket como usado
+        tk.status = 'usado';
+        tk.usadoTorneioId = torneioId;
+        tk.usadoEm = Date.now();
+        tk.valorUsado = abatido;
+
+        // Se sobrou valor, cria voucher com o troco
+        if (tv.valor > valorEntrada) {
+            const sobra = tv.valor - valorEntrada;
+            const novoVoucher = {
+                id: _genUuid(),
+                clubeId: sbClube?.id || null,
+                jogadorId: jogadorId,
+                valorOriginal: sobra,
+                saldoAtual: sobra,
+                descricao: `Troco de Ticket (${tk.descricao || 'Ticket'})`,
+                origem: 'ticket_sobra',
+                ticketOrigemId: tk.id,
+                status: 'ativo',
+                validade: tk.validade || _ticketVoucherValidadeDefault(),
+                observacoes: `Gerado automaticamente — sobra de R$${sobra.toFixed(2)} do ticket usado em ${torneioNome}`,
+                criadoEm: Date.now(),
+            };
+            vouchers.push(novoVoucher);
+            tk.sobraVoucherId = novoVoucher.id;
+            try { await syncVoucher(novoVoucher); } catch(e) { console.error('[TV] sync voucher sobra:', e); }
+            showToast(`🎟️ Sobra de R$${sobra.toFixed(2).replace('.', ',')} virou voucher`);
+        }
+
+        try { await syncTicket(tk); } catch(e) { console.error('[TV] sync ticket uso:', e); }
+        localStorage.setItem('ps_tickets', JSON.stringify(tickets));
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+
+    } else if (tv.tipo === 'voucher') {
+        const v = tv.obj;
+        const saldoAntes = v.saldoAtual;
+        v.saldoAtual = Math.max(0, v.saldoAtual - abatido);
+        if (v.saldoAtual <= 0) v.status = 'esgotado';
+
+        // Registra movimento do voucher
+        const mov = {
+            id: _genUuid(),
+            voucherId: v.id,
+            clubeId: sbClube?.id || null,
+            tipo: 'debito',
+            valor: -abatido,
+            saldoAntes: saldoAntes,
+            saldoDepois: v.saldoAtual,
+            descricao: `Uso em ${torneioNome}`,
+            refTorneioId: torneioId,
+            ts: Date.now(),
+        };
+        voucherMovimentos.push(mov);
+        // Sync movimento
+        try {
+            await sb.from('voucher_movimentos').upsert({
+                id: mov.id, voucher_id: mov.voucherId, clube_id: mov.clubeId,
+                tipo: mov.tipo, valor: mov.valor, saldo_antes: mov.saldoAntes,
+                saldo_depois: mov.saldoDepois, descricao: mov.descricao,
+                ref_torneio_id: mov.refTorneioId,
+            });
+        } catch(e) { console.error('[TV] sync voucher mov:', e); }
+
+        try { await syncVoucher(v); } catch(e) { console.error('[TV] sync voucher:', e); }
+        localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+        localStorage.setItem('ps_voucher_movimentos', JSON.stringify(voucherMovimentos));
+    }
+
+    // Transação de abatimento (POSITIVA — compensa o buy-in negativo)
+    const tipoTx = tv.tipo === 'ticket' ? 'ticket_uso' : 'voucher_uso';
+    registrarTransacao({
+        jogadorId: jogadorId,
+        tipo: tipoTx,
+        valor: abatido,
+        descricao: `${tv.tipo === 'ticket' ? 'Ticket' : 'Voucher'} usado · ${torneioNome}`,
+        origem: 'caixa',
+        refId: torneioId,
+    });
+
+    return abatido;
+}
+
 // Atualiza visibilidade do staff e valor total mostrado no modal
 function atualizarResumoEntrada() {
     const t = torneios[activeTorneioIdx];
@@ -30384,6 +30577,28 @@ function atualizarResumoEntrada() {
                 ' <span style="font-size:.65rem;color:#71717a;font-weight:400;font-family:Manrope,sans-serif;">(' + partes.join(' + ') + ')</span>';
         } else {
             resumoVal.innerText = 'R$ ' + total.toFixed(2).replace('.', ',');
+        }
+    }
+
+    // LOTE 6: Mostra desconto de ticket/voucher selecionado
+    const tvDiv = document.getElementById('entrada-desconto-tv');
+    if (tvDiv) {
+        const tvSel = _getTicketVoucherSelecionado();
+        if (tvSel && total > 0) {
+            const abatido = Math.min(tvSel.valor, total);
+            const restante = Math.max(0, total - abatido);
+            const label = tvSel.tipo === 'ticket' ? '🎟️ Ticket' : '🎫 Voucher';
+            let html = `${label}: -R$ ${abatido.toFixed(2).replace('.', ',')}`;
+            html += ` · <strong style="color:#22c55e;">A cobrar: R$ ${restante.toFixed(2).replace('.', ',')}</strong>`;
+            if (tvSel.valor > total) {
+                const sobra = tvSel.valor - total;
+                html += ` <span style="color:#a855f7;font-size:.65rem;">(sobra R$ ${sobra.toFixed(2).replace('.', ',')} → voucher)</span>`;
+            }
+            tvDiv.innerHTML = html;
+            tvDiv.style.display = '';
+        } else {
+            tvDiv.style.display = 'none';
+            tvDiv.innerHTML = '';
         }
     }
 }
@@ -30673,6 +30888,22 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         i++;
     }
 
+    // LOTE 6: Ticket/Voucher — abate valor total do combo se selecionado
+    let tvAbatidoCombo = 0;
+    const tvSelecionadoCombo = _getTicketVoucherSelecionado();
+    if (tvSelecionadoCombo) {
+        let totalComboParaTV = 0;
+        entriesCriadas.forEach(e => {
+            totalComboParaTV += Number(e.valor) || 0;
+            totalComboParaTV += Number(e.staff) || 0;
+            totalComboParaTV += Number(e.taxaAdm) || 0;
+            if (e.passaporte && e.passaporte.cobrado) totalComboParaTV += Number(e.passaporte.valor) || 0;
+        });
+        if (totalComboParaTV > 0) {
+            tvAbatidoCombo = await _consumirTicketVoucher(tvSelecionadoCombo, jid, totalComboParaTV, t.id, t.nome);
+        }
+    }
+
     saveData();
     closeModal('modal-entrada');
     updateModalTorneio();
@@ -30698,7 +30929,8 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         totalGeral += Number(e.taxaAdm) || 0;
         if (e.passaporte && e.passaporte.cobrado) totalGeral += Number(e.passaporte.valor) || 0;
     });
-    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}`);
+    const tvLabelCombo = tvAbatidoCombo > 0 ? ` · 🎟️ Desconto R$ ${tvAbatidoCombo.toFixed(2).replace('.',',')}` : '';
+    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}${tvLabelCombo}`);
 
     // Lembrete de Jackpot pendente: combo tem buy-in? Se sim, dispara
     // (mesma regra do single — só pra primeira entrada do jogador)
@@ -30719,7 +30951,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     }
 }
 
-function _registrarEntradaImpl() {
+async function _registrarEntradaImpl() {
     const t   = torneios[activeTorneioIdx];
     const jid = document.getElementById('entrada-jogador').value;
 
@@ -30940,6 +31172,15 @@ function _registrarEntradaImpl() {
         });
     }
 
+    // LOTE 6: Ticket/Voucher — abate valor da entrada se selecionado
+    // Entrada já registrada a VALOR CHEIO (prize pool correto).
+    // Cria transação POSITIVA de offset (ticket_uso/voucher_uso) pra abater dívida do jogador.
+    let tvAbatido = 0;
+    const tvSelecionado = _getTicketVoucherSelecionado();
+    if (tvSelecionado && valorTotal > 0) {
+        tvAbatido = await _consumirTicketVoucher(tvSelecionado, jid, valorTotal, t.id, t.nome);
+    }
+
     saveData();
     closeModal('modal-entrada');
     updateModalTorneio();
@@ -30949,7 +31190,7 @@ function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0);
+    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0) + (tvAbatido > 0 ? 1 : 0);
     const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
@@ -30962,7 +31203,8 @@ function _registrarEntradaImpl() {
     });
 
     const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
-    showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}`);
+    const tvLabel = tvAbatido > 0 ? ` · 🎟️ Desconto R$ ${tvAbatido.toFixed(2).replace('.',',')}` : '';
+    showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}${tvLabel}`);
 
     // Lembrete de Jackpot pendente (só dispara em buy-in, e se jogador ainda não tem jackpot)
     _lembreteJackpotPosCompra(t, jid, tipo);
@@ -42748,6 +42990,12 @@ function renderPagarConta() {
             ${toggleCobranca}
         </div>
 
+        <!-- LOTE 6: Voucher disponível (pra devedores) -->
+        <div id="pj-voucher-wrap" style="display:none;margin-bottom:1rem;padding:.75rem 1rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;">
+            <div style="font-size:.62rem;color:#a855f7;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;"><i class="fa-solid fa-gift"></i> Voucher disponível</div>
+            <div id="pj-voucher-opcoes" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+        </div>
+
         <!-- Valor a movimentar -->
         <div class="pj-valor-wrap">
             <div class="pj-valor-head">
@@ -42859,6 +43107,75 @@ function renderPagarConta() {
     _pjSplits = [{ valor: totalSugerido, metodo: 'dinheiro' }];
     _pjTotalSugerido = totalSugerido;
     pjSelecionarMetodo('dinheiro'); // Marca Dinheiro como ativo
+
+    // LOTE 6: Renderiza vouchers disponíveis do devedor
+    _renderVoucherPagarConta(pagamentoJogadorId, totalSugerido);
+}
+
+// LOTE 6: Popula seção de voucher no modal Pagar Conta
+function _renderVoucherPagarConta(jogadorId, totalSugerido) {
+    const wrap = document.getElementById('pj-voucher-wrap');
+    const container = document.getElementById('pj-voucher-opcoes');
+    if (!wrap || !container) return;
+
+    const vchDisp = getVouchersDisponiveis(jogadorId);
+    if (vchDisp.length === 0) {
+        wrap.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    wrap.style.display = '';
+    container.innerHTML = vchDisp.map(v => {
+        const abateMax = Math.min(v.saldoAtual, totalSugerido);
+        return `
+            <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;padding:.5rem .65rem;border:1px solid rgba(168,85,247,.2);border-radius:.4rem;background:rgba(168,85,247,.06);">
+                <input type="radio" name="pj-voucher-uso" value="${v.id}" onchange="_pjVoucherChanged()" style="accent-color:#a855f7;width:16px;height:16px;cursor:pointer;">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;">
+                        <span><i class="fa-solid fa-gift" style="color:#a855f7;margin-right:.3rem;"></i>${esc(v.descricao || 'Voucher')}</span>
+                        <span style="font-weight:700;color:#a855f7;">R$ ${v.saldoAtual.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">Abate até R$ ${abateMax.toFixed(2).replace('.', ',')} desta dívida</div>
+                </div>
+            </label>`;
+    }).join('') + `
+        <label style="display:flex;align-items:center;gap:.55rem;cursor:pointer;padding:.35rem .65rem;font-size:.75rem;color:#71717a;">
+            <input type="radio" name="pj-voucher-uso" value="" onchange="_pjVoucherChanged()" style="width:14px;height:14px;cursor:pointer;" checked>
+            Não usar voucher
+        </label>`;
+}
+
+// Quando voucher é selecionado/deselecionado, atualiza o valor sugerido
+function _pjVoucherChanged() {
+    const radio = document.querySelector('input[name="pj-voucher-uso"]:checked');
+    const voucherId = radio ? radio.value : '';
+    const inputValor = document.getElementById('pj-valor-editavel');
+    if (!inputValor) return;
+
+    // Recalcula total base (sem voucher)
+    const divida = (_pjCobrancaModo === 'torneio') ? _pjDividaTorneio : _pjDividaTotal;
+    const incluirComandas = (document.getElementById('pj-incluir-comandas') || {}).checked !== false;
+    const totalComandas = incluirComandas ? _pjTotalComandas : 0;
+    const totalBase = divida + totalComandas;
+
+    if (voucherId) {
+        const v = (vouchers || []).find(v => v.id === voucherId);
+        if (v) {
+            const abatido = Math.min(v.saldoAtual, totalBase);
+            const restante = Math.max(0, totalBase - abatido);
+            inputValor.value = restante.toFixed(2);
+            _pjTotalSugerido = restante;
+            // Atualiza splits
+            _pjSplits = [{ valor: restante, metodo: _pjSplits[0]?.metodo || 'dinheiro' }];
+            pjOnValorEditavelChange();
+        }
+    } else {
+        inputValor.value = totalBase.toFixed(2);
+        _pjTotalSugerido = totalBase;
+        _pjSplits = [{ valor: totalBase, metodo: _pjSplits[0]?.metodo || 'dinheiro' }];
+        pjOnValorEditavelChange();
+    }
 }
 
 // Atualiza total quando toggle "incluir comandas" muda
@@ -42895,6 +43212,10 @@ function atualizarTotalComComandas() {
     } else {
         pjSelecionarMetodo(metodoAtual);
     }
+
+    // LOTE 6: Recalcula voucher se selecionado (total base mudou)
+    const voucherRadio = document.querySelector('input[name="pj-voucher-uso"]:checked');
+    if (voucherRadio && voucherRadio.value) _pjVoucherChanged();
 }
 
 // ============================================================
@@ -42965,6 +43286,10 @@ function _pjTrocarCobranca(modo) {
             infoEl.textContent = `Cobrando só ${nomeTorneio} (${formatMoney(_pjDividaTorneio)}) — restam ${formatMoney(dividaExtra)} de dívidas anteriores`;
         }
     }
+
+    // LOTE 6: Recalcula voucher se selecionado (total base mudou)
+    const voucherRadio = document.querySelector('input[name="pj-voucher-uso"]:checked');
+    if (voucherRadio && voucherRadio.value) _pjVoucherChanged();
 }
 window._pjTrocarCobranca = _pjTrocarCobranca;
 
@@ -43158,14 +43483,59 @@ function confirmarPagamentoConta() {
     }, '⏳ Processando pagamento, aguarde...');
 }
 
-function _confirmarPagamentoContaImpl() {
+async function _confirmarPagamentoContaImpl() {
+    // LOTE 6: Consumir voucher selecionado ANTES do pagamento normal
+    let voucherAbatido = 0;
+    const voucherRadio = document.querySelector('input[name="pj-voucher-uso"]:checked');
+    const voucherSelecionadoId = voucherRadio ? voucherRadio.value : '';
+    if (voucherSelecionadoId) {
+        const v = (vouchers || []).find(v => v.id === voucherSelecionadoId);
+        if (v && v.saldoAtual > 0) {
+            const dividaAtual = Math.max(0, -getSaldoJogador(pagamentoJogadorId));
+            const abatir = Math.min(v.saldoAtual, dividaAtual);
+            if (abatir > 0) {
+                const saldoAntes = v.saldoAtual;
+                v.saldoAtual = Math.max(0, v.saldoAtual - abatir);
+                if (v.saldoAtual <= 0) v.status = 'esgotado';
+                const mov = {
+                    id: _genUuid(), voucherId: v.id, clubeId: sbClube?.id || null,
+                    tipo: 'debito', valor: -abatir, saldoAntes: saldoAntes,
+                    saldoDepois: v.saldoAtual, descricao: 'Abatimento de dívida no caixa',
+                    refTorneioId: null, ts: Date.now(),
+                };
+                voucherMovimentos.push(mov);
+                try {
+                    await sb.from('voucher_movimentos').upsert({
+                        id: mov.id, voucher_id: mov.voucherId, clube_id: mov.clubeId,
+                        tipo: mov.tipo, valor: mov.valor, saldo_antes: mov.saldoAntes,
+                        saldo_depois: mov.saldoDepois, descricao: mov.descricao,
+                    });
+                } catch(e) { console.error('[TV] sync voucher mov caixa:', e); }
+                try { await syncVoucher(v); } catch(e) { console.error('[TV] sync voucher caixa:', e); }
+                localStorage.setItem('ps_vouchers', JSON.stringify(vouchers));
+                localStorage.setItem('ps_voucher_movimentos', JSON.stringify(voucherMovimentos));
+
+                registrarTransacao({
+                    jogadorId: pagamentoJogadorId,
+                    tipo: 'voucher_uso',
+                    valor: abatir,
+                    descricao: `Voucher usado · abatimento de dívida`,
+                    origem: 'caixa',
+                });
+                voucherAbatido = abatir;
+                showToast(`🎫 Voucher: R$ ${abatir.toFixed(2).replace('.',',')} abatido da dívida`);
+            }
+        }
+    }
+
     // ===== NOVA LÓGICA: usa _pjSplits =====
     const splits = _pjSplits.filter(p => Number(p.valor) > 0);
-    if (splits.length === 0) return showToast('⚠️ Informe ao menos uma forma de pagamento');
-    
+    // Se voucher cobriu tudo e não sobra valor em dinheiro, permite pagamento zero
+    if (splits.length === 0 && voucherAbatido <= 0) return showToast('⚠️ Informe ao menos uma forma de pagamento');
+
     const valorBase = splits.reduce((s, p) => s + Number(p.valor), 0);
-    if (valorBase <= 0) return showToast('⚠️ Valor inválido');
-    
+    if (valorBase <= 0 && voucherAbatido <= 0) return showToast('⚠️ Valor inválido');
+
     const obs = document.getElementById('pj-pagar-obs').value.trim();
     const j = jogadores.find(x => x.id === pagamentoJogadorId);
     
@@ -43176,6 +43546,7 @@ function _confirmarPagamentoContaImpl() {
     const tMarcador = Date.now();
     
     // Para cada split, registrar pagamento + taxa (se houver)
+    // Se voucher cobriu tudo, splits pode estar vazio — pula pagamento em dinheiro
     const metodosUsados = [];
     let totalTaxaCobrada = 0;  // soma das taxas cobradas do cliente (pro recibo)
     splits.forEach(p => {
@@ -43218,8 +43589,8 @@ function _confirmarPagamentoContaImpl() {
         if (!metodosUsados.includes(p.metodo)) metodosUsados.push(p.metodo);
     });
     
-    const valor = valorBase;  // pra log audit
-    const metodo = metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo';
+    const valor = valorBase + voucherAbatido;  // pra log audit (inclui voucher)
+    const metodo = metodosUsados.length === 0 ? 'voucher' : (metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo');
     const taxaAplicada = totalTaxaCobrada;  // pro recibo: soma das taxas cobradas
 
     // === FECHAMENTO INTELIGENTE DE COMANDAS ABERTAS ===
@@ -43338,9 +43709,11 @@ function _confirmarPagamentoContaImpl() {
     }
 
     // Label amigável pra log/recibo
-    const metodoLabel = metodosUsados.length === 1
-        ? (PAYMENT_METHODS[metodosUsados[0]] && PAYMENT_METHODS[metodosUsados[0]].label) || metodo
-        : `${metodosUsados.length} formas (${metodosUsados.map(m => (PAYMENT_METHODS[m]||{}).label || m).join(' + ')})`;
+    const metodoLabel = metodosUsados.length === 0
+        ? (voucherAbatido > 0 ? 'Voucher' : 'N/A')
+        : metodosUsados.length === 1
+            ? (PAYMENT_METHODS[metodosUsados[0]] && PAYMENT_METHODS[metodosUsados[0]].label) || metodo
+            : `${metodosUsados.length} formas (${metodosUsados.map(m => (PAYMENT_METHODS[m]||{}).label || m).join(' + ')})`;
 
     logAudit('PAGAMENTO', `Pagamento de ${formatMoney(valor)} · ${j.nome} via ${metodoLabel}`, { jogadorId: pagamentoJogadorId, valor, metodo, splits });
 
