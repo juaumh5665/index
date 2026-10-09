@@ -7019,6 +7019,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="tab-btn active" id="pjtab-btn-extrato"    onclick="switchPagamentoTab('pj-extrato', this)">Extrato</button>
             <button class="tab-btn"        id="pjtab-btn-pagar"      onclick="switchPagamentoTab('pj-pagar', this)">Pagar Conta</button>
             <button class="tab-btn"        id="pjtab-btn-depositar"  onclick="switchPagamentoTab('pj-depositar', this)">Depositar</button>
+            <button class="tab-btn"        id="pjtab-btn-transferir" onclick="switchPagamentoTab('pj-transferir', this)">Transferir</button>
         </div>
         <div style="flex:1;overflow:auto;padding:1.5rem;">
             <!-- TAB: EXTRATO -->
@@ -7032,6 +7033,10 @@ document.addEventListener('DOMContentLoaded', function(){
             <!-- TAB: DEPOSITAR -->
             <div id="pj-depositar" class="pj-tab-content" style="display:none;">
                 <div id="pj-depositar-content"></div>
+            </div>
+            <!-- TAB: TRANSFERIR -->
+            <div id="pj-transferir" class="pj-tab-content" style="display:none;">
+                <div id="pj-transferir-content"></div>
             </div>
         </div>
     </div>
@@ -42477,9 +42482,10 @@ function switchPagamentoTab(tabId, btn) {
     document.querySelectorAll('#modal-pagamento-jogador .tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).style.display = 'block';
     btn.classList.add('active');
-    if (tabId === 'pj-extrato')    renderExtratoJogador();
-    if (tabId === 'pj-pagar')      renderPagarConta();
-    if (tabId === 'pj-depositar')  renderDepositar();
+    if (tabId === 'pj-extrato')     renderExtratoJogador();
+    if (tabId === 'pj-pagar')       renderPagarConta();
+    if (tabId === 'pj-depositar')   renderDepositar();
+    if (tabId === 'pj-transferir')  renderTransferir();
 }
 
 function renderExtratoJogador() {
@@ -42577,7 +42583,7 @@ function getTipoIcon(tipo) {
         cash_rec: 'fa-plus-circle',  bar:       'fa-utensils',
         pagamento:'fa-credit-card',  deposito:  'fa-wallet',
         pagamento_credito: 'fa-hand-holding-dollar',  pagamento_cash: 'fa-hand-holding-dollar',
-        estorno:  'fa-rotate-left',
+        estorno:  'fa-rotate-left',  transferencia: 'fa-arrow-right-arrow-left',
     };
     return icons[tipo] || 'fa-circle-dot';
 }
@@ -43518,6 +43524,117 @@ function confirmarDepositoNoModal() {
     });
 
     showToast(`💰 Depósito de ${formatMoney(valor)} registrado`);
+    renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+    renderExtratoJogador();
+    renderCaixaAberto();
+}
+
+// ============================================================
+// TRANSFERÊNCIA DE SALDO
+// ============================================================
+function renderTransferir() {
+    const el = document.getElementById('pj-transferir-content');
+    if (!el) return;
+    const jogadorAtual = jogadores.find(j => j.id === pagamentoJogadorId);
+    const saldoAtual = getSaldoJogador(pagamentoJogadorId);
+    // Lista de jogadores destino (exclui o jogador atual)
+    const destinos = jogadores.filter(j => j.id !== pagamentoJogadorId).sort((a, b) => a.nome.localeCompare(b.nome));
+
+    el.innerHTML = `
+        <div style="padding:1rem;background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.15);border-radius:.6rem;margin-bottom:1rem;font-size:.8rem;color:#a1a1aa;">
+            <i class="fa-solid fa-arrow-right-arrow-left" style="color:#818cf8;"></i> Transfere saldo de <strong style="color:#e4e4e7;">${esc(jogadorAtual ? jogadorAtual.nome : '')}</strong> para outro jogador. As duas transações se anulam — o caixa do clube não é afetado.
+        </div>
+        ${saldoAtual !== 0 ? `
+        <div style="padding:.75rem 1rem;background:${saldoAtual < 0 ? 'rgba(239,68,68,.06)' : 'rgba(34,197,94,.06)'};border:1px solid ${saldoAtual < 0 ? 'rgba(239,68,68,.15)' : 'rgba(34,197,94,.15)'};border-radius:.5rem;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.75rem;color:#71717a;">Saldo atual de ${esc(jogadorAtual ? jogadorAtual.nome.split(' ')[0] : '')}</span>
+            <span style="font-family:var(--font-mono);font-weight:800;color:${saldoAtual < 0 ? '#ef4444' : '#22c55e'};font-size:.95rem;">${saldoAtual < 0 ? '-' : '+'}${formatMoney(Math.abs(saldoAtual))}</span>
+        </div>` : ''}
+        <label class="inp-label">Jogador Destino *</label>
+        <select id="pj-transf-destino" class="inp" style="margin-bottom:1rem;">
+            <option value="">Selecione o jogador...</option>
+            ${destinos.map(j => `<option value="${esc(j.id)}">${esc(j.nome)}${j.apelido ? ' (' + esc(j.apelido) + ')' : ''}</option>`).join('')}
+        </select>
+        <label class="inp-label">Valor R$ *</label>
+        <input id="pj-transf-valor" type="number" step="1" min="1" class="inp" placeholder="Ex: 200" style="margin-bottom:1rem;">
+        <label class="inp-label">Observação</label>
+        <input id="pj-transf-obs" class="inp" placeholder="Ex: Pagamento de cavalo" style="margin-bottom:1.25rem;">
+        <button onclick="confirmarTransferencia()" class="btn-gold" style="width:100%;padding:.85rem;border-radius:.6rem;">
+            <i class="fa-solid fa-arrow-right-arrow-left"></i> Confirmar Transferência
+        </button>
+    `;
+}
+
+function confirmarTransferencia() {
+    const destinoId = (document.getElementById('pj-transf-destino') || {}).value;
+    const valor = parseFloat((document.getElementById('pj-transf-valor') || {}).value) || 0;
+    const obs = ((document.getElementById('pj-transf-obs') || {}).value || '').trim();
+
+    if (!destinoId) return showToast('⚠️ Selecione o jogador destino');
+    if (valor <= 0) return showToast('⚠️ Valor inválido');
+    if (destinoId === pagamentoJogadorId) return showToast('⚠️ Não pode transferir pra si mesmo');
+
+    const origem = jogadores.find(j => j.id === pagamentoJogadorId);
+    const destino = jogadores.find(j => j.id === destinoId);
+    if (!origem || !destino) return showToast('❌ Jogador não encontrado');
+
+    const nomeOrigem = origem.nome;
+    const nomeDestino = destino.nome;
+    const descObs = obs ? ` — ${obs}` : '';
+
+    showConfirmModal(
+        'Confirmar Transferência',
+        `Transferir ${formatMoney(valor)} do saldo de\n${nomeOrigem} → ${nomeDestino}${descObs ? '\n\nObs: ' + obs : ''}\n\nIsso vai:\n• Debitar ${formatMoney(valor)} de ${nomeOrigem.split(' ')[0]}\n• Creditar ${formatMoney(valor)} para ${nomeDestino.split(' ')[0]}\n\nO caixa do clube NÃO é afetado.`,
+        () => {
+            _executarTransferencia(pagamentoJogadorId, destinoId, valor, obs);
+        },
+        {
+            icon: '🔄',
+            iconColor: '#818cf8',
+            borderColor: '#818cf8',
+            confirmColor: '#6366f1',
+            confirmLabel: 'Transferir'
+        }
+    );
+}
+
+function _executarTransferencia(origemId, destinoId, valor, obs) {
+    const origem = jogadores.find(j => j.id === origemId);
+    const destino = jogadores.find(j => j.id === destinoId);
+    if (!origem || !destino) return showToast('❌ Erro interno');
+
+    const nomeOrigem = origem.nome;
+    const nomeDestino = destino.nome;
+    const descObs = obs ? ` — ${obs}` : '';
+    const linkId = _genUuid(); // ID de vínculo entre as duas transações
+
+    // Transação 1: débito do remetente (valor negativo = sai do saldo)
+    const tx1 = registrarTransacao({
+        jogadorId: origemId,
+        tipo: 'transferencia',
+        valor: -valor,
+        descricao: `Transferência para ${nomeDestino}${descObs}`,
+        origem: 'caixa',
+        refId: linkId,
+    });
+
+    // Transação 2: crédito do destinatário (valor positivo = entra no saldo)
+    const tx2 = registrarTransacao({
+        jogadorId: destinoId,
+        tipo: 'transferencia',
+        valor: valor,
+        descricao: `Transferência de ${nomeOrigem}${descObs}`,
+        origem: 'caixa',
+        refId: linkId,
+    });
+
+    if (!tx1 || !tx2) {
+        showToast('❌ Erro ao registrar transferência (possível duplicata)');
+        return;
+    }
+
+    showToast(`✅ ${formatMoney(valor)} transferido de ${nomeOrigem.split(' ')[0]} → ${nomeDestino.split(' ')[0]}`);
+
+    // Atualiza UI
     renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
     renderExtratoJogador();
     renderCaixaAberto();
