@@ -18908,8 +18908,9 @@ function _abrirModalPromptImpressao(opcoes) {
 
 // === RECIBO DE PAGAMENTO ===
 function imprimirReciboPagamento(dados) {
-    // dados = { jogadorNome, valor, metodo, descricao, ts, taxaAplicada }
+    // dados = { jogadorNome, valor, metodo, descricao, ts, taxaAplicada, voucherAbatido }
     const taxaAplicada = Number(dados.taxaAplicada) || 0;
+    const voucherAbatido = Number(dados.voucherAbatido) || 0;
     const valorPago = Number(dados.valor) || 0;
     const totalCobrado = valorPago + taxaAplicada;
 
@@ -18920,6 +18921,14 @@ function imprimirReciboPagamento(dados) {
     txt += 'Data: ' + new Date(dados.ts).toLocaleString('pt-BR') + '\n';
     txt += 'Metodo: ' + (dados.metodo || '—') + '\n';
     txt += _printLine('-', 32) + '\n';
+    // LOTE 6: Mostra voucher discriminado no recibo
+    if (voucherAbatido > 0) {
+        txt += _printPad('Voucher aplicado', formatMoney(voucherAbatido)) + '\n';
+        if (valorPago - voucherAbatido > 0.005) {
+            txt += _printPad('Pago em dinheiro', formatMoney(valorPago - voucherAbatido)) + '\n';
+        }
+        txt += _printLine('-', 32) + '\n';
+    }
     if (taxaAplicada > 0) {
         // Discrimina: valor da dívida quitada + taxa do método + total efetivamente cobrado
         txt += _printPad('Valor da conta', formatMoney(valorPago)) + '\n';
@@ -18990,6 +18999,11 @@ function _whatsappMontarMensagemRecibo(dados) {
     msg += '👤 ' + (dados.jogadorNome || '—') + '\n';
     msg += '📅 ' + dataStr + '  ' + horaStr + '\n\n';
     msg += '━━━━━━━━━━━━━━━━━\n';
+    // LOTE 6: Mostra voucher no recibo WhatsApp
+    const vchWa = Number(dados.voucherAbatido) || 0;
+    if (vchWa > 0) {
+        msg += '🎫 *Voucher aplicado:* ' + formatMoney(vchWa) + '\n';
+    }
     msg += '💰 *Total pago:* ' + formatMoney(dados.valor) + '\n\n';
     msg += '*Forma de pagamento:*\n' + splitsTxt + '\n\n';
     msg += '━━━━━━━━━━━━━━━━━\n';
@@ -19120,7 +19134,8 @@ function abrirAcoesPosPagamento(dadosRecibo) {
                 metodo: dadosRecibo.metodoLabel || '—',
                 descricao: dadosRecibo.obs || '',
                 ts: dadosRecibo.ts || Date.now(),
-                taxaAplicada: dadosRecibo.taxaAplicada || 0
+                taxaAplicada: dadosRecibo.taxaAplicada || 0,
+                voucherAbatido: dadosRecibo.voucherAbatido || 0
             });
         } catch (e) { console.error('[Recibo] erro imprimir:', e); }
         overlay.remove();
@@ -27267,22 +27282,34 @@ function _imprimirExtratoTorneioJogador(jogadorId) {
         txt += fmtLinha(`${horaStr} ${desc}`, tx.valor) + '\n';
     });
 
+    // LOTE 6: Destaca ticket/voucher usado no comprovante
+    const tvTxs = txs.filter(tx => tx.tipo === 'ticket_uso' || tx.tipo === 'voucher_uso');
+    const totalTV = tvTxs.reduce((s, tx) => s + tx.valor, 0);
+    // Lançamentos "normais" (sem ticket/voucher) pra exibir total gasto separado
+    const totalGastoSemTV = txs.filter(tx => tx.valor < 0).reduce((s, tx) => s + tx.valor, 0);
+    const saldoReal = saldo; // saldo completo (já inclui tudo)
+
     txt += '--------------------------------\n';
-    if (totalGasto < 0) {
-        txt += fmtLinha('Total gasto', totalGasto) + '\n';
+    if (totalGastoSemTV < 0) {
+        txt += fmtLinha('Total gasto', totalGastoSemTV) + '\n';
     }
-    if (totalRecebido > 0) {
-        txt += fmtLinha('Total recebido', totalRecebido) + '\n';
+    if (tvTxs.length > 0) {
+        tvTxs.forEach(tv => {
+            const label = tv.tipo === 'ticket_uso' ? 'Ticket' : 'Voucher';
+            txt += fmtLinha(`${label} aplicado`, tv.valor) + '\n';
+        });
+        const aPagar = Math.max(0, Math.abs(totalGastoSemTV) - totalTV);
+        txt += fmtLinha('A cobrar', -aPagar) + '\n';
     }
-    txt += fmtLinha('SALDO', saldo) + '\n';
+    txt += fmtLinha('SALDO', saldoReal) + '\n';
     txt += '--------------------------------\n';
 
-    if (saldo < -0.005) {
+    if (saldoReal < -0.005) {
         txt += _printCenter('JOGADOR DEVE PAGAR', 32) + '\n';
-        txt += _printCenter('R$ ' + Math.abs(saldo).toFixed(2).replace('.', ','), 32) + '\n';
-    } else if (saldo > 0.005) {
+        txt += _printCenter('R$ ' + Math.abs(saldoReal).toFixed(2).replace('.', ','), 32) + '\n';
+    } else if (saldoReal > 0.005) {
         txt += _printCenter('JOGADOR TEM A RECEBER', 32) + '\n';
-        txt += _printCenter('R$ ' + saldo.toFixed(2).replace('.', ','), 32) + '\n';
+        txt += _printCenter('R$ ' + saldoReal.toFixed(2).replace('.', ','), 32) + '\n';
     } else {
         txt += _printCenter('SALDO ZERADO', 32) + '\n';
     }
@@ -43737,7 +43764,8 @@ async function _confirmarPagamentoContaImpl() {
                 ts: Date.now(),
                 taxaAplicada: taxaAplicada,
                 saldoAntes: saldoAntes,
-                transacaoId: 'pgto-' + tMarcador
+                transacaoId: 'pgto-' + tMarcador,
+                voucherAbatido: voucherAbatido,
             });
         } else {
             // Fallback de segurança — comportamento legado
@@ -43749,6 +43777,7 @@ async function _confirmarPagamentoContaImpl() {
                     descricao: obs,
                     ts: Date.now(),
                     taxaAplicada: taxaAplicada,
+                    voucherAbatido: voucherAbatido,
                 });
             }
         }
