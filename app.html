@@ -3925,6 +3925,15 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
                     <!-- Comandas Abertas do Bar foi removida — agora aparece integrada ao saldo de cada jogador (clique no jogador → modal mostra a comanda e permite pagar junto) -->
                     <div id="caixa-aberto-list" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+
+                    <!-- Vendas Diretas do Bar (pagas na hora via Stack Bar) -->
+                    <div id="caixa-vendas-diretas-wrap" style="display:none;margin-top:1.5rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                            <div style="font-size:.7rem;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:.1em;"><i class="fa-solid fa-bolt" style="margin-right:.3rem;"></i> Vendas Diretas do Bar (Pagas)</div>
+                            <span id="caixa-vendas-diretas-count" style="font-size:.7rem;color:#71717a;"></span>
+                        </div>
+                        <div id="caixa-vendas-diretas-list" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                    </div>
                 </div>
 
                 <!-- ABA: FECHAMENTO -->
@@ -37024,6 +37033,7 @@ async function vrConfirmarVenda() {
     if (typeof renderProdutos === 'function')              renderProdutos();
     if (typeof renderHistorico === 'function')             renderHistorico();
     if (typeof renderDashboard === 'function')             renderDashboard();
+    if (typeof renderCaixa === 'function')                 renderCaixa();
 }
 
 // Bar modal pre-fill hooks - called from openModal
@@ -42463,6 +42473,8 @@ function renderCaixa() {
 function renderCaixaAberto() {
     // Render comandas abertas do bar (no-op agora — fica integrado no saldo)
     renderComandasAbertasCaixa();
+    // Render vendas diretas do bar (pagas na hora via Stack Bar)
+    renderVendasDiretasCaixa();
 
     const filtro = (document.getElementById('caixa-filtro') || {}).value || 'devedor';
     const buscaRaw = ((document.getElementById('caixa-aberto-busca') || {}).value || '').trim();
@@ -42621,6 +42633,57 @@ function renderComandasAbertasCaixa() {
     const wrap = document.getElementById('caixa-comandas-abertas-wrap');
     if (wrap) wrap.style.display = 'none';
     return;
+}
+
+// Renderiza vendas diretas do bar (pagas na hora) na aba Contas em Aberto do Caixa
+function renderVendasDiretasCaixa() {
+    const wrap = document.getElementById('caixa-vendas-diretas-wrap');
+    const lista = document.getElementById('caixa-vendas-diretas-list');
+    const countEl = document.getElementById('caixa-vendas-diretas-count');
+    if (!wrap || !lista) return;
+
+    // Filtra vendas diretas (tipoVenda='direta') do dia atual
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime();
+    const diretas = (barComandas || []).filter(c =>
+        c.tipoVenda === 'direta' &&
+        c.status === 'fechada' &&
+        (c.fechadoEm || c.abertoEm) >= inicioHoje
+    ).sort((a, b) => (b.fechadoEm || b.abertoEm) - (a.fechadoEm || a.abertoEm));
+
+    if (!diretas.length) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'block';
+
+    const totalDiretas = diretas.reduce((s, c) => s + (c.total || 0), 0);
+    if (countEl) countEl.textContent = `${diretas.length} venda${diretas.length > 1 ? 's' : ''} · Total: ${formatMoney(totalDiretas)}`;
+
+    // Mapa de métodos de pagamento
+    const metIcons = {
+        pix:      { label: 'PIX',      icon: 'fa-bolt',        color: '#06b6d4' },
+        dinheiro: { label: 'Dinheiro', icon: 'fa-money-bill',  color: '#22c55e' },
+        debito:   { label: 'Débito',   icon: 'fa-credit-card', color: '#8b5cf6' },
+        credito:  { label: 'Crédito',  icon: 'fa-credit-card', color: '#f59e0b' },
+    };
+
+    lista.innerHTML = diretas.map(c => {
+        const j = jogadores.find(x => x.id === c.jogadorId);
+        const met = metIcons[c.pagamento] || { label: c.pagamento || '?', icon: 'fa-circle', color: '#71717a' };
+        const hora = new Date(c.fechadoEm || c.abertoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const itensStr = (c.itens || []).map(it => `${it.qtd}x ${it.nome}`).join(', ');
+        return `
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:.75rem;align-items:center;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;font-size:.8rem;">
+            <div style="width:28px;height:28px;border-radius:50%;background:rgba(249,115,22,.12);color:#f97316;display:flex;align-items:center;justify-content:center;font-size:.7rem;"><i class="fa-solid fa-bolt"></i></div>
+            <div>
+                <div style="font-weight:700;">${j ? j.nome : '?'}</div>
+                <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">${hora} · ${itensStr || 'Venda direta'} · <i class="fa-solid ${met.icon}" style="color:${met.color};"></i> ${met.label}${c.operador ? ' · op: ' + c.operador : ''}</div>
+            </div>
+            <span style="font-family:var(--font-mono);font-weight:800;color:#22c55e;">${formatMoney(c.total || 0)}</span>
+            <span style="font-size:.6rem;background:rgba(34,197,94,.12);color:#22c55e;padding:.2rem .5rem;border-radius:1rem;font-weight:700;">PAGO</span>
+        </div>`;
+    }).join('');
 }
 
 function renderComandasAbertasCaixa_DEPRECATED() {
@@ -42865,7 +42928,9 @@ function getTipoIcon(tipo) {
         buyin:    'fa-trophy',       reentry:   'fa-rotate',
         cash_in:  'fa-coins',        cash_out:  'fa-right-from-bracket',
         cash_rec: 'fa-plus-circle',  bar:       'fa-utensils',
+        bar_direta: 'fa-bolt',
         pagamento:'fa-credit-card',  deposito:  'fa-wallet',
+        pagamento_direto: 'fa-circle-check',
         pagamento_credito: 'fa-hand-holding-dollar',  pagamento_cash: 'fa-hand-holding-dollar',
         estorno:  'fa-rotate-left',  transferencia: 'fa-arrow-right-arrow-left',
     };
@@ -44567,7 +44632,7 @@ function renderCaixaTransacoes() {
     const mapFiltro = {
         buyin: ['buyin'],
         reentry: ['reentry'],
-        bar: ['bar'],
+        bar: ['bar', 'bar_direta'],
         pagamento: ['pagamento'],
         deposito: ['deposito'],
     };
