@@ -3754,10 +3754,12 @@ function montarCarouselPremiacao(d) {
       }
     });
     
-    // Atualizar tempo decorrido (se tem iniciado_em)
-    if (t.iniciado_em) {
-      const elapsedMs = Date.now() - new Date(t.iniciado_em).getTime();
-      if (elapsedMs > 0) {
+    // Atualizar tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
+    {
+      const acumulado = Number(t.tempo_jogo_acumulado_ms) || 0;
+      const resumedAt = t.tempo_jogo_resumed_at ? new Date(t.tempo_jogo_resumed_at).getTime() : null;
+      const elapsedMs = acumulado + (t.rodando && resumedAt ? Date.now() - resumedAt : 0);
+      if (elapsedMs >= 0) {
         const total = Math.floor(elapsedMs / 1000);
         const h = Math.floor(total / 3600);
         const mm = Math.floor((total % 3600) / 60);
@@ -3980,10 +3982,12 @@ function montarCarouselPremiacao(d) {
     const tempoTotal = Number(t.tempo_total || (Number(t.tempo_nivel || 15) * 60));
     const pct = tempoTotal > 0 ? (ts / tempoTotal) * 100 : 100;
     
-    // Tempo decorrido total
+    // Tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
     let elapsed = '00:00:00';
-    if (t.iniciado_em) {
-      const elapsedMs = Date.now() - new Date(t.iniciado_em).getTime();
+    {
+      const acumulado = Number(t.tempo_jogo_acumulado_ms) || 0;
+      const resumedAt = t.tempo_jogo_resumed_at ? new Date(t.tempo_jogo_resumed_at).getTime() : null;
+      const elapsedMs = acumulado + (t.rodando && resumedAt ? Date.now() - resumedAt : 0);
       if (elapsedMs > 0) {
         const total = Math.floor(elapsedMs / 1000);
         const h = Math.floor(total / 3600);

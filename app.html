@@ -11712,6 +11712,8 @@ function _torneioToDb(t) {
         rodando: !!t.rodando,
         is_break: !!t.isBreak,
         iniciado_em: t.iniciadoEm ? new Date(t.iniciadoEm).toISOString() : null,
+        tempo_jogo_acumulado_ms: t.tempoJogoAcumuladoMs || 0,
+        tempo_jogo_resumed_at: t.tempoJogoResumedAt ? new Date(t.tempoJogoResumedAt).toISOString() : null,
         encerrado_em: t.encerradoEm ? new Date(t.encerradoEm).toISOString() : null,
         encerrado_por: t.encerradoPor || null,
         caixa_status: (t.caixaTorneio && t.caixaTorneio.status) || 'fechado',
@@ -12914,6 +12916,8 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         rodando: !!r.rodando,
         isBreak: !!r.is_break,
         iniciadoEm: r.iniciado_em ? new Date(r.iniciado_em).getTime() : null,
+        tempoJogoAcumuladoMs: Number(r.tempo_jogo_acumulado_ms) || 0,
+        tempoJogoResumedAt: r.tempo_jogo_resumed_at ? new Date(r.tempo_jogo_resumed_at).getTime() : null,
         encerradoEm: r.encerrado_em ? new Date(r.encerrado_em).getTime() : null,
         encerradoPor: r.encerrado_por,
         caixaTorneio: {
@@ -26571,6 +26575,8 @@ function saveTournament() {
         rodando:      false,
         isBreak:      false,
         iniciadoEm:   null,       // para calcular tempo decorrido total
+        tempoJogoAcumuladoMs: 0,   // tempo de jogo EFETIVO acumulado (só conta quando rodando)
+        tempoJogoResumedAt: null,  // timestamp de quando o segmento atual de jogo começou
         status:       'waiting',
         entries:      [],
         eliminados:   [],
@@ -29224,8 +29230,15 @@ async function toggleTimer(idx) {
             // Atualiza o indicador visual de "X/Y torneios" na barra superior
             setTimeout(() => { try { _renderIndicadorTorneios(); } catch(_){} }, 1000);
         }
+        // TEMPO DE JOGO: marca início do segmento atual
+        t.tempoJogoResumedAt = Date.now();
     } else {
         t.status = 'paused';
+        // TEMPO DE JOGO: acumula o segmento que acabou de pausar
+        if (t.tempoJogoResumedAt) {
+            t.tempoJogoAcumuladoMs = (t.tempoJogoAcumuladoMs || 0) + (Date.now() - t.tempoJogoResumedAt);
+            t.tempoJogoResumedAt = null;
+        }
     }
     
     // Atualiza tempoAlvo (timestamp absoluto pra TV pública sincronizar)
@@ -31642,8 +31655,8 @@ function updateTV(idx) {
         }
     }
 
-    // Tempo decorrido total desde o início
-    const elapsedMs = t.iniciadoEm ? (Date.now() - t.iniciadoEm) : 0;
+    // Tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
+    const elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
     const elapsedFormatted = formatElapsed(elapsedMs);
 
     // Nome do clube (se configurado)
@@ -31908,10 +31921,11 @@ function _computarDadosMiniTV(t) {
             prize = getPrize(t) || 0;
         }
     } catch(e){}
-    // Elapsed time: usa tempoIniciado se houver
+    // Elapsed time: tempo de jogo EFETIVO (só conta quando rodando)
     let elapsedStr = '00:00:00';
-    if (t.tempoIniciado) {
-        const elapsedSec = Math.max(0, Math.floor((Date.now() - t.tempoIniciado) / 1000));
+    {
+        const elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
+        const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000));
         const h = Math.floor(elapsedSec / 3600);
         const m = Math.floor((elapsedSec % 3600) / 60);
         const s = elapsedSec % 60;
