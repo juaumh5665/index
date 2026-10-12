@@ -31649,9 +31649,9 @@ function updateTV(idx) {
     }
 
     // Tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
-    // Fallback: se acumulado=0 mas torneio rodando com iniciadoEm, calcula desde o início
+    // Fallback: se acumulado=0 mas torneio rodando após nível 0, calcula desde o início
     let elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
-    if (elapsedMs < 60000 && t.rodando && t.iniciadoEm && t.nivelAtual > 0) {
+    if (!(t.tempoJogoAcumuladoMs) && t.rodando && t.iniciadoEm && t.nivelAtual > 0) {
         elapsedMs = Date.now() - new Date(t.iniciadoEm).getTime();
     }
     const elapsedFormatted = formatElapsed(elapsedMs);
@@ -31919,11 +31919,11 @@ function _computarDadosMiniTV(t) {
         }
     } catch(e){}
     // Elapsed time: tempo de jogo EFETIVO (só conta quando rodando)
-    // Fallback: se acumulado=0 mas torneio rodando com iniciadoEm, calcula desde o início
+    // Fallback: se acumulado=0 mas torneio rodando após nível 0, calcula desde o início
     let elapsedStr = '00:00:00';
     {
         let elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
-        if (elapsedMs < 60000 && t.rodando && t.iniciadoEm && t.nivelAtual > 0) {
+        if (!(t.tempoJogoAcumuladoMs) && t.rodando && t.iniciadoEm && t.nivelAtual > 0) {
             elapsedMs = Date.now() - new Date(t.iniciadoEm).getTime();
         }
         const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000));
