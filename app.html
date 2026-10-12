@@ -31649,7 +31649,11 @@ function updateTV(idx) {
     }
 
     // Tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
-    const elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
+    // Fallback: se acumulado=0 mas torneio rodando com iniciadoEm, calcula desde o início
+    let elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
+    if (elapsedMs < 60000 && t.rodando && t.iniciadoEm && t.nivelAtual > 0) {
+        elapsedMs = Date.now() - new Date(t.iniciadoEm).getTime();
+    }
     const elapsedFormatted = formatElapsed(elapsedMs);
 
     // Nome do clube (se configurado)
@@ -31915,9 +31919,13 @@ function _computarDadosMiniTV(t) {
         }
     } catch(e){}
     // Elapsed time: tempo de jogo EFETIVO (só conta quando rodando)
+    // Fallback: se acumulado=0 mas torneio rodando com iniciadoEm, calcula desde o início
     let elapsedStr = '00:00:00';
     {
-        const elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
+        let elapsedMs = (t.tempoJogoAcumuladoMs || 0) + (t.rodando && t.tempoJogoResumedAt ? Date.now() - t.tempoJogoResumedAt : 0);
+        if (elapsedMs < 60000 && t.rodando && t.iniciadoEm && t.nivelAtual > 0) {
+            elapsedMs = Date.now() - new Date(t.iniciadoEm).getTime();
+        }
         const elapsedSec = Math.max(0, Math.floor(elapsedMs / 1000));
         const h = Math.floor(elapsedSec / 3600);
         const m = Math.floor((elapsedSec % 3600) / 60);
