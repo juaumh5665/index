@@ -12119,18 +12119,14 @@ async function sincronizarEstado() {
                                     // Não faz throw — entries boas foram sincronizadas
                                 }
 
-                                // DELETE seletivo: remove do banco IDs que não estão mais no estado local
-                                const idsLocais = t.entries.map(e => e.id);
-                                if (idsLocais.length) {
-                                    await sb.from('torneio_entries')
-                                        .delete()
-                                        .eq('torneio_id', t.id)
-                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
-                                }
+                                // SAFE SYNC: NÃO deletar entries do banco que não estão na memória local.
+                                // A memória pode estar incompleta (ex: F5 durante carregamento, crash, race condition).
+                                // Entries só são removidas via estorno explícito na UI, nunca pelo sync.
+                                // O upsert acima já garante que entries locais estão no banco.
                             } else {
-                                // Estado local vazio — só remove se realmente não houver nada
-                                // (proteção extra: só executa se o torneio existe e está sincronizado)
-                                await sb.from('torneio_entries').delete().eq('torneio_id', t.id);
+                                // Estado local vazio — NÃO deletar entries do banco.
+                                // Memória vazia geralmente indica falha de carregamento, não torneio sem entries.
+                                console.warn('[SYNC] ⚠️ Torneio ' + t.id + ' com entries vazio no local — ignorando delete para proteção de dados');
                             }
 
                             // === ELIMINADOS ===
@@ -12155,15 +12151,9 @@ async function sincronizarEstado() {
                                     throw new Error('Upsert eliminados: ' + (errEl.message || errEl));
                                 }
 
-                                const idsLocais = t.eliminados.map(e => e.id);
-                                if (idsLocais.length) {
-                                    await sb.from('torneio_eliminados')
-                                        .delete()
-                                        .eq('torneio_id', t.id)
-                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
-                                }
+                                // SAFE SYNC: não deletar eliminados do banco que não estão na memória local
                             } else {
-                                await sb.from('torneio_eliminados').delete().eq('torneio_id', t.id);
+                                console.warn('[SYNC] ⚠️ Torneio ' + t.id + ' com eliminados vazio no local — ignorando delete');
                             }
 
                             // === JACKPOT COMPRAS ===
@@ -12185,15 +12175,9 @@ async function sincronizarEstado() {
                                     throw new Error('Upsert jackpots: ' + (errJ.message || errJ));
                                 }
 
-                                const idsLocais = t.jackpotCompras.map(j => j.id);
-                                if (idsLocais.length) {
-                                    await sb.from('torneio_jackpot_compras')
-                                        .delete()
-                                        .eq('torneio_id', t.id)
-                                        .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
-                                }
+                                // SAFE SYNC: não deletar jackpots do banco que não estão na memória local
                             } else {
-                                await sb.from('torneio_jackpot_compras').delete().eq('torneio_id', t.id);
+                                console.warn('[SYNC] ⚠️ Torneio ' + t.id + ' com jackpotCompras vazio no local — ignorando delete');
                             }
 
                             // === MESAS ===
