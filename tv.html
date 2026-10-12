@@ -3755,10 +3755,14 @@ function montarCarouselPremiacao(d) {
     });
     
     // Atualizar tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
+    // Fallback: se acumulado=0 mas torneio rodando após nível 0, calcula desde o início
     {
       const acumulado = Number(t.tempo_jogo_acumulado_ms) || 0;
       const resumedAt = t.tempo_jogo_resumed_at ? new Date(t.tempo_jogo_resumed_at).getTime() : null;
-      const elapsedMs = acumulado + (t.rodando && resumedAt ? Date.now() - resumedAt : 0);
+      let elapsedMs = acumulado + (t.rodando && resumedAt ? Date.now() - resumedAt : 0);
+      if (!acumulado && t.rodando && t.iniciado_em && (Number(t.nivel_atual) || 0) > 0) {
+          elapsedMs = Date.now() - new Date(t.iniciado_em).getTime();
+      }
       if (elapsedMs >= 0) {
         const total = Math.floor(elapsedMs / 1000);
         const h = Math.floor(total / 3600);
@@ -3983,11 +3987,15 @@ function montarCarouselPremiacao(d) {
     const pct = tempoTotal > 0 ? (ts / tempoTotal) * 100 : 100;
     
     // Tempo de jogo EFETIVO (só conta quando rodando, exclui pausas)
+    // Fallback: se acumulado=0 mas torneio rodando após nível 0, calcula desde o início
     let elapsed = '00:00:00';
     {
       const acumulado = Number(t.tempo_jogo_acumulado_ms) || 0;
       const resumedAt = t.tempo_jogo_resumed_at ? new Date(t.tempo_jogo_resumed_at).getTime() : null;
-      const elapsedMs = acumulado + (t.rodando && resumedAt ? Date.now() - resumedAt : 0);
+      let elapsedMs = acumulado + (t.rodando && resumedAt ? Date.now() - resumedAt : 0);
+      if (!acumulado && t.rodando && t.iniciado_em && (Number(t.nivel_atual) || 0) > 0) {
+          elapsedMs = Date.now() - new Date(t.iniciado_em).getTime();
+      }
       if (elapsedMs > 0) {
         const total = Math.floor(elapsedMs / 1000);
         const h = Math.floor(total / 3600);
