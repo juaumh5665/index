@@ -48154,7 +48154,11 @@ function recalcularPayoutDist(forceRegen = false) {
     pp.qtd = qtd;
     pp.modelo = modelo;
     pp.percentuais = pcts;
-    pp.valores = pcts.map(pc => (prize * pc) / 100);
+    // Preserva valores salvos se já existem com o tamanho certo (editados manualmente / acordo)
+    // Só recalcula a partir dos percentuais quando houve regeneração ou não havia valores salvos
+    if (precisaRegenerar || !pp.valores || pp.valores.length !== qtd) {
+        pp.valores = pcts.map(pc => (prize * pc) / 100);
+    }
     
     // 🎫 VAGAS — preserva vagas existentes; preenche null para posições novas
     if (!Array.isArray(pp.vagas)) pp.vagas = [];
