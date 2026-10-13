@@ -27756,8 +27756,24 @@ function _desfazerEliminacao(jogadorId) {
 
     const posicaoRemovida = elim.posicao;
 
-    // 1) Remove da lista de eliminados
+    // 1) Remove da lista de eliminados (local)
+    const elimId = elim.id; // guardar ID antes de remover
     t.eliminados = (t.eliminados || []).filter(e => String(e.jogadorId) !== String(jogadorId));
+
+    // 1b) Deletar registro da tabela torneio_eliminados no banco
+    //     (o sync só faz upsert, nunca delete — sem isso a TV fica desatualizada)
+    if (elimId && typeof sb !== 'undefined') {
+        sb.from('torneio_eliminados').delete().eq('id', elimId).then(({ error }) => {
+            if (error) console.error('[DESFAZER_ELIM] ❌ Falha ao deletar do banco:', error.message);
+            else console.log('[DESFAZER_ELIM] ✅ Registro deletado do banco:', elimId);
+        });
+    } else if (typeof sb !== 'undefined') {
+        // Fallback: deletar por torneio_id + jogador_id
+        sb.from('torneio_eliminados').delete().eq('torneio_id', t.id).eq('jogador_id', jogadorId).then(({ error }) => {
+            if (error) console.error('[DESFAZER_ELIM] ❌ Fallback delete falhou:', error.message);
+            else console.log('[DESFAZER_ELIM] ✅ Registro deletado (fallback) jogador:', jogadorId);
+        });
+    }
 
     // 2) Recalcular posições: quem foi eliminado DEPOIS (posição menor = eliminado depois)
     //    precisa ter posição incrementada (+1) pois agora há mais um jogador ativo
@@ -31459,11 +31475,20 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
     const nomeJog = getJogadorNome(jid);
+    const _undoTorneioId = t.id;
+    const _undoJogadorId = jid;
     registrarUndo(`💀 Eliminação de ${nomeJog} em ${posicao}º`, () => {
         torneios[tornIdx] = JSON.parse(snapshot);
         // Remove transações recentes de bounty (últimos 5s)
         const agora = Date.now();
-        transacoes = transacoes.filter(tx => !(tx.refId === t.id && tx.descricao && (tx.descricao.includes('Bounty') || tx.descricao.includes('KO')) && (agora - tx.ts) < 10000));
+        transacoes = transacoes.filter(tx => !(tx.refId === _undoTorneioId && tx.descricao && (tx.descricao.includes('Bounty') || tx.descricao.includes('KO')) && (agora - tx.ts) < 10000));
+        // Deletar eliminação do banco (sync só faz upsert, não delete)
+        if (typeof sb !== 'undefined') {
+            sb.from('torneio_eliminados').delete().eq('torneio_id', _undoTorneioId).eq('jogador_id', _undoJogadorId).then(({ error }) => {
+                if (error) console.error('[UNDO_ELIM] ❌ Falha ao deletar do banco:', error.message);
+                else console.log('[UNDO_ELIM] ✅ Eliminação deletada do banco:', _undoJogadorId);
+            });
+        }
         saveData();
         updateModalTorneio();
         renderTorneiosList();
@@ -49480,11 +49505,21 @@ function _acertoSaida_cancelarEliminacao() {
         return;
     }
     try {
+        const torneioId = torneios[snap.tornIdx] && torneios[snap.tornIdx].id;
         torneios[snap.tornIdx] = JSON.parse(snap.snapshot);
         _ultimoSnapshotEliminacao = null;
+
+        // Deletar registro de eliminação do banco (sync só faz upsert, não delete)
+        if (typeof sb !== 'undefined' && torneioId && snap.jogadorId) {
+            sb.from('torneio_eliminados').delete().eq('torneio_id', torneioId).eq('jogador_id', snap.jogadorId).then(({ error }) => {
+                if (error) console.error('[CANCEL_ELIM] ❌ Falha ao deletar do banco:', error.message);
+                else console.log('[CANCEL_ELIM] ✅ Eliminação deletada do banco:', snap.jogadorId);
+            });
+        }
+
         if (typeof saveData === 'function') saveData();
         if (typeof logAudit === 'function') {
-            logAudit('CANCEL_ELIMINACAO_PELO_X', `Eliminação cancelada (X do modal de acerto): ${snap.nomeJog} · era ${snap.posicao}º`, { jogadorId: snap.jogadorId, torneioId: torneios[snap.tornIdx] && torneios[snap.tornIdx].id });
+            logAudit('CANCEL_ELIMINACAO_PELO_X', `Eliminação cancelada (X do modal de acerto): ${snap.nomeJog} · era ${snap.posicao}º`, { jogadorId: snap.jogadorId, torneioId: torneioId });
         }
         const m = document.getElementById('modal-acerto-saida');
         if (m) m.remove();
