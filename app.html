@@ -31767,11 +31767,16 @@ function updateTV(idx) {
         // (TV usa fallback padrão sem logo do clube).
         clubeLogo: (typeof _getClubeLogoUrl === 'function') ? (_getClubeLogoUrl() || '') : ((typeof config !== 'undefined' && config.clube && config.clube.logo) ? config.clube.logo : ''),
         nextBlinds,
-        premiacaoProjetada: (t.premiacaoProjetada && t.premiacaoProjetada.mostrarNaTV) ? {
-            qtd: t.premiacaoProjetada.qtd,
-            valores: t.premiacaoProjetada.valores.map(v => Math.round(v)),
-            percentuais: t.premiacaoProjetada.percentuais,
-            vagas: t.premiacaoProjetada.vagas || [],
+        premiacaoProjetada: (t.premiacaoProjetada && t.premiacaoProjetada.mostrarNaTV) ? (() => {
+            const _pp = t.premiacaoProjetada;
+            const _ocultos = Array.isArray(_pp.ocultosTV) ? _pp.ocultosTV : [];
+            const _idx = []; // índices visíveis
+            for (let i = 0; i < (_pp.qtd || 0); i++) { if (!_ocultos[i]) _idx.push(i); }
+            return {
+            qtd: _idx.length,
+            valores: _idx.map(i => Math.round((_pp.valores || [])[i] || 0)),
+            percentuais: _idx.map(i => (_pp.percentuais || [])[i] || 0),
+            vagas: _idx.map(i => ((_pp.vagas || [])[i]) || ''),
             // Estilo de exibição: 'horizontal' (atual) | 'vertical' | 'destaque'
             estiloPremiacao: t.premiacaoProjetada.estiloPremiacao || 'horizontal',
             // Modo Copa — campos opcionais. TV só renderiza o bloco extra se modoCopa=true
@@ -31782,7 +31787,7 @@ function updateTV(idx) {
                 valores: (t.premiacaoProjetada.equipes.valores || []).map(v => Math.round(v)),
                 percentuais: t.premiacaoProjetada.equipes.percentuais || [],
             } : null,
-        } : null,
+        }; })() : null,
         // Fonte dos números configurada nas Preferências
         fontMono: (config && config.preferencias && config.preferencias.fontMono) || 'jetbrains',
     }, '*');
@@ -48184,16 +48189,25 @@ function recalcularPayoutDist(forceRegen = false) {
     while (pp.vagas.length < qtd) pp.vagas.push(null);
     if (pp.vagas.length > qtd) pp.vagas = pp.vagas.slice(0, qtd);
 
+    // 👁️ OCULTOS NA TV — preserva array existente
+    if (!Array.isArray(pp.ocultosTV)) pp.ocultosTV = [];
+    while (pp.ocultosTV.length < qtd) pp.ocultosTV.push(false);
+    if (pp.ocultosTV.length > qtd) pp.ocultosTV = pp.ocultosTV.slice(0, qtd);
+
     // Renderiza lista
     const lista = document.getElementById('prm-payout-list');
-    lista.innerHTML = pcts.map((pct, i) => `
-        <div style="display:grid;grid-template-columns:3rem .9fr .9fr 1.4fr;gap:.5rem;align-items:center;padding:.4rem .6rem;background:${i===0?'rgba(245,158,11,.08)':i===1?'rgba(161,161,170,.05)':i===2?'rgba(146,97,10,.06)':'#0f0f12'};border:1px solid ${i===0?'rgba(245,158,11,.25)':i===1?'rgba(161,161,170,.15)':i===2?'rgba(146,97,10,.2)':'#1e1e23'};border-radius:.4rem;">
+    lista.innerHTML = pcts.map((pct, i) => {
+        const oculto = !!pp.ocultosTV[i];
+        return `
+        <div style="display:grid;grid-template-columns:2.2rem 3rem .9fr .9fr 1.2fr;gap:.4rem;align-items:center;padding:.4rem .5rem;background:${i===0?'rgba(245,158,11,.08)':i===1?'rgba(161,161,170,.05)':i===2?'rgba(146,97,10,.06)':'#0f0f12'};border:1px solid ${i===0?'rgba(245,158,11,.25)':i===1?'rgba(161,161,170,.15)':i===2?'rgba(146,97,10,.2)':'#1e1e23'};border-radius:.4rem;${oculto ? 'opacity:.45;' : ''}">
+            <button onclick="_toggleOcultoTV(${i})" data-idx="${i}" class="prm-oculto-btn" style="background:${oculto ? 'rgba(239,68,68,.15)' : 'rgba(34,197,94,.1)'};border:1px solid ${oculto ? 'rgba(239,68,68,.3)' : 'rgba(34,197,94,.2)'};color:${oculto ? '#ef4444' : '#22c55e'};border-radius:.3rem;padding:.2rem;cursor:pointer;font-size:.7rem;line-height:1;" title="${oculto ? 'Oculto na TV — clique para mostrar' : 'Visível na TV — clique para ocultar'}"><i class="fa-solid ${oculto ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
             <span style="font-weight:800;color:${i===0?'var(--gold)':i===1?'#a1a1aa':i===2?'#92610a':'#71717a'};">${i+1}º</span>
             <input type="number" step="0.1" min="0" value="${pct.toFixed(1)}" data-idx="${i}" class="prm-pct-inp inp" style="padding:.3rem .5rem;font-family:var(--font-mono);font-size:.8rem;text-align:center;">
             <input type="number" step="1" min="0" value="${Math.round(pp.valores[i])}" data-idx="${i}" class="prm-val-inp inp" style="padding:.3rem .5rem;font-family:var(--font-mono);font-size:.8rem;text-align:right;">
-            <input type="text" placeholder="Ex: Vaga 50K" value="${(pp.vagas[i] || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="prm-vaga-inp inp" maxlength="40" style="padding:.3rem .5rem;font-size:.78rem;font-family:'Manrope',sans-serif;color:var(--gold);font-weight:600;" title="Nome da vaga que esta posição ganha (opcional)">
+            <input type="text" placeholder="Ex: Vaga 50K" value="${(pp.vagas[i] || '').replace(/"/g, '&quot;')}" data-idx="${i}" class="prm-vaga-inp inp" maxlength="40" style="padding:.3rem .5rem;font-size:.72rem;font-family:'Manrope',sans-serif;color:var(--gold);font-weight:600;" title="Nome da vaga que esta posição ganha (opcional)">
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     // Eventos de edição
     document.querySelectorAll('.prm-pct-inp').forEach(inp => {
@@ -48344,6 +48358,17 @@ function prmAtualizarPercentCopa(valor, comingFromNumberInput) {
     if (t.premiacaoProjetada.modoCopa) {
         recalcularPayoutDistEquipes(true);
     }
+}
+
+function _toggleOcultoTV(idx) {
+    const t = torneios[activeTorneioIdx];
+    if (!t || !t.premiacaoProjetada) return;
+    const pp = t.premiacaoProjetada;
+    if (!Array.isArray(pp.ocultosTV)) pp.ocultosTV = [];
+    pp.ocultosTV[idx] = !pp.ocultosTV[idx];
+    recalcularPayoutDist(false);
+    saveData();
+    updateTV(activeTorneioIdx);
 }
 
 function prmAtualizarPreviewCopa() {
