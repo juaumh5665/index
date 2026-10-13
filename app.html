@@ -38251,6 +38251,7 @@ function abrirEditarMovimentos(mesaId, jogadorId) {
             <div style="display:flex;align-items:center;gap:.5rem;">
                 <span style="font-family:var(--font-mono);font-weight:800;font-size:.9rem;color:#22c55e;">${formatMoney(mv.valor)}</span>
                 <button onclick="editarMovimentoCash('${mesaId}','${jogadorId}',${idx})" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:#3b82f6;border-radius:.35rem;padding:.3rem .5rem;cursor:pointer;font-size:.65rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Editar valor"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="estornarMovimentoCash('${mesaId}','${jogadorId}',${idx})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.35rem;padding:.3rem .5rem;cursor:pointer;font-size:.65rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Estornar compra"><i class="fa-solid fa-rotate-left"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -38354,6 +38355,70 @@ function editarMovimentoCash(mesaId, jogadorId, movIdx) {
             logAudit && logAudit('CASH_MOVIMENTO_EDIT', `Edição ${label}: ${jog?jog.nome:'?'} · ${formatMoney(valorAnterior)} → ${formatMoney(novoValor)} · Mesa ${m.nome} · por ${operador}`);
         },
         { borderColor: '#3b82f6' }
+    );
+}
+
+// --- ESTORNAR MOVIMENTO (COMPRA) DO CASH ---
+function estornarMovimentoCash(mesaId, jogadorId, movIdx) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return;
+    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId);
+    if (!j) return;
+    const movsFiltrados = (j.movimentos || []).filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
+    const mv = movsFiltrados[movIdx];
+    if (!mv) return;
+    const label = mv.tipo === 'buyin' ? 'Buy-in' : 'Recompra';
+    const jog = jogadores.find(x => x.id === jogadorId);
+    const nomeJog = jog ? jog.nome : 'Jogador';
+
+    // Fecha overlay de lista
+    const ov = document.getElementById('_editMovOv');
+    if (ov) ov.remove();
+
+    showConfirmModal(
+        `ESTORNAR ${label.toUpperCase()}`,
+        `${nomeJog}\nValor: ${formatMoney(mv.valor)}\n\nEssa compra será completamente estornada.\nO valor NÃO irá para o saldo devedor do jogador.`,
+        () => {
+            const operador = (currentUser && currentUser.nome) || 'Desconhecido';
+            const valorEstornado = mv.valor;
+
+            // 1) Remover o movimento do array original
+            const realIdx = j.movimentos.indexOf(mv);
+            if (realIdx >= 0) {
+                j.movimentos.splice(realIdx, 1);
+            }
+
+            // 2) Recalcular totalInvestido
+            j.totalInvestido = (j.movimentos || [])
+                .filter(x => x.tipo === 'buyin' || x.tipo === 'recompra')
+                .reduce((s, x) => s + (Number(x.valor) || 0), 0);
+
+            // 3) Registrar transação de estorno (valor positivo anula o débito original)
+            //    Não modifica a transação original — cria uma contra-partida
+            if (typeof registrarTransacao === 'function') {
+                registrarTransacao({
+                    jogadorId: jogadorId,
+                    tipo: 'cash_estorno',
+                    valor: valorEstornado, // positivo = crédito/estorno
+                    descricao: `Estorno ${label.toLowerCase()} · ${m.nome} (${formatMoney(valorEstornado)}) · por ${operador}`,
+                    origem: 'cash',
+                    refId: m.id,
+                });
+            }
+
+            // 4) Persistir sessão no Supabase
+            if (sbClube && typeof sb !== 'undefined' && j.id) {
+                sb.from('cash_sessoes').update(_cashSessaoToDb(j, m.id)).eq('id', j.id).then(({ error }) => {
+                    if (error) console.warn('[CASH] Falha ao atualizar sessão (estorno mov):', error.message);
+                }).catch(e => console.warn('[CASH] update estorno mov falhou:', e));
+            }
+
+            saveData();
+            renderCashMesas();
+            showToast(`🔄 ${label} estornado: ${formatMoney(valorEstornado)} · ${nomeJog}`);
+            logAudit && logAudit('CASH_MOVIMENTO_ESTORNO', `Estorno ${label}: ${nomeJog} · ${formatMoney(valorEstornado)} · Mesa ${m.nome} · por ${operador}`);
+        },
+        { confirmLabel: 'Confirmar Estorno', confirmColor: '#ef4444', icon: '🔄', iconColor: '#ef4444' }
     );
 }
 
