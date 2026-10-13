@@ -18564,6 +18564,22 @@ function gerarComprovanteCompraCash(dados) {
         txt += '\n';
     }
 
+    // Status de pagamento no caixa — consulta saldo do jogador
+    if (dados.jogadorId && typeof getSaldoJogador === 'function') {
+        const saldoGeral = getSaldoJogador(dados.jogadorId);
+        txt += _printLine('-', col) + '\n';
+        txt += _printCenter('SITUACAO NO CAIXA', col) + '\n';
+        if (saldoGeral >= 0) {
+            txt += _printCenter('*** PAGO / SEM DEBITO ***', col) + '\n';
+            if (saldoGeral > 0) {
+                txt += _printPad('Credito disponivel', formatMoney(saldoGeral), col) + '\n';
+            }
+        } else {
+            txt += _printPad('DEBITO PENDENTE', formatMoney(Math.abs(saldoGeral)), col) + '\n';
+        }
+        txt += _printLine('-', col) + '\n';
+    }
+
     txt += _printLine('-', col) + '\n';
     txt += _printCenter('Fichas em valor equivalente', col) + '\n';
     txt += _printLine('-', col) + '\n';
@@ -37518,6 +37534,7 @@ async function confirmAddCashJogador() {
             imprimirComprovanteCompraCash({
                 mesa: m,
                 jogadorNome: jog ? jog.nome : '—',
+                jogadorId: jid,
                 valor,
                 ts: agora,
             });
@@ -37609,6 +37626,7 @@ function confirmRecompra() {
             imprimirComprovanteCompraCash({
                 mesa: m,
                 jogadorNome: jog ? jog.nome : '—',
+                jogadorId: j.jogadorId,
                 valor,
                 ts: Date.now(),
                 totalAcumulado,
