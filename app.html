@@ -37287,26 +37287,36 @@ function renderCashMesas() {
                 const caps = Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [];
                 if (caps.length === 0) return '';
                 const capsAtivos = caps.filter(c => !c.estornado);
+                const capsEstornados = caps.filter(c => c.estornado);
                 const totalCapile = capsAtivos.reduce((s, c) => s + (Number(c.valor) || 0), 0);
 
-                // Agrupa por dealer (só ativos)
-                const grupos = {};
-                capsAtivos.forEach(c => {
-                    const chave = c.dealerNome || '—';
-                    if (!grupos[chave]) grupos[chave] = { nome: chave, total: 0, count: 0 };
-                    grupos[chave].total += Number(c.valor) || 0;
-                    grupos[chave].count += 1;
-                });
-                const ranking = Object.values(grupos).sort((a, b) => b.total - a.total);
-                const corpoCapile = ranking.map(g => `
+                // Individual capilé entries with estorno/edit buttons
+                const corpoCapile = capsAtivos.map(c => `
                     <div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.4rem .55rem;background:rgba(0,0,0,.2);border-radius:.35rem;">
                         <div style="display:flex;flex-direction:column;">
-                            <span style="color:#e4e4e7;font-weight:500;">${esc(g.nome)}</span>
-                            <span style="font-size:.65rem;color:#52525b;">${g.count} capilé${g.count !== 1 ? 's' : ''}</span>
+                            <span style="color:#e4e4e7;font-weight:500;">${esc(c.dealerNome || '—')}</span>
+                            <span style="font-size:.6rem;color:#52525b;">${formatMoney(c.valor)}${c.editadoPor ? ' · editado' : ''}</span>
                         </div>
-                        <span style="font-family:var(--font-mono);color:#a78bfa;font-weight:700;">${formatMoney(g.total)}</span>
+                        <div style="display:flex;align-items:center;gap:.35rem;">
+                            <span style="font-family:var(--font-mono);color:#a78bfa;font-weight:700;">${formatMoney(c.valor)}</span>
+                            <button onclick="editarLancCapile('${m.id}','${c.id}')" style="background:rgba(147,51,234,.1);border:1px solid rgba(147,51,234,.25);color:#a78bfa;border-radius:.35rem;padding:.25rem .4rem;cursor:pointer;font-size:.6rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Editar capilé"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="estornarLancCapile('${m.id}','${c.id}')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:.35rem;padding:.25rem .4rem;cursor:pointer;font-size:.6rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Estornar capilé"><i class="fa-solid fa-rotate-left"></i></button>
+                        </div>
                     </div>
                 `).join('');
+
+                // Estornados (collapsed, visual only)
+                const corpoEstornados = capsEstornados.length === 0 ? '' : `
+                    <div style="margin-top:.35rem;padding-top:.3rem;border-top:1px dashed rgba(82,82,91,.3);">
+                        <div style="font-size:.55rem;color:#52525b;margin-bottom:.2rem;">Estornados (${capsEstornados.length})</div>
+                        ${capsEstornados.map(c => `
+                            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.65rem;padding:.25rem .4rem;opacity:.45;text-decoration:line-through;">
+                                <span style="color:#71717a;">${esc(c.dealerNome || '—')}</span>
+                                <span style="color:#71717a;font-family:var(--font-mono);">${formatMoney(c.valor)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
 
                 return `
                 <div style="padding:.85rem 1.5rem;background:rgba(124,58,237,.04);border-bottom:1px solid #1e1e23;">
@@ -37318,6 +37328,7 @@ function renderCashMesas() {
                     </div>
                     <div style="display:flex;flex-direction:column;gap:.25rem;">
                         ${corpoCapile}
+                        ${corpoEstornados}
                     </div>
                 </div>
                 `;
@@ -37966,7 +37977,37 @@ function abrirAcertoDealers(mesaId) {
     const totalRake = rakeLancs.reduce((s, l) => s + (Number(l.valor) || 0), 0);
     const totalCapile = capileLancs.reduce((s, c) => s + (Number(c.valor) || 0), 0);
 
+    // Agrupar por dealer — rake
+    const dealersMap = {};
+    rakeLancs.forEach(l => {
+        const chave = (l.dealerNome || '—').trim().toLowerCase();
+        if (!dealersMap[chave]) dealersMap[chave] = { nome: l.dealerNome || '—', rake: 0, capile: 0, pct: 0 };
+        dealersMap[chave].rake += Number(l.valor) || 0;
+    });
+    // Capilés — somente de quem já está no dealersMap (dealers reais da mesa)
+    // Capilés de pessoas que NÃO são dealers (ex: bar staff) ficam fora do acerto
+    const capileDealers = [];
+    const capileOutros = [];
+    capileLancs.forEach(c => {
+        const chave = (c.dealerNome || '—').trim().toLowerCase();
+        if (dealersMap[chave]) {
+            dealersMap[chave].capile += Number(c.valor) || 0;
+            capileDealers.push(c);
+        } else {
+            capileOutros.push(c);
+        }
+    });
+    const totalCapileDealers = capileDealers.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+    const totalCapileOutros = capileOutros.reduce((s, c) => s + (Number(c.valor) || 0), 0);
+
     // Info header
+    const capileNota = capileOutros.length > 0
+        ? `<div style="font-size:.55rem;color:#71717a;margin-top:.35rem;padding:.3rem .5rem;background:rgba(82,82,91,.1);border-radius:.3rem;">` +
+            `<i class="fa-solid fa-circle-info" style="color:#a78bfa;"></i> ` +
+            `${formatMoney(totalCapileOutros)} em capilés de não-dealers (${capileOutros.map(c => c.dealerNome).join(', ')}) não entram no acerto` +
+          `</div>`
+        : '';
+
     document.getElementById('acerto-dealers-info').innerHTML =
         `<div style="display:flex;justify-content:space-between;align-items:center;">` +
             `<span><strong style="color:#e4e4e7;">${esc(m.nome)}</strong></span>` +
@@ -37978,24 +38019,11 @@ function abrirAcertoDealers(mesaId) {
                 `<div style="font-size:.9rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">${formatMoney(totalRake)}</div>` +
             `</div>` +
             `<div style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:.35rem;padding:.4rem .6rem;">` +
-                `<div style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;">Capilés Total</div>` +
-                `<div style="font-size:.9rem;font-weight:800;color:#a78bfa;font-family:var(--font-mono);">${formatMoney(totalCapile)}</div>` +
+                `<div style="font-size:.55rem;color:#52525b;text-transform:uppercase;font-weight:700;">Capilés (Dealers)</div>` +
+                `<div style="font-size:.9rem;font-weight:800;color:#a78bfa;font-family:var(--font-mono);">${formatMoney(totalCapileDealers)}</div>` +
             `</div>` +
-        `</div>`;
-
-    // Agrupar por dealer — rake
-    const dealersMap = {};
-    rakeLancs.forEach(l => {
-        const chave = (l.dealerNome || '—').trim().toLowerCase();
-        if (!dealersMap[chave]) dealersMap[chave] = { nome: l.dealerNome || '—', rake: 0, capile: 0, pct: 0 };
-        dealersMap[chave].rake += Number(l.valor) || 0;
-    });
-    // Capilés
-    capileLancs.forEach(c => {
-        const chave = (c.dealerNome || '—').trim().toLowerCase();
-        if (!dealersMap[chave]) dealersMap[chave] = { nome: c.dealerNome || '—', rake: 0, capile: 0, pct: 0 };
-        dealersMap[chave].capile += Number(c.valor) || 0;
-    });
+        `</div>` +
+        capileNota;
 
     const dealers = Object.values(dealersMap).sort((a, b) => (b.rake + b.capile) - (a.rake + a.capile));
 
