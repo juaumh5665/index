@@ -9546,7 +9546,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false,
+        detectSessionInUrl: true,
     },
 });
 window.sb = sb; // [STACKCLOCK] expõe cliente pro stackclock-operador.js
@@ -14499,10 +14499,8 @@ async function solicitarResetSenha() {
     try {
         // Domínio canônico + rota /app (onde o app.html roda — tem supabase + handler PASSWORD_RECOVERY)
         // Precisa estar em "Redirect URLs" do Supabase: https://stackos.com.br/**
-        const isProducao = /stackos\.com\.br$/.test(window.location.hostname);
-        const baseUrl = isProducao
-            ? window.location.origin
-            : 'https://stackos.com.br';
+        // Sempre usa domínio canônico sem www (precisa bater com Redirect URLs do Supabase)
+        const baseUrl = 'https://stackos.com.br';
         const { error } = await sb.auth.resetPasswordForEmail(email, {
             redirectTo: baseUrl + '/app',
         });
