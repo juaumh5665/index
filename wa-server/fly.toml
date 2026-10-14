@@ -2,15 +2,18 @@ app = "stackos-wppconnect"
 primary_region = "gru"
 
 [build]
-  image = "wppconnect/wppconnect-server:latest"
+  image = "atendai/evolution-api:v2.1.1"
 
 [env]
-  HOST = "0.0.0.0"
-  PORT = "21465"
-  SECRET_KEY = "StackOS2024WPP"
+  SERVER_PORT = "8080"
+  AUTHENTICATION_API_KEY = "StackOS2024WPP"
+  AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES = "true"
+  DATABASE_ENABLED = "false"
+  CACHE_REDIS_ENABLED = "false"
+  LOG_LEVEL = "WARN"
 
 [http_service]
-  internal_port = 21465
+  internal_port = 8080
   force_https = true
   auto_stop_machines = false
   auto_start_machines = true
@@ -22,4 +25,4 @@ primary_region = "gru"
 
 [mounts]
   source = "wpp_data"
-  destination = "/usr/src/wpp-server/tokens"
+  destination = "/evolution/store"

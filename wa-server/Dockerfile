@@ -1,8 +1,7 @@
-FROM wppconnect/wppconnect-server:latest
+FROM atendai/evolution-api:v2.1.1
 
-# WPPConnect Server API - porta padrão 21465
-ENV HOST=0.0.0.0
-ENV PORT=21465
-ENV SECRET_KEY=StackOS2024WPP
+# Evolution API - porta padrão 8080, usa Baileys (sem Chromium)
+ENV SERVER_PORT=8080
+ENV AUTHENTICATION_API_KEY=StackOS2024WPP
 
-EXPOSE 21465
+EXPOSE 8080
