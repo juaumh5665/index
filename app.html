@@ -40325,11 +40325,22 @@ async function _convEnviarUm(idx) {
     let envioOk = false;
 
     if (metodo !== 'manual') {
-        // ENVIO VIA API (WPPConnect ou Evolution)
+        // ENVIO VIA API (WPPConnect, Evolution ou Baileys)
         try {
             if (flyerUrl && _convCampanha.flyerUrlPublica) {
                 // Envia imagem com caption (mensagem como legenda)
-                await _waProvider.sendImage(p.numero, _convCampanha.flyerUrlPublica, mensagem);
+                try {
+                    await _waProvider.sendImage(p.numero, _convCampanha.flyerUrlPublica, mensagem);
+                } catch (imgErr) {
+                    // Fallback: se send-image não existe (404), envia texto com link da imagem
+                    if (imgErr.message?.includes('status 404') || imgErr.message?.includes('status 405')) {
+                        console.warn('[Convites] send-image não disponível, enviando como texto + link');
+                        const textoComImg = mensagem + '\n\n' + _convCampanha.flyerUrlPublica;
+                        await _waProvider.sendText(p.numero, textoComImg);
+                    } else {
+                        throw imgErr; // re-throw se for outro erro
+                    }
+                }
             } else {
                 // Envia texto puro
                 await _waProvider.sendText(p.numero, mensagem);
