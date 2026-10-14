@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const pino = require('pino');
@@ -40,6 +42,19 @@ app.post('/api/:session/start', auth, async (req, res) => {
     // Close existing session if any
     if (sessions[sessionId]?.sock) {
         try { sessions[sessionId].sock.end(); } catch (e) {}
+    }
+
+    // Clean auth state if previous session was CLOSED/ERROR (forces new QR)
+    const authDir = path.join(__dirname, 'auth_sessions', sessionId);
+    if (sessions[sessionId]?.status === 'CLOSED' || sessions[sessionId]?.status === 'ERROR' || req.query.clean === '1') {
+        try {
+            if (fs.existsSync(authDir)) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log(`[${sessionId}] Cleaned auth state for fresh QR`);
+            }
+        } catch (e) {
+            console.log(`[${sessionId}] Auth cleanup error:`, e.message);
+        }
     }
 
     try {
@@ -89,11 +104,15 @@ app.post('/api/:session/start', auth, async (req, res) => {
                 console.log(`[${sessionId}] Connection closed: ${reason} (${statusCode})`);
 
                 sessions[sessionId].connected = false;
-                sessions[sessionId].status = 'CLOSED';
 
-                // Reconnect on logout (QR expired, etc) but not on intentional disconnect
-                if (statusCode !== DisconnectReason.loggedOut && statusCode !== 401) {
-                    // Don't auto-reconnect for now — let frontend handle retry
+                // loggedOut (401) = user disconnected intentionally, don't reconnect
+                if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+                    sessions[sessionId].status = 'DISCONNECTED';
+                    // Clean auth so next start gets fresh QR
+                    const authPath = path.join(__dirname, 'auth_sessions', sessionId);
+                    try { fs.rmSync(authPath, { recursive: true, force: true }); } catch(e) {}
+                } else {
+                    sessions[sessionId].status = 'CLOSED';
                 }
             }
 
