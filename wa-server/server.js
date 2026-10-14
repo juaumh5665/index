@@ -25,6 +25,125 @@ function auth(req, res, next) {
     next();
 }
 
+/**
+ * Create (or reconnect) a Baileys socket for sessionId.
+ * Handles QR generation, auto-reconnect on restartRequired, and creds saving.
+ * @param {string} sessionId
+ * @param {boolean} isReconnect - true if this is an auto-reconnect (skip auth cleanup)
+ */
+async function connectSocket(sessionId, isReconnect = false) {
+    const authDir = path.join(__dirname, 'auth_sessions', sessionId);
+
+    // Only clean auth on fresh start, never on reconnect (reconnect needs saved creds from QR scan)
+    if (!isReconnect) {
+        try {
+            if (fs.existsSync(authDir)) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log(`[${sessionId}] Cleaned auth state for fresh QR`);
+            }
+        } catch (e) {
+            console.log(`[${sessionId}] Auth cleanup error:`, e.message);
+        }
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(`./auth_sessions/${sessionId}`);
+    const { version } = await fetchLatestBaileysVersion();
+
+    const sock = makeWASocket({
+        version,
+        auth: state,
+        logger: pino({ level: 'silent' }),
+        browser: ['StackOS', 'Chrome', '10.0'],
+        connectTimeoutMs: 90000,
+        qrTimeout: 90000,
+    });
+
+    // Update session object
+    sessions[sessionId].sock = sock;
+    if (!isReconnect) {
+        sessions[sessionId].qr = null;
+        sessions[sessionId].qrDataUrl = null;
+    }
+
+    // Connection events
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            console.log(`[${sessionId}] QR code generated`);
+            sessions[sessionId].qr = qr;
+            sessions[sessionId].status = 'QRCODE';
+            try {
+                sessions[sessionId].qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
+            } catch (e) {
+                console.error(`[${sessionId}] QR encode error:`, e.message);
+            }
+        }
+
+        if (connection === 'close') {
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const reason = DisconnectReason[statusCode] || statusCode;
+            console.log(`[${sessionId}] Connection closed: ${reason} (${statusCode})`);
+
+            sessions[sessionId].connected = false;
+
+            // loggedOut (401) = user disconnected intentionally
+            if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+                console.log(`[${sessionId}] Logged out — cleaning auth state`);
+                sessions[sessionId].status = 'DISCONNECTED';
+                const authPath = path.join(__dirname, 'auth_sessions', sessionId);
+                try { fs.rmSync(authPath, { recursive: true, force: true }); } catch(e) {}
+                return;
+            }
+
+            // restartRequired (515) and other non-fatal disconnects → auto-reconnect
+            // This is NORMAL after QR scan — Baileys needs one reconnect to complete the handshake
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
+            if (shouldReconnect) {
+                const retryCount = (sessions[sessionId].retryCount || 0) + 1;
+                sessions[sessionId].retryCount = retryCount;
+
+                // Limit retries to prevent infinite loops
+                if (retryCount <= 5) {
+                    const delay = Math.min(retryCount * 1000, 5000);
+                    console.log(`[${sessionId}] Auto-reconnecting in ${delay}ms (attempt ${retryCount})...`);
+                    sessions[sessionId].status = 'RECONNECTING';
+
+                    setTimeout(async () => {
+                        try {
+                            // Only reconnect if session still exists (wasn't manually disconnected)
+                            if (sessions[sessionId] && !sessions[sessionId].connected) {
+                                await connectSocket(sessionId, true);
+                            }
+                        } catch (e) {
+                            console.error(`[${sessionId}] Reconnect error:`, e.message);
+                            sessions[sessionId].status = 'ERROR';
+                            sessions[sessionId].error = e.message;
+                        }
+                    }, delay);
+                } else {
+                    console.log(`[${sessionId}] Max retries reached, giving up`);
+                    sessions[sessionId].status = 'CLOSED';
+                    sessions[sessionId].retryCount = 0;
+                }
+            }
+        }
+
+        if (connection === 'open') {
+            console.log(`[${sessionId}] Connected!`);
+            sessions[sessionId].connected = true;
+            sessions[sessionId].status = 'CONNECTED';
+            sessions[sessionId].qr = null;
+            sessions[sessionId].qrDataUrl = null;
+            sessions[sessionId].retryCount = 0; // Reset on success
+            sessions[sessionId].error = null;
+        }
+    });
+
+    // Save credentials on update
+    sock.ev.on('creds.update', saveCreds);
+}
+
 // Health check
 app.get('/', (req, res) => {
     res.json({ status: 'ok', service: 'stackos-wa-server', sessions: Object.keys(sessions).length });
@@ -39,21 +158,9 @@ app.post('/api/:session/start', auth, async (req, res) => {
         return res.json({ status: 'CONNECTED', message: 'Already connected' });
     }
 
-    // Close existing session if any
+    // Close existing socket if any
     if (sessions[sessionId]?.sock) {
         try { sessions[sessionId].sock.end(); } catch (e) {}
-    }
-
-    // Always clean auth state on start — ensures fresh QR every time
-    // Connected sessions are returned early above, so this only runs for disconnected/new sessions
-    const authDir = path.join(__dirname, 'auth_sessions', sessionId);
-    try {
-        if (fs.existsSync(authDir)) {
-            fs.rmSync(authDir, { recursive: true, force: true });
-            console.log(`[${sessionId}] Cleaned auth state for fresh QR`);
-        }
-    } catch (e) {
-        console.log(`[${sessionId}] Auth cleanup error:`, e.message);
     }
 
     try {
@@ -64,69 +171,12 @@ app.post('/api/:session/start', auth, async (req, res) => {
             connected: false,
             status: 'INITIALIZING',
             sock: null,
-            error: null
+            error: null,
+            retryCount: 0
         };
 
-        const { state, saveCreds } = await useMultiFileAuthState(`./auth_sessions/${sessionId}`);
-        const { version } = await fetchLatestBaileysVersion();
+        await connectSocket(sessionId, false);
 
-        const sock = makeWASocket({
-            version,
-            auth: state,
-            logger: pino({ level: 'silent' }),
-            browser: ['StackOS', 'Chrome', '10.0'],
-            connectTimeoutMs: 90000,
-            qrTimeout: 90000,
-        });
-
-        sessions[sessionId].sock = sock;
-
-        // QR code event
-        sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            if (qr) {
-                console.log(`[${sessionId}] QR code generated`);
-                sessions[sessionId].qr = qr;
-                sessions[sessionId].status = 'QRCODE';
-                try {
-                    sessions[sessionId].qrDataUrl = await QRCode.toDataURL(qr, { width: 300 });
-                } catch (e) {
-                    console.error(`[${sessionId}] QR encode error:`, e.message);
-                }
-            }
-
-            if (connection === 'close') {
-                const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const reason = DisconnectReason[statusCode] || statusCode;
-                console.log(`[${sessionId}] Connection closed: ${reason} (${statusCode})`);
-
-                sessions[sessionId].connected = false;
-
-                // loggedOut (401) = user disconnected intentionally, don't reconnect
-                if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-                    sessions[sessionId].status = 'DISCONNECTED';
-                    // Clean auth so next start gets fresh QR
-                    const authPath = path.join(__dirname, 'auth_sessions', sessionId);
-                    try { fs.rmSync(authPath, { recursive: true, force: true }); } catch(e) {}
-                } else {
-                    sessions[sessionId].status = 'CLOSED';
-                }
-            }
-
-            if (connection === 'open') {
-                console.log(`[${sessionId}] Connected!`);
-                sessions[sessionId].connected = true;
-                sessions[sessionId].status = 'CONNECTED';
-                sessions[sessionId].qr = null;
-                sessions[sessionId].qrDataUrl = null;
-            }
-        });
-
-        // Save credentials on update
-        sock.ev.on('creds.update', saveCreds);
-
-        // Return immediately — QR will be available via /qr endpoint
         res.json({ status: 'INITIALIZING', message: 'Session starting, poll /qr for QR code' });
 
     } catch (e) {
@@ -197,7 +247,7 @@ app.post('/api/:session/send', auth, async (req, res) => {
     }
 });
 
-// Disconnect session
+// Disconnect session (logout — clears auth)
 app.post('/api/:session/disconnect', auth, async (req, res) => {
     const sessionId = req.params.session;
     const session = sessions[sessionId];
