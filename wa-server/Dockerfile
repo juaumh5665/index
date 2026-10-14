@@ -1,9 +1,8 @@
-FROM wppconnect/server-cli:latest
+FROM wppconnect/wppconnect-server:latest
 
-# Fly.io injeta PORT como env var, WPPConnect usa PORT direto
+# WPPConnect Server API - porta padrão 21465
 ENV HOST=0.0.0.0
 ENV PORT=21465
-ENV CORS_ORIGIN=*
-ENV LOG_LEVEL=info
+ENV SECRET_KEY=StackOS2024WPP
 
 EXPOSE 21465
