@@ -265,9 +265,36 @@ app.post('/api/:session/send', auth, async (req, res) => {
 
     try {
         // Format phone number: remove non-digits, ensure @s.whatsapp.net
-        const jid = phone.replace(/\D/g, '') + '@s.whatsapp.net';
-        await session.sock.sendMessage(jid, { text: message });
-        res.json({ status: 'sent', phone, jid });
+        const cleanPhone = phone.replace(/\D/g, '');
+        const jid = cleanPhone + '@s.whatsapp.net';
+        console.log(`[${sessionId}] Sending to: ${cleanPhone} → JID: ${jid}`);
+
+        // Verifica se o número existe no WhatsApp
+        try {
+            const [exists] = await session.sock.onWhatsApp(jid);
+            if (!exists || !exists.exists) {
+                console.warn(`[${sessionId}] Número NÃO encontrado no WhatsApp: ${cleanPhone}`);
+                return res.status(400).json({
+                    error: `Número ${cleanPhone} não encontrado no WhatsApp`,
+                    code: 'NOT_ON_WHATSAPP',
+                    phone: cleanPhone,
+                    jid
+                });
+            }
+            // Usa o JID retornado pelo WhatsApp (pode ser diferente do formatado)
+            const realJid = exists.jid;
+            console.log(`[${sessionId}] Número verificado OK: ${cleanPhone} → ${realJid}`);
+
+            const result = await session.sock.sendMessage(realJid, { text: message });
+            console.log(`[${sessionId}] Mensagem enviada OK: key=${result?.key?.id}`);
+            res.json({ status: 'sent', phone: cleanPhone, jid: realJid, messageId: result?.key?.id });
+        } catch (checkErr) {
+            // Se onWhatsApp falhar (ex: sem suporte), tenta enviar direto
+            console.warn(`[${sessionId}] onWhatsApp falhou (${checkErr.message}), enviando direto...`);
+            const result = await session.sock.sendMessage(jid, { text: message });
+            console.log(`[${sessionId}] Mensagem enviada (sem verificação): key=${result?.key?.id}`);
+            res.json({ status: 'sent', phone: cleanPhone, jid, messageId: result?.key?.id, verified: false });
+        }
     } catch (e) {
         console.error(`[${sessionId}] Send error:`, e.message);
         res.status(500).json({ error: e.message });
@@ -289,12 +316,34 @@ app.post('/api/:session/send-image', auth, async (req, res) => {
     }
 
     try {
-        const jid = phone.replace(/\D/g, '') + '@s.whatsapp.net';
-        await session.sock.sendMessage(jid, {
+        const cleanPhone = phone.replace(/\D/g, '');
+        const jid = cleanPhone + '@s.whatsapp.net';
+        console.log(`[${sessionId}] Sending image to: ${cleanPhone} → JID: ${jid}`);
+
+        // Verifica se o número existe no WhatsApp
+        let targetJid = jid;
+        try {
+            const [exists] = await session.sock.onWhatsApp(jid);
+            if (!exists || !exists.exists) {
+                console.warn(`[${sessionId}] Número NÃO encontrado no WhatsApp: ${cleanPhone}`);
+                return res.status(400).json({
+                    error: `Número ${cleanPhone} não encontrado no WhatsApp`,
+                    code: 'NOT_ON_WHATSAPP',
+                    phone: cleanPhone
+                });
+            }
+            targetJid = exists.jid;
+            console.log(`[${sessionId}] Número verificado OK: ${cleanPhone} → ${targetJid}`);
+        } catch (checkErr) {
+            console.warn(`[${sessionId}] onWhatsApp falhou (${checkErr.message}), enviando direto...`);
+        }
+
+        const result = await session.sock.sendMessage(targetJid, {
             image: { url: imageUrl },
             caption: caption || ''
         });
-        res.json({ status: 'sent', phone, jid });
+        console.log(`[${sessionId}] Imagem enviada OK: key=${result?.key?.id}`);
+        res.json({ status: 'sent', phone: cleanPhone, jid: targetJid, messageId: result?.key?.id });
     } catch (e) {
         console.error(`[${sessionId}] Send image error:`, e.message);
         res.status(500).json({ error: e.message });

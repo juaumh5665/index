@@ -40354,6 +40354,8 @@ async function _convEnviarUm(idx) {
                 p.erroApi = 'WhatsApp desconectado — reconecte na aba Config';
             } else if (e.message?.includes('Failed to fetch') || e.message?.includes('NetworkError')) {
                 p.erroApi = 'Servidor não responde — pode estar dormindo (Render free tier)';
+            } else if (e.message?.includes('NOT_ON_WHATSAPP') || e.message?.includes('não encontrado no WhatsApp')) {
+                p.erroApi = 'Número não tem WhatsApp';
             } else {
                 p.erroApi = e.message;
             }
@@ -41034,6 +41036,12 @@ const _waProvider = {
             throw new Error(`Servidor retornou HTML (status ${resp.status}) — pode estar dormindo ou reiniciando. Aguarde ~30s.`);
         }
         const data = await resp.json();
+        // Propaga erros HTTP (4xx/5xx) como throw pra quem chamou tratar
+        if (!resp.ok && data.error) {
+            const err = new Error(data.error);
+            err.code = data.code || '';
+            throw err;
+        }
         return data;
     },
 
