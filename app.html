@@ -40557,6 +40557,8 @@ const _waProvider = {
             h['Authorization'] = 'Bearer ' + (this._jwtToken || cfg.token);
         } else if (cfg.provider === 'evolution') {
             h['apikey'] = cfg.token;
+        } else if (cfg.provider === 'baileys') {
+            h['x-api-key'] = cfg.token;
         }
         return h;
     },
@@ -40583,6 +40585,9 @@ const _waProvider = {
             } else if (cfg.provider === 'evolution') {
                 url = `${cfg.url}/instance/connectionState/${encodeURIComponent(cfg.session)}`;
                 opts = { method: 'GET', headers: this._headers(cfg) };
+            } else if (cfg.provider === 'baileys') {
+                url = `${cfg.url}/api/${encodeURIComponent(cfg.session)}/status`;
+                opts = { method: 'GET', headers: this._headers(cfg) };
             } else {
                 return { connected: false };
             }
@@ -40597,6 +40602,8 @@ const _waProvider = {
                 const state = data && (data.state || (data.instance && data.instance.state));
                 const connected = state === 'open' || state === 'connected';
                 return { connected, raw: data };
+            } else if (cfg.provider === 'baileys') {
+                return { connected: !!data.connected, raw: data };
             }
         } catch (e) {
             return { connected: false, error: e.message };
@@ -40706,6 +40713,15 @@ const _waProvider = {
                 })
             });
             return await resp.json();
+        } else if (cfg.provider === 'baileys') {
+            console.log('[Baileys] Iniciando sessão...');
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start`, {
+                method: 'POST',
+                headers: this._headers(cfg)
+            });
+            const data = await resp.json();
+            console.log('[Baileys] Start response:', data);
+            return data;
         }
     },
 
@@ -40753,6 +40769,15 @@ const _waProvider = {
             const data = await resp.json();
             // Evolution retorna { base64: "data:image/png;base64,..." } ou { code: "..." }
             return { qr: data.base64 || null, code: data.code || null, raw: data };
+        } else if (cfg.provider === 'baileys') {
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/qr`, {
+                method: 'GET',
+                headers: this._headers(cfg)
+            });
+            const data = await resp.json();
+            // Baileys retorna { status, qr: dataURL, raw }
+            // Se status CONNECTED, QR é null
+            return { qr: data.qr || null, raw: data };
         }
     },
 
@@ -40791,6 +40816,15 @@ const _waProvider = {
             });
             const data = await resp.json();
             if (data.error) throw new Error(data.message || 'Erro Evolution API');
+            return { success: true, raw: data };
+        } else if (cfg.provider === 'baileys') {
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({ phone, message: texto })
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
             return { success: true, raw: data };
         }
 
@@ -40836,6 +40870,10 @@ const _waProvider = {
             const data = await resp.json();
             if (data.error) throw new Error(data.message || 'Erro Evolution API imagem');
             return { success: true, raw: data };
+        } else if (cfg.provider === 'baileys') {
+            // Baileys server não tem endpoint de imagem — envia caption como texto
+            const texto = caption ? `${caption}\n${imageUrl}` : imageUrl;
+            return await this.sendText(numero, texto);
         }
 
         throw new Error('Provider inválido');
@@ -40853,6 +40891,11 @@ const _waProvider = {
         } else if (cfg.provider === 'evolution') {
             await fetch(`${cfg.url}/instance/logout/${encodeURIComponent(cfg.session)}`, {
                 method: 'DELETE',
+                headers: this._headers(cfg)
+            });
+        } else if (cfg.provider === 'baileys') {
+            await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/disconnect`, {
+                method: 'POST',
                 headers: this._headers(cfg)
             });
         }
@@ -40997,27 +41040,65 @@ async function convWaConectar() {
     if (qrStatus) qrStatus.textContent = 'Aguardando…';
 
     try {
-        // 1. Iniciar sessão (gera JWT + dispara Chromium — espera QR via waitQrCode, até 120s)
-        if (qrLoading) qrLoading.textContent = 'Iniciando navegador… pode levar até 2min';
-        const startResult = await _waProvider.startSession();
-        console.log('[WPP] startSession result:', startResult);
+        const isBaileys = conviteConfig.wa_provider === 'baileys';
 
-        // 2. Polling de status até QRCODE ou CONNECTED (máx 90s)
+        // 1. Iniciar sessão
+        if (qrLoading) qrLoading.textContent = isBaileys ? 'Iniciando sessão…' : 'Iniciando navegador… pode levar até 2min';
+        const startResult = await _waProvider.startSession();
+        console.log('[WA] startSession result:', startResult);
+
+        // Se já está conectado (Baileys retorna status CONNECTED)
+        if (startResult?.status === 'CONNECTED') {
+            conviteConfig.wa_connected = true;
+            convWaUpdateStatusBadge(true);
+            if (qrLoading) qrLoading.style.display = 'none';
+            if (qrStatus) qrStatus.textContent = '✅ WhatsApp já estava conectado!';
+            await convWaSalvarConfig();
+            setTimeout(() => convWaFecharQR(), 2000);
+            showToast('✅ WhatsApp já conectado!');
+            return;
+        }
+
+        // 2. Obter QR code
         let qrData = null;
 
-        // Se já veio QR no start (sessão rápida), usar direto
-        if (startResult?.qrcode) {
+        if (isBaileys) {
+            // Baileys: QR gerado assincronamente — poll rápido até disponível (máx 15s)
+            if (qrLoading) qrLoading.textContent = 'Gerando QR Code…';
+            for (let i = 0; i < 10; i++) {
+                await new Promise(r => setTimeout(r, 1500));
+                try {
+                    const qrResult = await _waProvider.getQR();
+                    console.log(`[Baileys] QR poll ${i+1}/10:`, qrResult?.raw?.status);
+                    if (qrResult?.qr) {
+                        qrData = { qr: qrResult.qr };
+                        break;
+                    }
+                    if (qrResult?.raw?.status === 'CONNECTED') {
+                        conviteConfig.wa_connected = true;
+                        convWaUpdateStatusBadge(true);
+                        if (qrLoading) qrLoading.style.display = 'none';
+                        if (qrStatus) qrStatus.textContent = '✅ WhatsApp já estava conectado!';
+                        await convWaSalvarConfig();
+                        setTimeout(() => convWaFecharQR(), 2000);
+                        showToast('✅ WhatsApp já conectado!');
+                        return;
+                    }
+                } catch(e) {
+                    console.log(`[Baileys] QR poll ${i+1} error:`, e.message);
+                }
+            }
+        } else if (startResult?.qrcode) {
+            // WPPConnect: QR veio direto no start (waitQrCode=true)
             const qr = startResult.qrcode.startsWith('data:') ? startResult.qrcode : 'data:image/png;base64,' + startResult.qrcode;
-            console.log('[WPP] QR veio direto do start!');
             qrData = { qr };
         } else {
-            // Fallback: se waitQrCode deu timeout, polling via status-session (que retorna qrcode quando disponível)
+            // WPPConnect/Evolution: fallback polling via status-session
             if (qrLoading) qrLoading.textContent = 'Navegador iniciando… pode levar até 2min';
-            for (let i = 0; i < 12; i++) { // 12 × 5s = 60s extras (já esperou ~120s no waitQrCode)
+            for (let i = 0; i < 12; i++) {
                 await new Promise(r => setTimeout(r, 5000));
                 const elapsed = (i + 1) * 5;
                 try {
-                    // status-session retorna { status, qrcode (dataURL quando QRCODE), urlcode }
                     const cfg = _waProvider.getConfig();
                     const statusResp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/status-session`, {
                         method: 'GET',
@@ -41028,7 +41109,6 @@ async function convWaConectar() {
                     if (statusData.qrcode) {
                         const qr = statusData.qrcode.startsWith('data:') ? statusData.qrcode : 'data:image/png;base64,' + statusData.qrcode;
                         qrData = { qr };
-                        console.log('[WPP] QR obtido via status-session!');
                         break;
                     }
                     if (statusData.status === 'CONNECTED' || statusData.status === 'isLogged') {
@@ -41166,8 +41246,8 @@ async function convWaSalvarConfig() {
 
 // Config global do servidor gerenciado (João configura aqui, clubes usam automaticamente)
 const _WA_MANAGED_SERVER = {
-    provider: 'wppconnect',
-    url: 'https://stackos-wppconnect.fly.dev',
+    provider: 'baileys',
+    url: '', // será preenchido após deploy no Render.com
     token: 'StackOS2024WPP'
 };
 
