@@ -3280,6 +3280,56 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div id="conv-tab-config" class="conv-tab-content" style="display:none;">
                         <div style="display:grid;grid-template-columns:1fr;gap:1rem;">
 
+                            <!-- WhatsApp API -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem;">
+                                    <div style="display:flex;align-items:center;gap:.5rem;">
+                                        <div style="font-size:1.2rem;">📡</div>
+                                        <h3 style="font-size:.95rem;font-weight:800;color:#fff;">WhatsApp API</h3>
+                                        <span id="conv-wa-status-badge" style="font-size:.6rem;font-weight:800;padding:.15rem .45rem;border-radius:.25rem;letter-spacing:.05em;background:rgba(113,113,122,.15);color:#71717a;border:1px solid rgba(113,113,122,.2);">DESCONECTADO</span>
+                                    </div>
+                                </div>
+                                <p style="font-size:.72rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
+                                    Conecte uma API de WhatsApp para envio automático. Sem configurar, o envio continua pelo método manual (wa.me).
+                                </p>
+
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:1rem;" id="conv-wa-grid">
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Provider</div>
+                                        <select id="conv-wa-provider" class="inp" onchange="convWaProviderChanged()" style="width:100%;">
+                                            <option value="manual">🔗 Manual (wa.me — padrão)</option>
+                                            <option value="wppconnect">🟢 WPPConnect</option>
+                                            <option value="evolution">🔵 Evolution API</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Nome da sessão</div>
+                                        <input id="conv-wa-session" class="inp" placeholder="default" value="default" style="width:100%;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">URL do servidor</div>
+                                        <input id="conv-wa-url" class="inp" placeholder="https://api.seuservidor.com" style="width:100%;">
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Token / API Key</div>
+                                        <input id="conv-wa-token" class="inp" type="password" placeholder="Seu token de autenticação" style="width:100%;">
+                                    </div>
+                                </div>
+
+                                <div id="conv-wa-api-fields" style="display:none;">
+                                    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                                        <button onclick="convWaTestarConexao()" id="conv-wa-btn-testar" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.3);color:#38bdf8;padding:.6rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">🔍 Testar Conexão</button>
+                                        <button onclick="convWaConectar()" id="conv-wa-btn-conectar" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">📱 Conectar WhatsApp</button>
+                                        <button onclick="convWaDesconectar()" id="conv-wa-btn-desconectar" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.6rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">🔌 Desconectar</button>
+                                    </div>
+                                    <div id="conv-wa-feedback" style="margin-top:.75rem;font-size:.72rem;color:#71717a;line-height:1.5;"></div>
+                                </div>
+
+                                <div id="conv-wa-info-manual" style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15);border-radius:.5rem;padding:.65rem .85rem;font-size:.72rem;color:#fbbf24;margin-top:.75rem;line-height:1.5;">
+                                    💡 <strong>Modo manual:</strong> Cada envio abre uma aba no wa.me. Para envio automático em background, selecione WPPConnect ou Evolution API.
+                                </div>
+                            </div>
+
                             <!-- Anti-cansaço -->
                             <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
                                 <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
@@ -3346,6 +3396,25 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                     </div>
 
+                </div>
+            </div>
+
+            <!-- Modal QR Code WhatsApp -->
+            <div id="conv-wa-qr-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">
+                <div style="background:#111113;border:1px solid #27272a;border-radius:1rem;padding:1.5rem;max-width:380px;width:90%;text-align:center;position:relative;">
+                    <button onclick="convWaFecharQR()" style="position:absolute;top:.75rem;right:.75rem;background:transparent;border:none;color:#71717a;font-size:1.2rem;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">✕</button>
+                    <div style="font-size:2.5rem;margin-bottom:.5rem;">📱</div>
+                    <h3 style="font-size:1rem;font-weight:800;color:#fff;margin-bottom:.35rem;">Conectar WhatsApp</h3>
+                    <p style="font-size:.72rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">Abra o WhatsApp no celular → Dispositivos conectados → Conectar dispositivo → Escanear o QR Code abaixo</p>
+                    <div id="conv-wa-qr-container" style="background:#fff;border-radius:.75rem;padding:1rem;display:inline-block;margin-bottom:1rem;min-height:200px;min-width:200px;display:flex;align-items:center;justify-content:center;">
+                        <div id="conv-wa-qr-loading" style="color:#71717a;font-size:.8rem;">Gerando QR Code…</div>
+                        <img id="conv-wa-qr-img" style="display:none;max-width:220px;max-height:220px;image-rendering:pixelated;">
+                    </div>
+                    <div id="conv-wa-qr-status" style="font-size:.72rem;color:#71717a;margin-bottom:.5rem;">Aguardando escaneamento…</div>
+                    <div style="display:flex;gap:.5rem;justify-content:center;">
+                        <button onclick="convWaConectar()" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.3);color:#38bdf8;padding:.5rem .85rem;border-radius:.4rem;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;">🔄 Novo QR</button>
+                        <button onclick="convWaFecharQR()" style="background:rgba(113,113,122,.08);border:1px solid #27272a;color:#a1a1aa;padding:.5rem .85rem;border-radius:.4rem;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit;">Fechar</button>
+                    </div>
                 </div>
             </div>
 
@@ -39725,6 +39794,9 @@ async function convConfigCarregar() {
         // Popular dropdown de opt-out + lista atual
         convConfigPopularDropdownOptout();
         convConfigRenderListaOptout();
+
+        // Popular form WhatsApp API
+        convWaPopularForm();
     } catch (e) {
         console.warn('[Convites] erro carregar config:', e);
     }
@@ -39743,7 +39815,12 @@ async function convConfigSalvar() {
         cooldown_dias: getInt('conv-cfg-cooldown', 30, 0, 365),
         hora_inicio: getInt('conv-cfg-hora-inicio', 9, 0, 23),
         hora_fim: getInt('conv-cfg-hora-fim', 22, 0, 23),
-        assinatura: ((document.getElementById('conv-cfg-assinatura') || {}).value || '').trim()
+        assinatura: ((document.getElementById('conv-cfg-assinatura') || {}).value || '').trim(),
+        wa_provider: ((document.getElementById('conv-wa-provider') || {}).value || 'manual'),
+        wa_api_url: ((document.getElementById('conv-wa-url') || {}).value || '').trim(),
+        wa_api_token: ((document.getElementById('conv-wa-token') || {}).value || '').trim(),
+        wa_session_name: ((document.getElementById('conv-wa-session') || {}).value || 'default').trim(),
+        wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
     };
     if (payload.hora_fim <= payload.hora_inicio) {
         showToast('⚠️ Horário fim precisa ser maior que início');
@@ -40227,12 +40304,35 @@ async function _convEnviarUm(idx) {
     const assinatura = (conviteConfig && conviteConfig.assinatura) ? String(conviteConfig.assinatura).trim() : '';
     if (assinatura) mensagem = mensagem + '\n\n' + assinatura;
 
-    // Abre wa.me
-    const url = `https://wa.me/${p.numero}?text=${encodeURIComponent(mensagem)}`;
-    window.open(url, '_blank');
+    // ─── ENVIO: API ou manual ───
+    const metodo = _waProvider.isApi() ? _waProvider.getConfig().provider : 'manual';
+    let envioOk = false;
+
+    if (metodo !== 'manual') {
+        // ENVIO VIA API (WPPConnect ou Evolution)
+        try {
+            if (flyerUrl && _convCampanha.flyerUrlPublica) {
+                // Envia imagem com caption (mensagem como legenda)
+                await _waProvider.sendImage(p.numero, _convCampanha.flyerUrlPublica, mensagem);
+            } else {
+                // Envia texto puro
+                await _waProvider.sendText(p.numero, mensagem);
+            }
+            envioOk = true;
+        } catch (e) {
+            console.error('[Convites] erro envio API:', e);
+            // Marca como falha mas continua o loop
+            p.erroApi = e.message;
+        }
+    } else {
+        // ENVIO MANUAL (wa.me — abre aba)
+        const url = `https://wa.me/${p.numero}?text=${encodeURIComponent(mensagem)}`;
+        window.open(url, '_blank');
+        envioOk = true;
+    }
 
     // Marca como enviado
-    p.enviado = true;
+    p.enviado = envioOk;
     p.ts = Date.now();
 
     // Registra no banco
@@ -40243,8 +40343,9 @@ async function _convEnviarUm(idx) {
             template_id: _convCampanha.templateId,
             torneio_id: _convCampanha.torneioId || null,
             flyer_url: flyerUrl || null,
-            status: 'enviado',
-            variante: variante
+            status: envioOk ? 'enviado' : 'erro',
+            variante: variante,
+            metodo: metodo
         });
     } catch (e) { console.warn('[Convites] erro registrar envio:', e); }
 
@@ -40337,12 +40438,19 @@ async function convIniciarEnvioSequencial() {
     const validos = _convCampanha.listaJogadores.filter(p => p.valido && !p.enviado);
     if (validos.length === 0) { showToast('⚠️ Ninguém pra enviar'); return; }
 
-    if (!confirm(`Vai enviar ${validos.length} convite${validos.length!==1?'s':''} sequencialmente, com 2s entre cada um. Cada um abrirá em uma nova aba do WhatsApp.\n\nContinuar?`)) return;
+    const usandoApi = _waProvider.isApi();
+    const msgConfirm = usandoApi
+        ? `Vai enviar ${validos.length} convite${validos.length!==1?'s':''} automaticamente via API (${_waProvider.getConfig().provider}).\n\nDelay de 8-15s entre cada para evitar bloqueio.\n\nContinuar?`
+        : `Vai enviar ${validos.length} convite${validos.length!==1?'s':''} sequencialmente, com 2s entre cada um. Cada um abrirá em uma nova aba do WhatsApp.\n\nContinuar?`;
+
+    if (!confirm(msgConfirm)) return;
 
     _convCampanha.enviando = true;
     _convCampanha.indiceAtual = -1;
     document.getElementById('conv-progress-bar').style.display = '';
     document.getElementById('conv-btn-sequencial').disabled = true;
+
+    let errosApi = 0;
 
     for (let i = 0; i < _convCampanha.listaJogadores.length; i++) {
         if (!_convCampanha.enviando) break; // pausado/cancelado
@@ -40352,21 +40460,33 @@ async function convIniciarEnvioSequencial() {
         _convCampanha.indiceAtual = i - 1;
         await _convEnviarUm(i);
 
+        // Conta erros de API
+        if (p.erroApi) errosApi++;
+
+        // Se muitos erros seguidos, pausa pra segurança
+        if (errosApi >= 5) {
+            _convCampanha.enviando = false;
+            showToast('⚠️ Muitos erros na API. Envio pausado. Verifique a conexão do WhatsApp.');
+            break;
+        }
+
         // Atualiza barra
         const total = validos.length;
         const enviados = _convCampanha.listaJogadores.filter(x => x.enviado).length;
         const pct = Math.round((enviados / total) * 100);
         document.getElementById('conv-progress-fill').style.width = pct + '%';
-        document.getElementById('conv-progress-texto').textContent = `${enviados} / ${total} enviados`;
+        document.getElementById('conv-progress-texto').textContent = `${enviados} / ${total} enviados` + (errosApi ? ` (${errosApi} erro${errosApi!==1?'s':''})` : '');
         document.getElementById('conv-progress-pct').textContent = pct + '%';
 
-        // Pausa de 2s entre cada
-        await new Promise(r => setTimeout(r, 2000));
+        // Delay: API usa 8-15s randomizado (anti-spam), manual usa 2s
+        const delay = usandoApi ? (8000 + Math.random() * 7000) : 2000;
+        await new Promise(r => setTimeout(r, delay));
     }
 
     _convCampanha.enviando = false;
     document.getElementById('conv-btn-sequencial').disabled = false;
-    showToast('🎉 Envio sequencial concluído!');
+    const totalEnviados = _convCampanha.listaJogadores.filter(x => x.enviado).length;
+    showToast(`🎉 Envio concluído! ${totalEnviados} enviado${totalEnviados!==1?'s':''}` + (errosApi ? ` (${errosApi} erro${errosApi!==1?'s':''})` : ''));
 }
 
 function convPausarEnvio() {
@@ -40379,6 +40499,447 @@ function convFinalizarEnvio() {
     _convCampanha.enviando = false;
     document.getElementById('conv-progress-bar').style.display = 'none';
     document.getElementById('conv-btn-sequencial').disabled = false;
+}
+
+// =====================================================================
+// CONVITES — WHATSAPP PROVIDER ABSTRACTION LAYER
+// =====================================================================
+// Camada genérica que despacha envios para o provider configurado.
+// Suporta: manual (wa.me), wppconnect, evolution
+// Para trocar de provider, basta mudar wa_provider na config.
+// =====================================================================
+
+const _waProvider = {
+    // Retorna config atual do provider
+    getConfig() {
+        return {
+            provider: (conviteConfig && conviteConfig.wa_provider) || 'manual',
+            url: (conviteConfig && conviteConfig.wa_api_url) || '',
+            token: (conviteConfig && conviteConfig.wa_api_token) || '',
+            session: (conviteConfig && conviteConfig.wa_session_name) || 'default',
+            connected: !!(conviteConfig && conviteConfig.wa_connected)
+        };
+    },
+
+    // Verifica se está usando API (não manual)
+    isApi() {
+        const cfg = this.getConfig();
+        return cfg.provider !== 'manual' && cfg.url && cfg.token;
+    },
+
+    // Monta headers padrão para cada provider
+    _headers(cfg) {
+        const h = { 'Content-Type': 'application/json' };
+        if (cfg.provider === 'wppconnect') {
+            h['Authorization'] = 'Bearer ' + cfg.token;
+        } else if (cfg.provider === 'evolution') {
+            h['apikey'] = cfg.token;
+        }
+        return h;
+    },
+
+    // Normaliza número: remove tudo que não é dígito
+    _normalizePhone(numero) {
+        return String(numero).replace(/\D/g, '');
+    },
+
+    // ─── CHECK SESSION STATUS ───
+    async checkStatus() {
+        const cfg = this.getConfig();
+        if (!cfg.url || !cfg.token) return { connected: false, error: 'URL ou token não configurado' };
+
+        try {
+            let url, opts;
+            if (cfg.provider === 'wppconnect') {
+                url = `${cfg.url}/api/${encodeURIComponent(cfg.session)}/check-connection-session`;
+                opts = { method: 'GET', headers: this._headers(cfg) };
+            } else if (cfg.provider === 'evolution') {
+                url = `${cfg.url}/instance/connectionState/${encodeURIComponent(cfg.session)}`;
+                opts = { method: 'GET', headers: this._headers(cfg) };
+            } else {
+                return { connected: false };
+            }
+
+            const resp = await fetch(url, opts);
+            const data = await resp.json();
+
+            if (cfg.provider === 'wppconnect') {
+                const connected = data && data.response === true;
+                return { connected, raw: data };
+            } else if (cfg.provider === 'evolution') {
+                const state = data && (data.state || (data.instance && data.instance.state));
+                const connected = state === 'open' || state === 'connected';
+                return { connected, raw: data };
+            }
+        } catch (e) {
+            return { connected: false, error: e.message };
+        }
+    },
+
+    // ─── GENERATE / START SESSION (QR CODE) ───
+    async startSession() {
+        const cfg = this.getConfig();
+        if (!cfg.url || !cfg.token) throw new Error('URL ou token não configurado');
+
+        if (cfg.provider === 'wppconnect') {
+            // Gerar token de sessão + iniciar
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
+                method: 'POST',
+                headers: this._headers(cfg)
+            });
+            return await resp.json();
+        } else if (cfg.provider === 'evolution') {
+            // Criar instância se não existe
+            const resp = await fetch(`${cfg.url}/instance/create`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({
+                    instanceName: cfg.session,
+                    qrcode: true,
+                    integration: 'WHATSAPP-BAILEYS'
+                })
+            });
+            return await resp.json();
+        }
+    },
+
+    // ─── GET QR CODE ───
+    async getQR() {
+        const cfg = this.getConfig();
+        if (!cfg.url || !cfg.token) throw new Error('URL ou token não configurado');
+
+        if (cfg.provider === 'wppconnect') {
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/qrcode-session`, {
+                method: 'GET',
+                headers: this._headers(cfg)
+            });
+            const data = await resp.json();
+            // WPPConnect retorna { qrcode: "data:image/png;base64,..." }
+            return { qr: data.qrcode || null, raw: data };
+        } else if (cfg.provider === 'evolution') {
+            const resp = await fetch(`${cfg.url}/instance/connect/${encodeURIComponent(cfg.session)}`, {
+                method: 'GET',
+                headers: this._headers(cfg)
+            });
+            const data = await resp.json();
+            // Evolution retorna { base64: "data:image/png;base64,..." } ou { code: "..." }
+            return { qr: data.base64 || null, code: data.code || null, raw: data };
+        }
+    },
+
+    // ─── SEND TEXT MESSAGE ───
+    async sendText(numero, texto) {
+        const cfg = this.getConfig();
+        const phone = this._normalizePhone(numero);
+
+        if (cfg.provider === 'wppconnect') {
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-message`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({
+                    phone: phone,
+                    isGroup: false,
+                    message: texto
+                })
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.message || 'Erro WPPConnect');
+            return { success: true, raw: data };
+        } else if (cfg.provider === 'evolution') {
+            const resp = await fetch(`${cfg.url}/message/sendText/${encodeURIComponent(cfg.session)}`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({
+                    number: phone,
+                    text: texto
+                })
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.message || 'Erro Evolution API');
+            return { success: true, raw: data };
+        }
+
+        throw new Error('Provider inválido');
+    },
+
+    // ─── SEND IMAGE WITH CAPTION ───
+    async sendImage(numero, imageUrl, caption) {
+        const cfg = this.getConfig();
+        const phone = this._normalizePhone(numero);
+
+        if (cfg.provider === 'wppconnect') {
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-image`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({
+                    phone: phone,
+                    isGroup: false,
+                    path: imageUrl,
+                    caption: caption || ''
+                })
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.message || 'Erro WPPConnect imagem');
+            return { success: true, raw: data };
+        } else if (cfg.provider === 'evolution') {
+            const resp = await fetch(`${cfg.url}/message/sendMedia/${encodeURIComponent(cfg.session)}`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({
+                    number: phone,
+                    mediatype: 'image',
+                    media: imageUrl,
+                    caption: caption || ''
+                })
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.message || 'Erro Evolution API imagem');
+            return { success: true, raw: data };
+        }
+
+        throw new Error('Provider inválido');
+    },
+
+    // ─── DISCONNECT / LOGOUT ───
+    async disconnect() {
+        const cfg = this.getConfig();
+        if (cfg.provider === 'wppconnect') {
+            await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/logout-session`, {
+                method: 'POST',
+                headers: this._headers(cfg)
+            });
+        } else if (cfg.provider === 'evolution') {
+            await fetch(`${cfg.url}/instance/logout/${encodeURIComponent(cfg.session)}`, {
+                method: 'DELETE',
+                headers: this._headers(cfg)
+            });
+        }
+    }
+};
+
+// =====================================================================
+// CONVITES — WhatsApp Config UI helpers
+// =====================================================================
+
+function convWaProviderChanged() {
+    const sel = document.getElementById('conv-wa-provider');
+    const provider = sel ? sel.value : 'manual';
+    const apiFields = document.getElementById('conv-wa-api-fields');
+    const infoManual = document.getElementById('conv-wa-info-manual');
+
+    if (provider === 'manual') {
+        if (apiFields) apiFields.style.display = 'none';
+        if (infoManual) infoManual.style.display = '';
+    } else {
+        if (apiFields) apiFields.style.display = '';
+        if (infoManual) infoManual.style.display = 'none';
+    }
+}
+
+function convWaUpdateStatusBadge(connected) {
+    const badge = document.getElementById('conv-wa-status-badge');
+    if (!badge) return;
+    if (connected) {
+        badge.textContent = 'CONECTADO';
+        badge.style.background = 'rgba(34,197,94,.15)';
+        badge.style.color = '#22c55e';
+        badge.style.borderColor = 'rgba(34,197,94,.3)';
+    } else {
+        badge.textContent = 'DESCONECTADO';
+        badge.style.background = 'rgba(113,113,122,.15)';
+        badge.style.color = '#71717a';
+        badge.style.borderColor = 'rgba(113,113,122,.2)';
+    }
+    // Toggle botões conectar/desconectar
+    const btnConectar = document.getElementById('conv-wa-btn-conectar');
+    const btnDesconectar = document.getElementById('conv-wa-btn-desconectar');
+    if (btnConectar) btnConectar.style.display = connected ? 'none' : '';
+    if (btnDesconectar) btnDesconectar.style.display = connected ? '' : 'none';
+}
+
+async function convWaTestarConexao() {
+    const btn = document.getElementById('conv-wa-btn-testar');
+    const fb = document.getElementById('conv-wa-feedback');
+    if (btn) { btn.disabled = true; btn.textContent = '🔍 Testando…'; }
+
+    // Atualiza config temporariamente pra testar
+    const tmpCfg = {
+        wa_provider: (document.getElementById('conv-wa-provider') || {}).value || 'manual',
+        wa_api_url: (document.getElementById('conv-wa-url') || {}).value || '',
+        wa_api_token: (document.getElementById('conv-wa-token') || {}).value || '',
+        wa_session_name: (document.getElementById('conv-wa-session') || {}).value || 'default'
+    };
+    const oldCfg = { ...conviteConfig };
+    Object.assign(conviteConfig, tmpCfg);
+
+    try {
+        const result = await _waProvider.checkStatus();
+        convWaUpdateStatusBadge(result.connected);
+
+        if (result.connected) {
+            if (fb) fb.innerHTML = '<span style="color:#22c55e;">✅ Conexão ativa! WhatsApp está conectado e pronto pra enviar.</span>';
+            // Salva estado de conexão
+            conviteConfig.wa_connected = true;
+        } else if (result.error) {
+            if (fb) fb.innerHTML = `<span style="color:#f87171;">❌ Erro: ${result.error}</span>`;
+            conviteConfig.wa_connected = false;
+        } else {
+            if (fb) fb.innerHTML = '<span style="color:#fbbf24;">⚠️ Servidor respondeu mas sessão não está conectada. Clique "Conectar WhatsApp" pra escanear o QR Code.</span>';
+            conviteConfig.wa_connected = false;
+        }
+    } catch (e) {
+        if (fb) fb.innerHTML = `<span style="color:#f87171;">❌ Não foi possível conectar: ${e.message}. Verifique a URL e o token.</span>`;
+        conviteConfig.wa_connected = false;
+        Object.assign(conviteConfig, oldCfg);
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Testar Conexão'; }
+}
+
+async function convWaConectar() {
+    const fb = document.getElementById('conv-wa-feedback');
+
+    // Salva config no conviteConfig temporário
+    conviteConfig.wa_provider = (document.getElementById('conv-wa-provider') || {}).value || 'manual';
+    conviteConfig.wa_api_url = (document.getElementById('conv-wa-url') || {}).value || '';
+    conviteConfig.wa_api_token = (document.getElementById('conv-wa-token') || {}).value || '';
+    conviteConfig.wa_session_name = (document.getElementById('conv-wa-session') || {}).value || 'default';
+
+    if (!conviteConfig.wa_api_url || !conviteConfig.wa_api_token) {
+        if (fb) fb.innerHTML = '<span style="color:#f87171;">❌ Preencha a URL e o Token primeiro.</span>';
+        return;
+    }
+
+    // Abre modal QR
+    const modal = document.getElementById('conv-wa-qr-modal');
+    if (modal) modal.style.display = 'flex';
+
+    const qrImg = document.getElementById('conv-wa-qr-img');
+    const qrLoading = document.getElementById('conv-wa-qr-loading');
+    const qrStatus = document.getElementById('conv-wa-qr-status');
+    if (qrImg) qrImg.style.display = 'none';
+    if (qrLoading) { qrLoading.style.display = ''; qrLoading.textContent = 'Iniciando sessão…'; }
+    if (qrStatus) qrStatus.textContent = 'Aguardando…';
+
+    try {
+        // 1. Iniciar sessão
+        await _waProvider.startSession();
+        await new Promise(r => setTimeout(r, 1500));
+
+        // 2. Buscar QR Code
+        if (qrLoading) qrLoading.textContent = 'Gerando QR Code…';
+        const qrData = await _waProvider.getQR();
+
+        if (qrData.qr) {
+            if (qrImg) { qrImg.src = qrData.qr; qrImg.style.display = ''; }
+            if (qrLoading) qrLoading.style.display = 'none';
+            if (qrStatus) qrStatus.textContent = 'Escaneie o QR Code com o WhatsApp do celular';
+
+            // 3. Poll pra verificar conexão (a cada 3s, até 60s)
+            _convWaPollConexao();
+        } else {
+            if (qrLoading) qrLoading.textContent = 'QR não disponível. Tente novamente.';
+            if (qrStatus) qrStatus.textContent = 'Sessão pode já estar conectada — clique "Testar Conexão"';
+        }
+    } catch (e) {
+        if (qrLoading) { qrLoading.style.display = ''; qrLoading.textContent = `Erro: ${e.message}`; }
+        if (qrStatus) qrStatus.textContent = 'Verifique a URL e o token nas configurações';
+    }
+}
+
+let _convWaPollTimer = null;
+
+async function _convWaPollConexao() {
+    if (_convWaPollTimer) clearInterval(_convWaPollTimer);
+    let tentativas = 0;
+    const maxTentativas = 20; // 20 × 3s = 60s
+
+    _convWaPollTimer = setInterval(async () => {
+        tentativas++;
+        if (tentativas > maxTentativas) {
+            clearInterval(_convWaPollTimer);
+            _convWaPollTimer = null;
+            const qrStatus = document.getElementById('conv-wa-qr-status');
+            if (qrStatus) qrStatus.textContent = 'QR expirou. Clique "Novo QR" pra tentar de novo.';
+            return;
+        }
+
+        try {
+            const result = await _waProvider.checkStatus();
+            if (result.connected) {
+                clearInterval(_convWaPollTimer);
+                _convWaPollTimer = null;
+
+                // Sucesso!
+                conviteConfig.wa_connected = true;
+                convWaUpdateStatusBadge(true);
+
+                const qrStatus = document.getElementById('conv-wa-qr-status');
+                if (qrStatus) qrStatus.textContent = '✅ Conectado com sucesso!';
+
+                // Salva no banco
+                await convWaSalvarConfig();
+
+                // Fecha modal após 1.5s
+                setTimeout(() => convWaFecharQR(), 1500);
+                showToast('✅ WhatsApp conectado com sucesso!');
+            }
+        } catch (e) { /* ignora erros de poll */ }
+    }, 3000);
+}
+
+function convWaFecharQR() {
+    const modal = document.getElementById('conv-wa-qr-modal');
+    if (modal) modal.style.display = 'none';
+    if (_convWaPollTimer) {
+        clearInterval(_convWaPollTimer);
+        _convWaPollTimer = null;
+    }
+}
+
+async function convWaDesconectar() {
+    if (!confirm('Desconectar a sessão do WhatsApp?\n\nVocê precisará escanear o QR Code novamente para reconectar.')) return;
+
+    try {
+        await _waProvider.disconnect();
+        conviteConfig.wa_connected = false;
+        convWaUpdateStatusBadge(false);
+        await convWaSalvarConfig();
+        showToast('🔌 WhatsApp desconectado');
+        const fb = document.getElementById('conv-wa-feedback');
+        if (fb) fb.innerHTML = '<span style="color:#71717a;">Sessão desconectada. Clique "Conectar WhatsApp" pra reconectar.</span>';
+    } catch (e) {
+        showToast('❌ Erro ao desconectar: ' + e.message);
+    }
+}
+
+// Salva config do WhatsApp no banco (chamada pelo botão Salvar geral e pelo connect)
+async function convWaSalvarConfig() {
+    if (!sb || !sbClube) return;
+    try {
+        await sb.from('convite_config').upsert({
+            clube_id: sbClube.id,
+            wa_provider: conviteConfig.wa_provider || 'manual',
+            wa_api_url: conviteConfig.wa_api_url || '',
+            wa_api_token: conviteConfig.wa_api_token || '',
+            wa_session_name: conviteConfig.wa_session_name || 'default',
+            wa_connected: !!conviteConfig.wa_connected
+        }, { onConflict: 'clube_id' });
+    } catch (e) {
+        console.warn('[Convites] erro salvar WA config:', e);
+    }
+}
+
+// Popula form de WhatsApp a partir da config carregada
+function convWaPopularForm() {
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setVal('conv-wa-provider', (conviteConfig && conviteConfig.wa_provider) || 'manual');
+    setVal('conv-wa-url', (conviteConfig && conviteConfig.wa_api_url) || '');
+    setVal('conv-wa-token', (conviteConfig && conviteConfig.wa_api_token) || '');
+    setVal('conv-wa-session', (conviteConfig && conviteConfig.wa_session_name) || 'default');
+
+    convWaProviderChanged();
+    convWaUpdateStatusBadge(!!(conviteConfig && conviteConfig.wa_connected));
 }
 
 function renderPainelDono() {
