@@ -40964,8 +40964,14 @@ async function convWaTestarConexao() {
     const fb = document.getElementById('conv-wa-feedback');
     if (btn) { btn.disabled = true; btn.textContent = '🔍 Verificando…'; }
 
-    // Super admin: lê do form. Operador: usa managed server
-    if (window._isSuperAdmin) {
+    // Managed server sempre tem prioridade
+    const hasManagedServer = _WA_MANAGED_SERVER.url && _WA_MANAGED_SERVER.token;
+    if (hasManagedServer) {
+        conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
+        conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
+        conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
+        if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
+    } else if (window._isSuperAdmin) {
         const tmpCfg = {
             wa_provider: (document.getElementById('conv-wa-provider') || {}).value || 'manual',
             wa_api_url: (document.getElementById('conv-wa-url') || {}).value || '',
@@ -40974,14 +40980,6 @@ async function convWaTestarConexao() {
             wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
         };
         Object.assign(conviteConfig, tmpCfg);
-    } else {
-        const hasManagedServer = _WA_MANAGED_SERVER.url && _WA_MANAGED_SERVER.token;
-        if (hasManagedServer) {
-            conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
-            conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
-            conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
-            if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
-        }
     }
     const oldCfg = { ...conviteConfig };
 
@@ -41012,21 +41010,18 @@ async function convWaTestarConexao() {
 async function convWaConectar() {
     const fb = document.getElementById('conv-wa-feedback');
 
-    // Super admin: lê dos inputs do form. Operador: usa config gerenciada ou já salva
-    if (window._isSuperAdmin) {
+    // Managed server sempre tem prioridade (garante provider/url/token corretos)
+    const hasManagedServer = _WA_MANAGED_SERVER.url && _WA_MANAGED_SERVER.token;
+    if (hasManagedServer) {
+        conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
+        conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
+        conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
+        if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
+    } else if (window._isSuperAdmin) {
         conviteConfig.wa_provider = (document.getElementById('conv-wa-provider') || {}).value || 'manual';
         conviteConfig.wa_api_url = (document.getElementById('conv-wa-url') || {}).value || '';
         conviteConfig.wa_api_token = (document.getElementById('conv-wa-token') || {}).value || '';
         conviteConfig.wa_session_name = (document.getElementById('conv-wa-session') || {}).value || 'default';
-    } else {
-        // Operador: sempre usa config do managed server (provider, url, token)
-        const hasManagedServer = _WA_MANAGED_SERVER.url && _WA_MANAGED_SERVER.token;
-        if (hasManagedServer) {
-            conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
-            conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
-            conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
-            if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
-        }
     }
 
     if (conviteConfig.wa_provider !== 'teste' && (!conviteConfig.wa_api_url || !conviteConfig.wa_api_token)) {
