@@ -40328,6 +40328,7 @@ async function _convEnviarUm(idx) {
                 await _waProvider.sendText(p.numero, mensagem);
             }
             envioOk = true;
+            _waKeepAlive.touch(); // reseta timer de inatividade
         } catch (e) {
             console.error('[Convites] erro envio API:', e);
             // Verifica se é erro de conexão
@@ -40987,6 +40988,18 @@ const _waProvider = {
         return String(numero).replace(/\D/g, '');
     },
 
+    // Fetch seguro que trata respostas HTML (servidor dormindo/erro)
+    async _safeFetch(url, opts) {
+        const resp = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
+        const contentType = resp.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const txt = (await resp.text()).substring(0, 120);
+            throw new Error(`Servidor retornou HTML (status ${resp.status}) — pode estar dormindo ou reiniciando. Aguarde ~30s.`);
+        }
+        const data = await resp.json();
+        return data;
+    },
+
     // ─── CHECK SESSION STATUS ───
     async checkStatus() {
         const cfg = this.getConfig();
@@ -41011,8 +41024,7 @@ const _waProvider = {
                 return { connected: false };
             }
 
-            const resp = await fetch(url, opts);
-            const data = await resp.json();
+            const data = await this._safeFetch(url, opts);
 
             if (cfg.provider === 'wppconnect') {
                 const connected = data && data.response === true;
@@ -41134,11 +41146,10 @@ const _waProvider = {
             return await resp.json();
         } else if (cfg.provider === 'baileys') {
             console.log('[Baileys] Iniciando sessão...');
-            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start`, {
+            const data = await this._safeFetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start`, {
                 method: 'POST',
                 headers: this._headers(cfg)
             });
-            const data = await resp.json();
             console.log('[Baileys] Start response:', data);
             return data;
         }
@@ -41189,11 +41200,10 @@ const _waProvider = {
             // Evolution retorna { base64: "data:image/png;base64,..." } ou { code: "..." }
             return { qr: data.base64 || null, code: data.code || null, raw: data };
         } else if (cfg.provider === 'baileys') {
-            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/qr`, {
+            const data = await this._safeFetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/qr`, {
                 method: 'GET',
                 headers: this._headers(cfg)
             });
-            const data = await resp.json();
             // Baileys retorna { status, qr: dataURL, raw }
             // Se status CONNECTED, QR é null
             return { qr: data.qr || null, raw: data };
@@ -41237,12 +41247,11 @@ const _waProvider = {
             if (data.error) throw new Error(data.message || 'Erro Evolution API');
             return { success: true, raw: data };
         } else if (cfg.provider === 'baileys') {
-            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send`, {
+            const data = await this._safeFetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send`, {
                 method: 'POST',
                 headers: this._headers(cfg),
                 body: JSON.stringify({ phone, message: texto })
             });
-            const data = await resp.json();
             if (data.error) throw new Error(data.error);
             return { success: true, raw: data };
         }
@@ -41290,12 +41299,11 @@ const _waProvider = {
             if (data.error) throw new Error(data.message || 'Erro Evolution API imagem');
             return { success: true, raw: data };
         } else if (cfg.provider === 'baileys') {
-            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-image`, {
+            const data = await this._safeFetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-image`, {
                 method: 'POST',
                 headers: this._headers(cfg),
                 body: JSON.stringify({ phone, imageUrl, caption: caption || '' })
             });
-            const data = await resp.json();
             if (data.error) throw new Error(data.error);
             return { success: true, raw: data };
         }
@@ -41323,6 +41331,93 @@ const _waProvider = {
                 headers: this._headers(cfg)
             });
         }
+    }
+};
+
+// =====================================================================
+// KEEPALIVE + AUTO-DISCONNECT WhatsApp (Render free tier dorme em 15min)
+// =====================================================================
+const _waKeepAlive = {
+    _pingInterval: null,     // setInterval ID for keepalive pings
+    _idleTimeout: null,      // setTimeout ID for auto-disconnect
+    _lastActivity: 0,        // timestamp of last user activity
+    PING_INTERVAL: 10 * 60 * 1000,   // 10 min — ping antes dos 15min do Render
+    IDLE_LIMIT: 20 * 60 * 1000,      // 20 min — desconecta se sem atividade
+
+    // Chamado quando WhatsApp conecta (após QR scan)
+    start() {
+        this.stop(); // limpa timers anteriores
+        this._lastActivity = Date.now();
+        console.log('[WA-KeepAlive] Iniciando keepalive (ping 10min, idle 20min)');
+
+        // Ping a cada 10 min para manter Render acordado
+        this._pingInterval = setInterval(() => this._ping(), this.PING_INTERVAL);
+
+        // Checa idle a cada minuto
+        this._idleTimeout = setInterval(() => this._checkIdle(), 60 * 1000);
+
+        // Registra atividade do usuário
+        this._onActivity = () => { this._lastActivity = Date.now(); };
+        document.addEventListener('click', this._onActivity, { passive: true });
+        document.addEventListener('keydown', this._onActivity, { passive: true });
+        document.addEventListener('touchstart', this._onActivity, { passive: true });
+    },
+
+    // Chamado quando desconecta (manual ou auto)
+    stop() {
+        if (this._pingInterval) { clearInterval(this._pingInterval); this._pingInterval = null; }
+        if (this._idleTimeout) { clearInterval(this._idleTimeout); this._idleTimeout = null; }
+        if (this._onActivity) {
+            document.removeEventListener('click', this._onActivity);
+            document.removeEventListener('keydown', this._onActivity);
+            document.removeEventListener('touchstart', this._onActivity);
+            this._onActivity = null;
+        }
+        console.log('[WA-KeepAlive] Parado');
+    },
+
+    // Registra atividade de envio (reseta timer idle)
+    touch() {
+        this._lastActivity = Date.now();
+    },
+
+    async _ping() {
+        try {
+            const status = await _waProvider.checkStatus();
+            if (status.connected) {
+                console.log('[WA-KeepAlive] Ping OK — servidor acordado');
+            } else {
+                console.log('[WA-KeepAlive] Ping: servidor desconectado');
+                this._handleDisconnect('Servidor WhatsApp desconectou');
+            }
+        } catch (e) {
+            console.warn('[WA-KeepAlive] Ping falhou:', e.message);
+        }
+    },
+
+    _checkIdle() {
+        const idle = Date.now() - this._lastActivity;
+        if (idle >= this.IDLE_LIMIT) {
+            console.log(`[WA-KeepAlive] Inativo por ${Math.round(idle/60000)}min — desconectando`);
+            this._handleDisconnect('Desconectado automaticamente por inatividade (20 min)');
+        }
+    },
+
+    async _handleDisconnect(motivo) {
+        this.stop();
+        try { await _waProvider.disconnect(); } catch(e) { console.warn('[WA-KeepAlive] Erro ao desconectar:', e.message); }
+        conviteConfig.wa_connected = false;
+        // Atualiza UI se existir
+        const statusEl = document.getElementById('conv-wa-status');
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color:var(--cor-erro,#e53)">⚠️ ${motivo}</span>`;
+        }
+        const btnConnect = document.getElementById('conv-wa-btn-connect');
+        if (btnConnect) {
+            btnConnect.textContent = '📱 Conectar WhatsApp';
+            btnConnect.disabled = false;
+        }
+        console.log(`[WA-KeepAlive] ${motivo}`);
     }
 };
 
@@ -41415,6 +41510,7 @@ async function convWaTestarConexao() {
             if (fb) fb.innerHTML = '<span style="color:#22c55e;">✅ Conexão ativa! WhatsApp está conectado e pronto pra enviar.</span>';
             // Salva estado de conexão
             conviteConfig.wa_connected = true;
+            _waKeepAlive.start();
         } else if (result.error) {
             if (fb) fb.innerHTML = `<span style="color:#f87171;">❌ Erro: ${result.error}</span>`;
             conviteConfig.wa_connected = false;
@@ -41476,6 +41572,7 @@ async function convWaConectar() {
         if (startResult?.status === 'CONNECTED') {
             conviteConfig.wa_connected = true;
             convWaUpdateStatusBadge(true);
+            _waKeepAlive.start();
             if (qrLoading) qrLoading.style.display = 'none';
             if (qrStatus) qrStatus.textContent = '✅ WhatsApp já estava conectado!';
             await convWaSalvarConfig();
@@ -41502,6 +41599,7 @@ async function convWaConectar() {
                     if (qrResult?.raw?.status === 'CONNECTED') {
                         conviteConfig.wa_connected = true;
                         convWaUpdateStatusBadge(true);
+                        _waKeepAlive.start();
                         if (qrLoading) qrLoading.style.display = 'none';
                         if (qrStatus) qrStatus.textContent = '✅ WhatsApp já estava conectado!';
                         await convWaSalvarConfig();
@@ -41539,6 +41637,7 @@ async function convWaConectar() {
                     if (statusData.status === 'CONNECTED' || statusData.status === 'isLogged') {
                         conviteConfig.wa_connected = true;
                         convWaUpdateStatusBadge(true);
+                        _waKeepAlive.start();
                         if (qrLoading) qrLoading.style.display = 'none';
                         if (qrStatus) qrStatus.textContent = '✅ WhatsApp já estava conectado!';
                         await convWaSalvarConfig();
@@ -41612,6 +41711,7 @@ async function _convWaPollConexao() {
                 // Sucesso!
                 conviteConfig.wa_connected = true;
                 convWaUpdateStatusBadge(true);
+                _waKeepAlive.start();
 
                 const qrStatus = document.getElementById('conv-wa-qr-status');
                 if (qrStatus) qrStatus.textContent = '✅ Conectado com sucesso!';
@@ -41640,6 +41740,7 @@ async function convWaDesconectar() {
     if (!confirm('Desconectar a sessão do WhatsApp?\n\nVocê precisará escanear o QR Code novamente para reconectar.')) return;
 
     try {
+        _waKeepAlive.stop();
         await _waProvider.disconnect();
         conviteConfig.wa_connected = false;
         convWaUpdateStatusBadge(false);

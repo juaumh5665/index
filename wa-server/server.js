@@ -144,9 +144,9 @@ async function connectSocket(sessionId, isReconnect = false) {
     sock.ev.on('creds.update', saveCreds);
 }
 
-// Health check
+// Health check (also serves as keepalive ping from frontend)
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', service: 'stackos-wa-server', sessions: Object.keys(sessions).length });
+    res.json({ status: 'ok', service: 'stackos-wa-server', sessions: Object.keys(sessions).length, ts: Date.now() });
 });
 
 // Start session — creates WhatsApp connection and generates QR
