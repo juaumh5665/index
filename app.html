@@ -40636,8 +40636,18 @@ const _waProvider = {
                 }
             } catch(e) { console.log('[WPP] Status check falhou:', e.message); }
 
-            // 3. Iniciar sessão com waitQrCode=true — server segura a request até QR estar pronto
-            console.log('[WPP] Iniciando sessão (waitQrCode=true)...');
+            // 3. Fechar sessão antiga se existir (limpa lock de Chromium travado)
+            try {
+                console.log('[WPP] Fechando sessão anterior (cleanup)...');
+                await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/close-session`, {
+                    method: 'POST',
+                    headers: this._headers(cfg)
+                });
+                await new Promise(r => setTimeout(r, 3000));
+            } catch(e) { console.log('[WPP] Close cleanup:', e.message); }
+
+            // 4. Iniciar sessão
+            console.log('[WPP] Iniciando sessão...');
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
                 method: 'POST',
                 headers: { ...this._headers(cfg), 'Content-Type': 'application/json' },
@@ -40928,7 +40938,7 @@ async function convWaConectar() {
             }
             if (!conviteConfig.wa_api_url) conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
             if (!conviteConfig.wa_api_token) conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
-            if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'clube_' + sbClube.id : 'default';
+            if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
         }
     }
 
@@ -41115,14 +41125,14 @@ function convWaPopularForm() {
         conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
         conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
         conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
-        conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'clube_' + sbClube.id : 'default';
+        conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
     }
 
     // Se tem servidor gerenciado e clube não é super admin, auto-preenche
     if (hasManagedServer && !window._isSuperAdmin && conviteConfig) {
         if (!conviteConfig.wa_api_url) conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
         if (!conviteConfig.wa_api_token) conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
-        if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'clube_' + sbClube.id : 'default';
+        if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'sess_' + sbClube.id : 'default';
     }
 
     setVal('conv-wa-provider', (conviteConfig && conviteConfig.wa_provider) || 'manual');
