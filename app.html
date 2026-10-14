@@ -40242,6 +40242,12 @@ function convRenderListaCampanha() {
                     <div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ Enviado ${horaStr}</div>
                     <button onclick="convMarcarSemWhatsapp(${idx})" title="Marcar como número sem WhatsApp (reverte envio)" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.15rem .45rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">❌ Sem WA</button>
                 </div>`;
+        } else if (p.erroApi) {
+            statusHtml = `
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;">
+                    <div style="font-size:.65rem;color:#ef4444;font-weight:700;max-width:200px;text-align:right;">⚠️ ${esc(p.erroApi)}</div>
+                    <button class="conv-btn-enviar" onclick="convEnviarJogadorIndividual(${idx})">🔄 Tentar de novo</button>
+                </div>`;
         } else if (!p.valido) {
             statusHtml = `<div style="font-size:.7rem;color:#ef4444;font-weight:700;">🚫 ${p.motivoBloqueio}</div>`;
         } else {
@@ -40271,7 +40277,10 @@ function convRenderListaCampanha() {
 // Enviar individual: gera link wa.me + abre nova aba + registra
 async function convEnviarJogadorIndividual(idx) {
     const p = _convCampanha.listaJogadores[idx];
-    if (!p || !p.valido || p.enviado) return;
+    if (!p || !p.valido) return;
+    if (p.enviado) return;
+    // Limpa erro anterior pra permitir retry
+    p.erroApi = null;
     await _convEnviarUm(idx);
 }
 
@@ -40321,8 +40330,14 @@ async function _convEnviarUm(idx) {
             envioOk = true;
         } catch (e) {
             console.error('[Convites] erro envio API:', e);
-            // Marca como falha mas continua o loop
-            p.erroApi = e.message;
+            // Verifica se é erro de conexão
+            if (e.message?.includes('NOT_CONNECTED') || e.message?.includes('not connected')) {
+                p.erroApi = 'WhatsApp desconectado — reconecte na aba Config';
+            } else if (e.message?.includes('Failed to fetch') || e.message?.includes('NetworkError')) {
+                p.erroApi = 'Servidor não responde — pode estar dormindo (Render free tier)';
+            } else {
+                p.erroApi = e.message;
+            }
         }
     } else {
         // ENVIO MANUAL (wa.me — abre aba)
@@ -40826,9 +40841,25 @@ function convEnviarSalvarTemplate() {
 }
 
 // --- Iniciar envio (botão principal) ---
-function convEnviarIniciar() {
+async function convEnviarIniciar() {
     const texto = document.getElementById('conv-enviar-texto')?.value?.trim();
     if (!texto) { showToast('⚠️ Escreva uma mensagem primeiro'); return; }
+
+    // Verificar conexão WhatsApp antes de iniciar
+    if (_waProvider.isApi() && !_waProvider.isTeste()) {
+        try {
+            showToast('🔄 Verificando conexão WhatsApp...');
+            const status = await _waProvider.checkStatus();
+            if (!status.connected) {
+                showToast('❌ WhatsApp não está conectado! Vá em Config e conecte primeiro.');
+                return;
+            }
+        } catch (e) {
+            showToast('❌ Servidor WhatsApp não responde. O servidor pode estar dormindo — aguarde ~30s e tente novamente.');
+            console.error('[Convites] checkStatus error:', e);
+            return;
+        }
+    }
 
     const torneioId = document.getElementById('conv-enviar-torneio')?.value || null;
 
@@ -41259,9 +41290,14 @@ const _waProvider = {
             if (data.error) throw new Error(data.message || 'Erro Evolution API imagem');
             return { success: true, raw: data };
         } else if (cfg.provider === 'baileys') {
-            // Baileys server não tem endpoint de imagem — envia caption como texto
-            const texto = caption ? `${caption}\n${imageUrl}` : imageUrl;
-            return await this.sendText(numero, texto);
+            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-image`, {
+                method: 'POST',
+                headers: this._headers(cfg),
+                body: JSON.stringify({ phone, imageUrl, caption: caption || '' })
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+            return { success: true, raw: data };
         }
 
         throw new Error('Provider inválido');

@@ -222,14 +222,14 @@ app.get('/api/:session/status', auth, (req, res) => {
     });
 });
 
-// Send message
+// Send text message
 app.post('/api/:session/send', auth, async (req, res) => {
     const sessionId = req.params.session;
     const session = sessions[sessionId];
     const { phone, message } = req.body;
 
     if (!session?.sock || !session.connected) {
-        return res.status(400).json({ error: 'Session not connected' });
+        return res.status(400).json({ error: 'Session not connected', code: 'NOT_CONNECTED' });
     }
 
     if (!phone || !message) {
@@ -243,6 +243,33 @@ app.post('/api/:session/send', auth, async (req, res) => {
         res.json({ status: 'sent', phone, jid });
     } catch (e) {
         console.error(`[${sessionId}] Send error:`, e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Send image with caption
+app.post('/api/:session/send-image', auth, async (req, res) => {
+    const sessionId = req.params.session;
+    const session = sessions[sessionId];
+    const { phone, imageUrl, caption } = req.body;
+
+    if (!session?.sock || !session.connected) {
+        return res.status(400).json({ error: 'Session not connected', code: 'NOT_CONNECTED' });
+    }
+
+    if (!phone || !imageUrl) {
+        return res.status(400).json({ error: 'phone and imageUrl are required' });
+    }
+
+    try {
+        const jid = phone.replace(/\D/g, '') + '@s.whatsapp.net';
+        await session.sock.sendMessage(jid, {
+            image: { url: imageUrl },
+            caption: caption || ''
+        });
+        res.json({ status: 'sent', phone, jid });
+    } catch (e) {
+        console.error(`[${sessionId}] Send image error:`, e.message);
         res.status(500).json({ error: e.message });
     }
 });
