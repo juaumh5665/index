@@ -40636,31 +40636,40 @@ const _waProvider = {
                 }
             } catch(e) { console.log('[WPP] Status check falhou:', e.message); }
 
-            // 3. Fechar sessões antigas (limpa Chromium travado)
-            // Fecha a sessão atual E a antiga com prefixo clube_ (que pode ter zombie)
+            // 3. Fechar sessão atual (limpa Chromium travado de tentativa anterior)
+            try {
+                console.log(`[WPP] Fechando sessão: ${cfg.session}`);
+                await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/close-session`, {
+                    method: 'POST',
+                    headers: this._headers(cfg)
+                });
+            } catch(e) { console.log(`[WPP] Close error:`, e.message); }
+
+            // Fechar sessão antiga com prefixo clube_ (precisa de JWT próprio)
             const oldSession = cfg.session.replace(/^sess_/, 'clube_');
-            const sessionsToClose = [cfg.session];
-            if (oldSession !== cfg.session) sessionsToClose.push(oldSession);
-            for (const s of sessionsToClose) {
-                try {
-                    console.log(`[WPP] Fechando sessão: ${s}`);
-                    await fetch(`${cfg.url}/api/${encodeURIComponent(s)}/close-session`, {
-                        method: 'POST',
-                        headers: this._headers(cfg)
-                    });
-                } catch(e) { console.log(`[WPP] Close ${s}:`, e.message); }
-            }
-            // Também tenta logout da sessão antiga (mata processo Chromium)
             if (oldSession !== cfg.session) {
                 try {
-                    console.log(`[WPP] Logout sessão antiga: ${oldSession}`);
-                    await fetch(`${cfg.url}/api/${encodeURIComponent(oldSession)}/logout-session`, {
+                    // Gerar JWT específico para a sessão antiga
+                    console.log(`[WPP] Gerando token para sessão antiga: ${oldSession}`);
+                    const oldGenResp = await fetch(`${cfg.url}/api/${encodeURIComponent(oldSession)}/${encodeURIComponent(cfg.token)}/generate-token`, {
                         method: 'POST',
-                        headers: this._headers(cfg)
+                        headers: { 'Content-Type': 'application/json' }
                     });
-                } catch(e) { console.log(`[WPP] Logout old:`, e.message); }
+                    const oldGenData = await oldGenResp.json();
+                    if (oldGenData.token) {
+                        const oldHeaders = { 'Authorization': `Bearer ${oldGenData.token}` };
+                        console.log(`[WPP] Fechando sessão antiga: ${oldSession}`);
+                        await fetch(`${cfg.url}/api/${encodeURIComponent(oldSession)}/close-session`, {
+                            method: 'POST', headers: oldHeaders
+                        }).catch(() => {});
+                        console.log(`[WPP] Logout sessão antiga: ${oldSession}`);
+                        await fetch(`${cfg.url}/api/${encodeURIComponent(oldSession)}/logout-session`, {
+                            method: 'POST', headers: oldHeaders
+                        }).catch(() => {});
+                    }
+                } catch(e) { console.log(`[WPP] Cleanup old session:`, e.message); }
             }
-            await new Promise(r => setTimeout(r, 5000)); // espera processos morrerem
+            await new Promise(r => setTimeout(r, 3000)); // espera processos morrerem
 
             // 4. Iniciar sessão COM waitQrCode — servidor segura a resposta até QR estar pronto
             // O exportQR envia JSON { status:'qrcode', qrcode: base64, urlcode, session }
