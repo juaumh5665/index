@@ -41810,18 +41810,22 @@ function convWaFecharQR() {
 async function convWaDesconectar() {
     if (!confirm('Desconectar a sessão do WhatsApp?\n\nVocê precisará escanear o QR Code novamente para reconectar.')) return;
 
+    _waKeepAlive.stop();
+
+    // Tenta desconectar no servidor, mas se falhar (servidor dormindo/CORS)
+    // limpa estado local mesmo assim — sessão no servidor morre ao reiniciar
     try {
-        _waKeepAlive.stop();
         await _waProvider.disconnect();
-        conviteConfig.wa_connected = false;
-        convWaUpdateStatusBadge(false);
-        await convWaSalvarConfig();
-        showToast('🔌 WhatsApp desconectado');
-        const fb = document.getElementById('conv-wa-feedback');
-        if (fb) fb.innerHTML = '<span style="color:#71717a;">Sessão desconectada. Clique "Conectar WhatsApp" pra reconectar.</span>';
     } catch (e) {
-        showToast('❌ Erro ao desconectar: ' + e.message);
+        console.warn('[WA] Erro ao desconectar no servidor (provavelmente dormindo):', e.message);
     }
+
+    conviteConfig.wa_connected = false;
+    convWaUpdateStatusBadge(false);
+    await convWaSalvarConfig();
+    showToast('🔌 WhatsApp desconectado');
+    const fb = document.getElementById('conv-wa-feedback');
+    if (fb) fb.innerHTML = '<span style="color:#71717a;">Sessão desconectada. Clique "Conectar WhatsApp" pra reconectar.</span>';
 }
 
 // Salva config do WhatsApp no banco (chamada pelo botão Salvar geral e pelo connect)
