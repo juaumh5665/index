@@ -13,6 +13,17 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY || 'StackOS2024WPP';
 
+// Limpa auth_sessions corrompidas ao iniciar (previne loop Bad MAC)
+const authBaseDir = path.join(__dirname, 'auth_sessions');
+try {
+    if (fs.existsSync(authBaseDir)) {
+        fs.rmSync(authBaseDir, { recursive: true, force: true });
+        console.log('[Server] Limpou auth_sessions antigas no startup');
+    }
+} catch (e) {
+    console.warn('[Server] Erro ao limpar auth_sessions:', e.message);
+}
+
 // Store sessions in memory
 const sessions = {};
 
@@ -142,6 +153,22 @@ async function connectSocket(sessionId, isReconnect = false) {
 
     // Save credentials on update
     sock.ev.on('creds.update', saveCreds);
+
+    // Captura erros de decrypt (Bad MAC) pra não travar o servidor
+    sock.ev.on('messages.upsert', () => {}); // necessário pra Baileys não crashar
+    process.removeAllListeners('uncaughtException'); // limpa listeners anteriores
+    process.on('uncaughtException', (err) => {
+        if (err.message?.includes('Bad MAC') || err.message?.includes('decrypt')) {
+            console.warn(`[${sessionId}] Ignorando erro de decrypt:`, err.message);
+            // Limpa auth corrompida e fecha socket
+            const authPath = path.join(__dirname, 'auth_sessions', sessionId);
+            try { fs.rmSync(authPath, { recursive: true, force: true }); } catch(e) {}
+            try { sock.end(); } catch(e) {}
+            sessions[sessionId] = { status: 'DISCONNECTED', connected: false, sock: null, error: 'Sessão corrompida — reconecte escaneando o QR novamente' };
+        } else {
+            console.error('[Server] Uncaught exception:', err);
+        }
+    });
 }
 
 // Health check (also serves as keepalive ping from frontend)
@@ -310,4 +337,17 @@ app.post('/api/:session/close', auth, async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`StackOS WA Server running on port ${PORT}`);
+
+    // Self-ping a cada 13 min pra manter Render free tier acordado
+    // (Render dorme após 15 min sem requests)
+    const KEEP_ALIVE_MS = 13 * 60 * 1000;
+    setInterval(() => {
+        const url = `http://localhost:${PORT}/`;
+        require('http').get(url, (res) => {
+            console.log(`[KeepAlive] Self-ping OK (${res.statusCode})`);
+        }).on('error', (e) => {
+            console.warn('[KeepAlive] Self-ping falhou:', e.message);
+        });
+    }, KEEP_ALIVE_MS);
+    console.log('[KeepAlive] Self-ping ativo a cada 13min');
 });
