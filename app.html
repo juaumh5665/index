@@ -39860,9 +39860,9 @@ async function convConfigRenderListaOptout() {
     if (!sb || !sbClube) { wrap.innerHTML = '<div style="padding:1rem;color:#71717a;font-size:.78rem;">Sem conexão.</div>'; return; }
     try {
         const { data, error } = await sb.from('convite_optout')
-            .select('jogador_id, motivo, criado_em')
+            .select('jogador_id, motivo, ts')
             .eq('clube_id', sbClube.id)
-            .order('criado_em', { ascending: false });
+            .order('ts', { ascending: false });
         if (error) throw error;
         const lista = data || [];
         if (lista.length === 0) {
@@ -39871,7 +39871,7 @@ async function convConfigRenderListaOptout() {
         }
         const linhas = lista.map(o => {
             const j = (jogadores || []).find(x => x.id === o.jogador_id) || { nome: '(jogador removido)' };
-            const dt = o.criado_em ? new Date(o.criado_em).toLocaleDateString('pt-BR') : '—';
+            const dt = o.ts ? new Date(o.ts).toLocaleDateString('pt-BR') : '—';
             return `
                 <div style="display:flex;align-items:center;gap:.75rem;padding:.65rem .85rem;border-bottom:1px solid #18181b;">
                     <div style="flex:1;min-width:0;">
