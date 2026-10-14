@@ -41037,12 +41037,24 @@ const _waProvider = {
         return data;
     },
 
-    // Tenta acordar o servidor Render pingando o health check até responder JSON
+    // Tenta acordar o servidor Render pingando até responder
+    // Quando Render está dormindo, retorna 502 SEM headers CORS,
+    // então o browser bloqueia a resposta. Usamos no-cors pra enviar
+    // o request (que acorda o servidor) mesmo sem poder ler a resposta.
     async _wakeUp() {
         const cfg = this.getConfig();
         if (!cfg.url) return false;
         console.log('[WA] Acordando servidor...');
-        for (let i = 0; i < 6; i++) { // 6 tentativas × 5s = 30s max
+        for (let i = 0; i < 8; i++) { // 8 tentativas × 5s = 40s max
+            // 1. Envia ping no-cors (não lê resposta, mas acorda o servidor)
+            try {
+                await fetch(cfg.url + '/', { mode: 'no-cors', signal: AbortSignal.timeout(8000) });
+            } catch(e) { /* esperado — servidor offline */ }
+
+            // Espera o servidor processar
+            await new Promise(r => setTimeout(r, 5000));
+
+            // 2. Tenta fetch normal — se CORS funciona, Express está rodando
             try {
                 const r = await fetch(cfg.url + '/', { signal: AbortSignal.timeout(8000) });
                 const ct = r.headers.get('content-type') || '';
@@ -41050,10 +41062,12 @@ const _waProvider = {
                     console.log(`[WA] Servidor acordou após ${(i+1)*5}s`);
                     return true;
                 }
-            } catch(e) { /* servidor ainda dormindo */ }
-            await new Promise(r => setTimeout(r, 5000));
+            } catch(e) {
+                // CORS ainda bloqueado = servidor ainda não está pronto
+                console.log(`[WA] Servidor ainda acordando... (${(i+1)*5}s)`);
+            }
         }
-        console.log('[WA] Servidor não acordou após 30s');
+        console.log('[WA] Servidor não acordou após 40s');
         return false;
     },
 
