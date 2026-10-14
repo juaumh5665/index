@@ -40547,11 +40547,14 @@ const _waProvider = {
         return this.getConfig().provider === 'teste';
     },
 
+    // Token JWT gerado pelo WPPConnect (diferente do SECRET_KEY)
+    _jwtToken: null,
+
     // Monta headers padrão para cada provider
     _headers(cfg) {
         const h = { 'Content-Type': 'application/json' };
         if (cfg.provider === 'wppconnect') {
-            h['Authorization'] = 'Bearer ' + cfg.token;
+            h['Authorization'] = 'Bearer ' + (this._jwtToken || cfg.token);
         } else if (cfg.provider === 'evolution') {
             h['apikey'] = cfg.token;
         }
@@ -40607,7 +40610,17 @@ const _waProvider = {
         if (!cfg.url || !cfg.token) throw new Error('URL ou token não configurado');
 
         if (cfg.provider === 'wppconnect') {
-            // Gerar token de sessão + iniciar
+            // 1. Gerar token JWT a partir do SECRET_KEY
+            const genResp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/${encodeURIComponent(cfg.token)}/generate-token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const genData = await genResp.json();
+            if (genData.token) {
+                this._jwtToken = genData.token;
+            }
+
+            // 2. Iniciar sessão com o JWT
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
                 method: 'POST',
                 headers: this._headers(cfg)
@@ -40914,13 +40927,22 @@ async function convWaConectar() {
     if (qrStatus) qrStatus.textContent = 'Aguardando…';
 
     try {
-        // 1. Iniciar sessão
+        // 1. Iniciar sessão (gera JWT + inicia Chromium)
         await _waProvider.startSession();
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 5000));
 
-        // 2. Buscar QR Code
+        // 2. Buscar QR Code (com até 3 tentativas, pois Chromium pode demorar)
         if (qrLoading) qrLoading.textContent = 'Gerando QR Code…';
-        const qrData = await _waProvider.getQR();
+        let qrData = null;
+        for (let tentativa = 0; tentativa < 3; tentativa++) {
+            qrData = await _waProvider.getQR();
+            if (qrData && qrData.qr) break;
+            if (tentativa < 2) {
+                if (qrLoading) qrLoading.textContent = `Aguardando QR Code… (tentativa ${tentativa + 2}/3)`;
+                await new Promise(r => setTimeout(r, 4000));
+            }
+        }
+        if (!qrData) qrData = { qr: null };
 
         if (qrData.qr) {
             if (qrImg) { qrImg.src = qrData.qr; qrImg.style.display = ''; }
