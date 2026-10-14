@@ -8534,6 +8534,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
                 <button onclick="copiarLinkRanking()" class="btn-ghost" style="font-size:.8rem;" title="Copiar link público do ranking"><i class="fa-solid fa-share-nodes"></i> Copiar Link</button>
                 <button onclick="compartilharWhatsApp()" class="btn-ghost" style="font-size:.8rem;color:#25d366;border-color:rgba(37,211,102,.3);" title="Compartilhar no WhatsApp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                <button onclick="abrirRelatorioParticipantes()" class="btn-ghost" style="font-size:.8rem;color:#06b6d4;border-color:rgba(6,182,212,.3);" title="Lista de participantes para envio de mensagens"><i class="fa-solid fa-users"></i> Participantes</button>
                 <button onclick="abrirResumoFinanceiroTorneio()" class="btn-ghost" style="font-size:.8rem;color:#f59e0b;border-color:rgba(245,158,11,.3);" title="Resumo financeiro para enviar ao dono"><i class="fa-solid fa-file-invoice-dollar"></i> Resumo</button>
                 <button onclick="ativarKioskTV()" class="btn-ghost" style="font-size:.8rem;" title="Modo apresentação (fullscreen)"><i class="fa-solid fa-expand"></i> Kiosk</button>
                 <button onclick="closeModal('modal-torneio')" style="background:none;border:none;color:#52525b;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
@@ -14112,6 +14113,159 @@ function compartilharWhatsApp() {
     
     const wppUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(wppUrl, '_blank', 'noopener,noreferrer');
+}
+
+// ============================================================
+// RELATÓRIO DE PARTICIPANTES — TORNEIO (para envio WhatsApp)
+// ============================================================
+function abrirRelatorioParticipantes() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return showToast('⚠️ Nenhum torneio selecionado');
+    const entries = t.entries || [];
+    if (!entries.length) return showToast('⚠️ Este torneio não tem participantes');
+
+    // Jogadores únicos (ignora addon — mesmo jogador)
+    const idsUnicos = [...new Set(entries.filter(e => e.tipo !== 'addon').map(e => String(e.jogadorId)))];
+    const participantes = idsUnicos.map(id => {
+        const j = jogadores.find(x => x.id === id);
+        if (!j) return null;
+        const entradasDoJogador = entries.filter(e => String(e.jogadorId) === id);
+        const buyins = entradasDoJogador.filter(e => e.tipo === 'buyin' || e.tipo === 'buyin_duplo').length;
+        const reentries = entradasDoJogador.filter(e => e.tipo === 'reentry').length;
+        const rebuys = entradasDoJogador.filter(e => e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo').length;
+        const addons = entradasDoJogador.filter(e => e.tipo === 'addon').length;
+        return { jogador: j, buyins, reentries, rebuys, addons, totalEntradas: entradasDoJogador.length };
+    }).filter(Boolean);
+
+    const nomeClube = (config && config.clube && config.clube.nome) ? config.clube.nome : 'Clube';
+    const nomeTorneio = t.nome || 'Torneio';
+    const dataTorneio = t.data ? new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+
+    // Contadores
+    const comWhatsapp = participantes.filter(p => p.jogador.whatsapp && String(p.jogador.whatsapp).trim()).length;
+    const semWhatsapp = participantes.length - comWhatsapp;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem;';
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+    let html = `
+        <div style="background:#18181b;border:1px solid #27272a;border-radius:1rem;padding:0;width:680px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;">
+            <div style="padding:1.5rem 1.5rem 1rem;border-bottom:1px solid #27272a;">
+                <div style="display:flex;justify-content:space-between;align-items:start;">
+                    <div>
+                        <div style="font-size:1.1rem;font-weight:800;color:#e4e4e7;"><i class="fa-solid fa-users" style="color:#06b6d4;"></i> Participantes do Torneio</div>
+                        <div style="font-size:.8rem;color:#a1a1aa;margin-top:.25rem;">${nomeTorneio} · ${dataTorneio}</div>
+                    </div>
+                    <button onclick="this.closest('div[style*=position]').remove()" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+                </div>
+                <div style="display:flex;gap:.75rem;margin-top:.75rem;flex-wrap:wrap;">
+                    <div style="background:#0f0f12;border:1px solid #27272a;border-radius:.5rem;padding:.5rem .75rem;font-size:.75rem;">
+                        <span style="color:#71717a;">Total:</span> <strong style="color:#e4e4e7;">${participantes.length}</strong>
+                    </div>
+                    <div style="background:#0f0f12;border:1px solid #27272a;border-radius:.5rem;padding:.5rem .75rem;font-size:.75rem;">
+                        <span style="color:#71717a;">Com WhatsApp:</span> <strong style="color:#25d366;">${comWhatsapp}</strong>
+                    </div>
+                    <div style="background:#0f0f12;border:1px solid #27272a;border-radius:.5rem;padding:.5rem .75rem;font-size:.75rem;">
+                        <span style="color:#71717a;">Sem WhatsApp:</span> <strong style="color:#ef4444;">${semWhatsapp}</strong>
+                    </div>
+                </div>
+                <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;">
+                    <button onclick="_relPartCopiarLista(this)" class="btn-ghost" style="font-size:.78rem;color:#06b6d4;border-color:rgba(6,182,212,.3);" title="Copiar lista completa"><i class="fa-solid fa-copy"></i> Copiar Lista</button>
+                    <button onclick="_relPartCopiarMsgAgradecimento(this)" class="btn-ghost" style="font-size:.78rem;color:#25d366;border-color:rgba(37,211,102,.3);" title="Gerar mensagem de agradecimento para copiar"><i class="fa-brands fa-whatsapp"></i> Msg Agradecimento</button>
+                    <button onclick="_relPartCopiarContatos(this)" class="btn-ghost" style="font-size:.78rem;color:#a78bfa;border-color:rgba(167,139,250,.3);" title="Copiar apenas números de WhatsApp"><i class="fa-solid fa-phone"></i> Copiar Números</button>
+                </div>
+            </div>
+            <div style="flex:1;overflow:auto;padding:1rem 1.5rem;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #27272a;">
+                            <th style="text-align:left;padding:.5rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">#</th>
+                            <th style="text-align:left;padding:.5rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Jogador</th>
+                            <th style="text-align:left;padding:.5rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">WhatsApp</th>
+                            <th style="text-align:left;padding:.5rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Cidade</th>
+                            <th style="text-align:center;padding:.5rem;font-size:.65rem;color:#52525b;text-transform:uppercase;letter-spacing:.08em;font-weight:700;">Entradas</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+    participantes.forEach((p, i) => {
+        const j = p.jogador;
+        const nome = j.apelido ? `${j.nome} <span style="color:#71717a;font-size:.75rem;">(${j.apelido})</span>` : j.nome;
+        const wa = j.whatsapp && String(j.whatsapp).trim() ? String(j.whatsapp).trim() : '';
+        const cidade = j.cidade ? `${j.cidade}${j.uf ? '/' + j.uf : ''}` : '';
+        const entradasInfo = [];
+        if (p.buyins) entradasInfo.push(p.buyins + ' buy-in');
+        if (p.reentries) entradasInfo.push(p.reentries + ' re-entry');
+        if (p.rebuys) entradasInfo.push(p.rebuys + ' rebuy');
+        if (p.addons) entradasInfo.push(p.addons + ' addon');
+
+        html += `<tr style="border-bottom:1px solid #1e1e23;">
+            <td style="padding:.55rem .5rem;font-size:.8rem;color:#52525b;font-weight:700;">${i + 1}</td>
+            <td style="padding:.55rem .5rem;font-size:.85rem;color:#e4e4e7;font-weight:600;">${nome}</td>
+            <td style="padding:.55rem .5rem;font-size:.8rem;font-family:var(--font-mono);${wa ? 'color:#25d366;' : 'color:#3f3f46;'}">${wa || '—'}</td>
+            <td style="padding:.55rem .5rem;font-size:.8rem;color:#a1a1aa;">${cidade || '<span style="color:#3f3f46;">—</span>'}</td>
+            <td style="padding:.55rem .5rem;font-size:.75rem;color:#71717a;text-align:center;" title="${entradasInfo.join(', ')}">${p.totalEntradas}</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div></div>`;
+    overlay.innerHTML = html;
+
+    // Salvar dados no overlay para uso pelos botões
+    overlay._participantes = participantes;
+    overlay._nomeTorneio = nomeTorneio;
+    overlay._dataTorneio = dataTorneio;
+    overlay._nomeClube = nomeClube;
+
+    document.body.appendChild(overlay);
+}
+
+function _relPartCopiarLista(btn) {
+    const overlay = btn.closest('div[style*="position"]');
+    const pp = overlay._participantes;
+    const nomeTorneio = overlay._nomeTorneio;
+    const dataTorneio = overlay._dataTorneio;
+    const nomeClube = overlay._nomeClube;
+
+    let txt = `📋 *PARTICIPANTES — ${nomeTorneio}*\n`;
+    txt += `🏠 ${nomeClube} · 📅 ${dataTorneio}\n`;
+    txt += `👥 ${pp.length} jogadores\n`;
+    txt += '─────────────────\n';
+    pp.forEach((p, i) => {
+        const j = p.jogador;
+        const nome = j.apelido || j.nome.split(' ')[0];
+        const wa = j.whatsapp && String(j.whatsapp).trim() ? ' · 📱 ' + String(j.whatsapp).trim() : '';
+        const cidade = j.cidade ? ' · 📍 ' + j.cidade + (j.uf ? '/' + j.uf : '') : '';
+        txt += `${i + 1}. ${nome}${wa}${cidade}\n`;
+    });
+    txt += '\n_Gerado por StackOS_';
+
+    navigator.clipboard.writeText(txt).then(() => showToast('📋 Lista copiada!')).catch(() => prompt('Copie:', txt));
+}
+
+function _relPartCopiarMsgAgradecimento(btn) {
+    const overlay = btn.closest('div[style*="position"]');
+    const nomeTorneio = overlay._nomeTorneio;
+    const nomeClube = overlay._nomeClube;
+
+    const msg = `Olá! 👋\n\nAgradecemos sua participação no torneio *${nomeTorneio}* no *${nomeClube}*! 🏆\n\nFoi um prazer ter você conosco. Esperamos vê-lo novamente em breve nas mesas! ♠️♥️♣️♦️\n\nAbraço da equipe ${nomeClube}! 🤝`;
+
+    navigator.clipboard.writeText(msg).then(() => showToast('📋 Mensagem de agradecimento copiada! Cole no WhatsApp.')).catch(() => prompt('Copie a mensagem:', msg));
+}
+
+function _relPartCopiarContatos(btn) {
+    const overlay = btn.closest('div[style*="position"]');
+    const pp = overlay._participantes;
+    const comWa = pp.filter(p => p.jogador.whatsapp && String(p.jogador.whatsapp).trim());
+    if (!comWa.length) return showToast('⚠️ Nenhum participante com WhatsApp cadastrado');
+
+    const numeros = comWa.map(p => {
+        const nome = p.jogador.apelido || p.jogador.nome.split(' ')[0];
+        return nome + ': ' + String(p.jogador.whatsapp).trim();
+    }).join('\n');
+
+    navigator.clipboard.writeText(numeros).then(() => showToast(`📋 ${comWa.length} contatos copiados!`)).catch(() => prompt('Copie:', numeros));
 }
 
 // ============================================================
