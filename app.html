@@ -3300,6 +3300,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                             <option value="manual">🔗 Manual (wa.me — padrão)</option>
                                             <option value="wppconnect">🟢 WPPConnect</option>
                                             <option value="evolution">🔵 Evolution API</option>
+                                            <option value="teste">🧪 Modo Teste (simulação)</option>
                                         </select>
                                     </div>
                                     <div>
@@ -40524,7 +40525,13 @@ const _waProvider = {
     // Verifica se está usando API (não manual)
     isApi() {
         const cfg = this.getConfig();
+        if (cfg.provider === 'teste') return true;
         return cfg.provider !== 'manual' && cfg.url && cfg.token;
+    },
+
+    // Verifica se é modo teste
+    isTeste() {
+        return this.getConfig().provider === 'teste';
     },
 
     // Monta headers padrão para cada provider
@@ -40546,6 +40553,10 @@ const _waProvider = {
     // ─── CHECK SESSION STATUS ───
     async checkStatus() {
         const cfg = this.getConfig();
+        if (cfg.provider === 'teste') {
+            await new Promise(r => setTimeout(r, 500));
+            return { connected: !!conviteConfig.wa_connected, raw: { teste: true } };
+        }
         if (!cfg.url || !cfg.token) return { connected: false, error: 'URL ou token não configurado' };
 
         try {
@@ -40579,6 +40590,7 @@ const _waProvider = {
     // ─── GENERATE / START SESSION (QR CODE) ───
     async startSession() {
         const cfg = this.getConfig();
+        if (cfg.provider === 'teste') { await new Promise(r => setTimeout(r, 800)); return { status: 'ok', teste: true }; }
         if (!cfg.url || !cfg.token) throw new Error('URL ou token não configurado');
 
         if (cfg.provider === 'wppconnect') {
@@ -40606,6 +40618,27 @@ const _waProvider = {
     // ─── GET QR CODE ───
     async getQR() {
         const cfg = this.getConfig();
+        if (cfg.provider === 'teste') {
+            await new Promise(r => setTimeout(r, 600));
+            // Gera um QR code fake usando canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 220; canvas.height = 220;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,220,220);
+            ctx.fillStyle = '#000000';
+            // Desenha padrão de QR fake
+            for (let y = 0; y < 22; y++) for (let x = 0; x < 22; x++) {
+                if (Math.random() < 0.4 || (x < 3 && y < 3) || (x > 18 && y < 3) || (x < 3 && y > 18)) {
+                    ctx.fillRect(x*10, y*10, 10, 10);
+                }
+            }
+            // Marcadores de canto
+            const drawFinder = (ox,oy) => { ctx.fillStyle='#000'; ctx.fillRect(ox,oy,70,70); ctx.fillStyle='#fff'; ctx.fillRect(ox+10,oy+10,50,50); ctx.fillStyle='#000'; ctx.fillRect(ox+20,oy+20,30,30); };
+            drawFinder(0,0); drawFinder(150,0); drawFinder(0,150);
+            ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#25d366'; ctx.textAlign = 'center';
+            ctx.fillText('MODO TESTE', 110, 115);
+            return { qr: canvas.toDataURL('image/png'), raw: { teste: true } };
+        }
         if (!cfg.url || !cfg.token) throw new Error('URL ou token não configurado');
 
         if (cfg.provider === 'wppconnect') {
@@ -40631,6 +40664,12 @@ const _waProvider = {
     async sendText(numero, texto) {
         const cfg = this.getConfig();
         const phone = this._normalizePhone(numero);
+
+        if (cfg.provider === 'teste') {
+            await new Promise(r => setTimeout(r, 300 + Math.random() * 500));
+            console.log(`[WA-TESTE] sendText → ${phone}: ${texto.substring(0, 80)}…`);
+            return { success: true, raw: { teste: true, phone, preview: texto.substring(0, 50) } };
+        }
 
         if (cfg.provider === 'wppconnect') {
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-message`, {
@@ -40666,6 +40705,12 @@ const _waProvider = {
     async sendImage(numero, imageUrl, caption) {
         const cfg = this.getConfig();
         const phone = this._normalizePhone(numero);
+
+        if (cfg.provider === 'teste') {
+            await new Promise(r => setTimeout(r, 400 + Math.random() * 600));
+            console.log(`[WA-TESTE] sendImage → ${phone}: img + ${(caption||'').substring(0, 50)}…`);
+            return { success: true, raw: { teste: true, phone, imageUrl } };
+        }
 
         if (cfg.provider === 'wppconnect') {
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-image`, {
@@ -40703,6 +40748,7 @@ const _waProvider = {
     // ─── DISCONNECT / LOGOUT ───
     async disconnect() {
         const cfg = this.getConfig();
+        if (cfg.provider === 'teste') { await new Promise(r => setTimeout(r, 300)); return; }
         if (cfg.provider === 'wppconnect') {
             await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/logout-session`, {
                 method: 'POST',
@@ -40726,13 +40772,22 @@ function convWaProviderChanged() {
     const provider = sel ? sel.value : 'manual';
     const apiFields = document.getElementById('conv-wa-api-fields');
     const infoManual = document.getElementById('conv-wa-info-manual');
+    const waGrid = document.getElementById('conv-wa-grid');
 
     if (provider === 'manual') {
         if (apiFields) apiFields.style.display = 'none';
         if (infoManual) infoManual.style.display = '';
+        if (waGrid) waGrid.style.display = '';
+    } else if (provider === 'teste') {
+        if (apiFields) apiFields.style.display = '';
+        if (infoManual) infoManual.style.display = 'none';
+        if (waGrid) waGrid.style.display = 'none'; // Esconde URL/token no modo teste
+        const fb = document.getElementById('conv-wa-feedback');
+        if (fb) fb.innerHTML = '<span style="color:#a855f7;">🧪 <strong>Modo Teste:</strong> Simula envios sem servidor real. As mensagens aparecem no console do navegador (F12). Nenhuma mensagem real é enviada no WhatsApp.</span>';
     } else {
         if (apiFields) apiFields.style.display = '';
         if (infoManual) infoManual.style.display = 'none';
+        if (waGrid) waGrid.style.display = '';
     }
 }
 
@@ -40767,7 +40822,8 @@ async function convWaTestarConexao() {
         wa_provider: (document.getElementById('conv-wa-provider') || {}).value || 'manual',
         wa_api_url: (document.getElementById('conv-wa-url') || {}).value || '',
         wa_api_token: (document.getElementById('conv-wa-token') || {}).value || '',
-        wa_session_name: (document.getElementById('conv-wa-session') || {}).value || 'default'
+        wa_session_name: (document.getElementById('conv-wa-session') || {}).value || 'default',
+        wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
     };
     const oldCfg = { ...conviteConfig };
     Object.assign(conviteConfig, tmpCfg);
@@ -40805,7 +40861,7 @@ async function convWaConectar() {
     conviteConfig.wa_api_token = (document.getElementById('conv-wa-token') || {}).value || '';
     conviteConfig.wa_session_name = (document.getElementById('conv-wa-session') || {}).value || 'default';
 
-    if (!conviteConfig.wa_api_url || !conviteConfig.wa_api_token) {
+    if (conviteConfig.wa_provider !== 'teste' && (!conviteConfig.wa_api_url || !conviteConfig.wa_api_token)) {
         if (fb) fb.innerHTML = '<span style="color:#f87171;">❌ Preencha a URL e o Token primeiro.</span>';
         return;
     }
@@ -40836,7 +40892,21 @@ async function convWaConectar() {
             if (qrStatus) qrStatus.textContent = 'Escaneie o QR Code com o WhatsApp do celular';
 
             // 3. Poll pra verificar conexão (a cada 3s, até 60s)
-            _convWaPollConexao();
+            if (conviteConfig.wa_provider === 'teste') {
+                // No modo teste, "conecta" automaticamente após 4s
+                const qrStatusEl = document.getElementById('conv-wa-qr-status');
+                if (qrStatusEl) qrStatusEl.textContent = '🧪 Modo teste — conectando automaticamente em 4s…';
+                setTimeout(async () => {
+                    conviteConfig.wa_connected = true;
+                    convWaUpdateStatusBadge(true);
+                    if (qrStatusEl) qrStatusEl.textContent = '✅ Conectado (simulação)!';
+                    await convWaSalvarConfig();
+                    setTimeout(() => convWaFecharQR(), 1500);
+                    showToast('✅ WhatsApp conectado (modo teste)!');
+                }, 4000);
+            } else {
+                _convWaPollConexao();
+            }
         } else {
             if (qrLoading) qrLoading.textContent = 'QR não disponível. Tente novamente.';
             if (qrStatus) qrStatus.textContent = 'Sessão pode já estar conectada — clique "Testar Conexão"';
