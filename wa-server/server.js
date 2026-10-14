@@ -44,17 +44,16 @@ app.post('/api/:session/start', auth, async (req, res) => {
         try { sessions[sessionId].sock.end(); } catch (e) {}
     }
 
-    // Clean auth state if previous session was CLOSED/ERROR (forces new QR)
+    // Always clean auth state on start — ensures fresh QR every time
+    // Connected sessions are returned early above, so this only runs for disconnected/new sessions
     const authDir = path.join(__dirname, 'auth_sessions', sessionId);
-    if (sessions[sessionId]?.status === 'CLOSED' || sessions[sessionId]?.status === 'ERROR' || req.query.clean === '1') {
-        try {
-            if (fs.existsSync(authDir)) {
-                fs.rmSync(authDir, { recursive: true, force: true });
-                console.log(`[${sessionId}] Cleaned auth state for fresh QR`);
-            }
-        } catch (e) {
-            console.log(`[${sessionId}] Auth cleanup error:`, e.message);
+    try {
+        if (fs.existsSync(authDir)) {
+            fs.rmSync(authDir, { recursive: true, force: true });
+            console.log(`[${sessionId}] Cleaned auth state for fresh QR`);
         }
+    } catch (e) {
+        console.log(`[${sessionId}] Auth cleanup error:`, e.message);
     }
 
     try {
@@ -74,11 +73,10 @@ app.post('/api/:session/start', auth, async (req, res) => {
         const sock = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: true,
             logger: pino({ level: 'silent' }),
             browser: ['StackOS', 'Chrome', '10.0'],
-            connectTimeoutMs: 60000,
-            qrTimeout: 60000,
+            connectTimeoutMs: 90000,
+            qrTimeout: 90000,
         });
 
         sessions[sessionId].sock = sock;
