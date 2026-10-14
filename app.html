@@ -40929,17 +40929,18 @@ async function convWaConectar() {
     try {
         // 1. Iniciar sessão (gera JWT + inicia Chromium)
         await _waProvider.startSession();
-        await new Promise(r => setTimeout(r, 5000));
+        if (qrLoading) qrLoading.textContent = 'Iniciando navegador… aguarde ~30s';
+        await new Promise(r => setTimeout(r, 15000));
 
-        // 2. Buscar QR Code (com até 3 tentativas, pois Chromium pode demorar)
+        // 2. Buscar QR Code (com até 8 tentativas — Chromium pode demorar 30-60s)
         if (qrLoading) qrLoading.textContent = 'Gerando QR Code…';
         let qrData = null;
-        for (let tentativa = 0; tentativa < 3; tentativa++) {
-            qrData = await _waProvider.getQR();
+        for (let tentativa = 0; tentativa < 8; tentativa++) {
+            try { qrData = await _waProvider.getQR(); } catch(e) { qrData = null; }
             if (qrData && qrData.qr) break;
-            if (tentativa < 2) {
-                if (qrLoading) qrLoading.textContent = `Aguardando QR Code… (tentativa ${tentativa + 2}/3)`;
-                await new Promise(r => setTimeout(r, 4000));
+            if (tentativa < 7) {
+                if (qrLoading) qrLoading.textContent = `Aguardando QR Code… (${tentativa + 1}/8) ~${(7 - tentativa) * 8}s`;
+                await new Promise(r => setTimeout(r, 8000));
             }
         }
         if (!qrData) qrData = { qr: null };
