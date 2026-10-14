@@ -3908,6 +3908,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <option value="zerado">Zerados</option>
                             </select>
                             <button onclick="openModalDepositoRapido()" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-plus-circle"></i> Depósito</button>
+                            <button onclick="gerarRelatorioCaixaWhatsApp()" class="btn-ghost" style="font-size:.8rem;" title="Gerar relatório para WhatsApp"><i class="fa-brands fa-whatsapp"></i> Relatório</button>
                         </div>
                     </div>
                     <!-- Busca global do caixa (saldos + comandas) -->
@@ -42599,6 +42600,119 @@ function switchCaixaTab(tabId, btn) {
 
 function renderCaixa() {
     renderCaixaAberto();
+}
+
+// ============================================================
+// RELATÓRIO CAIXA → WhatsApp (devedores / crédito / ambos)
+// ============================================================
+function gerarRelatorioCaixaWhatsApp() {
+    const comandasAbertasMap = new Map();
+    (barComandas || []).forEach(c => {
+        if (c.status !== 'aberta') return;
+        const total = calcTotalComanda(c);
+        const existente = comandasAbertasMap.get(c.jogadorId) || { valor: 0, qtd: 0 };
+        existente.valor += total;
+        existente.qtd += 1;
+        comandasAbertasMap.set(c.jogadorId, existente);
+    });
+
+    const saldos = jogadores.map(j => {
+        const saldo = getSaldoJogador(j.id);
+        const comanda = comandasAbertasMap.get(j.id) || null;
+        const totalDevido = (saldo < 0 ? Math.abs(saldo) : 0) + (comanda ? comanda.valor : 0);
+        return { jogador: j, saldo, comanda, totalDevido };
+    });
+
+    const devedores = saldos.filter(s => s.saldo < 0 || s.comanda).sort((a, b) => b.totalDevido - a.totalDevido);
+    const credito = saldos.filter(s => s.saldo > 0).sort((a, b) => b.saldo - a.saldo);
+
+    const totalReceber = devedores.reduce((s, x) => s + x.totalDevido, 0);
+    const totalCredito = credito.reduce((s, x) => s + x.saldo, 0);
+
+    // Modal de seleção
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+    const nomeClube = (clube && clube.nome) ? clube.nome : 'Clube';
+    const dataHoje = new Date().toLocaleDateString('pt-BR');
+
+    function gerarTexto(tipo) {
+        let linhas = [];
+        linhas.push('📊 *RELATÓRIO DE SALDOS*');
+        linhas.push('🏠 ' + nomeClube);
+        linhas.push('📅 ' + dataHoje);
+        linhas.push('');
+
+        if (tipo === 'devedores' || tipo === 'ambos') {
+            linhas.push('🔴 *DEVEDORES (' + devedores.length + ')*');
+            linhas.push('Total a receber: *' + formatMoney(totalReceber) + '*');
+            linhas.push('─────────────────');
+            if (devedores.length === 0) {
+                linhas.push('✅ Nenhum devedor!');
+            } else {
+                devedores.forEach((s, i) => {
+                    const nome = s.jogador.apelido || s.jogador.nome.split(' ')[0];
+                    let detalhe = '';
+                    if (s.saldo < 0 && s.comanda) {
+                        detalhe = ' _(Caixa: ' + formatMoney(Math.abs(s.saldo)) + ' + Bar: ' + formatMoney(s.comanda.valor) + ')_';
+                    }
+                    linhas.push((i + 1) + '. ' + nome + ': *' + formatMoney(s.totalDevido) + '*' + detalhe);
+                });
+            }
+            linhas.push('');
+        }
+
+        if (tipo === 'credito' || tipo === 'ambos') {
+            linhas.push('🟢 *JOGADORES COM CRÉDITO (' + credito.length + ')*');
+            linhas.push('Total em crédito: *' + formatMoney(totalCredito) + '*');
+            linhas.push('─────────────────');
+            if (credito.length === 0) {
+                linhas.push('Nenhum jogador com crédito.');
+            } else {
+                credito.forEach((s, i) => {
+                    const nome = s.jogador.apelido || s.jogador.nome.split(' ')[0];
+                    linhas.push((i + 1) + '. ' + nome + ': *' + formatMoney(s.saldo) + '*');
+                });
+            }
+            linhas.push('');
+        }
+
+        linhas.push('_Gerado por StackOS_');
+        return linhas.join('\n');
+    }
+
+    function copiarEFechar(tipo) {
+        const texto = gerarTexto(tipo);
+        navigator.clipboard.writeText(texto).then(() => {
+            showToast('📋 Relatório copiado! Cole no WhatsApp.');
+        }).catch(() => {
+            // Fallback: prompt
+            prompt('Copie o relatório abaixo:', texto);
+        });
+        overlay.remove();
+    }
+
+    overlay.innerHTML = `
+        <div style="background:#18181b;border:1px solid #27272a;border-radius:1rem;padding:1.8rem;width:360px;max-width:92vw;">
+            <div style="font-size:1.1rem;font-weight:800;color:#e4e4e7;margin-bottom:.3rem;"><i class="fa-brands fa-whatsapp" style="color:#25d366;"></i> Relatório para WhatsApp</div>
+            <div style="font-size:.78rem;color:#71717a;margin-bottom:1.3rem;">Escolha o tipo de relatório. O texto será copiado para colar no WhatsApp.</div>
+            <div style="display:flex;flex-direction:column;gap:.6rem;">
+                <button onclick="this.closest('div[style*=position]').copiarEFechar('devedores')" class="btn" style="background:#dc2626;padding:.7rem 1rem;border-radius:.6rem;font-size:.85rem;font-weight:700;width:100%;border:none;color:#fff;cursor:pointer;">
+                    🔴 Apenas Devedores (${devedores.length})
+                </button>
+                <button onclick="this.closest('div[style*=position]').copiarEFechar('credito')" class="btn" style="background:#16a34a;padding:.7rem 1rem;border-radius:.6rem;font-size:.85rem;font-weight:700;width:100%;border:none;color:#fff;cursor:pointer;">
+                    🟢 Apenas com Crédito (${credito.length})
+                </button>
+                <button onclick="this.closest('div[style*=position]').copiarEFechar('ambos')" class="btn" style="background:#6366f1;padding:.7rem 1rem;border-radius:.6rem;font-size:.85rem;font-weight:700;width:100%;border:none;color:#fff;cursor:pointer;">
+                    📊 Ambos (Completo)
+                </button>
+            </div>
+            <button onclick="this.closest('div[style*=position]').remove()" style="margin-top:1rem;width:100%;text-align:center;padding:.5rem;font-size:.78rem;color:#71717a;background:none;border:none;cursor:pointer;">Cancelar</button>
+        </div>
+    `;
+    overlay.copiarEFechar = copiarEFechar;
+    document.body.appendChild(overlay);
 }
 
 function renderCaixaAberto() {
