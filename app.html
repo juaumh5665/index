@@ -40611,21 +40611,36 @@ const _waProvider = {
 
         if (cfg.provider === 'wppconnect') {
             // 1. Gerar token JWT a partir do SECRET_KEY
+            console.log('[WPP] Gerando token JWT...');
             const genResp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/${encodeURIComponent(cfg.token)}/generate-token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
             const genData = await genResp.json();
+            console.log('[WPP] Token response:', genData);
             if (genData.token) {
                 this._jwtToken = genData.token;
             }
 
-            // 2. Iniciar sessão com o JWT
+            // 2. Fechar sessão anterior se existir (evita conflito de browser)
+            try {
+                console.log('[WPP] Fechando sessão anterior...');
+                await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/close-session`, {
+                    method: 'POST',
+                    headers: this._headers(cfg)
+                });
+                await new Promise(r => setTimeout(r, 2000));
+            } catch(e) { console.log('[WPP] Sem sessão anterior:', e.message); }
+
+            // 3. Iniciar sessão com o JWT
+            console.log('[WPP] Iniciando sessão...');
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
                 method: 'POST',
                 headers: this._headers(cfg)
             });
-            return await resp.json();
+            const startData = await resp.json();
+            console.log('[WPP] Start response:', startData);
+            return startData;
         } else if (cfg.provider === 'evolution') {
             // Criar instância se não existe
             const resp = await fetch(`${cfg.url}/instance/create`, {
@@ -40668,11 +40683,13 @@ const _waProvider = {
         if (!cfg.url || !cfg.token) throw new Error('URL ou token não configurado');
 
         if (cfg.provider === 'wppconnect') {
+            console.log('[WPP] Buscando QR code...');
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/qrcode-session`, {
                 method: 'GET',
                 headers: this._headers(cfg)
             });
             const data = await resp.json();
+            console.log('[WPP] QR response:', JSON.stringify(data).substring(0, 200));
             // WPPConnect retorna { qrcode: "data:image/png;base64,..." }
             return { qr: data.qrcode || null, raw: data };
         } else if (cfg.provider === 'evolution') {
