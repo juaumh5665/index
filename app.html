@@ -3280,54 +3280,67 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div id="conv-tab-config" class="conv-tab-content" style="display:none;">
                         <div style="display:grid;grid-template-columns:1fr;gap:1rem;">
 
-                            <!-- WhatsApp API -->
+                            <!-- WhatsApp API — Envio Automático -->
                             <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
                                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem;">
                                     <div style="display:flex;align-items:center;gap:.5rem;">
                                         <div style="font-size:1.2rem;">📡</div>
-                                        <h3 style="font-size:.95rem;font-weight:800;color:#fff;">WhatsApp API</h3>
+                                        <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Envio Automático WhatsApp</h3>
                                         <span id="conv-wa-status-badge" style="font-size:.6rem;font-weight:800;padding:.15rem .45rem;border-radius:.25rem;letter-spacing:.05em;background:rgba(113,113,122,.15);color:#71717a;border:1px solid rgba(113,113,122,.2);">DESCONECTADO</span>
                                     </div>
                                 </div>
-                                <p style="font-size:.72rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
-                                    Conecte uma API de WhatsApp para envio automático. Sem configurar, o envio continua pelo método manual (wa.me).
-                                </p>
 
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:1rem;" id="conv-wa-grid">
-                                    <div>
-                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Provider</div>
-                                        <select id="conv-wa-provider" class="inp" onchange="convWaProviderChanged()" style="width:100%;">
-                                            <option value="manual">🔗 Manual (wa.me — padrão)</option>
-                                            <option value="wppconnect">🟢 WPPConnect</option>
-                                            <option value="evolution">🔵 Evolution API</option>
-                                            <option value="teste">🧪 Modo Teste (simulação)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Nome da sessão</div>
-                                        <input id="conv-wa-session" class="inp" placeholder="default" value="default" style="width:100%;">
-                                    </div>
-                                    <div>
-                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">URL do servidor</div>
-                                        <input id="conv-wa-url" class="inp" placeholder="https://api.seuservidor.com" style="width:100%;">
-                                    </div>
-                                    <div>
-                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Token / API Key</div>
-                                        <input id="conv-wa-token" class="inp" type="password" placeholder="Seu token de autenticação" style="width:100%;">
-                                    </div>
-                                </div>
+                                <!-- VISÃO DO OPERADOR (sempre visível) -->
+                                <div id="conv-wa-operador">
+                                    <p id="conv-wa-desc-desconectado" style="font-size:.78rem;color:#a1a1aa;margin-bottom:1rem;line-height:1.6;">
+                                        Conecte o WhatsApp do clube para enviar convites <strong style="color:#22c55e;">automaticamente em background</strong>, sem precisar abrir abas manualmente.
+                                    </p>
+                                    <p id="conv-wa-desc-conectado" style="display:none;font-size:.78rem;color:#a1a1aa;margin-bottom:1rem;line-height:1.6;">
+                                        ✅ WhatsApp conectado! Os convites serão enviados <strong style="color:#22c55e;">automaticamente</strong> quando você iniciar uma campanha.
+                                    </p>
 
-                                <div id="conv-wa-api-fields" style="display:none;">
                                     <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-                                        <button onclick="convWaTestarConexao()" id="conv-wa-btn-testar" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.3);color:#38bdf8;padding:.6rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">🔍 Testar Conexão</button>
-                                        <button onclick="convWaConectar()" id="conv-wa-btn-conectar" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">📱 Conectar WhatsApp</button>
-                                        <button onclick="convWaDesconectar()" id="conv-wa-btn-desconectar" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.6rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;">🔌 Desconectar</button>
+                                        <button onclick="convWaConectar()" id="conv-wa-btn-conectar" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.7rem 1.25rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">📱 Conectar WhatsApp</button>
+                                        <button onclick="convWaDesconectar()" id="conv-wa-btn-desconectar" style="display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#ef4444;padding:.7rem 1.25rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">🔌 Desconectar</button>
+                                        <button onclick="convWaTestarConexao()" id="conv-wa-btn-testar" style="display:none;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.25);color:#38bdf8;padding:.7rem 1.25rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">🔍 Verificar Status</button>
                                     </div>
                                     <div id="conv-wa-feedback" style="margin-top:.75rem;font-size:.72rem;color:#71717a;line-height:1.5;"></div>
                                 </div>
 
+                                <!-- INFO quando não tem API configurada (operador vê isso) -->
                                 <div id="conv-wa-info-manual" style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15);border-radius:.5rem;padding:.65rem .85rem;font-size:.72rem;color:#fbbf24;margin-top:.75rem;line-height:1.5;">
-                                    💡 <strong>Modo manual:</strong> Cada envio abre uma aba no wa.me. Para envio automático em background, selecione WPPConnect ou Evolution API.
+                                    💡 <strong>Envio manual ativo.</strong> Cada convite abrirá uma aba no WhatsApp Web. Peça ao administrador do sistema para ativar o envio automático.
+                                </div>
+
+                                <!-- PAINEL ADMIN (só super admin vê — config técnica) -->
+                                <div id="conv-wa-admin-panel" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid #1e1e23;">
+                                    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.75rem;">
+                                        <span style="font-size:.75rem;">🔧</span>
+                                        <div style="font-size:.65rem;color:#a855f7;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">Config técnica (só admin sistema)</div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:.75rem;" id="conv-wa-grid">
+                                        <div>
+                                            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Provider</div>
+                                            <select id="conv-wa-provider" class="inp" onchange="convWaProviderChanged()" style="width:100%;">
+                                                <option value="manual">🔗 Manual (wa.me)</option>
+                                                <option value="wppconnect">🟢 WPPConnect</option>
+                                                <option value="evolution">🔵 Evolution API</option>
+                                                <option value="teste">🧪 Modo Teste</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Nome da sessão</div>
+                                            <input id="conv-wa-session" class="inp" placeholder="default" value="default" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">URL do servidor</div>
+                                            <input id="conv-wa-url" class="inp" placeholder="https://api.seuservidor.com" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Token / API Key</div>
+                                            <input id="conv-wa-token" class="inp" type="password" placeholder="Seu token de autenticação" style="width:100%;">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -40770,22 +40783,18 @@ const _waProvider = {
 function convWaProviderChanged() {
     const sel = document.getElementById('conv-wa-provider');
     const provider = sel ? sel.value : 'manual';
-    const apiFields = document.getElementById('conv-wa-api-fields');
     const infoManual = document.getElementById('conv-wa-info-manual');
     const waGrid = document.getElementById('conv-wa-grid');
 
     if (provider === 'manual') {
-        if (apiFields) apiFields.style.display = 'none';
         if (infoManual) infoManual.style.display = '';
         if (waGrid) waGrid.style.display = '';
     } else if (provider === 'teste') {
-        if (apiFields) apiFields.style.display = '';
         if (infoManual) infoManual.style.display = 'none';
-        if (waGrid) waGrid.style.display = 'none'; // Esconde URL/token no modo teste
+        if (waGrid) waGrid.style.display = 'none';
         const fb = document.getElementById('conv-wa-feedback');
-        if (fb) fb.innerHTML = '<span style="color:#a855f7;">🧪 <strong>Modo Teste:</strong> Simula envios sem servidor real. As mensagens aparecem no console do navegador (F12). Nenhuma mensagem real é enviada no WhatsApp.</span>';
+        if (fb) fb.innerHTML = '<span style="color:#a855f7;">🧪 <strong>Modo Teste:</strong> Simula envios sem servidor real. As mensagens aparecem no console do navegador (F12).</span>';
     } else {
-        if (apiFields) apiFields.style.display = '';
         if (infoManual) infoManual.style.display = 'none';
         if (waGrid) waGrid.style.display = '';
     }
@@ -40805,28 +40814,42 @@ function convWaUpdateStatusBadge(connected) {
         badge.style.color = '#71717a';
         badge.style.borderColor = 'rgba(113,113,122,.2)';
     }
-    // Toggle botões conectar/desconectar
+    // Toggle botões conectar/desconectar e descrições
     const btnConectar = document.getElementById('conv-wa-btn-conectar');
     const btnDesconectar = document.getElementById('conv-wa-btn-desconectar');
+    const btnTestar = document.getElementById('conv-wa-btn-testar');
+    const descOn = document.getElementById('conv-wa-desc-conectado');
+    const descOff = document.getElementById('conv-wa-desc-desconectado');
+    const infoManual = document.getElementById('conv-wa-info-manual');
+
     if (btnConectar) btnConectar.style.display = connected ? 'none' : '';
     if (btnDesconectar) btnDesconectar.style.display = connected ? '' : 'none';
+    if (btnTestar) btnTestar.style.display = connected ? '' : 'none';
+    if (descOn) descOn.style.display = connected ? '' : 'none';
+    if (descOff) descOff.style.display = connected ? 'none' : '';
+
+    // Se tem API configurada (managed ou manual), esconde aviso de manual
+    const hasApi = conviteConfig && conviteConfig.wa_provider && conviteConfig.wa_provider !== 'manual';
+    if (infoManual) infoManual.style.display = hasApi ? 'none' : '';
 }
 
 async function convWaTestarConexao() {
     const btn = document.getElementById('conv-wa-btn-testar');
     const fb = document.getElementById('conv-wa-feedback');
-    if (btn) { btn.disabled = true; btn.textContent = '🔍 Testando…'; }
+    if (btn) { btn.disabled = true; btn.textContent = '🔍 Verificando…'; }
 
-    // Atualiza config temporariamente pra testar
-    const tmpCfg = {
-        wa_provider: (document.getElementById('conv-wa-provider') || {}).value || 'manual',
-        wa_api_url: (document.getElementById('conv-wa-url') || {}).value || '',
-        wa_api_token: (document.getElementById('conv-wa-token') || {}).value || '',
-        wa_session_name: (document.getElementById('conv-wa-session') || {}).value || 'default',
-        wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
-    };
+    // Super admin: lê do form. Operador: usa config já carregada
+    if (window._isSuperAdmin) {
+        const tmpCfg = {
+            wa_provider: (document.getElementById('conv-wa-provider') || {}).value || 'manual',
+            wa_api_url: (document.getElementById('conv-wa-url') || {}).value || '',
+            wa_api_token: (document.getElementById('conv-wa-token') || {}).value || '',
+            wa_session_name: (document.getElementById('conv-wa-session') || {}).value || 'default',
+            wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
+        };
+        Object.assign(conviteConfig, tmpCfg);
+    }
     const oldCfg = { ...conviteConfig };
-    Object.assign(conviteConfig, tmpCfg);
 
     try {
         const result = await _waProvider.checkStatus();
@@ -40849,20 +40872,33 @@ async function convWaTestarConexao() {
         Object.assign(conviteConfig, oldCfg);
     }
 
-    if (btn) { btn.disabled = false; btn.textContent = '🔍 Testar Conexão'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Verificar Status'; }
 }
 
 async function convWaConectar() {
     const fb = document.getElementById('conv-wa-feedback');
 
-    // Salva config no conviteConfig temporário
-    conviteConfig.wa_provider = (document.getElementById('conv-wa-provider') || {}).value || 'manual';
-    conviteConfig.wa_api_url = (document.getElementById('conv-wa-url') || {}).value || '';
-    conviteConfig.wa_api_token = (document.getElementById('conv-wa-token') || {}).value || '';
-    conviteConfig.wa_session_name = (document.getElementById('conv-wa-session') || {}).value || 'default';
+    // Super admin: lê dos inputs do form. Operador: usa config gerenciada ou já salva
+    if (window._isSuperAdmin) {
+        conviteConfig.wa_provider = (document.getElementById('conv-wa-provider') || {}).value || 'manual';
+        conviteConfig.wa_api_url = (document.getElementById('conv-wa-url') || {}).value || '';
+        conviteConfig.wa_api_token = (document.getElementById('conv-wa-token') || {}).value || '';
+        conviteConfig.wa_session_name = (document.getElementById('conv-wa-session') || {}).value || 'default';
+    } else {
+        // Operador: garante que tem config gerenciada
+        const hasManagedServer = _WA_MANAGED_SERVER.url && _WA_MANAGED_SERVER.token;
+        if (hasManagedServer) {
+            if (!conviteConfig.wa_provider || conviteConfig.wa_provider === 'manual') {
+                conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
+            }
+            if (!conviteConfig.wa_api_url) conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
+            if (!conviteConfig.wa_api_token) conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
+            if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'clube_' + sbClube.id : 'default';
+        }
+    }
 
     if (conviteConfig.wa_provider !== 'teste' && (!conviteConfig.wa_api_url || !conviteConfig.wa_api_token)) {
-        if (fb) fb.innerHTML = '<span style="color:#f87171;">❌ Preencha a URL e o Token primeiro.</span>';
+        if (fb) fb.innerHTML = '<span style="color:#f87171;">❌ Envio automático não disponível. Entre em contato com o suporte.</span>';
         return;
     }
 
@@ -41000,9 +41036,39 @@ async function convWaSalvarConfig() {
     }
 }
 
+// Config global do servidor gerenciado (João configura aqui, clubes usam automaticamente)
+const _WA_MANAGED_SERVER = {
+    provider: 'wppconnect',
+    url: '',    // João preenche quando subir o servidor: ex 'https://wa.stackos.com.br'
+    token: ''   // Token de autenticação do servidor gerenciado
+};
+
 // Popula form de WhatsApp a partir da config carregada
 function convWaPopularForm() {
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    const adminPanel = document.getElementById('conv-wa-admin-panel');
+
+    // Super admin vê painel técnico completo
+    if (window._isSuperAdmin && adminPanel) {
+        adminPanel.style.display = '';
+    }
+
+    // Se clube não tem provider configurado mas servidor gerenciado existe, pré-configura
+    const hasManagedServer = _WA_MANAGED_SERVER.url && _WA_MANAGED_SERVER.token;
+    if (hasManagedServer && conviteConfig && (!conviteConfig.wa_provider || conviteConfig.wa_provider === 'manual')) {
+        conviteConfig.wa_provider = _WA_MANAGED_SERVER.provider;
+        conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
+        conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
+        conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'clube_' + sbClube.id : 'default';
+    }
+
+    // Se tem servidor gerenciado e clube não é super admin, auto-preenche
+    if (hasManagedServer && !window._isSuperAdmin && conviteConfig) {
+        if (!conviteConfig.wa_api_url) conviteConfig.wa_api_url = _WA_MANAGED_SERVER.url;
+        if (!conviteConfig.wa_api_token) conviteConfig.wa_api_token = _WA_MANAGED_SERVER.token;
+        if (!conviteConfig.wa_session_name) conviteConfig.wa_session_name = (sbClube && sbClube.id) ? 'clube_' + sbClube.id : 'default';
+    }
+
     setVal('conv-wa-provider', (conviteConfig && conviteConfig.wa_provider) || 'manual');
     setVal('conv-wa-url', (conviteConfig && conviteConfig.wa_api_url) || '');
     setVal('conv-wa-token', (conviteConfig && conviteConfig.wa_api_token) || '');
