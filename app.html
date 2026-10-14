@@ -40232,7 +40232,9 @@ function convRenderListaCampanha() {
         const isVip = torneiosCnt >= 10;
 
         let statusHtml = '';
-        if (p.semWhatsapp) {
+        if (p._enviando) {
+            statusHtml = `<div style="font-size:.7rem;color:#fbbf24;font-weight:700;">⏳ Enviando…</div>`;
+        } else if (p.semWhatsapp) {
             // Marcado manualmente como número inválido (após operador ver erro no WhatsApp)
             statusHtml = `<div style="font-size:.7rem;color:#ef4444;font-weight:700;">🚫 Sem WhatsApp</div>`;
         } else if (p.enviado) {
@@ -40281,7 +40283,12 @@ async function convEnviarJogadorIndividual(idx) {
     if (p.enviado) return;
     // Limpa erro anterior pra permitir retry
     p.erroApi = null;
+    // Feedback visual: mostra "Enviando..." no lugar do botão
+    p._enviando = true;
+    convRenderListaCampanha();
     await _convEnviarUm(idx);
+    p._enviando = false;
+    convRenderListaCampanha();
 }
 
 async function _convEnviarUm(idx) {
@@ -40855,8 +40862,10 @@ async function convEnviarIniciar() {
                 showToast('❌ WhatsApp não está conectado! Vá em Config e conecte primeiro.');
                 return;
             }
+            showToast('✅ WhatsApp conectado — iniciando envios...');
         } catch (e) {
-            showToast('❌ Servidor WhatsApp não responde. O servidor pode estar dormindo — aguarde ~30s e tente novamente.');
+            // Se checkStatus falhar, o _safeFetch já tentou acordar o servidor
+            showToast('❌ Servidor WhatsApp não responde. Tente novamente em alguns segundos.');
             console.error('[Convites] checkStatus error:', e);
             return;
         }
@@ -40989,15 +40998,52 @@ const _waProvider = {
     },
 
     // Fetch seguro que trata respostas HTML (servidor dormindo/erro)
-    async _safeFetch(url, opts) {
-        const resp = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
+    // retry=true tenta acordar o servidor e repetir 1x
+    async _safeFetch(url, opts, retry = true) {
+        let resp;
+        try {
+            resp = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
+        } catch (e) {
+            // Failed to fetch / timeout — servidor totalmente offline
+            if (retry) {
+                console.log('[WA] Fetch falhou, tentando acordar servidor...');
+                const acordou = await this._wakeUp();
+                if (acordou) return this._safeFetch(url, opts, false);
+            }
+            throw new Error('Servidor não responde — pode estar dormindo. Aguarde ~30s e tente novamente.');
+        }
         const contentType = resp.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
-            const txt = (await resp.text()).substring(0, 120);
+            // Servidor retornou HTML (Render error page) — tentar acordar
+            if (retry) {
+                console.log(`[WA] Servidor retornou HTML (${resp.status}), tentando acordar...`);
+                const acordou = await this._wakeUp();
+                if (acordou) return this._safeFetch(url, opts, false);
+            }
             throw new Error(`Servidor retornou HTML (status ${resp.status}) — pode estar dormindo ou reiniciando. Aguarde ~30s.`);
         }
         const data = await resp.json();
         return data;
+    },
+
+    // Tenta acordar o servidor Render pingando o health check até responder JSON
+    async _wakeUp() {
+        const cfg = this.getConfig();
+        if (!cfg.url) return false;
+        console.log('[WA] Acordando servidor...');
+        for (let i = 0; i < 6; i++) { // 6 tentativas × 5s = 30s max
+            try {
+                const r = await fetch(cfg.url + '/', { signal: AbortSignal.timeout(8000) });
+                const ct = r.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    console.log(`[WA] Servidor acordou após ${(i+1)*5}s`);
+                    return true;
+                }
+            } catch(e) { /* servidor ainda dormindo */ }
+            await new Promise(r => setTimeout(r, 5000));
+        }
+        console.log('[WA] Servidor não acordou após 30s');
+        return false;
     },
 
     // ─── CHECK SESSION STATUS ───
