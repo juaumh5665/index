@@ -25873,7 +25873,7 @@ function showPage(page) {
     }
     if (page === 'dashboard') renderDashboard();
     if (page === 'painel-dono') { renderPainelDono(); pdIniciarAutoRefresh(); setTimeout(_pdAtualizarBotaoInstalar, 200); }
-    if (page === 'convites') { renderConvitesPage(); }
+    if (page === 'convites') { renderConvitesPage(); _waServerWarm.start(); }
     if (page !== 'painel-dono') pdPararAutoRefresh();
     if (page === 'bar')       renderBarProdutos();
     if (page === 'cash')      renderCashMesas();
@@ -41045,7 +41045,12 @@ const _waProvider = {
         const cfg = this.getConfig();
         if (!cfg.url) return false;
         console.log('[WA] Acordando servidor...');
-        for (let i = 0; i < 8; i++) { // 8 tentativas × 5s = 40s max
+        // Mostra progresso no modal do QR se estiver aberto
+        const qrLoading = document.getElementById('conv-wa-qr-loading');
+        for (let i = 0; i < 12; i++) { // 12 tentativas × 5s = 60s max
+            if (qrLoading && qrLoading.style.display !== 'none') {
+                qrLoading.textContent = `Acordando servidor... ${(i+1)*5}s`;
+            }
             // 1. Envia ping no-cors (não lê resposta, mas acorda o servidor)
             try {
                 await fetch(cfg.url + '/', { mode: 'no-cors', signal: AbortSignal.timeout(8000) });
@@ -41060,14 +41065,14 @@ const _waProvider = {
                 const ct = r.headers.get('content-type') || '';
                 if (ct.includes('application/json')) {
                     console.log(`[WA] Servidor acordou após ${(i+1)*5}s`);
+                    if (qrLoading) qrLoading.textContent = 'Servidor acordou! Iniciando sessão…';
                     return true;
                 }
             } catch(e) {
-                // CORS ainda bloqueado = servidor ainda não está pronto
                 console.log(`[WA] Servidor ainda acordando... (${(i+1)*5}s)`);
             }
         }
-        console.log('[WA] Servidor não acordou após 40s');
+        console.log('[WA] Servidor não acordou após 60s');
         return false;
     },
 
@@ -41492,6 +41497,47 @@ const _waKeepAlive = {
     }
 };
 
+// Pre-aquece o servidor Render quando a aba Convites carrega
+// Envia um ping no-cors a cada 12 min pra manter acordado enquanto o app estiver aberto
+const _waServerWarm = {
+    _interval: null,
+    _ready: false, // servidor confirmado acordado
+
+    // Chamado quando aba Convites é carregada
+    start() {
+        if (this._interval) return; // já rodando
+        this._ping(); // ping imediato
+        this._interval = setInterval(() => this._ping(), 12 * 60 * 1000); // 12 min
+    },
+
+    stop() {
+        if (this._interval) { clearInterval(this._interval); this._interval = null; }
+    },
+
+    async _ping() {
+        const url = (_WA_MANAGED_SERVER && _WA_MANAGED_SERVER.url) || '';
+        if (!url) return;
+        try {
+            // no-cors: acorda mesmo com CORS bloqueado
+            await fetch(url + '/', { mode: 'no-cors', signal: AbortSignal.timeout(10000) });
+            // Tenta verificar se está realmente acordado
+            try {
+                const r = await fetch(url + '/', { signal: AbortSignal.timeout(8000) });
+                const ct = r.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    if (!this._ready) console.log('[WA-Warm] Servidor Render está acordado');
+                    this._ready = true;
+                    return;
+                }
+            } catch(e) { /* CORS bloqueado = ainda acordando */ }
+            this._ready = false;
+            console.log('[WA-Warm] Ping enviado (servidor pode estar acordando)');
+        } catch(e) {
+            this._ready = false;
+        }
+    }
+};
+
 // =====================================================================
 // CONVITES — WhatsApp Config UI helpers
 // =====================================================================
@@ -41633,6 +41679,19 @@ async function convWaConectar() {
 
     try {
         const isBaileys = conviteConfig.wa_provider === 'baileys';
+
+        // 0. Acorda servidor se estiver dormindo (antes de qualquer API call)
+        if (isBaileys && !_waServerWarm._ready) {
+            if (qrLoading) qrLoading.textContent = 'Acordando servidor… aguarde';
+            const acordou = await _waProvider._wakeUp();
+            if (!acordou) {
+                if (qrLoading) qrLoading.textContent = '';
+                const qrArea = document.getElementById('conv-wa-qr-area');
+                if (qrArea) qrArea.innerHTML = '<div style="padding:2rem;text-align:center;color:#f87171;">Servidor não respondeu após 60s.<br><br>Verifique se o serviço está ativo no <a href="https://dashboard.render.com" target="_blank" style="color:#60a5fa;">Render Dashboard</a>.<br><br>Clique <b>Novo QR</b> pra tentar novamente.</div>';
+                return;
+            }
+            _waServerWarm._ready = true;
+        }
 
         // 1. Iniciar sessão
         if (qrLoading) qrLoading.textContent = isBaileys ? 'Iniciando sessão…' : 'Iniciando navegador… pode levar até 2min';
