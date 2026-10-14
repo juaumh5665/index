@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  wppconnect:
+    image: wppconnect/server-cli:latest
+    container_name: wppconnect-stackos
+    restart: unless-stopped
+    ports:
+      - "21465:21465"
+    volumes:
+      - wpp_tokens:/usr/src/wpp-server/tokens
+      - wpp_userdata:/usr/src/wpp-server/userDataDir
+    environment:
+      - SECRETKEY=STACKOS_TOKEN_ALTERAR_AQUI
+      - HOST=0.0.0.0
+      - PORT=21465
+      - CORS_ORIGIN=*
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:21465/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  wpp_tokens:
+  wpp_userdata:
