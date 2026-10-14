@@ -3108,6 +3108,24 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <button class="conv-filtro-btn" data-filtro="todos" onclick="convSetFiltro('todos')">👥 Todos</button>
                                     </div>
                                     <div id="conv-enviar-count" style="font-size:.72rem;color:#71717a;font-weight:600;padding:.35rem 0;">Selecione um filtro acima</div>
+
+                                    <!-- Lista de seleção de jogadores -->
+                                    <div style="margin-top:.65rem;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+                                            <div style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Selecionar jogadores</div>
+                                            <div style="display:flex;gap:.35rem;">
+                                                <button onclick="convEnviarToggleAll(true)" style="background:transparent;border:1px solid #27272a;color:#a1a1aa;padding:.15rem .45rem;border-radius:.25rem;font-size:.58rem;cursor:pointer;font-family:inherit;font-weight:600;">✅ Todos</button>
+                                                <button onclick="convEnviarToggleAll(false)" style="background:transparent;border:1px solid #27272a;color:#a1a1aa;padding:.15rem .45rem;border-radius:.25rem;font-size:.58rem;cursor:pointer;font-family:inherit;font-weight:600;">Nenhum</button>
+                                            </div>
+                                        </div>
+                                        <div style="margin-bottom:.35rem;">
+                                            <input id="conv-enviar-busca" class="inp" placeholder="🔍 Buscar jogador..." oninput="convEnviarFiltrarLista()" style="width:100%;padding:.35rem .55rem;font-size:.72rem;">
+                                        </div>
+                                        <div id="conv-enviar-jogadores" style="max-height:220px;overflow-y:auto;border:1px solid #1e1e23;border-radius:.45rem;background:#0a0a0c;">
+                                            <!-- preenchido por JS -->
+                                        </div>
+                                        <div id="conv-enviar-selecionados-count" style="font-size:.65rem;color:#22c55e;font-weight:700;margin-top:.35rem;"></div>
+                                    </div>
                                 </div>
 
                                 <!-- Templates salvos (compacto) -->
@@ -39496,6 +39514,8 @@ function convSetFiltro(filtro) {
     document.querySelectorAll('.conv-filtro-btn').forEach(b => {
         b.classList.toggle('conv-filtro-active', b.dataset.filtro === filtro);
     });
+    // Limpar seleção ao trocar filtro (auto-seleciona os novos com WA válido)
+    _convEnviarSelecionados = new Set();
     convEnviarAtualizarCount();
 }
 
@@ -40652,6 +40672,97 @@ function convEnviarAtualizarCount() {
         return val.valido;
     }).length;
     countEl.innerHTML = `<strong style="color:#22c55e;">${comWa}</strong> jogadores com WhatsApp válido <span style="color:#52525b;">(de ${filtrados.length} no filtro)</span>`;
+
+    // Renderizar lista de jogadores com checkboxes
+    convEnviarRenderJogadores();
+}
+
+// Set para rastrear jogadores selecionados (por id)
+let _convEnviarSelecionados = new Set();
+
+// Renderizar lista de jogadores com checkboxes
+function convEnviarRenderJogadores() {
+    const container = document.getElementById('conv-enviar-jogadores');
+    if (!container) return;
+
+    const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
+    const busca = (document.getElementById('conv-enviar-busca')?.value || '').toLowerCase().trim();
+
+    // Filtrar por busca
+    const lista = busca
+        ? filtrados.filter(j => {
+            const nome = (j.nome || '').toLowerCase();
+            const apelido = (j.apelido || '').toLowerCase();
+            const wa = (j.whatsapp || '');
+            return nome.includes(busca) || apelido.includes(busca) || wa.includes(busca);
+        })
+        : filtrados;
+
+    if (lista.length === 0) {
+        container.innerHTML = '<div style="padding:.75rem;text-align:center;font-size:.7rem;color:#52525b;">Nenhum jogador encontrado</div>';
+        _convEnviarAtualizarSelecionadosCount();
+        return;
+    }
+
+    // Se selecionados está vazio (primeira vez ou troca de filtro), selecionar todos com WhatsApp válido
+    if (_convEnviarSelecionados.size === 0 && !busca) {
+        filtrados.forEach(j => {
+            const val = _normalizarWhatsappE164(j.whatsapp);
+            if (val.valido) _convEnviarSelecionados.add(j.id);
+        });
+    }
+
+    container.innerHTML = lista.map(j => {
+        const val = _normalizarWhatsappE164(j.whatsapp);
+        const checked = _convEnviarSelecionados.has(j.id);
+        const disabled = !val.valido;
+        const nome = esc(j.apelido || j.nome || 'Sem nome');
+        const nomeCompleto = j.apelido && j.nome ? ` <span style="color:#52525b;font-size:.62rem;">(${esc(j.nome)})</span>` : '';
+        const waIcon = val.valido
+            ? '<span style="color:#25d366;font-size:.65rem;">📱</span>'
+            : '<span style="color:#ef4444;font-size:.6rem;" title="WhatsApp inválido">❌</span>';
+
+        return `<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-bottom:1px solid #1a1a1f;cursor:${disabled ? 'not-allowed' : 'pointer'};opacity:${disabled ? '.4' : '1'};transition:background .15s;${checked && !disabled ? 'background:rgba(34,197,94,.04);' : ''}" onmouseenter="this.style.background='rgba(255,255,255,.02)'" onmouseleave="this.style.background='${checked && !disabled ? 'rgba(34,197,94,.04)' : ''}'">
+            <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="convEnviarToggleJogador('${j.id}', this.checked)" style="accent-color:#22c55e;width:14px;height:14px;cursor:inherit;">
+            ${waIcon}
+            <span style="font-size:.72rem;font-weight:600;color:${disabled ? '#52525b' : '#e4e4e7'};">${nome}${nomeCompleto}</span>
+        </label>`;
+    }).join('');
+
+    _convEnviarAtualizarSelecionadosCount();
+}
+
+function convEnviarToggleJogador(id, checked) {
+    if (checked) {
+        _convEnviarSelecionados.add(id);
+    } else {
+        _convEnviarSelecionados.delete(id);
+    }
+    _convEnviarAtualizarSelecionadosCount();
+}
+
+function convEnviarToggleAll(selecionar) {
+    const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
+    if (selecionar) {
+        filtrados.forEach(j => {
+            const val = _normalizarWhatsappE164(j.whatsapp);
+            if (val.valido) _convEnviarSelecionados.add(j.id);
+        });
+    } else {
+        filtrados.forEach(j => _convEnviarSelecionados.delete(j.id));
+    }
+    convEnviarRenderJogadores();
+}
+
+function convEnviarFiltrarLista() {
+    convEnviarRenderJogadores();
+}
+
+function _convEnviarAtualizarSelecionadosCount() {
+    const el = document.getElementById('conv-enviar-selecionados-count');
+    if (!el) return;
+    const total = _convEnviarSelecionados.size;
+    el.textContent = total > 0 ? `✅ ${total} jogador${total !== 1 ? 'es' : ''} selecionado${total !== 1 ? 's' : ''} para envio` : '';
 }
 
 // --- Templates salvos (chips compactos) ---
@@ -40751,11 +40862,21 @@ function convEnviarIniciar() {
         _convCampanha.flyerUrlPublica = null;
     }
 
-    // Carregar lista de jogadores (reutiliza lógica existente)
+    // Carregar lista de jogadores — usa seleção manual se houver
     const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
-    if (filtrados.length === 0) { showToast('⚠️ Nenhum jogador encontrado com esse filtro'); return; }
+    let jogadoresParaEnviar;
 
-    _convCampanha.listaJogadores = filtrados.map(j => {
+    if (_convEnviarSelecionados.size > 0) {
+        // Usar apenas os selecionados manualmente
+        jogadoresParaEnviar = filtrados.filter(j => _convEnviarSelecionados.has(j.id));
+    } else {
+        // Fallback: todos do filtro com WhatsApp válido
+        jogadoresParaEnviar = filtrados;
+    }
+
+    if (jogadoresParaEnviar.length === 0) { showToast('⚠️ Nenhum jogador selecionado. Marque pelo menos um na lista.'); return; }
+
+    _convCampanha.listaJogadores = jogadoresParaEnviar.map(j => {
         const val = _normalizarWhatsappE164(j.whatsapp);
         return {
             jogador: j,
