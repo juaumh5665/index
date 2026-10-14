@@ -40999,21 +40999,23 @@ async function convWaConectar() {
             console.log('[WPP] QR veio direto do start!');
             qrData = { qr };
         } else {
-            // Polling: esperar status mudar de INITIALIZING → QRCODE via status-session
-            if (qrLoading) qrLoading.textContent = 'Aguardando navegador iniciar…';
-            const _cfg = _waProvider.getConfig();
-            for (let i = 0; i < 18; i++) { // 18 × 5s = 90s
+            // Polling: buscar QR a cada 5s por até 150s (Chromium demora ~80s no VM pequeno)
+            if (qrLoading) qrLoading.textContent = 'Iniciando navegador… pode levar até 2min';
+            for (let i = 0; i < 30; i++) { // 30 × 5s = 150s
                 await new Promise(r => setTimeout(r, 5000));
+                const elapsed = (i + 1) * 5;
                 try {
-                    const stResp = await fetch(`${_cfg.url}/api/${encodeURIComponent(_cfg.session)}/status-session`, {
-                        method: 'GET',
-                        headers: _waProvider._headers(_cfg)
-                    });
-                    const stData = await stResp.json();
-                    console.log(`[WPP] Status poll ${i+1}/18:`, stData);
-                    if (qrLoading) qrLoading.textContent = `Aguardando navegador… (${(i+1)*5}s) — ${stData.status || 'checking'}`;
-
-                    if (stData.status === 'CONNECTED' || stData.status === 'isLogged') {
+                    // Tentar buscar QR direto
+                    const qrAttempt = await _waProvider.getQR();
+                    console.log(`[WPP] QR poll ${i+1}/30 (${elapsed}s):`, qrAttempt);
+                    if (qrAttempt && qrAttempt.qr) {
+                        qrData = qrAttempt;
+                        console.log('[WPP] QR obtido!');
+                        break;
+                    }
+                    // Verificar se já conectou
+                    const st = await _waProvider.checkStatus();
+                    if (st.connected) {
                         conviteConfig.wa_connected = true;
                         convWaUpdateStatusBadge(true);
                         if (qrLoading) qrLoading.style.display = 'none';
@@ -41023,31 +41025,10 @@ async function convWaConectar() {
                         showToast('✅ WhatsApp já conectado!');
                         return;
                     }
-
-                    if (stData.status === 'QRCODE') {
-                        console.log('[WPP] Status QRCODE — buscando QR image...');
-                        break;
-                    }
-
-                    // Se ficou CLOSED por mais de 40s, Chromium não vai iniciar
-                    if (stData.status === 'CLOSED' && i > 7) {
-                        console.log('[WPP] Status CLOSED após 40s — Chromium não iniciou');
-                        break;
-                    }
+                    if (qrLoading) qrLoading.textContent = `Iniciando navegador… ${elapsed}s (pode levar até 2min)`;
                 } catch(e) {
-                    console.log(`[WPP] Status poll error:`, e.message);
-                }
-            }
-
-            // 3. Buscar QR via getQR (5 tentativas)
-            if (qrLoading) qrLoading.textContent = 'Buscando QR Code…';
-            for (let tentativa = 0; tentativa < 5; tentativa++) {
-                try { qrData = await _waProvider.getQR(); } catch(e) { qrData = null; }
-                console.log(`[WPP] QR tentativa ${tentativa+1}/5:`, qrData);
-                if (qrData && qrData.qr) break;
-                if (tentativa < 4) {
-                    if (qrLoading) qrLoading.textContent = `Buscando QR Code… (${tentativa + 1}/5)`;
-                    await new Promise(r => setTimeout(r, 3000));
+                    console.log(`[WPP] Poll ${i+1} error:`, e.message);
+                    if (qrLoading) qrLoading.textContent = `Aguardando… ${elapsed}s`;
                 }
             }
         }
