@@ -40646,16 +40646,26 @@ const _waProvider = {
                 await new Promise(r => setTimeout(r, 3000));
             } catch(e) { console.log('[WPP] Close cleanup:', e.message); }
 
-            // 4. Iniciar sessão
+            // 4. Iniciar sessão (sem waitQrCode — retorna imediato, QR vem via polling)
             console.log('[WPP] Iniciando sessão...');
-            const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
-                method: 'POST',
-                headers: { ...this._headers(cfg), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ waitQrCode: true })
-            });
-            const startData = await resp.json();
-            console.log('[WPP] Start response:', startData);
-            return startData;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 30000);
+            try {
+                const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
+                    method: 'POST',
+                    headers: { ...this._headers(cfg), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+                const startData = await resp.json();
+                console.log('[WPP] Start response:', startData);
+                return startData;
+            } catch(e) {
+                clearTimeout(timeout);
+                console.log('[WPP] Start fetch error (pode ser timeout):', e.message);
+                return { status: 'INITIALIZING' };
+            }
         } else if (cfg.provider === 'evolution') {
             // Criar instância se não existe
             const resp = await fetch(`${cfg.url}/instance/create`, {
@@ -40959,22 +40969,56 @@ async function convWaConectar() {
     if (qrStatus) qrStatus.textContent = 'Aguardando…';
 
     try {
-        // 1. Iniciar sessão (gera JWT + inicia Chromium)
-        // Com waitQrCode=true o server segura a request até o QR estar pronto (~30-90s)
-        if (qrLoading) qrLoading.textContent = 'Iniciando navegador… aguarde até 90s';
+        // 1. Iniciar sessão (gera JWT + dispara Chromium — retorna imediato)
+        if (qrLoading) qrLoading.textContent = 'Iniciando navegador…';
         const startResult = await _waProvider.startSession();
         console.log('[WPP] startSession result:', startResult);
 
-        // 2. Extrair QR do resultado do start (waitQrCode=true retorna o QR direto)
+        // 2. Polling de status até QRCODE ou CONNECTED (máx 90s)
         let qrData = null;
-        const startQr = startResult?.qrcode
-            ? (startResult.qrcode.startsWith('data:') ? startResult.qrcode : 'data:image/png;base64,' + startResult.qrcode)
-            : null;
-        if (startQr) {
-            console.log('[WPP] QR veio direto do start-session!');
-            qrData = { qr: startQr };
+
+        // Se já veio QR no start (sessão rápida), usar direto
+        if (startResult?.qrcode) {
+            const qr = startResult.qrcode.startsWith('data:') ? startResult.qrcode : 'data:image/png;base64,' + startResult.qrcode;
+            console.log('[WPP] QR veio direto do start!');
+            qrData = { qr };
         } else {
-            // Fallback: buscar via endpoint getQR (3 tentativas)
+            // Polling: esperar status mudar de INITIALIZING → QRCODE
+            if (qrLoading) qrLoading.textContent = 'Aguardando navegador iniciar…';
+            for (let i = 0; i < 18; i++) { // 18 × 5s = 90s
+                await new Promise(r => setTimeout(r, 5000));
+                try {
+                    const st = await _waProvider.checkStatus();
+                    console.log(`[WPP] Status poll ${i+1}/18:`, st);
+                    if (qrLoading) qrLoading.textContent = `Aguardando navegador… (${(i+1)*5}s) — ${st.status || 'checking'}`;
+
+                    if (st.connected) {
+                        // Já conectou (sessão anterior salva)
+                        conviteConfig.wa_connected = true;
+                        convWaUpdateStatusBadge(true);
+                        if (qrLoading) qrLoading.style.display = 'none';
+                        if (qrStatus) qrStatus.textContent = '✅ WhatsApp já estava conectado!';
+                        await convWaSalvarConfig();
+                        setTimeout(() => convWaFecharQR(), 2000);
+                        showToast('✅ WhatsApp já conectado!');
+                        return;
+                    }
+
+                    if (st.status === 'QRCODE') {
+                        console.log('[WPP] Status QRCODE — buscando QR image...');
+                        break; // sai do loop para buscar QR
+                    }
+
+                    if (st.status === 'CLOSED' || st.status === 'ERROR') {
+                        console.log('[WPP] Status terminal:', st.status);
+                        if (i > 6) break; // se passou 30s e ainda CLOSED, desiste
+                    }
+                } catch(e) {
+                    console.log(`[WPP] Status poll error:`, e.message);
+                }
+            }
+
+            // 3. Buscar QR via getQR (5 tentativas)
             if (qrLoading) qrLoading.textContent = 'Buscando QR Code…';
             for (let tentativa = 0; tentativa < 5; tentativa++) {
                 try { qrData = await _waProvider.getQR(); } catch(e) { qrData = null; }
@@ -40982,7 +41026,7 @@ async function convWaConectar() {
                 if (qrData && qrData.qr) break;
                 if (tentativa < 4) {
                     if (qrLoading) qrLoading.textContent = `Buscando QR Code… (${tentativa + 1}/5)`;
-                    await new Promise(r => setTimeout(r, 5000));
+                    await new Promise(r => setTimeout(r, 3000));
                 }
             }
         }
