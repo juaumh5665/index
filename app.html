@@ -40636,15 +40636,31 @@ const _waProvider = {
                 }
             } catch(e) { console.log('[WPP] Status check falhou:', e.message); }
 
-            // 3. Fechar sessão antiga se existir (limpa lock de Chromium travado)
-            try {
-                console.log('[WPP] Fechando sessão anterior (cleanup)...');
-                await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/close-session`, {
-                    method: 'POST',
-                    headers: this._headers(cfg)
-                });
-                await new Promise(r => setTimeout(r, 3000));
-            } catch(e) { console.log('[WPP] Close cleanup:', e.message); }
+            // 3. Fechar sessões antigas (limpa Chromium travado)
+            // Fecha a sessão atual E a antiga com prefixo clube_ (que pode ter zombie)
+            const oldSession = cfg.session.replace(/^sess_/, 'clube_');
+            const sessionsToClose = [cfg.session];
+            if (oldSession !== cfg.session) sessionsToClose.push(oldSession);
+            for (const s of sessionsToClose) {
+                try {
+                    console.log(`[WPP] Fechando sessão: ${s}`);
+                    await fetch(`${cfg.url}/api/${encodeURIComponent(s)}/close-session`, {
+                        method: 'POST',
+                        headers: this._headers(cfg)
+                    });
+                } catch(e) { console.log(`[WPP] Close ${s}:`, e.message); }
+            }
+            // Também tenta logout da sessão antiga (mata processo Chromium)
+            if (oldSession !== cfg.session) {
+                try {
+                    console.log(`[WPP] Logout sessão antiga: ${oldSession}`);
+                    await fetch(`${cfg.url}/api/${encodeURIComponent(oldSession)}/logout-session`, {
+                        method: 'POST',
+                        headers: this._headers(cfg)
+                    });
+                } catch(e) { console.log(`[WPP] Logout old:`, e.message); }
+            }
+            await new Promise(r => setTimeout(r, 5000)); // espera processos morrerem
 
             // 4. Iniciar sessão (sem waitQrCode — retorna imediato, QR vem via polling)
             console.log('[WPP] Iniciando sessão...');
@@ -40983,17 +40999,21 @@ async function convWaConectar() {
             console.log('[WPP] QR veio direto do start!');
             qrData = { qr };
         } else {
-            // Polling: esperar status mudar de INITIALIZING → QRCODE
+            // Polling: esperar status mudar de INITIALIZING → QRCODE via status-session
             if (qrLoading) qrLoading.textContent = 'Aguardando navegador iniciar…';
+            const _cfg = _waProvider.getConfig();
             for (let i = 0; i < 18; i++) { // 18 × 5s = 90s
                 await new Promise(r => setTimeout(r, 5000));
                 try {
-                    const st = await _waProvider.checkStatus();
-                    console.log(`[WPP] Status poll ${i+1}/18:`, st);
-                    if (qrLoading) qrLoading.textContent = `Aguardando navegador… (${(i+1)*5}s) — ${st.status || 'checking'}`;
+                    const stResp = await fetch(`${_cfg.url}/api/${encodeURIComponent(_cfg.session)}/status-session`, {
+                        method: 'GET',
+                        headers: _waProvider._headers(_cfg)
+                    });
+                    const stData = await stResp.json();
+                    console.log(`[WPP] Status poll ${i+1}/18:`, stData);
+                    if (qrLoading) qrLoading.textContent = `Aguardando navegador… (${(i+1)*5}s) — ${stData.status || 'checking'}`;
 
-                    if (st.connected) {
-                        // Já conectou (sessão anterior salva)
+                    if (stData.status === 'CONNECTED' || stData.status === 'isLogged') {
                         conviteConfig.wa_connected = true;
                         convWaUpdateStatusBadge(true);
                         if (qrLoading) qrLoading.style.display = 'none';
@@ -41004,14 +41024,15 @@ async function convWaConectar() {
                         return;
                     }
 
-                    if (st.status === 'QRCODE') {
+                    if (stData.status === 'QRCODE') {
                         console.log('[WPP] Status QRCODE — buscando QR image...');
-                        break; // sai do loop para buscar QR
+                        break;
                     }
 
-                    if (st.status === 'CLOSED' || st.status === 'ERROR') {
-                        console.log('[WPP] Status terminal:', st.status);
-                        if (i > 6) break; // se passou 30s e ainda CLOSED, desiste
+                    // Se ficou CLOSED por mais de 40s, Chromium não vai iniciar
+                    if (stData.status === 'CLOSED' && i > 7) {
+                        console.log('[WPP] Status CLOSED após 40s — Chromium não iniciou');
+                        break;
                     }
                 } catch(e) {
                     console.log(`[WPP] Status poll error:`, e.message);
