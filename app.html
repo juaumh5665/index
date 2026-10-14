@@ -40636,11 +40636,12 @@ const _waProvider = {
                 }
             } catch(e) { console.log('[WPP] Status check falhou:', e.message); }
 
-            // 3. Iniciar sessão (start é assíncrono — Chromium inicia em background)
-            console.log('[WPP] Iniciando sessão...');
+            // 3. Iniciar sessão com waitQrCode=true — server segura a request até QR estar pronto
+            console.log('[WPP] Iniciando sessão (waitQrCode=true)...');
             const resp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/start-session`, {
                 method: 'POST',
-                headers: this._headers(cfg)
+                headers: { ...this._headers(cfg), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ waitQrCode: true })
             });
             const startData = await resp.json();
             console.log('[WPP] Start response:', startData);
@@ -40948,51 +40949,31 @@ async function convWaConectar() {
     if (qrStatus) qrStatus.textContent = 'Aguardando…';
 
     try {
-        // 1. Iniciar sessão (gera JWT + inicia Chromium — start é assíncrono)
+        // 1. Iniciar sessão (gera JWT + inicia Chromium)
+        // Com waitQrCode=true o server segura a request até o QR estar pronto (~30-90s)
+        if (qrLoading) qrLoading.textContent = 'Iniciando navegador… aguarde até 90s';
         const startResult = await _waProvider.startSession();
         console.log('[WPP] startSession result:', startResult);
 
-        // Se já está com QR ou conectado, pula a espera
-        if (startResult && (startResult.status === 'QRCODE' || startResult.status === 'CONNECTED' || startResult.status === 'isLogged')) {
-            console.log('[WPP] Sessão já ativa, buscando QR direto...');
-        } else {
-            // Chromium inicia em background — aguardar status mudar de CLOSED para QRCODE
-            if (qrLoading) qrLoading.textContent = 'Iniciando navegador… aguarde ~60s';
-            const cfg = _waProvider.getConfig();
-            let browserReady = false;
-            for (let i = 0; i < 12; i++) { // 12 × 10s = 120s máximo
-                await new Promise(r => setTimeout(r, 10000));
-                try {
-                    const statusResp = await fetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/status-session`, {
-                        method: 'GET',
-                        headers: _waProvider._headers(cfg)
-                    });
-                    const statusData = await statusResp.json();
-                    console.log(`[WPP] Status check ${i+1}/12:`, statusData);
-                    if (statusData.status === 'QRCODE' || statusData.status === 'CONNECTED' || statusData.status === 'isLogged') {
-                        browserReady = true;
-                        break;
-                    }
-                    if (qrLoading) qrLoading.textContent = `Aguardando navegador… (${i+1}/12) ~${(11-i)*10}s`;
-                } catch(e) {
-                    console.log(`[WPP] Status check ${i+1} erro:`, e.message);
-                }
-            }
-            if (!browserReady) {
-                console.log('[WPP] Browser não ficou pronto após 120s, tentando QR mesmo assim...');
-            }
-        }
-
-        // 2. Buscar QR Code (3 tentativas rápidas agora que o browser deve estar pronto)
-        if (qrLoading) qrLoading.textContent = 'Gerando QR Code…';
+        // 2. Extrair QR do resultado do start (waitQrCode=true retorna o QR direto)
         let qrData = null;
-        for (let tentativa = 0; tentativa < 3; tentativa++) {
-            try { qrData = await _waProvider.getQR(); } catch(e) { qrData = null; }
-            console.log(`[WPP] QR tentativa ${tentativa+1}/3:`, qrData);
-            if (qrData && qrData.qr) break;
-            if (tentativa < 2) {
-                if (qrLoading) qrLoading.textContent = `Buscando QR Code… (${tentativa + 1}/3)`;
-                await new Promise(r => setTimeout(r, 5000));
+        const startQr = startResult?.qrcode
+            ? (startResult.qrcode.startsWith('data:') ? startResult.qrcode : 'data:image/png;base64,' + startResult.qrcode)
+            : null;
+        if (startQr) {
+            console.log('[WPP] QR veio direto do start-session!');
+            qrData = { qr: startQr };
+        } else {
+            // Fallback: buscar via endpoint getQR (3 tentativas)
+            if (qrLoading) qrLoading.textContent = 'Buscando QR Code…';
+            for (let tentativa = 0; tentativa < 5; tentativa++) {
+                try { qrData = await _waProvider.getQR(); } catch(e) { qrData = null; }
+                console.log(`[WPP] QR tentativa ${tentativa+1}/5:`, qrData);
+                if (qrData && qrData.qr) break;
+                if (tentativa < 4) {
+                    if (qrLoading) qrLoading.textContent = `Buscando QR Code… (${tentativa + 1}/5)`;
+                    await new Promise(r => setTimeout(r, 5000));
+                }
             }
         }
         if (!qrData) qrData = { qr: null };
