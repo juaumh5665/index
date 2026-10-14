@@ -3,6 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+// Supabase auth redirect: quando o token de recuperação de senha (ou login via magic link)
+// chega na landing page (Site URL = stackos.com.br), redireciona para /app preservando o hash
+// para que o Supabase client do app.html consiga processar o token.
+(function() {
+  try {
+    var h = window.location.hash;
+    if (h && (h.indexOf('access_token=') !== -1 || h.indexOf('error=') !== -1 || h.indexOf('type=recovery') !== -1 || h.indexOf('type=magiclink') !== -1)) {
+      window.location.replace('/app' + h);
+    }
+  } catch(e) {}
+})();
+</script>
 <title>StackOS — Gestão Inteligente para Clubes de Poker</title>
 <meta name="description" content="O sistema completo para gestão de clubes de poker: torneios com rake inteligente, cash game profissional, bar, comandas, StackClock, Caixa do Jackpot, TV pública e relatórios. Migração assistida de outros sistemas. Teste grátis por 14 dias.">
 <meta name="keywords" content="gestão clube poker, sistema poker, torneio poker, cash game, StackClock, caixa jackpot, software clube poker brasil, timer dealer poker, rake torneio">
