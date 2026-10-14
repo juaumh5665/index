@@ -1062,6 +1062,7 @@
 @media (max-width: 600px) {
     #conv-tpl-grid { grid-template-columns: 1fr !important; }
     #conv-camp-grid { grid-template-columns: 1fr !important; }
+    #conv-enviar-grid { grid-template-columns: 1fr !important; }
     .conv-pl-row { grid-template-columns: 36px 1fr; }
     .conv-pl-row > div:nth-child(3),
     .conv-pl-row > div:nth-child(4) { grid-column: 1 / -1; }
@@ -3015,165 +3016,119 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div id="conv-content" style="display:none;">
 
                     <!-- Tabs -->
-                    <div style="display:flex;gap:.25rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.55rem;padding:.25rem;margin-bottom:1.25rem;max-width:600px;">
-                        <button class="conv-tab-btn conv-tab-active" data-tab="templates" onclick="convSetTab('templates')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;font-family:'Manrope',sans-serif;">📝 Templates</button>
-                        <button class="conv-tab-btn" data-tab="campanha" onclick="convSetTab('campanha')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:#a1a1aa;font-family:'Manrope',sans-serif;">📣 Nova Campanha</button>
+                    <div style="display:flex;gap:.25rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.55rem;padding:.25rem;margin-bottom:1.25rem;max-width:500px;">
+                        <button class="conv-tab-btn conv-tab-active" data-tab="enviar" onclick="convSetTab('enviar')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;font-family:'Manrope',sans-serif;">📤 Enviar</button>
                         <button class="conv-tab-btn" data-tab="historico" onclick="convSetTab('historico')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:#a1a1aa;font-family:'Manrope',sans-serif;">📊 Histórico</button>
                         <button class="conv-tab-btn" data-tab="config" onclick="convSetTab('config')" style="flex:1;padding:.55rem .85rem;border-radius:.4rem;font-size:.8rem;font-weight:700;cursor:pointer;border:none;background:transparent;color:#a1a1aa;font-family:'Manrope',sans-serif;">⚙️ Config</button>
                     </div>
 
-                    <!-- ABA 1: TEMPLATES -->
-                    <div id="conv-tab-templates" class="conv-tab-content">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;" id="conv-tpl-grid">
-                            <!-- Coluna 1: Editor -->
-                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
-                                <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;display:flex;align-items:center;gap:.4rem;">✏️ Editor de Template</div>
+                    <!-- ABA 1: ENVIAR (tela unificada) -->
+                    <div id="conv-tab-enviar" class="conv-tab-content">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;" id="conv-enviar-grid">
+                            <!-- Coluna 1: Mensagem + Imagem -->
+                            <div style="display:flex;flex-direction:column;gap:1rem;">
+                                <!-- Mensagem -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                                    <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">✏️ Mensagem</div>
 
-                                <div style="margin-bottom:1rem;">
-                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Nome do template</div>
-                                    <input id="conv-tpl-nome" class="inp" placeholder="Ex: Daily Sábado VIP" style="width:100%;">
-                                </div>
+                                    <textarea id="conv-enviar-texto" class="inp" rows="7" placeholder="E aí {nome}! {Hoje tem|Bora pro|Cola no} {torneio} 🎰&#10;&#10;Use {chaves|com|opções} pra variar o texto automaticamente" oninput="convEnviarAtualizarPreview()" style="width:100%;font-family:var(--font-mono,monospace);font-size:.8rem;resize:vertical;line-height:1.5;"></textarea>
 
-                                <div style="margin-bottom:1rem;">
-                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Categoria</div>
-                                    <select id="conv-tpl-categoria" class="inp" style="width:100%;">
-                                        <option value="convite">🎯 Convite</option>
-                                        <option value="last_call">🔥 Last call</option>
-                                        <option value="vip">👑 VIP exclusivo</option>
-                                        <option value="saudade">💤 Saudade</option>
-                                        <option value="novos">🆕 Boas-vindas</option>
-                                        <option value="aviso">📣 Aviso geral</option>
-                                    </select>
-                                </div>
-
-                                <div style="margin-bottom:1rem;">
-                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Mensagem</div>
-                                    <textarea id="conv-tpl-texto" class="inp" rows="8" placeholder="🎰 E aí {nome}! Hoje tem {torneio}..." oninput="convAtualizarPreview()" style="width:100%;font-family:var(--font-mono,monospace);font-size:.8rem;resize:vertical;"></textarea>
                                     <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem;">
-                                        <span class="conv-var-chip" onclick="convInserirVar('{nome}')">{nome}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{apelido}')">{apelido}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{torneio}')">{torneio}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{data}')">{data}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{hora}')">{hora}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{buyin}')">{buyin}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{prize}')">{prize}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{clube}')">{clube}</span>
-                                        <span class="conv-var-chip" onclick="convInserirVar('{flyer}')">{flyer}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{nome}')">{nome}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{apelido}')">{apelido}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{torneio}')">{torneio}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{data}')">{data}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{hora}')">{hora}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{buyin}')">{buyin}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{prize}')">{prize}</span>
+                                        <span class="conv-var-chip" onclick="convEnviarInserirVar('{clube}')">{clube}</span>
+                                    </div>
+
+                                    <div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.15);border-radius:.45rem;padding:.55rem .75rem;margin-top:.75rem;font-size:.68rem;color:#c4b5fd;line-height:1.5;">
+                                        <strong style="color:#a855f7;">Anti-spam:</strong> Use <code style="background:rgba(0,0,0,.3);padding:.05rem .25rem;border-radius:.2rem;">{opção1|opção2|opção3}</code> e cada jogador recebe uma versão diferente. Ex: <code style="background:rgba(0,0,0,.3);padding:.05rem .25rem;border-radius:.2rem;">{Oi|Olá|E aí|Fala}</code>
                                     </div>
                                 </div>
 
-                                <!-- A/B Testing: Variante B opcional -->
-                                <div style="margin-bottom:1rem;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:.55rem;padding:.85rem;">
-                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;gap:.5rem;flex-wrap:wrap;">
-                                        <div style="display:flex;align-items:center;gap:.4rem;">
-                                            <span style="font-size:.85rem;">🅰️🅱️</span>
-                                            <div style="font-size:.7rem;color:#a855f7;font-weight:800;text-transform:uppercase;letter-spacing:.05em;">Variante B (A/B testing — opcional)</div>
+                                <!-- Imagem -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                                    <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">📸 Imagem (opcional)</div>
+                                    <div id="conv-enviar-img-preview" style="display:none;margin-bottom:.65rem;">
+                                        <div style="position:relative;display:inline-block;">
+                                            <img id="conv-enviar-img-thumb" style="max-width:100%;max-height:200px;border-radius:.55rem;border:1px solid #27272a;">
+                                            <button onclick="convEnviarRemoverImg()" style="position:absolute;top:.35rem;right:.35rem;background:rgba(0,0,0,.7);border:1px solid rgba(239,68,68,.5);color:#ef4444;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;" title="Remover imagem">✕</button>
                                         </div>
-                                        <button type="button" onclick="document.getElementById('conv-tpl-texto-b').value=''" style="background:transparent;border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.2rem .55rem;border-radius:.3rem;font-size:.65rem;cursor:pointer;font-family:inherit;font-weight:700;">Limpar B</button>
                                     </div>
-                                    <textarea id="conv-tpl-texto-b" class="inp" rows="4" placeholder="(opcional) Texto alternativo. Se preenchido, sistema alterna entre A e B aleatoriamente no envio." style="width:100%;font-family:var(--font-mono,monospace);font-size:.78rem;resize:vertical;background:rgba(0,0,0,.3);"></textarea>
+                                    <div id="conv-enviar-img-drop" style="border:2px dashed #27272a;border-radius:.55rem;padding:1.25rem;text-align:center;cursor:pointer;transition:border-color .2s;" onclick="document.getElementById('conv-enviar-img-input').click()" ondragover="event.preventDefault();this.style.borderColor='#f59e0b'" ondragleave="this.style.borderColor='#27272a'" ondrop="convEnviarHandleDrop(event)">
+                                        <div style="font-size:1.5rem;margin-bottom:.35rem;">📤</div>
+                                        <div style="font-size:.78rem;color:#71717a;font-weight:600;">Arraste, cole (Ctrl+V) ou clique pra selecionar</div>
+                                        <div style="font-size:.65rem;color:#52525b;margin-top:.25rem;">JPG, PNG · max 5MB</div>
+                                    </div>
+                                    <input type="file" id="conv-enviar-img-input" accept="image/*" style="display:none;" onchange="convEnviarHandleFile(this.files[0])">
                                 </div>
 
-                                <div style="display:flex;gap:.5rem;">
-                                    <button id="conv-tpl-salvar" onclick="convSalvarTemplate()" style="flex:1;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;border:none;padding:.65rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">💾 Salvar Template</button>
-                                    <button onclick="convLimparEditor()" style="background:transparent;color:#a1a1aa;border:1px solid #27272a;padding:.65rem 1rem;border-radius:.5rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">Limpar</button>
+                                <!-- Torneio (opcional) -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1rem;">
+                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.45rem;">Torneio (preenche {torneio}, {data}, {hora}, {buyin})</div>
+                                    <select id="conv-enviar-torneio" class="inp" style="width:100%;">
+                                        <option value="">— Nenhum (mensagem avulsa) —</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <!-- Coluna 2: Preview WhatsApp -->
-                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
-                                <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;">👁️ Preview ao vivo (WhatsApp)</div>
-                                <div style="background:#0d1418;border:1px solid #1e2833;border-radius:.75rem;padding:1rem;">
-                                    <div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.85rem;border-bottom:1px solid #1e2833;margin-bottom:1rem;">
-                                        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:.9rem;">JS</div>
-                                        <div>
-                                            <div style="font-weight:700;font-size:.85rem;color:#e4e4e7;">João Silva (exemplo)</div>
-                                            <div style="font-size:.65rem;color:#71717a;">jogador VIP</div>
-                                        </div>
+                            <!-- Coluna 2: Preview + Enviar -->
+                            <div style="display:flex;flex-direction:column;gap:1rem;">
+                                <!-- Preview WhatsApp -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+                                        <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">👁️ Preview (variação aleatória)</div>
+                                        <button onclick="convEnviarAtualizarPreview()" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.2rem .55rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">🔄 Outra variação</button>
                                     </div>
-                                    <div style="background:#0a1418;padding:1rem;border-radius:.5rem;min-height:200px;">
-                                        <div style="background:#054640;border-radius:.55rem .55rem 0 .55rem;padding:.65rem .85rem;max-width:90%;margin-left:auto;">
-                                            <div id="conv-preview-texto" style="color:#e4e4e7;font-size:.82rem;line-height:1.45;white-space:pre-wrap;">Digite uma mensagem no editor pra ver o preview aqui...</div>
+                                    <div style="background:#0d1418;border:1px solid #1e2833;border-radius:.75rem;padding:.85rem;">
+                                        <div style="background:#054640;border-radius:.55rem .55rem 0 .55rem;padding:.65rem .85rem;max-width:95%;margin-left:auto;">
+                                            <div id="conv-enviar-preview-img" style="display:none;margin-bottom:.45rem;">
+                                                <img id="conv-enviar-preview-img-tag" style="max-width:100%;border-radius:.35rem;">
+                                            </div>
+                                            <div id="conv-enviar-preview-texto" style="color:#e4e4e7;font-size:.8rem;line-height:1.45;white-space:pre-wrap;">Escreva a mensagem ao lado...</div>
                                             <div style="font-size:.55rem;color:#a1a1aa;text-align:right;margin-top:.25rem;">10:42 ✓✓</div>
                                         </div>
                                     </div>
-                                </div>
-                                <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.2);border-radius:.5rem;padding:.65rem .85rem;font-size:.72rem;color:#86efac;margin-top:1rem;line-height:1.5;">
-                                    💡 <strong style="color:#22c55e;">Como funciona:</strong> Use as variáveis acima entre <code style="background:rgba(0,0,0,.3);padding:0 .2rem;border-radius:.2rem;">{}</code> e o sistema substituirá pelos dados reais de cada jogador no envio.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Lista de templates -->
-                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                                <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">📚 Templates cadastrados</div>
-                                <div id="conv-tpl-count" style="font-size:.7rem;color:#71717a;font-weight:700;">0 templates</div>
-                            </div>
-                            <div id="conv-tpl-lista" style="display:flex;flex-direction:column;gap:.4rem;">
-                                <!-- preenchido por JS -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ABA 2: NOVA CAMPANHA -->
-                    <div id="conv-tab-campanha" class="conv-tab-content" style="display:none;">
-                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;margin-bottom:1rem;">
-                            <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem;">🎯 Configurar Campanha</div>
-
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;margin-bottom:1rem;" id="conv-camp-grid">
-                                <div>
-                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Torneio (opcional)</div>
-                                    <select id="conv-camp-torneio" class="inp" onchange="convAtualizarFlyerTorneio()" style="width:100%;">
-                                        <option value="">— Sem torneio (aviso avulso) —</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Template</div>
-                                    <select id="conv-camp-template" class="inp" style="width:100%;">
-                                        <option value="">— Selecione um template —</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Filtros de jogadores -->
-                            <div style="margin-bottom:1rem;">
-                                <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.5rem;">Quem convidar</div>
-                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.4rem;" id="conv-camp-filtros">
-                                    <button class="conv-filtro-btn conv-filtro-active" data-filtro="ativos" onclick="convSetFiltro('ativos')">🔥 Ativos 30d</button>
-                                    <button class="conv-filtro-btn" data-filtro="vips" onclick="convSetFiltro('vips')">⭐ VIPs (10+)</button>
-                                    <button class="conv-filtro-btn" data-filtro="aniversariantes" onclick="convSetFiltro('aniversariantes')">🎂 Aniversariantes</button>
-                                    <button class="conv-filtro-btn" data-filtro="sumidos" onclick="convSetFiltro('sumidos')">💤 Sumidos 60d+</button>
-                                    <button class="conv-filtro-btn" data-filtro="novos" onclick="convSetFiltro('novos')">🆕 Novos &lt;30d</button>
-                                    <button class="conv-filtro-btn" data-filtro="todos" onclick="convSetFiltro('todos')">👥 Todos</button>
-                                </div>
-                            </div>
-
-                            <!-- Flyer -->
-                            <div style="background:#0a0a0c;border:1px dashed #27272a;border-radius:.55rem;padding:.85rem;">
-                                <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.5rem;">📸 Flyer da Campanha</div>
-                                <div id="conv-flyer-preview" style="display:none;background:#111113;border:1px solid #27272a;border-radius:.45rem;padding:.55rem;margin-bottom:.55rem;display:flex;align-items:center;gap:.55rem;">
-                                    <img id="conv-flyer-thumb" style="width:50px;height:50px;object-fit:cover;border-radius:.3rem;">
-                                    <div style="flex:1;min-width:0;">
-                                        <div id="conv-flyer-nome" style="font-size:.75rem;font-weight:700;color:#e4e4e7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                                        <div id="conv-flyer-meta" style="font-size:.65rem;color:#71717a;"></div>
+                                    <div id="conv-enviar-variacoes-info" style="display:none;margin-top:.65rem;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:.4rem;padding:.45rem .65rem;font-size:.68rem;color:#86efac;">
                                     </div>
-                                    <button onclick="convRemoverFlyer()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;padding:.35rem .65rem;border-radius:.35rem;cursor:pointer;font-size:.75rem;font-weight:700;">🗑️</button>
                                 </div>
-                                <input type="file" id="conv-flyer-input" accept="image/*" style="display:none;" onchange="convHandleFlyerUpload(this)">
-                                <button onclick="document.getElementById('conv-flyer-input').click()" id="conv-flyer-btn" style="width:100%;background:rgba(56,189,248,.06);border:1px dashed rgba(56,189,248,.3);color:#38bdf8;padding:.65rem;border-radius:.45rem;cursor:pointer;font-size:.78rem;font-weight:700;font-family:'Manrope',sans-serif;">📤 Selecionar flyer (max 5MB)</button>
-                                <label id="conv-flyer-salvar-torneio-wrap" style="display:none;margin-top:.55rem;font-size:.72rem;color:#a1a1aa;display:flex;align-items:center;gap:.4rem;cursor:pointer;">
-                                    <input type="checkbox" id="conv-flyer-salvar-torneio" checked style="cursor:pointer;">
-                                    💾 Salvar este flyer no torneio (pra reutilizar)
-                                </label>
-                            </div>
 
-                            <button onclick="convCarregarListaCampanha()" style="margin-top:1rem;width:100%;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:.75rem;border-radius:.55rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.9rem;">
-                                🎯 Carregar lista de jogadores
-                            </button>
+                                <!-- Pra quem -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
+                                    <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.65rem;">👥 Pra quem enviar</div>
+                                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-bottom:.65rem;" id="conv-enviar-filtros">
+                                        <button class="conv-filtro-btn conv-filtro-active" data-filtro="ativos" onclick="convSetFiltro('ativos')">🔥 Ativos</button>
+                                        <button class="conv-filtro-btn" data-filtro="vips" onclick="convSetFiltro('vips')">⭐ VIPs</button>
+                                        <button class="conv-filtro-btn" data-filtro="sumidos" onclick="convSetFiltro('sumidos')">💤 Sumidos</button>
+                                        <button class="conv-filtro-btn" data-filtro="novos" onclick="convSetFiltro('novos')">🆕 Novos</button>
+                                        <button class="conv-filtro-btn" data-filtro="aniversariantes" onclick="convSetFiltro('aniversariantes')">🎂 Aniversário</button>
+                                        <button class="conv-filtro-btn" data-filtro="todos" onclick="convSetFiltro('todos')">👥 Todos</button>
+                                    </div>
+                                    <div id="conv-enviar-count" style="font-size:.72rem;color:#71717a;font-weight:600;padding:.35rem 0;">Selecione um filtro acima</div>
+                                </div>
+
+                                <!-- Templates salvos (compacto) -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem;">
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">📚 Templates salvos</div>
+                                        <button onclick="convEnviarSalvarTemplate()" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:.2rem .55rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">💾 Salvar atual</button>
+                                    </div>
+                                    <div id="conv-enviar-templates" style="display:flex;flex-wrap:wrap;gap:.35rem;">
+                                        <!-- preenchido por JS -->
+                                    </div>
+                                </div>
+
+                                <!-- Botão Enviar -->
+                                <button onclick="convEnviarIniciar()" id="conv-btn-enviar-principal" style="width:100%;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.85rem;border-radius:.65rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:1rem;letter-spacing:.02em;transition:opacity .2s;">
+                                    🚀 Enviar Convites
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Lista de jogadores pra enviar -->
+                        <!-- Lista de jogadores (aparece após clicar enviar) -->
                         <div id="conv-camp-lista-wrap" style="display:none;background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
                                 <div>
@@ -3181,7 +3136,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <div style="font-size:.7rem;color:#71717a;" id="conv-camp-lista-meta"></div>
                                 </div>
                                 <div style="display:flex;gap:.5rem;">
-                                    <button onclick="convIniciarEnvioSequencial()" id="conv-btn-sequencial" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.8rem;">🚀 Iniciar Envio Sequencial</button>
+                                    <button onclick="convIniciarEnvioSequencial()" id="conv-btn-sequencial" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.6rem 1.1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.8rem;">🚀 Confirmar e Enviar</button>
                                 </div>
                             </div>
 
@@ -3189,7 +3144,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <!-- preenchido por JS -->
                             </div>
 
-                            <!-- Barra de progresso (fixa) -->
+                            <!-- Barra de progresso -->
                             <div id="conv-progress-bar" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid #1e1e23;">
                                 <div style="display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:#71717a;margin-bottom:.35rem;">
                                     <span id="conv-progress-texto">0 enviados</span>
@@ -3205,6 +3160,10 @@ document.addEventListener('DOMContentLoaded', function(){
                             </div>
                         </div>
                     </div>
+
+                    <!-- ABAS LEGADAS (hidden, mantém IDs pro JS existente) -->
+                    <div id="conv-tab-templates" class="conv-tab-content" style="display:none;"></div>
+                    <div id="conv-tab-campanha" class="conv-tab-content" style="display:none;"></div>
 
                     <!-- ABA 3: HISTÓRICO (Sessão 2) -->
                     <div id="conv-tab-historico" class="conv-tab-content" style="display:none;">
@@ -39298,6 +39257,12 @@ function convSetTab(tab) {
         convPopularTorneios();
         convPopularTemplatesSelect();
     }
+    // Aba unificada "enviar" — popular torneios e templates salvos
+    if (tab === 'enviar') {
+        convEnviarPopularTorneios();
+        convEnviarRenderTemplates();
+        convEnviarAtualizarCount();
+    }
     // [SESSÃO 2] Lazy-load das abas novas
     if (tab === 'historico' && typeof convHistoricoCarregar === 'function') {
         convHistoricoCarregar();
@@ -39531,6 +39496,7 @@ function convSetFiltro(filtro) {
     document.querySelectorAll('.conv-filtro-btn').forEach(b => {
         b.classList.toggle('conv-filtro-active', b.dataset.filtro === filtro);
     });
+    convEnviarAtualizarCount();
 }
 
 function convPopularTorneios() {
@@ -40514,6 +40480,307 @@ function convFinalizarEnvio() {
     document.getElementById('conv-progress-bar').style.display = 'none';
     document.getElementById('conv-btn-sequencial').disabled = false;
 }
+
+// =====================================================================
+// CONVITES — ABA UNIFICADA "ENVIAR"
+// =====================================================================
+// Tela simplificada: escrever mensagem com spin syntax {op1|op2|op3},
+// colar/anexar imagem, selecionar público, preview, enviar.
+// =====================================================================
+
+let _convEnviarImgFile = null;
+let _convEnviarImgDataUrl = null;
+
+// --- Spin syntax: {opção1|opção2|opção3} → escolhe uma aleatoriamente ---
+function _convSpinText(texto) {
+    if (!texto) return '';
+    return texto.replace(/\{([^{}]*\|[^{}]*)\}/g, (match, group) => {
+        const opts = group.split('|').map(s => s.trim()).filter(Boolean);
+        return opts.length ? opts[Math.floor(Math.random() * opts.length)] : match;
+    });
+}
+
+// Conta quantas variações possíveis o spin syntax gera
+function _convCountVariacoes(texto) {
+    if (!texto) return 1;
+    const spins = texto.match(/\{([^{}]*\|[^{}]*)\}/g);
+    if (!spins || spins.length === 0) return 1;
+    let total = 1;
+    for (const s of spins) {
+        const opts = s.slice(1, -1).split('|').filter(Boolean).length;
+        total *= Math.max(opts, 1);
+    }
+    return total;
+}
+
+// Inserir variável no textarea
+function convEnviarInserirVar(varStr) {
+    const ta = document.getElementById('conv-enviar-texto');
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const txt = ta.value;
+    ta.value = txt.substring(0, start) + varStr + txt.substring(end);
+    ta.selectionStart = ta.selectionEnd = start + varStr.length;
+    ta.focus();
+    convEnviarAtualizarPreview();
+}
+
+// Atualizar preview com spin syntax aplicado
+function convEnviarAtualizarPreview() {
+    const texto = document.getElementById('conv-enviar-texto')?.value || '';
+    const previewEl = document.getElementById('conv-enviar-preview-texto');
+    const imgPreview = document.getElementById('conv-enviar-preview-img');
+    const imgTag = document.getElementById('conv-enviar-preview-img-tag');
+    const infoEl = document.getElementById('conv-enviar-variacoes-info');
+
+    if (!previewEl) return;
+
+    // Aplicar spin + variáveis de exemplo
+    let previewTexto = _convSpinText(texto);
+    previewTexto = previewTexto
+        .replace(/\{nome\}/g, 'João Silva')
+        .replace(/\{apelido\}/g, 'João')
+        .replace(/\{torneio\}/g, 'Daily Sexta')
+        .replace(/\{data\}/g, 'sexta-feira, 18/10')
+        .replace(/\{hora\}/g, '21:00')
+        .replace(/\{buyin\}/g, 'R$ 50')
+        .replace(/\{prize\}/g, 'R$ 5.000')
+        .replace(/\{clube\}/g, (sbClube && sbClube.nome) || 'o clube');
+
+    // Assinatura
+    const assinatura = (conviteConfig && conviteConfig.assinatura) ? String(conviteConfig.assinatura).trim() : '';
+    if (assinatura) previewTexto = previewTexto + '\n\n' + assinatura;
+
+    previewEl.textContent = previewTexto || 'Escreva a mensagem ao lado...';
+
+    // Imagem no preview
+    if (_convEnviarImgDataUrl && imgPreview && imgTag) {
+        imgTag.src = _convEnviarImgDataUrl;
+        imgPreview.style.display = '';
+    } else if (imgPreview) {
+        imgPreview.style.display = 'none';
+    }
+
+    // Info de variações
+    const numVar = _convCountVariacoes(texto);
+    if (infoEl) {
+        if (numVar > 1) {
+            infoEl.style.display = '';
+            infoEl.innerHTML = `🔀 <strong>${numVar} variações</strong> possíveis — cada jogador recebe uma versão diferente`;
+        } else {
+            infoEl.style.display = 'none';
+        }
+    }
+}
+
+// --- Imagem: arrastar, colar, selecionar ---
+function convEnviarHandleFile(file) {
+    if (!file || !file.type.startsWith('image/')) { showToast('⚠️ Selecione uma imagem'); return; }
+    if (file.size > 5 * 1024 * 1024) { showToast('⚠️ Imagem muito grande (max 5MB)'); return; }
+
+    _convEnviarImgFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        _convEnviarImgDataUrl = e.target.result;
+        const thumb = document.getElementById('conv-enviar-img-thumb');
+        const preview = document.getElementById('conv-enviar-img-preview');
+        const drop = document.getElementById('conv-enviar-img-drop');
+        if (thumb) thumb.src = _convEnviarImgDataUrl;
+        if (preview) preview.style.display = '';
+        if (drop) drop.style.display = 'none';
+        convEnviarAtualizarPreview();
+    };
+    reader.readAsDataURL(file);
+}
+
+function convEnviarHandleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.style.borderColor = '#27272a';
+    const file = e.dataTransfer?.files?.[0];
+    if (file) convEnviarHandleFile(file);
+}
+
+function convEnviarRemoverImg() {
+    _convEnviarImgFile = null;
+    _convEnviarImgDataUrl = null;
+    const preview = document.getElementById('conv-enviar-img-preview');
+    const drop = document.getElementById('conv-enviar-img-drop');
+    if (preview) preview.style.display = 'none';
+    if (drop) drop.style.display = '';
+    document.getElementById('conv-enviar-img-input').value = '';
+    convEnviarAtualizarPreview();
+}
+
+// Colar imagem (Ctrl+V) global na aba convites
+document.addEventListener('paste', (e) => {
+    // Só processa se estiver na aba enviar
+    const enviarTab = document.getElementById('conv-tab-enviar');
+    if (!enviarTab || enviarTab.style.display === 'none') return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            e.preventDefault();
+            convEnviarHandleFile(item.getAsFile());
+            return;
+        }
+    }
+});
+
+// --- Popular torneios no dropdown ---
+function convEnviarPopularTorneios() {
+    const sel = document.getElementById('conv-enviar-torneio');
+    if (!sel) return;
+    const opts = ['<option value="">— Nenhum (mensagem avulsa) —</option>'];
+    const lista = (torneios || []).filter(t => t && !t.eliminado);
+    lista.sort((a, b) => new Date(b.dataHora || 0) - new Date(a.dataHora || 0));
+    for (const t of lista.slice(0, 20)) {
+        const dt = t.dataHora ? new Date(t.dataHora).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) : '';
+        opts.push(`<option value="${t.id}">${esc(t.nome || 'Torneio')} ${dt ? '(' + dt + ')' : ''}</option>`);
+    }
+    sel.innerHTML = opts.join('');
+}
+
+// --- Atualizar contagem de jogadores ao selecionar filtro ---
+function convEnviarAtualizarCount() {
+    const countEl = document.getElementById('conv-enviar-count');
+    if (!countEl) return;
+    const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
+    const comWa = filtrados.filter(j => {
+        const val = _normalizarWhatsappE164(j.whatsapp);
+        return val.valido;
+    }).length;
+    countEl.innerHTML = `<strong style="color:#22c55e;">${comWa}</strong> jogadores com WhatsApp válido <span style="color:#52525b;">(de ${filtrados.length} no filtro)</span>`;
+}
+
+// --- Templates salvos (chips compactos) ---
+function convEnviarRenderTemplates() {
+    const container = document.getElementById('conv-enviar-templates');
+    if (!container) return;
+    if (!conviteTemplates || conviteTemplates.length === 0) {
+        container.innerHTML = '<div style="font-size:.7rem;color:#52525b;">Nenhum template salvo. Escreva uma mensagem e clique "Salvar atual".</div>';
+        return;
+    }
+    container.innerHTML = conviteTemplates.map(t => {
+        const cat = t.categoria || 'convite';
+        const icons = { convite:'🎯', last_call:'🔥', vip:'👑', saudade:'💤', novos:'🆕', aviso:'📣' };
+        return `<button onclick="convEnviarCarregarTemplate('${t.id}')" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#fbbf24;padding:.3rem .65rem;border-radius:.35rem;font-size:.7rem;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;">${icons[cat] || '📝'} ${esc(t.nome || 'Sem nome')}</button>`;
+    }).join('');
+}
+
+function convEnviarCarregarTemplate(id) {
+    const tpl = (conviteTemplates || []).find(t => t.id === id);
+    if (!tpl) return;
+    const ta = document.getElementById('conv-enviar-texto');
+    if (ta) {
+        ta.value = tpl.texto || '';
+        convEnviarAtualizarPreview();
+    }
+    showToast(`📝 Template "${tpl.nome}" carregado`);
+}
+
+function convEnviarSalvarTemplate() {
+    const texto = document.getElementById('conv-enviar-texto')?.value?.trim();
+    if (!texto) { showToast('⚠️ Escreva uma mensagem primeiro'); return; }
+    const nome = prompt('Nome do template:');
+    if (!nome || !nome.trim()) return;
+
+    const novoTpl = {
+        id: 'tpl_' + Date.now(),
+        nome: nome.trim(),
+        categoria: 'convite',
+        texto: texto,
+        texto_b: '',
+        criado: new Date().toISOString()
+    };
+
+    if (!conviteTemplates) conviteTemplates = [];
+    conviteTemplates.push(novoTpl);
+
+    // Salvar no banco
+    if (sb && sbClube) {
+        sb.from('convite_templates').insert({
+            id: novoTpl.id,
+            clube_id: sbClube.id,
+            nome: novoTpl.nome,
+            categoria: novoTpl.categoria,
+            texto: novoTpl.texto,
+            texto_b: novoTpl.texto_b
+        }).then(() => {}).catch(e => console.warn('[Convites] erro salvar template:', e));
+    }
+
+    convEnviarRenderTemplates();
+    showToast(`💾 Template "${nome}" salvo!`);
+}
+
+// --- Iniciar envio (botão principal) ---
+function convEnviarIniciar() {
+    const texto = document.getElementById('conv-enviar-texto')?.value?.trim();
+    if (!texto) { showToast('⚠️ Escreva uma mensagem primeiro'); return; }
+
+    const torneioId = document.getElementById('conv-enviar-torneio')?.value || null;
+
+    // Criar um template temporário pro sistema de envio existente
+    const tmpTplId = '_envio_rapido_' + Date.now();
+    const tmpTpl = {
+        id: tmpTplId,
+        nome: 'Envio rápido',
+        categoria: 'convite',
+        texto: texto,
+        texto_b: '',
+        _isSpinSyntax: true // flag interna
+    };
+
+    // Adiciona ao array temporariamente
+    if (!conviteTemplates) conviteTemplates = [];
+    conviteTemplates.push(tmpTpl);
+
+    // Configurar campanha
+    _convCampanha.torneioId = torneioId;
+    _convCampanha.templateId = tmpTplId;
+
+    // Imagem
+    if (_convEnviarImgFile) {
+        _convCampanha.flyerFile = _convEnviarImgFile;
+        _convCampanha.flyerUrl = _convEnviarImgDataUrl;
+        _convCampanha.flyerUrlPublica = null; // vai fazer upload no envio
+    } else {
+        _convCampanha.flyerFile = null;
+        _convCampanha.flyerUrl = null;
+        _convCampanha.flyerUrlPublica = null;
+    }
+
+    // Carregar lista de jogadores (reutiliza lógica existente)
+    const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
+    if (filtrados.length === 0) { showToast('⚠️ Nenhum jogador encontrado com esse filtro'); return; }
+
+    _convCampanha.listaJogadores = filtrados.map(j => {
+        const val = _normalizarWhatsappE164(j.whatsapp);
+        return {
+            jogador: j,
+            valido: val.valido,
+            numero: val.numero || null,
+            motivoBloqueio: val.valido ? null : val.motivo,
+            enviado: false,
+            ts: null
+        };
+    });
+
+    document.getElementById('conv-camp-lista-wrap').style.display = '';
+    convRenderListaCampanha();
+
+    // Scroll até a lista
+    document.getElementById('conv-camp-lista-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Override: aplicar spin syntax no envio individual
+const _convAplicarVariaveisOriginal = _convAplicarVariaveis;
+_convAplicarVariaveis = function(texto, jogador, torneio, clube, flyerUrl) {
+    // Primeiro aplica spin syntax, depois variáveis normais
+    let spinned = _convSpinText(texto);
+    return _convAplicarVariaveisOriginal(spinned, jogador, torneio, clube, flyerUrl);
+};
 
 // =====================================================================
 // CONVITES — WHATSAPP PROVIDER ABSTRACTION LAYER
