@@ -14615,13 +14615,14 @@ async function carregarUsuarioEClube(authUser) {
 
     sbClube = clube;
 
-    // Garante feature_overrides carregado (select('*') pode não trazer se PostgREST cache stale)
-    if (!sbClube.feature_overrides) {
-        try {
-            const { data: foData } = await sb.rpc('admin_get_clube_feature_data', { p_clube_id: clube.id });
-            if (foData?.feature_overrides) sbClube.feature_overrides = foData.feature_overrides;
-        } catch(e) { console.warn('[FEATURES] Não carregou overrides:', e); }
-    }
+    // Sempre carrega feature_overrides via RPC (SECURITY DEFINER bypassa RLS e schema cache)
+    try {
+        const { data: foData } = await sb.rpc('admin_get_clube_feature_data', { p_clube_id: clube.id });
+        if (foData?.feature_overrides && Object.keys(foData.feature_overrides).length > 0) {
+            sbClube.feature_overrides = foData.feature_overrides;
+        }
+        console.log('[FEATURES] Overrides carregados:', sbClube.feature_overrides);
+    } catch(e) { console.warn('[FEATURES] Não carregou overrides:', e); }
 
     currentUser = {
         id: usuario.id,
