@@ -23242,27 +23242,37 @@ function _planoAtualObj() {
 
 // Verifica se o clube atual tem a feature.
 // Aceita nome com ou sem prefixo: 'stackclock' ou 'feature_stackclock'
+// Prioridade: super admin > trial > override por clube > plano
 window.hasFeature = function(name) {
     // Modo seguro: tudo liberado se a chave estiver desligada
     if (!FEATURES_BLOCK_ENABLED) return true;
-    
+
     // Super admin GLOBAL (verificado via RPC is_super_admin no banco)
     // tem acesso a tudo pra dar suporte. NÃO confunde com papel 'admin' do clube,
     // que é apenas o dono/gestor de um clube específico (esse paga plano normal).
     if (window._isSuperAdmin === true) {
         return true;
     }
-    
+
     // Em trial, libera tudo (cliente conhece o produto completo durante o trial)
     if (sbClube?.status === 'trial') return true;
-    
+
+    const key = name.startsWith('feature_') ? name : 'feature_' + name;
+
+    // Override por clube: se o super admin definiu override específico,
+    // ele prevalece sobre o plano. true = forçar ON, false = forçar OFF.
+    // Ausente ou null = herdar do plano (comportamento padrão).
+    const overrides = sbClube?.feature_overrides;
+    if (overrides && typeof overrides === 'object' && key in overrides) {
+        return !!overrides[key];
+    }
+
     // Se ainda não carregou cache, libera (fail-open temporário; depois recarrega correto)
     if (!_planosCache || _planosCache.length === 0) return true;
-    
+
     const plano = _planoAtualObj();
     if (!plano) return true; // sem plano definido = libera (fail-open)
-    
-    const key = name.startsWith('feature_') ? name : 'feature_' + name;
+
     return !!plano[key];
 };
 
@@ -24861,6 +24871,11 @@ function adminRenderClubes(clubes) {
                             title="Entrar no clube como suporte (somente leitura)">
                         <i class="fa-solid fa-eye"></i>
                     </button>
+                    <button onclick="adminAbrirModalFeatureOverride('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')"
+                            style="padding:.3rem .55rem;background:#1a1a2e;border:1px solid #fbbf24;color:#fbbf24;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;"
+                            title="Gerenciar features (override por clube)">
+                        ⚡
+                    </button>
                     <button onclick="adminAcoesClube('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}')"
                             style="padding:.3rem .55rem;background:#27272a;border:1px solid #3f3f46;color:#fafafa;border-radius:.3rem;font-size:.7rem;cursor:pointer;"
                             title="Mais ações">
@@ -24951,7 +24966,8 @@ async function adminAcoesClube(clubeId, nome) {
         `3 - Suspender (bloquear acesso)\n` +
         `4 - Reativar\n` +
         `5 - Registrar pagamento manual\n` +
-        `6 - Ver histórico de pagamentos\n\n` +
+        `6 - Ver histórico de pagamentos\n` +
+        `7 - Gerenciar features (override por clube)\n\n` +
         `Digite o número da ação:`
     );
     if (!opcao) return;
@@ -25048,9 +25064,170 @@ async function adminAcoesClube(clubeId, nome) {
             ).join('\n');
             alert(`Histórico de ${nome}:\n\n${txt}`);
         }
+        else if (opcao === '7') {
+            adminAbrirModalFeatureOverride(clubeId, nome);
+        }
     } catch(e) {
         console.error('[ADMIN] Erro ação:', e);
         alert('Erro: ' + (e.message || e));
+    }
+}
+
+// ============================================================
+// FEATURE OVERRIDE POR CLUBE — modal de gerenciamento
+// ============================================================
+const _FEATURE_LIST = [
+    {key:'feature_bar_comandas', label:'Bar e Comandas'},
+    {key:'feature_fechamento_dia', label:'Fechamento de Dia'},
+    {key:'feature_relatorios_avancados', label:'Relatórios Avançados'},
+    {key:'feature_templates_torneio', label:'Templates de Torneio'},
+    {key:'feature_impressao_termica', label:'Impressão Térmica'},
+    {key:'feature_multi_clube', label:'Multi-clube'},
+    {key:'feature_multi_tv', label:'TV Pública'},
+    {key:'feature_backup_automatico', label:'Backup Automático'},
+    {key:'feature_suporte_prioritario', label:'Suporte Prioritário'},
+    {key:'feature_api', label:'Acesso à API'},
+    {key:'feature_white_label', label:'White-label'},
+    {key:'feature_personalizacao_tv', label:'Personalização da TV'},
+    {key:'feature_patrocinadores_tv', label:'Patrocinadores na TV'},
+    {key:'feature_stackclock', label:'StackClock (Dealer App)'},
+    {key:'feature_stackbar', label:'StackBar (Bar App)'},
+    {key:'feature_convites_premium', label:'Convites via WhatsApp'},
+    {key:'feature_painel_dono', label:'Painel do Dono (Mobile)'},
+];
+
+async function adminAbrirModalFeatureOverride(clubeId, nome) {
+    // Busca dados atuais do clube e seu plano
+    const { data: clube, error } = await sb.from('clubes').select('feature_overrides, plano_atual').eq('id', clubeId).single();
+    if (error) { alert('Erro ao carregar clube: ' + error.message); return; }
+
+    const overrides = clube.feature_overrides || {};
+
+    // Busca plano do clube pra mostrar o que herdaria
+    const planoId = clube.plano_atual;
+    let planoObj = null;
+    if (_planosAdminCache) {
+        planoObj = _planosAdminCache.find(p => p.id === planoId);
+    }
+    if (!planoObj) {
+        // Tenta buscar do cache principal
+        const { data: planos } = await sb.from('planos').select('*').eq('id', planoId).single();
+        planoObj = planos;
+    }
+
+    const rows = _FEATURE_LIST.map(f => {
+        const planoVal = planoObj ? !!planoObj[f.key] : false;
+        const overrideVal = (f.key in overrides) ? overrides[f.key] : null; // null = herdar
+        // Determina estado: 'inherit' | 'on' | 'off'
+        const estado = overrideVal === null ? 'inherit' : (overrideVal ? 'on' : 'off');
+        const efetivo = estado === 'inherit' ? planoVal : (estado === 'on');
+        const planoLabel = planoVal ? '✅' : '❌';
+        const corEfetivo = efetivo ? '#10b981' : '#dc2626';
+        const iconEfetivo = efetivo ? '✅' : '❌';
+
+        return `<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:.5rem;padding:.65rem .75rem;border-bottom:1px solid #1e1e23;" data-feature-key="${f.key}">
+            <div>
+                <div style="font-size:.85rem;font-weight:600;color:#e4e4e7;">${f.label}</div>
+                <div style="font-size:.7rem;color:#71717a;">Plano: ${planoLabel} ${planoVal ? 'incluído' : 'não incluído'}</div>
+            </div>
+            <span class="fo-efetivo" style="font-size:.8rem;color:${corEfetivo};font-weight:700;min-width:24px;text-align:center;">${iconEfetivo}</span>
+            <select class="inp fo-select" data-fkey="${f.key}" data-plano-val="${planoVal}" onchange="adminFoAtualizarPreview(this)" style="font-size:.75rem;padding:.35rem .5rem;width:auto;min-width:130px;">
+                <option value="inherit" ${estado === 'inherit' ? 'selected' : ''}>📋 Herdar do plano</option>
+                <option value="on" ${estado === 'on' ? 'selected' : ''}>✅ Forçar LIGADO</option>
+                <option value="off" ${estado === 'off' ? 'selected' : ''}>❌ Forçar DESLIGADO</option>
+            </select>
+        </div>`;
+    }).join('');
+
+    const modal = `
+    <div id="modal-feature-override" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;">
+        <div style="background:#0d0d0f;border:1px solid #27272a;border-radius:.75rem;max-width:580px;width:100%;padding:1.5rem;color:#fafafa;max-height:92vh;overflow-y:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+                <div>
+                    <div style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.1em;">Feature Override</div>
+                    <div style="font-size:1.2rem;font-weight:800;margin-top:.15rem;">${nome}</div>
+                    <div style="font-size:.75rem;color:#a1a1aa;margin-top:.2rem;">Plano: <strong>${planoObj?.nome || planoId || '—'}</strong></div>
+                </div>
+                <button onclick="adminFecharModalFeatureOverride()" style="background:transparent;border:none;color:#71717a;font-size:1.5rem;cursor:pointer;padding:0;">&times;</button>
+            </div>
+
+            <div style="background:#18181b;border:1px solid #27272a;border-radius:.5rem;padding:.5rem .75rem;margin-bottom:1rem;font-size:.75rem;color:#a1a1aa;">
+                <strong style="color:#fbbf24;">ℹ️ Como funciona:</strong> "Herdar do plano" usa o que o plano define. "Forçar LIGADO" libera a feature mesmo que o plano não tenha. "Forçar DESLIGADO" bloqueia mesmo que o plano inclua.
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr auto auto;gap:.5rem;padding:0 .75rem .35rem;font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">
+                <div>Feature</div>
+                <div style="text-align:center;">Efetivo</div>
+                <div style="text-align:center;">Override</div>
+            </div>
+            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.5rem;overflow:hidden;max-height:55vh;overflow-y:auto;">
+                ${rows}
+            </div>
+
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem;">
+                <button onclick="adminResetarOverrides()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#f59e0b;border-radius:.4rem;cursor:pointer;font-size:.8rem;font-weight:600;" title="Remove todos os overrides — volta tudo pro plano">
+                    🔄 Resetar todos
+                </button>
+                <button onclick="adminFecharModalFeatureOverride()" style="padding:.6rem 1rem;background:#18181b;border:1px solid #27272a;color:#fafafa;border-radius:.4rem;cursor:pointer;font-size:.8rem;">Cancelar</button>
+                <button onclick="adminSalvarFeatureOverride('${clubeId}')" class="btn-gold" style="padding:.6rem 1.5rem;border-radius:.4rem;font-weight:700;cursor:pointer;border:none;font-size:.85rem;">
+                    ✓ Salvar
+                </button>
+            </div>
+        </div>
+    </div>`;
+
+    const ex = document.getElementById('modal-feature-override');
+    if (ex) ex.remove();
+    document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+function adminFoAtualizarPreview(selectEl) {
+    const val = selectEl.value; // 'inherit' | 'on' | 'off'
+    const planoVal = selectEl.getAttribute('data-plano-val') === 'true';
+    const efetivo = val === 'inherit' ? planoVal : (val === 'on');
+    const row = selectEl.closest('[data-feature-key]');
+    const badge = row?.querySelector('.fo-efetivo');
+    if (badge) {
+        badge.textContent = efetivo ? '✅' : '❌';
+        badge.style.color = efetivo ? '#10b981' : '#dc2626';
+    }
+}
+
+function adminResetarOverrides() {
+    const selects = document.querySelectorAll('#modal-feature-override .fo-select');
+    selects.forEach(sel => {
+        sel.value = 'inherit';
+        adminFoAtualizarPreview(sel);
+    });
+}
+
+function adminFecharModalFeatureOverride() {
+    const m = document.getElementById('modal-feature-override');
+    if (m) m.remove();
+}
+
+async function adminSalvarFeatureOverride(clubeId) {
+    const selects = document.querySelectorAll('#modal-feature-override .fo-select');
+    const overrides = {};
+    selects.forEach(sel => {
+        const key = sel.getAttribute('data-fkey');
+        const val = sel.value;
+        if (val === 'on') overrides[key] = true;
+        else if (val === 'off') overrides[key] = false;
+        // 'inherit' = não incluir na chave (ausência = herdar do plano)
+    });
+
+    try {
+        const { error } = await sb.from('clubes')
+            .update({ feature_overrides: overrides })
+            .eq('id', clubeId);
+        if (error) throw error;
+
+        showToast('✓ Feature overrides salvos com sucesso');
+        adminFecharModalFeatureOverride();
+    } catch(e) {
+        console.error('[ADMIN] Erro ao salvar feature overrides:', e);
+        alert('Erro ao salvar: ' + (e.message || e));
     }
 }
 
