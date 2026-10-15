@@ -3189,69 +3189,34 @@ document.addEventListener('DOMContentLoaded', function(){
 
                     <!-- ABA 3: HISTÓRICO (Sessão 2) -->
                     <div id="conv-tab-historico" class="conv-tab-content" style="display:none;">
-                        <!-- Stats cards (4 métricas top) -->
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.65rem;margin-bottom:1rem;" id="conv-hist-stats">
-                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
-                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Enviados</div>
-                                <div id="conv-hist-stat-enviados" style="font-size:1.5rem;font-weight:800;color:#fff;font-family:var(--font-mono,monospace);margin-top:.15rem;">—</div>
+                        <!-- Header: contador + filtros inline -->
+                        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap;">
+                            <div style="display:flex;align-items:baseline;gap:.4rem;margin-right:auto;">
+                                <span id="conv-hist-stat-enviados" style="font-size:1.6rem;font-weight:800;color:#fff;font-family:var(--font-mono,monospace);">—</span>
+                                <span style="font-size:.75rem;color:#71717a;font-weight:600;">envios</span>
+                                <span style="font-size:.7rem;color:#52525b;margin-left:.25rem;">·</span>
+                                <span id="conv-hist-stat-unicos" style="font-size:.85rem;font-weight:700;color:#3b82f6;font-family:var(--font-mono,monospace);">—</span>
+                                <span style="font-size:.7rem;color:#71717a;">jogadores</span>
                             </div>
-                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
-                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Jogadores únicos</div>
-                                <div id="conv-hist-stat-unicos" style="font-size:1.5rem;font-weight:800;color:#3b82f6;font-family:var(--font-mono,monospace);margin-top:.15rem;">—</div>
-                            </div>
-                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
-                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Taxa de resposta</div>
-                                <div id="conv-hist-stat-taxa" style="font-size:1.5rem;font-weight:800;color:#22c55e;font-family:var(--font-mono,monospace);margin-top:.15rem;">—</div>
-                            </div>
-                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:.85rem 1rem;">
-                                <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Template top</div>
-                                <div id="conv-hist-stat-template" style="font-size:.85rem;font-weight:700;color:#fbbf24;margin-top:.25rem;line-height:1.2;">—</div>
-                            </div>
+                            <select id="conv-hist-periodo" class="inp" onchange="convHistoricoCarregar()" style="font-size:.75rem;padding:.35rem .6rem;width:auto;">
+                                <option value="hoje">Hoje</option>
+                                <option value="7d" selected>7 dias</option>
+                                <option value="30d">30 dias</option>
+                                <option value="todos">Todos</option>
+                            </select>
+                            <select id="conv-hist-status" class="inp" onchange="convHistoricoFiltrarLocal()" style="font-size:.75rem;padding:.35rem .6rem;width:auto;">
+                                <option value="">Status</option>
+                                <option value="enviado">📤 Enviado</option>
+                                <option value="confirmou">✅ Confirmou</option>
+                                <option value="recusou">❌ Recusou</option>
+                                <option value="erro">⚠️ Erro</option>
+                            </select>
+                            <input type="text" id="conv-hist-jogador" class="inp" placeholder="🔍 Buscar…" oninput="convHistoricoFiltrarLocal()" style="font-size:.75rem;padding:.35rem .6rem;width:120px;">
                         </div>
 
-                        <!-- Filtros -->
-                        <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1rem;margin-bottom:1rem;">
-                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;align-items:end;">
-                                <div>
-                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Período</div>
-                                    <select id="conv-hist-periodo" class="inp" onchange="convHistoricoCarregar()" style="width:100%;font-size:.8rem;">
-                                        <option value="hoje">Hoje</option>
-                                        <option value="7d" selected>Últimos 7 dias</option>
-                                        <option value="30d">Últimos 30 dias</option>
-                                        <option value="mes">Este mês</option>
-                                        <option value="todos">Todos</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Jogador</div>
-                                    <input type="text" id="conv-hist-jogador" class="inp" placeholder="Buscar nome…" oninput="convHistoricoFiltrarLocal()" style="width:100%;font-size:.8rem;">
-                                </div>
-                                <div>
-                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Template</div>
-                                    <select id="conv-hist-template" class="inp" onchange="convHistoricoFiltrarLocal()" style="width:100%;font-size:.8rem;">
-                                        <option value="">— Todos —</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <div style="font-size:.6rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Status</div>
-                                    <select id="conv-hist-status" class="inp" onchange="convHistoricoFiltrarLocal()" style="width:100%;font-size:.8rem;">
-                                        <option value="">— Todos —</option>
-                                        <option value="enviado">📤 Enviado</option>
-                                        <option value="confirmou">✅ Confirmou</option>
-                                        <option value="recusou">❌ Recusou</option>
-                                        <option value="sem_resposta">🔇 Sem resposta</option>
-                                        <option value="numero_invalido">🚫 Número inválido</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <button onclick="convHistoricoExportarCSV()" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:.6rem 1rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.78rem;width:100%;">📥 CSV</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tabela de envios -->
+                        <!-- Lista de envios -->
                         <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;overflow:hidden;">
-                            <div id="conv-hist-tabela-wrap" style="max-height:60vh;overflow:auto;">
+                            <div id="conv-hist-tabela-wrap" style="max-height:65vh;overflow:auto;">
                                 <div style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;" id="conv-hist-loading">Carregando histórico…</div>
                             </div>
                         </div>
@@ -39575,6 +39540,7 @@ function convSetFiltro(filtro) {
     });
     // Limpar seleção ao trocar filtro (auto-seleciona os novos com WA válido)
     _convEnviarSelecionados = new Set();
+    _convEnviarUserInteracted = false; // permite auto-selecionar no novo filtro
     convEnviarAtualizarCount();
 }
 
@@ -40022,14 +39988,6 @@ async function convHistoricoCarregar() {
         if (error) throw error;
         _convHistEnvios = data || [];
 
-        // Popular dropdown templates do filtro
-        const selTpl = document.getElementById('conv-hist-template');
-        if (selTpl) {
-            const opts = ['<option value="">— Todos —</option>'];
-            (conviteTemplates || []).forEach(t => opts.push(`<option value="${t.id}">${escapeHtml(t.nome || '—')}</option>`));
-            selTpl.innerHTML = opts.join('');
-        }
-
         convHistoricoCalcularStats();
         convHistoricoRenderTabela();
     } catch (e) {
@@ -40043,29 +40001,15 @@ function convHistoricoCalcularStats() {
     const filtrados = _convHistGetFiltrados();
     const total = filtrados.length;
     const unicos = new Set(filtrados.map(e => e.jogador_id)).size;
-    const respondeu = filtrados.filter(e => e.status === 'confirmou' || e.status === 'recusou').length;
-    const taxa = total > 0 ? Math.round((respondeu / total) * 100) : 0;
-
-    // Template mais usado
-    const tplCount = {};
-    filtrados.forEach(e => { if (e.template_id) tplCount[e.template_id] = (tplCount[e.template_id] || 0) + 1; });
-    let topTplId = null, topQtd = 0;
-    Object.entries(tplCount).forEach(([id, q]) => { if (q > topQtd) { topTplId = id; topQtd = q; }});
-    const topTplNome = topTplId ? ((conviteTemplates || []).find(t => t.id === topTplId) || {}).nome : null;
-
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('conv-hist-stat-enviados', total);
     set('conv-hist-stat-unicos', unicos);
-    set('conv-hist-stat-taxa', taxa + '%');
-    set('conv-hist-stat-template', topTplNome ? (topTplNome + ' (' + topQtd + ')') : '—');
 }
 
 function _convHistGetFiltrados() {
     const buscaJog = ((document.getElementById('conv-hist-jogador') || {}).value || '').trim().toLowerCase();
-    const filtroTpl = (document.getElementById('conv-hist-template') || {}).value || '';
     const filtroSt  = (document.getElementById('conv-hist-status')   || {}).value || '';
     return (_convHistEnvios || []).filter(e => {
-        if (filtroTpl && e.template_id !== filtroTpl) return false;
         if (filtroSt && e.status !== filtroSt) return false;
         if (buscaJog) {
             const j = (jogadores || []).find(x => x.id === e.jogador_id);
@@ -40086,42 +40030,36 @@ function convHistoricoRenderTabela() {
     if (!wrap) return;
     const filtrados = _convHistGetFiltrados();
     if (filtrados.length === 0) {
-        wrap.innerHTML = '<div style="padding:2rem;text-align:center;color:#71717a;font-size:.85rem;">Nenhum envio nesse filtro.</div>';
+        wrap.innerHTML = '<div style="padding:2.5rem 1rem;text-align:center;color:#52525b;font-size:.82rem;"><div style="font-size:1.5rem;margin-bottom:.4rem;">📭</div>Nenhum envio encontrado</div>';
         return;
     }
-    const statusBadges = {
-        enviado:         '<span style="background:rgba(168,85,247,.15);color:#a855f7;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">📤 Enviado</span>',
-        confirmou:       '<span style="background:rgba(34,197,94,.15);color:#22c55e;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">✅ Confirmou</span>',
-        recusou:         '<span style="background:rgba(239,68,68,.15);color:#ef4444;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">❌ Recusou</span>',
-        sem_resposta:    '<span style="background:rgba(115,115,115,.15);color:#a1a1aa;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">🔇 Sem resp.</span>',
-        numero_invalido: '<span style="background:rgba(239,68,68,.15);color:#ef4444;padding:.15rem .5rem;border-radius:.3rem;font-size:.65rem;font-weight:700;">🚫 Nº inválido</span>'
+    const statusMap = {
+        enviado:         { icon: '📤', label: 'Enviado',     color: '#a855f7', bg: 'rgba(168,85,247,.12)' },
+        confirmou:       { icon: '✅', label: 'Confirmou',   color: '#22c55e', bg: 'rgba(34,197,94,.12)' },
+        recusou:         { icon: '❌', label: 'Recusou',     color: '#ef4444', bg: 'rgba(239,68,68,.12)' },
+        erro:            { icon: '⚠️', label: 'Erro',        color: '#f59e0b', bg: 'rgba(245,158,11,.12)' },
+        sem_resposta:    { icon: '🔇', label: 'Sem resp.',   color: '#71717a', bg: 'rgba(113,113,122,.12)' },
+        numero_invalido: { icon: '🚫', label: 'Nº inválido', color: '#ef4444', bg: 'rgba(239,68,68,.12)' }
     };
     const linhas = filtrados.map(e => {
         const j = (jogadores || []).find(x => x.id === e.jogador_id);
-        const tpl = (conviteTemplates || []).find(t => t.id === e.template_id);
         const dt = e.ts ? new Date(e.ts) : null;
-        const dtTxt = dt ? (dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })) : '—';
-        const variantBadge = e.variante === 'B' ? '<span title="Variante B (A/B testing)" style="background:rgba(168,85,247,.2);color:#a855f7;padding:.1rem .35rem;border-radius:.25rem;font-size:.6rem;font-weight:800;margin-left:.35rem;">B</span>' : '';
+        const hora = dt ? dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+        const dia = dt ? dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—';
+        const st = statusMap[e.status] || { icon: '•', label: e.status || '?', color: '#71717a', bg: 'rgba(113,113,122,.1)' };
         return `
-            <div style="display:grid;grid-template-columns:auto 1.5fr 1.5fr 1fr auto;gap:.65rem;padding:.6rem .85rem;border-bottom:1px solid #18181b;align-items:center;font-size:.78rem;">
-                <div style="color:#71717a;font-family:var(--font-mono,monospace);font-size:.72rem;white-space:nowrap;">${dtTxt}</div>
-                <div style="color:#fff;font-weight:600;">${escapeHtml(j ? (j.nome || '—') : '(removido)')}${variantBadge}</div>
-                <div style="color:#a1a1aa;">${escapeHtml(tpl ? (tpl.nome || '—') : '—')}</div>
-                <div>${statusBadges[e.status] || e.status}</div>
-                <div style="display:flex;gap:.3rem;">
-                    <button title="Confirmou"     onclick="convHistoricoMarcarStatus('${e.id}','confirmou')"    style="background:transparent;border:1px solid #27272a;color:#22c55e;width:30px;height:30px;border-radius:.3rem;cursor:pointer;font-size:.78rem;">✅</button>
-                    <button title="Recusou"       onclick="convHistoricoMarcarStatus('${e.id}','recusou')"      style="background:transparent;border:1px solid #27272a;color:#ef4444;width:30px;height:30px;border-radius:.3rem;cursor:pointer;font-size:.78rem;">❌</button>
-                    <button title="Sem resposta"  onclick="convHistoricoMarcarStatus('${e.id}','sem_resposta')" style="background:transparent;border:1px solid #27272a;color:#a1a1aa;width:30px;height:30px;border-radius:.3rem;cursor:pointer;font-size:.78rem;">🔇</button>
+            <div style="display:flex;align-items:center;gap:.65rem;padding:.55rem .85rem;border-bottom:1px solid #18181b;">
+                <div style="min-width:52px;text-align:center;">
+                    <div style="font-size:.72rem;font-weight:700;color:#a1a1aa;font-family:var(--font-mono,monospace);">${dia}</div>
+                    <div style="font-size:.6rem;color:#52525b;font-family:var(--font-mono,monospace);">${hora}</div>
                 </div>
-            </div>
-        `;
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:.8rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(j ? (j.nome || '—') : '(removido)')}</div>
+                </div>
+                <span style="background:${st.bg};color:${st.color};padding:.15rem .5rem;border-radius:.3rem;font-size:.62rem;font-weight:700;white-space:nowrap;">${st.icon} ${st.label}</span>
+            </div>`;
     }).join('');
-    wrap.innerHTML = `
-        <div style="display:grid;grid-template-columns:auto 1.5fr 1.5fr 1fr auto;gap:.65rem;padding:.55rem .85rem;background:#18181b;font-size:.62rem;text-transform:uppercase;color:#71717a;font-weight:800;letter-spacing:.05em;border-bottom:1px solid #1e1e23;position:sticky;top:0;z-index:1;">
-            <div>Data</div><div>Jogador</div><div>Template</div><div>Status</div><div>Marcar</div>
-        </div>
-        ${linhas}
-    `;
+    wrap.innerHTML = linhas;
 }
 
 async function convHistoricoMarcarStatus(envioId, novoStatus) {
@@ -40147,19 +40085,13 @@ async function convHistoricoMarcarStatus(envioId, novoStatus) {
 function convHistoricoExportarCSV() {
     const filtrados = _convHistGetFiltrados();
     if (filtrados.length === 0) { showToast('⚠️ Nada pra exportar'); return; }
-    const rows = [['Data', 'Jogador', 'Template', 'Torneio', 'Status', 'Variante', 'Resposta em']];
+    const rows = [['Data', 'Jogador', 'Status']];
     filtrados.forEach(e => {
         const j = (jogadores || []).find(x => x.id === e.jogador_id);
-        const tpl = (conviteTemplates || []).find(t => t.id === e.template_id);
-        const torn = e.torneio_id ? ((torneios || []).find(t => t.id === e.torneio_id) || {}).nome : '';
         rows.push([
             e.ts ? new Date(e.ts).toLocaleString('pt-BR') : '',
             j ? (j.nome || '') : '(removido)',
-            tpl ? (tpl.nome || '') : '',
-            torn || '',
-            e.status || '',
-            e.variante || 'A',
-            e.resposta_ts ? new Date(e.resposta_ts).toLocaleString('pt-BR') : ''
+            e.status || ''
         ]);
     });
     const csv = rows.map(r => r.map(c => {
@@ -40434,17 +40366,20 @@ async function _convEnviarUm(idx) {
 
     // Registra no banco
     try {
-        await sb.from('convite_envios').insert({
+        const row = {
             clube_id: sbClube.id,
             jogador_id: p.jogador.id,
-            template_id: _convCampanha.templateId,
+            template_id: _convCampanha.templateId || null,
             torneio_id: _convCampanha.torneioId || null,
             flyer_url: flyerUrl || null,
             status: envioOk ? 'enviado' : 'erro',
             variante: variante,
             metodo: metodo
-        });
-    } catch (e) { console.warn('[Convites] erro registrar envio:', e); }
+        };
+        const { error: insErr } = await sb.from('convite_envios').insert(row);
+        if (insErr) console.error('[Convites] erro insert convite_envios:', insErr, row);
+        else console.log('[Convites] ✅ registrado envio para', p.jogador.nome);
+    } catch (e) { console.error('[Convites] erro registrar envio:', e); }
 
     convRenderListaCampanha();
     return true;
@@ -40860,6 +40795,7 @@ function convEnviarAtualizarCount() {
 
 // Set para rastrear jogadores selecionados (por id)
 let _convEnviarSelecionados = new Set();
+let _convEnviarUserInteracted = false; // evita auto-selecionar tudo quando user clica "Nenhum"
 
 // Renderizar lista de jogadores com checkboxes
 function convEnviarRenderJogadores() {
@@ -40885,8 +40821,9 @@ function convEnviarRenderJogadores() {
         return;
     }
 
-    // Se selecionados está vazio (primeira vez ou troca de filtro), selecionar todos com WhatsApp válido
-    if (_convEnviarSelecionados.size === 0 && !busca) {
+    // Se selecionados está vazio E nunca houve interação, selecionar todos com WhatsApp válido
+    // _convEnviarUserInteracted evita reselecionar tudo quando o user clica "Nenhum"
+    if (_convEnviarSelecionados.size === 0 && !busca && !_convEnviarUserInteracted) {
         filtrados.forEach(j => {
             const val = _normalizarWhatsappE164(j.whatsapp);
             if (val.valido) _convEnviarSelecionados.add(j.id);
@@ -40914,6 +40851,7 @@ function convEnviarRenderJogadores() {
 }
 
 function convEnviarToggleJogador(id, checked) {
+    _convEnviarUserInteracted = true;
     if (checked) {
         _convEnviarSelecionados.add(id);
     } else {
@@ -40924,6 +40862,7 @@ function convEnviarToggleJogador(id, checked) {
 }
 
 function convEnviarToggleAll(selecionar) {
+    _convEnviarUserInteracted = true;
     const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
     if (selecionar) {
         filtrados.forEach(j => {
