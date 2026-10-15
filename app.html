@@ -14614,6 +14614,15 @@ async function carregarUsuarioEClube(authUser) {
     }
 
     sbClube = clube;
+
+    // Garante feature_overrides carregado (select('*') pode não trazer se PostgREST cache stale)
+    if (!sbClube.feature_overrides) {
+        try {
+            const { data: foData } = await sb.rpc('admin_get_clube_feature_data', { p_clube_id: clube.id });
+            if (foData?.feature_overrides) sbClube.feature_overrides = foData.feature_overrides;
+        } catch(e) { console.warn('[FEATURES] Não carregou overrides:', e); }
+    }
+
     currentUser = {
         id: usuario.id,
         nome: usuario.nome,
