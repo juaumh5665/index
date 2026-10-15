@@ -23242,6 +23242,7 @@ const FEATURE_REQUIREMENTS = {
     'relatorios':  'feature_relatorios_avancados',
     'stackclock':  'feature_stackclock',
     'stackbar':    'feature_stackbar',
+    'convites':    'feature_convites_premium',
 };
 
 // Retorna o objeto do plano atual do clube (ou null)
@@ -23306,10 +23307,18 @@ window._aplicarGatesVisuais = function(rootEl) {
         const feat = el.getAttribute('data-feature');
         if (!feat) return;
         const liberado = window.hasFeature(feat);
+
+        // Verifica se a feature tem override explícito OFF (admin removeu)
+        const key = feat.startsWith('feature_') ? feat : 'feature_' + feat;
+        const overrides = window.sbClube?.feature_overrides;
+        const overrideOff = overrides && typeof overrides === 'object' && key in overrides && overrides[key] === false;
+
         if (liberado) {
-            // Libera: remove a classe locked e o tooltip
+            // Libera: remove a classe locked, tooltip e mostra o item
             el.classList.remove('is-locked');
             el.removeAttribute('data-feature-tooltip');
+            el.style.removeProperty('display');
+            el.classList.remove('feature-hidden-by-override');
             // Restaura onclick original se a gente tinha trocado
             if (el.__originalOnclick !== undefined) {
                 el.onclick = el.__originalOnclick;
@@ -23320,9 +23329,15 @@ window._aplicarGatesVisuais = function(rootEl) {
                 el.setAttribute('for', el.__originalFor);
                 delete el.__originalFor;
             }
+        } else if (overrideOff) {
+            // Override explícito OFF: esconde completamente (admin desativou pra este clube)
+            el.classList.add('feature-hidden-by-override');
+            el.style.display = 'none';
         } else {
-            // Bloqueia: adiciona a classe locked e tooltip
+            // Bloqueia: adiciona a classe locked e tooltip (feature não incluída no plano)
             el.classList.add('is-locked');
+            el.classList.remove('feature-hidden-by-override');
+            el.style.removeProperty('display');
             const label = el.getAttribute('data-feature-label') || el.textContent.trim();
             el.setAttribute('data-feature-tooltip', '🔒 Recurso disponível no plano Pro');
             // Caso especial: <label for="..."> dispara o input automaticamente pelo navegador.
@@ -25907,8 +25922,20 @@ function applyPermissions() {
             el.style.display = 'none';
             return;
         }
+
+        // Verifica se a feature tem override explícito OFF (admin removeu pra este clube)
+        const req = (typeof _featureRequiredFor === 'function') ? _featureRequiredFor(page) : null;
+        const ovKey = req || '';
+        const ovObj = window.sbClube?.feature_overrides;
+        const isOverrideOff = ovObj && typeof ovObj === 'object' && ovKey in ovObj && ovObj[ovKey] === false;
+
+        if (isOverrideOff) {
+            el.style.display = 'none';
+            return;
+        }
+
         el.style.display = 'flex';
-        
+
         // Aplica cadeado se o papel permite mas o plano não inclui a feature
         _aplicarCadeadoSidebar(el, podeFeature, page);
     });
