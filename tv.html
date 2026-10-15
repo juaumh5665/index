@@ -202,10 +202,11 @@
         body.quality-performance .pw-blind-container {
             box-shadow: none !important;
         }
-        /* Carrossel: animação mais lenta (menos repaints) */
+        /* Carrossel Performance: usa variável CSS que o JS controla (velocidade configurável).
+           Fallback 180s = comportamento anterior caso JS não setar a var */
         body.quality-performance .pw-prize-strip,
         body.quality-performance .gt-strip {
-            animation-duration: 180s !important;
+            animation-duration: var(--perf-duration, 180s) !important;
         }
         /* Animações decorativas pausadas */
         body.quality-performance .pw-prize-pos.gold,
@@ -2169,6 +2170,7 @@ function _montarVertical(pp) {
     var linhasPorConjunto = Math.ceil(pp.valores.length / 2);
     var seg = Math.max(15, linhasPorConjunto * conjuntos * 3 * multV);
     strip.style.animationDuration = seg + 's';
+    strip.style.setProperty('--perf-duration', seg + 's');
     carousel.classList.add('show');
 
     // Modo Copa: vertical equipes — popula apenas se dados de equipes mudaram
@@ -2200,6 +2202,7 @@ function _montarVertical(pp) {
     var linhasPorConjuntoEq = Math.ceil(pp.equipes.valores.length / 2);
     var segEq = Math.max(15, linhasPorConjuntoEq * conjEq * 3 * multV);
     stripEq.style.animationDuration = segEq + 's';
+    stripEq.style.setProperty('--perf-duration', segEq + 's');
     carouselEq.classList.add('show');
 }
 
@@ -2283,6 +2286,7 @@ function montarCarouselPremiacao(d) {
         var mult = _getMultiplicadorVelocidade(pp);
         var segundos = Math.max(10, pp.valores.length * conjuntos * 0.8 * mult);
         strip.style.animationDuration = segundos + 's';
+        strip.style.setProperty('--perf-duration', segundos + 's');
 
         carousel.classList.add('show');
 
@@ -2313,6 +2317,7 @@ function montarCarouselPremiacao(d) {
                 stripEq.style.setProperty('--ticker-end', '-' + pctTranslateEq + '%');
                 var segundosEq = Math.max(10, pp.equipes.valores.length * conjuntosEq * 0.8 * mult);
                 stripEq.style.animationDuration = segundosEq + 's';
+                stripEq.style.setProperty('--perf-duration', segundosEq + 's');
                 carouselEq.classList.add('show');
             }
         }
@@ -2398,6 +2403,7 @@ function montarCarouselPremiacao(d) {
             var multG = _getMultiplicadorVelocidade(pp);
             var seg = Math.max(10, pp.valores.length * conjuntos * 0.8 * multG);
             strip.style.animationDuration = seg + 's';
+            strip.style.setProperty('--perf-duration', seg + 's');
 
             ticker.classList.add('show');
 
@@ -2444,6 +2450,7 @@ function montarCarouselPremiacao(d) {
                     stripEq.style.setProperty('--ticker-end', '-' + pctTransEq + '%');
                     var segEq = Math.max(20, pp.equipes.valores.length * conjEq * 0.8);
                     stripEq.style.animationDuration = segEq + 's';
+                    stripEq.style.setProperty('--perf-duration', segEq + 's');
                     tickerEq.classList.add('show');
                 }
             }
