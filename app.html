@@ -23258,25 +23258,23 @@ window.hasFeature = function(name) {
     // Modo seguro: tudo liberado se a chave estiver desligada
     if (!FEATURES_BLOCK_ENABLED) return true;
 
-    // Super admin GLOBAL (verificado via RPC is_super_admin no banco)
-    // tem acesso a tudo pra dar suporte. NÃO confunde com papel 'admin' do clube,
-    // que é apenas o dono/gestor de um clube específico (esse paga plano normal).
-    if (window._isSuperAdmin === true) {
-        return true;
-    }
-
-    // Em trial, libera tudo (cliente conhece o produto completo durante o trial)
-    if (sbClube?.status === 'trial') return true;
-
     const key = name.startsWith('feature_') ? name : 'feature_' + name;
 
-    // Override por clube: se o super admin definiu override específico,
-    // ele prevalece sobre o plano. true = forçar ON, false = forçar OFF.
-    // Ausente ou null = herdar do plano (comportamento padrão).
+    // Override por clube TEM PRIORIDADE MÁXIMA: se o super admin definiu
+    // override específico, ele prevalece sobre tudo (inclusive super admin e trial).
+    // true = forçar ON, false = forçar OFF.
+    // Ausente ou null = herdar do fluxo normal (super admin > trial > plano).
     const overrides = sbClube?.feature_overrides;
     if (overrides && typeof overrides === 'object' && key in overrides) {
         return !!overrides[key];
     }
+
+    // Super admin GLOBAL (verificado via RPC is_super_admin no banco)
+    // tem acesso a tudo pra dar suporte, MAS respeita overrides explícitos acima.
+    if (window._isSuperAdmin === true) return true;
+
+    // Em trial, libera tudo (cliente conhece o produto completo durante o trial)
+    if (sbClube?.status === 'trial') return true;
 
     // Se ainda não carregou cache, libera (fail-open temporário; depois recarrega correto)
     if (!_planosCache || _planosCache.length === 0) return true;
