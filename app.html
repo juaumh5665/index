@@ -40465,17 +40465,77 @@ async function convMarcarSemWhatsapp(idx) {
     }
 }
 
+// ─── ANTI-BAN: configurações de proteção ───
+const _CONV_ANTI_BAN = {
+    LIMITE_DIARIO: 100,            // máx mensagens/dia via API
+    DELAY_BASE: 10000,             // delay mínimo entre envios (10s)
+    DELAY_MAX: 25000,              // delay máximo (25s)
+    DELAY_INCREMENTO: 500,         // cresce 0.5s a cada envio
+    JITTER: 5000,                  // variação aleatória ±5s
+    PAUSA_A_CADA: 10,             // pausa longa a cada N envios
+    PAUSA_MIN: 120,                // pausa mínima (2 min, em segundos)
+    PAUSA_MAX: 180,                // pausa máxima (3 min, em segundos)
+    ERROS_MAX: 5                   // para após N erros
+};
+
+// Contador diário — persiste no localStorage
+function _convGetEnviosHoje() {
+    try {
+        const key = 'conv_envios_hoje_' + (sbClube ? sbClube.id : '');
+        const raw = localStorage.getItem(key);
+        if (!raw) return { count: 0, date: '' };
+        const obj = JSON.parse(raw);
+        const hoje = new Date().toISOString().slice(0, 10);
+        if (obj.date !== hoje) return { count: 0, date: hoje };
+        return obj;
+    } catch { return { count: 0, date: '' }; }
+}
+function _convIncrementarEnviosHoje() {
+    try {
+        const key = 'conv_envios_hoje_' + (sbClube ? sbClube.id : '');
+        const hoje = new Date().toISOString().slice(0, 10);
+        const obj = _convGetEnviosHoje();
+        obj.count++;
+        obj.date = hoje;
+        localStorage.setItem(key, JSON.stringify(obj));
+        return obj.count;
+    } catch { return 0; }
+}
+
+// Countdown visual durante pausa longa
+async function _convPausaLonga(segundos, progressTextoEl) {
+    for (let s = segundos; s > 0; s--) {
+        if (!_convCampanha.enviando) break;
+        const min = Math.floor(s / 60);
+        const sec = s % 60;
+        if (progressTextoEl) progressTextoEl.textContent = `⏸ Pausa de segurança: ${min}:${String(sec).padStart(2,'0')} restantes`;
+        await new Promise(r => setTimeout(r, 1000));
+    }
+}
+
 async function convIniciarEnvioSequencial() {
     if (_convCampanha.enviando) return;
     const validos = _convCampanha.listaJogadores.filter(p => p.valido && !p.enviado);
     if (validos.length === 0) { showToast('⚠️ Ninguém pra enviar'); return; }
 
     const usandoApi = _waProvider.isApi();
-    const msgConfirm = usandoApi
-        ? `Vai enviar ${validos.length} convite${validos.length!==1?'s':''} automaticamente via API (${_waProvider.getConfig().provider}).\n\nDelay de 8-15s entre cada para evitar bloqueio.\n\nContinuar?`
-        : `Vai enviar ${validos.length} convite${validos.length!==1?'s':''} sequencialmente, com 2s entre cada um. Cada um abrirá em uma nova aba do WhatsApp.\n\nContinuar?`;
 
-    if (!confirm(msgConfirm)) return;
+    // ─── Checagem de limite diário ───
+    if (usandoApi) {
+        const enviosHoje = _convGetEnviosHoje();
+        const restante = _CONV_ANTI_BAN.LIMITE_DIARIO - enviosHoje.count;
+        if (restante <= 0) {
+            showToast('🚫 Limite diário de ' + _CONV_ANTI_BAN.LIMITE_DIARIO + ' mensagens atingido. Tente amanhã.');
+            return;
+        }
+        const aEnviar = Math.min(validos.length, restante);
+        const tempoEstimado = Math.round((aEnviar * 17 + Math.floor(aEnviar / _CONV_ANTI_BAN.PAUSA_A_CADA) * 150) / 60);
+        const msgConfirm = `Vai enviar ${aEnviar} convite${aEnviar!==1?'s':''} via API.\n\n🛡️ Proteção anti-ban ativa:\n• Delay progressivo de ${_CONV_ANTI_BAN.DELAY_BASE/1000}s a ${_CONV_ANTI_BAN.DELAY_MAX/1000}s\n• Pausa de ${_CONV_ANTI_BAN.PAUSA_MIN/60}-${_CONV_ANTI_BAN.PAUSA_MAX/60}min a cada ${_CONV_ANTI_BAN.PAUSA_A_CADA} envios\n• Limite diário: ${enviosHoje.count}/${_CONV_ANTI_BAN.LIMITE_DIARIO} usado\n\n⏱️ Tempo estimado: ~${tempoEstimado} min\n\nContinuar?`;
+        if (!confirm(msgConfirm)) return;
+    } else {
+        const msgConfirm = `Vai enviar ${validos.length} convite${validos.length!==1?'s':''} sequencialmente, com 2s entre cada um. Cada um abrirá em uma nova aba do WhatsApp.\n\nContinuar?`;
+        if (!confirm(msgConfirm)) return;
+    }
 
     _convCampanha.enviando = true;
     _convCampanha.indiceAtual = -1;
@@ -40486,12 +40546,20 @@ async function convIniciarEnvioSequencial() {
     let errosApi = 0;
     let semWhatsapp = 0;
     let sucessos = 0;
+    let enviadosNesseLote = 0;
     const inicioEnvio = Date.now();
+    const progressTextoEl = document.getElementById('conv-progress-texto');
 
     for (let i = 0; i < _convCampanha.listaJogadores.length; i++) {
         if (!_convCampanha.enviando) break; // pausado/cancelado
         const p = _convCampanha.listaJogadores[i];
         if (!p.valido || p.enviado) continue;
+
+        // ─── Limite diário em tempo real ───
+        if (usandoApi && _convGetEnviosHoje().count >= _CONV_ANTI_BAN.LIMITE_DIARIO) {
+            showToast('🚫 Limite diário atingido (' + _CONV_ANTI_BAN.LIMITE_DIARIO + '). Restantes ficam pra amanhã.');
+            break;
+        }
 
         _convCampanha.indiceAtual = i - 1;
 
@@ -40500,7 +40568,6 @@ async function convIniciarEnvioSequencial() {
         p._enviando = false;
         convRenderListaCampanha();
 
-        // Pequeno delay pra UI atualizar
         await new Promise(r => setTimeout(r, 100));
 
         // Troca pra "enviando"
@@ -40520,10 +40587,12 @@ async function convIniciarEnvioSequencial() {
             errosApi++;
         } else if (p.enviado) {
             sucessos++;
+            enviadosNesseLote++;
+            if (usandoApi) _convIncrementarEnviosHoje();
         }
 
         // Se muitos erros seguidos, pausa pra segurança
-        if (errosApi >= 5) {
+        if (errosApi >= _CONV_ANTI_BAN.ERROS_MAX) {
             _convCampanha.enviando = false;
             showToast('⚠️ Muitos erros na API. Envio pausado. Verifique a conexão do WhatsApp.');
             break;
@@ -40534,14 +40603,30 @@ async function convIniciarEnvioSequencial() {
         const processados = sucessos + errosApi + semWhatsapp;
         const pct = Math.round((processados / total) * 100);
         document.getElementById('conv-progress-fill').style.width = pct + '%';
-        document.getElementById('conv-progress-texto').textContent = `${processados} / ${total} processados` + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : '') + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '');
+        if (progressTextoEl) progressTextoEl.textContent = `${processados} / ${total} processados` + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : '') + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '');
         document.getElementById('conv-progress-pct').textContent = pct + '%';
 
         convRenderListaCampanha();
 
-        // Delay: API usa 8-15s randomizado (anti-spam), manual usa 2s
-        const delay = usandoApi ? (8000 + Math.random() * 7000) : 2000;
-        await new Promise(r => setTimeout(r, delay));
+        if (usandoApi) {
+            // ─── PAUSA LONGA a cada N envios ───
+            if (enviadosNesseLote > 0 && enviadosNesseLote % _CONV_ANTI_BAN.PAUSA_A_CADA === 0) {
+                const pausaSeg = _CONV_ANTI_BAN.PAUSA_MIN + Math.floor(Math.random() * (_CONV_ANTI_BAN.PAUSA_MAX - _CONV_ANTI_BAN.PAUSA_MIN));
+                console.log(`[Convites] 🛡️ Pausa de segurança: ${pausaSeg}s após ${enviadosNesseLote} envios`);
+                await _convPausaLonga(pausaSeg, progressTextoEl);
+            }
+
+            // ─── DELAY PROGRESSIVO entre envios ───
+            const delayBase = Math.min(
+                _CONV_ANTI_BAN.DELAY_BASE + (enviadosNesseLote * _CONV_ANTI_BAN.DELAY_INCREMENTO),
+                _CONV_ANTI_BAN.DELAY_MAX
+            );
+            const jitter = (Math.random() - 0.5) * 2 * _CONV_ANTI_BAN.JITTER; // ±5s
+            const delay = Math.max(5000, delayBase + jitter);
+            await new Promise(r => setTimeout(r, delay));
+        } else {
+            await new Promise(r => setTimeout(r, 2000));
+        }
     }
 
     _convCampanha.enviando = false;
