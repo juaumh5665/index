@@ -3069,7 +3069,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <!-- Torneio (opcional) -->
                                 <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1rem;">
                                     <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.45rem;">Torneio (preenche {torneio}, {data}, {hora}, {buyin})</div>
-                                    <select id="conv-enviar-torneio" class="inp" style="width:100%;">
+                                    <select id="conv-enviar-torneio" class="inp" style="width:100%;" onchange="convEnviarAtualizarPreview()">
                                         <option value="">— Nenhum (mensagem avulsa) —</option>
                                     </select>
                                 </div>
@@ -3094,6 +3094,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                     </div>
                                     <div id="conv-enviar-variacoes-info" style="display:none;margin-top:.65rem;background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:.4rem;padding:.45rem .65rem;font-size:.68rem;color:#86efac;">
                                     </div>
+                                    <div id="conv-enviar-preview-badge" style="display:none;margin-top:.45rem;font-size:.6rem;color:#71717a;text-align:right;"></div>
                                 </div>
 
                                 <!-- Pra quem -->
@@ -3176,6 +3177,9 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <button onclick="convFinalizarEnvio()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.5rem .85rem;border-radius:.4rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;">❌ Finalizar</button>
                                 </div>
                             </div>
+
+                            <!-- Relatório pós-envio -->
+                            <div id="conv-relatorio-envio" style="display:none;margin-top:1rem;padding:1rem;background:#111113;border:1px solid #1e1e23;border-radius:.65rem;"></div>
                         </div>
                     </div>
 
@@ -40232,8 +40236,10 @@ function convRenderListaCampanha() {
         const isVip = torneiosCnt >= 10;
 
         let statusHtml = '';
-        if (p._enviando) {
-            statusHtml = `<div style="font-size:.7rem;color:#fbbf24;font-weight:700;">⏳ Enviando…</div>`;
+        if (p._verificando) {
+            statusHtml = `<div style="font-size:.7rem;color:#60a5fa;font-weight:700;">🔍 Verificando número…</div>`;
+        } else if (p._enviando) {
+            statusHtml = `<div style="font-size:.7rem;color:#fbbf24;font-weight:700;">📤 Enviando mensagem…</div>`;
         } else if (p.semWhatsapp) {
             // Marcado manualmente como número inválido (após operador ver erro no WhatsApp)
             statusHtml = `<div style="font-size:.7rem;color:#ef4444;font-weight:700;">🚫 Sem WhatsApp</div>`;
@@ -40486,7 +40492,11 @@ async function convIniciarEnvioSequencial() {
     document.getElementById('conv-progress-bar').style.display = '';
     document.getElementById('conv-btn-sequencial').disabled = true;
 
+    // Contadores pro relatório final
     let errosApi = 0;
+    let semWhatsapp = 0;
+    let sucessos = 0;
+    const inicioEnvio = Date.now();
 
     for (let i = 0; i < _convCampanha.listaJogadores.length; i++) {
         if (!_convCampanha.enviando) break; // pausado/cancelado
@@ -40494,10 +40504,33 @@ async function convIniciarEnvioSequencial() {
         if (!p.valido || p.enviado) continue;
 
         _convCampanha.indiceAtual = i - 1;
+
+        // Feedback: verificando número
+        p._verificando = true;
+        p._enviando = false;
+        convRenderListaCampanha();
+
+        // Pequeno delay pra UI atualizar
+        await new Promise(r => setTimeout(r, 100));
+
+        // Troca pra "enviando"
+        p._verificando = false;
+        p._enviando = true;
+        convRenderListaCampanha();
+
         await _convEnviarUm(i);
 
-        // Conta erros de API
-        if (p.erroApi) errosApi++;
+        p._verificando = false;
+        p._enviando = false;
+
+        // Contadores
+        if (p.erroApi && (p.erroApi.includes('não tem WhatsApp') || p.erroApi.includes('NOT_ON_WHATSAPP'))) {
+            semWhatsapp++;
+        } else if (p.erroApi) {
+            errosApi++;
+        } else if (p.enviado) {
+            sucessos++;
+        }
 
         // Se muitos erros seguidos, pausa pra segurança
         if (errosApi >= 5) {
@@ -40508,11 +40541,13 @@ async function convIniciarEnvioSequencial() {
 
         // Atualiza barra
         const total = validos.length;
-        const enviados = _convCampanha.listaJogadores.filter(x => x.enviado).length;
-        const pct = Math.round((enviados / total) * 100);
+        const processados = sucessos + errosApi + semWhatsapp;
+        const pct = Math.round((processados / total) * 100);
         document.getElementById('conv-progress-fill').style.width = pct + '%';
-        document.getElementById('conv-progress-texto').textContent = `${enviados} / ${total} enviados` + (errosApi ? ` (${errosApi} erro${errosApi!==1?'s':''})` : '');
+        document.getElementById('conv-progress-texto').textContent = `${processados} / ${total} processados` + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : '') + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '');
         document.getElementById('conv-progress-pct').textContent = pct + '%';
+
+        convRenderListaCampanha();
 
         // Delay: API usa 8-15s randomizado (anti-spam), manual usa 2s
         const delay = usandoApi ? (8000 + Math.random() * 7000) : 2000;
@@ -40521,8 +40556,41 @@ async function convIniciarEnvioSequencial() {
 
     _convCampanha.enviando = false;
     document.getElementById('conv-btn-sequencial').disabled = false;
-    const totalEnviados = _convCampanha.listaJogadores.filter(x => x.enviado).length;
-    showToast(`🎉 Envio concluído! ${totalEnviados} enviado${totalEnviados!==1?'s':''}` + (errosApi ? ` (${errosApi} erro${errosApi!==1?'s':''})` : ''));
+
+    // ─── RELATÓRIO PÓS-ENVIO ───
+    const tempoTotal = Math.round((Date.now() - inicioEnvio) / 1000);
+    const minutos = Math.floor(tempoTotal / 60);
+    const segundos = tempoTotal % 60;
+    const tempoStr = minutos > 0 ? `${minutos}min ${segundos}s` : `${segundos}s`;
+
+    const relatorio = document.getElementById('conv-relatorio-envio');
+    if (relatorio) {
+        relatorio.style.display = '';
+        relatorio.innerHTML = `
+            <div style="font-size:.75rem;font-weight:800;color:#fff;margin-bottom:.75rem;">📊 Relatório de Envio</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem;margin-bottom:.65rem;">
+                <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:.5rem;padding:.55rem .65rem;text-align:center;">
+                    <div style="font-size:1.3rem;font-weight:900;color:#22c55e;">${sucessos}</div>
+                    <div style="font-size:.6rem;color:#86efac;font-weight:700;">✅ Enviados</div>
+                </div>
+                <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:.5rem;padding:.55rem .65rem;text-align:center;">
+                    <div style="font-size:1.3rem;font-weight:900;color:#ef4444;">${semWhatsapp}</div>
+                    <div style="font-size:.6rem;color:#fca5a5;font-weight:700;">📵 Sem WhatsApp</div>
+                </div>
+                <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;padding:.55rem .65rem;text-align:center;">
+                    <div style="font-size:1.3rem;font-weight:900;color:#f59e0b;">${errosApi}</div>
+                    <div style="font-size:.6rem;color:#fcd34d;font-weight:700;">⚠️ Erros</div>
+                </div>
+                <div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:.5rem;padding:.55rem .65rem;text-align:center;">
+                    <div style="font-size:1.3rem;font-weight:900;color:#60a5fa;">⏱️</div>
+                    <div style="font-size:.6rem;color:#93c5fd;font-weight:700;">${tempoStr}</div>
+                </div>
+            </div>
+            ${sucessos > 0 ? `<div style="font-size:.68rem;color:#86efac;font-weight:600;">Taxa de sucesso: ${Math.round((sucessos / (sucessos + semWhatsapp + errosApi)) * 100)}%</div>` : ''}
+        `;
+    }
+
+    showToast(`🎉 Envio concluído! ${sucessos} enviado${sucessos!==1?'s':''}` + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '') + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : ''));
 }
 
 function convPausarEnvio() {
@@ -40592,16 +40660,27 @@ function convEnviarAtualizarPreview() {
 
     if (!previewEl) return;
 
-    // Aplicar spin + variáveis de exemplo
+    // Pega dados reais quando disponíveis
+    const torneioId = document.getElementById('conv-enviar-torneio')?.value || null;
+    const torneio = torneioId ? (torneios || []).find(t => t.id === torneioId) : null;
+
+    // Pega um jogador real selecionado pra preview (ou usa exemplo)
+    let jogadorPreview = null;
+    if (_convEnviarSelecionados && _convEnviarSelecionados.size > 0 && typeof jogadores !== 'undefined') {
+        const primeiroId = [..._convEnviarSelecionados][0];
+        jogadorPreview = (jogadores || []).find(j => j.id === primeiroId);
+    }
+
+    // Aplicar spin + variáveis com dados reais ou de exemplo
     let previewTexto = _convSpinText(texto);
     previewTexto = previewTexto
-        .replace(/\{nome\}/g, 'João Silva')
-        .replace(/\{apelido\}/g, 'João')
-        .replace(/\{torneio\}/g, 'Daily Sexta')
-        .replace(/\{data\}/g, 'sexta-feira, 18/10')
-        .replace(/\{hora\}/g, '21:00')
-        .replace(/\{buyin\}/g, 'R$ 50')
-        .replace(/\{prize\}/g, 'R$ 5.000')
+        .replace(/\{nome\}/g, jogadorPreview ? (jogadorPreview.nome || 'Jogador') : 'João Silva')
+        .replace(/\{apelido\}/g, jogadorPreview ? (jogadorPreview.apelido || (jogadorPreview.nome || '').split(' ')[0] || 'Jogador') : 'João')
+        .replace(/\{torneio\}/g, torneio ? (torneio.nome || 'Torneio') : 'Daily Sexta')
+        .replace(/\{data\}/g, torneio && torneio.data ? new Date(torneio.data).toLocaleDateString('pt-BR', {weekday:'long',day:'2-digit',month:'2-digit'}) : 'sexta-feira, 18/10')
+        .replace(/\{hora\}/g, torneio && torneio.hora ? torneio.hora : '21:00')
+        .replace(/\{buyin\}/g, torneio && torneio.buyin != null ? 'R$ ' + Number(torneio.buyin).toLocaleString('pt-BR') : 'R$ 50')
+        .replace(/\{prize\}/g, torneio && torneio.premiacao != null ? 'R$ ' + Number(torneio.premiacao).toLocaleString('pt-BR') : 'R$ 5.000')
         .replace(/\{clube\}/g, (sbClube && sbClube.nome) || 'o clube');
 
     // Assinatura
@@ -40609,6 +40688,17 @@ function convEnviarAtualizarPreview() {
     if (assinatura) previewTexto = previewTexto + '\n\n' + assinatura;
 
     previewEl.textContent = previewTexto || 'Escreva a mensagem ao lado...';
+
+    // Badge mostrando de quem é o preview
+    const previewBadge = document.getElementById('conv-enviar-preview-badge');
+    if (previewBadge) {
+        if (jogadorPreview) {
+            previewBadge.textContent = `Preview de: ${jogadorPreview.nome || 'Jogador'}`;
+            previewBadge.style.display = '';
+        } else {
+            previewBadge.style.display = 'none';
+        }
+    }
 
     // Imagem no preview
     if (_convEnviarImgDataUrl && imgPreview && imgTag) {
@@ -40775,6 +40865,7 @@ function convEnviarToggleJogador(id, checked) {
         _convEnviarSelecionados.delete(id);
     }
     _convEnviarAtualizarSelecionadosCount();
+    convEnviarAtualizarPreview();
 }
 
 function convEnviarToggleAll(selecionar) {
@@ -40788,6 +40879,7 @@ function convEnviarToggleAll(selecionar) {
         filtrados.forEach(j => _convEnviarSelecionados.delete(j.id));
     }
     convEnviarRenderJogadores();
+    convEnviarAtualizarPreview();
 }
 
 function convEnviarFiltrarLista() {
