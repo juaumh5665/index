@@ -7526,6 +7526,28 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
 </div>
 
+<!-- MODAL: EDITAR MESA CASH (limites) -->
+<div id="modal-editar-cash-mesa" class="modal-overlay">
+    <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="font-weight:800;font-size:1.1rem;"><i class="fa-solid fa-pen-to-square" style="color:var(--gold);"></i> Editar Mesa</h3>
+            <button onclick="closeModal('modal-editar-cash-mesa')" style="background:none;border:none;color:#52525b;font-size:1.4rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div><label class="inp-label">Nome da Mesa</label><input id="em-nome" class="inp"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+                <div><label class="inp-label">Buy-in Mín R$</label><input id="em-bmin" type="number" step="1" min="0" class="inp"></div>
+                <div><label class="inp-label">Buy-in Máx R$</label><input id="em-bmax" type="number" step="1" min="0" class="inp"></div>
+            </div>
+            <div style="font-size:.7rem;color:#71717a;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.15);border-radius:.4rem;padding:.6rem .8rem;">
+                <i class="fa-solid fa-info-circle" style="color:var(--gold);"></i> Jogadores que já entraram mantêm o valor original. O novo limite vale para as próximas entradas.
+            </div>
+            <input type="hidden" id="em-mesa-id">
+            <button onclick="salvarEdicaoMesaCash()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Salvar Alterações</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: ADICIONAR JOGADOR À MESA -->
 <div id="modal-add-cash-jogador" class="modal-overlay">
     <div style="background:#111113;border:1px solid #1e1e23;border-radius:1.25rem;padding:2rem;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;">
@@ -37353,6 +37375,38 @@ function criarMesaCash() {
     _criarMesaCashOrig_wrapped(fichasInicio);
 }
 
+function abrirEditarMesaCash(mesaId) {
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+    document.getElementById('em-mesa-id').value = mesaId;
+    document.getElementById('em-nome').value = m.nome || '';
+    document.getElementById('em-bmin').value = m.bmin || 0;
+    document.getElementById('em-bmax').value = m.bmax || 0;
+    openModal('modal-editar-cash-mesa');
+}
+
+function salvarEdicaoMesaCash() {
+    const mesaId = document.getElementById('em-mesa-id').value;
+    const m = cashMesas.find(x => x.id === mesaId);
+    if (!m) return showToast('⚠️ Mesa não encontrada');
+
+    const nome = document.getElementById('em-nome').value.trim();
+    const bmin = parseFloat(document.getElementById('em-bmin').value) || 0;
+    const bmax = parseFloat(document.getElementById('em-bmax').value) || 0;
+
+    if (!nome) return showToast('⚠️ Nome obrigatório');
+    if (bmin > bmax) return showToast('⚠️ Buy-in mínimo maior que máximo');
+
+    m.nome = nome;
+    m.bmin = bmin;
+    m.bmax = bmax;
+    _markDirty('cashMesas', m.id);
+    saveData();
+    closeModal('modal-editar-cash-mesa');
+    renderCashMesas();
+    showToast('✅ Mesa atualizada!');
+}
+
 function renderCashMesas() {
     const list  = document.getElementById('cash-mesas-list');
     const empty = document.getElementById('cash-sem-mesas');
@@ -37384,6 +37438,7 @@ function renderCashMesas() {
                     <div style="display:flex;gap:.75rem;align-items:center;margin-top:.35rem;">
                         <span class="tag tag-running">Ativa</span>
                         <span style="font-size:.75rem;color:#52525b;">Buy-in R$ ${m.bmin}–${m.bmax}</span>
+                        <button onclick="abrirEditarMesaCash('${m.id}')" style="background:none;border:none;color:#71717a;cursor:pointer;font-size:.7rem;padding:.1rem .3rem;" title="Editar limites da mesa"><i class="fa-solid fa-pen-to-square"></i></button>
                         <span style="font-size:.75rem;color:#71717a;font-family:var(--font-mono);"><i class="fa-regular fa-clock"></i> ${tempoAberto}</span>
                     </div>
                 </div>
