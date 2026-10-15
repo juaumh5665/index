@@ -9100,7 +9100,39 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div id="entrada-desconto-tv" style="display:none;margin-top:.4rem;padding-top:.4rem;border-top:1px solid #1e1e23;font-size:.75rem;color:#3b82f6;"></div>
             </div>
-            <button onclick="registrarEntrada()" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Entrada</button>
+            <!-- PAGO NA HORA: toggle para registrar pagamento junto com a entrada -->
+            <div id="pago-na-hora-wrap" style="border:1px solid #1e1e23;border-radius:.65rem;overflow:hidden;transition:border-color .2s;">
+                <div onclick="_togglePagoNaHora()" style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;cursor:pointer;user-select:none;background:rgba(34,197,94,.04);transition:background .2s;">
+                    <div style="display:flex;align-items:center;gap:.6rem;">
+                        <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;background:rgba(34,197,94,.12);color:#22c55e;"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                        <div>
+                            <div style="font-weight:700;font-size:.85rem;">Pago na hora?</div>
+                            <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">Registra o pagamento junto com a entrada</div>
+                        </div>
+                    </div>
+                    <label style="position:relative;width:42px;height:24px;flex-shrink:0;" onclick="event.stopPropagation()">
+                        <input type="checkbox" id="pago-na-hora-toggle" onchange="_togglePagoNaHora(this.checked)" style="opacity:0;width:0;height:0;">
+                        <span id="pago-na-hora-track" style="position:absolute;inset:0;background:#2a2a30;border-radius:12px;transition:background .2s;cursor:pointer;"></span>
+                        <span id="pago-na-hora-thumb" style="position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;"></span>
+                    </label>
+                </div>
+                <div id="pago-na-hora-body" style="max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s;padding:0 1rem;">
+                    <div style="margin-bottom:.5rem;">
+                        <label style="font-size:.7rem;color:#71717a;text-transform:uppercase;letter-spacing:.08em;font-weight:700;display:block;margin-bottom:.4rem;">Forma de pagamento</label>
+                        <div id="pago-na-hora-metodos" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;"></div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.65rem;">
+                        <span style="font-size:.85rem;font-weight:700;color:#71717a;">R$</span>
+                        <input type="number" id="pago-na-hora-valor" class="inp" step="0.01" min="0" value="0" oninput="_atualizarPagoNaHoraPreview()" style="font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:1.1rem;font-weight:700;">
+                    </div>
+                    <div style="font-size:.65rem;color:#71717a;margin-top:.35rem;">Valor total. Edite para pagamento parcial — o restante fica em aberto.</div>
+                    <div id="pago-na-hora-preview" style="margin-top:.65rem;margin-bottom:.5rem;padding:.6rem .85rem;border-radius:.45rem;font-size:.75rem;display:flex;justify-content:space-between;align-items:center;font-weight:700;border:1px solid rgba(34,197,94,.2);background:rgba(34,197,94,.06);color:#22c55e;">
+                        <span>Saldo após entrada</span>
+                        <span style="font-family:var(--font-mono,'JetBrains Mono',monospace);font-weight:800;">R$ 0,00 ✓</span>
+                    </div>
+                </div>
+            </div>
+            <button onclick="registrarEntrada()" id="btn-confirmar-entrada" class="btn-gold" style="padding:.85rem;border-radius:.6rem;">Confirmar Entrada</button>
         </div>
     </div>
 </div>
@@ -30443,6 +30475,7 @@ function openModalEntrada(idx) {
     if (staffWrap) staffWrap.style.display = 'none';
     
     atualizarResumoEntrada();
+    _resetPagoNaHora();
     openModal('modal-entrada');
 }
 
@@ -31106,6 +31139,134 @@ function atualizarResumoEntrada() {
             tvDiv.innerHTML = '';
         }
     }
+
+    // Sincroniza valor do "Pago na hora" com o total calculado
+    const _pnhValorEl = document.getElementById('pago-na-hora-valor');
+    if (_pnhValorEl) {
+        // Usa o valor "a cobrar" (descontando ticket/voucher se houver)
+        const tvSel2 = _getTicketVoucherSelecionado();
+        const tvAbate = (tvSel2 && total > 0) ? Math.min(tvSel2.valor, total) : 0;
+        const aCobrar = Math.max(0, total - tvAbate);
+        _pnhValorEl.value = aCobrar > 0 ? aCobrar.toFixed(2) : '0';
+        _atualizarPagoNaHoraPreview();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGO NA HORA — Toggle para registrar pagamento junto com a entrada
+// ═══════════════════════════════════════════════════════════════════
+
+function _resetPagoNaHora() {
+    const toggle = document.getElementById('pago-na-hora-toggle');
+    if (toggle) toggle.checked = false;
+    const body = document.getElementById('pago-na-hora-body');
+    if (body) body.style.maxHeight = '0';
+    if (body) body.style.padding = '0 1rem';
+    const track = document.getElementById('pago-na-hora-track');
+    if (track) track.style.background = '#2a2a30';
+    const thumb = document.getElementById('pago-na-hora-thumb');
+    if (thumb) thumb.style.transform = 'translateX(0)';
+    const wrap = document.getElementById('pago-na-hora-wrap');
+    if (wrap) wrap.style.borderColor = '#1e1e23';
+    // Atualiza botão confirmar
+    const btn = document.getElementById('btn-confirmar-entrada');
+    if (btn) btn.textContent = 'Confirmar Entrada';
+    // Renderiza botões de método de pagamento
+    _renderMetodosPagoNaHora();
+    // Estado interno
+    window._pagoNaHoraMetodo = 'pix'; // default PIX
+}
+
+function _renderMetodosPagoNaHora() {
+    const container = document.getElementById('pago-na-hora-metodos');
+    if (!container) return;
+    // Excluir crédito_sistema — créditos são tratados apenas no caixa
+    const metodos = ['dinheiro', 'pix', 'debito', 'credito', 'cheque'];
+    container.innerHTML = metodos.map(k => {
+        const m = PAYMENT_METHODS[k];
+        const sel = k === (window._pagoNaHoraMetodo || 'pix');
+        return `<button type="button" onclick="_selectMetodoPagoNaHora('${k}')" style="
+            display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.5rem .3rem;
+            border-radius:.45rem;border:1.5px solid ${sel ? m.color : '#2a2a30'};
+            background:${sel ? m.color + '18' : 'transparent'};cursor:pointer;transition:all .15s;
+        ">
+            <i class="fa-solid ${m.icon}" style="font-size:.9rem;color:${sel ? m.color : '#71717a'};"></i>
+            <span style="font-size:.6rem;font-weight:600;color:${sel ? m.color : '#71717a'};">${m.label}</span>
+        </button>`;
+    }).join('');
+}
+
+function _selectMetodoPagoNaHora(metodo) {
+    window._pagoNaHoraMetodo = metodo;
+    _renderMetodosPagoNaHora();
+}
+
+function _togglePagoNaHora(forceState) {
+    const toggle = document.getElementById('pago-na-hora-toggle');
+    if (!toggle) return;
+    // Se chamado pelo div wrapper (click), inverte; se chamado pelo checkbox (onchange), usa forceState
+    if (typeof forceState === 'boolean') {
+        toggle.checked = forceState;
+    } else {
+        toggle.checked = !toggle.checked;
+    }
+    const isOn = toggle.checked;
+    const body = document.getElementById('pago-na-hora-body');
+    const track = document.getElementById('pago-na-hora-track');
+    const wrap = document.getElementById('pago-na-hora-wrap');
+    if (body) {
+        body.style.maxHeight = isOn ? '300px' : '0';
+        body.style.padding = isOn ? '.65rem 1rem' : '0 1rem';
+    }
+    if (track) track.style.background = isOn ? '#22c55e' : '#2a2a30';
+    const thumb = document.getElementById('pago-na-hora-thumb');
+    if (thumb) thumb.style.transform = isOn ? 'translateX(18px)' : 'translateX(0)';
+    if (wrap) wrap.style.borderColor = isOn ? 'rgba(34,197,94,.35)' : '#1e1e23';
+    // Atualiza texto do botão confirmar
+    const btn = document.getElementById('btn-confirmar-entrada');
+    if (btn) btn.textContent = isOn ? 'Confirmar Entrada + Pagamento' : 'Confirmar Entrada';
+    if (isOn) _atualizarPagoNaHoraPreview();
+}
+
+function _atualizarPagoNaHoraPreview() {
+    const preview = document.getElementById('pago-na-hora-preview');
+    const valorInput = document.getElementById('pago-na-hora-valor');
+    if (!preview || !valorInput) return;
+    const valorPago = Math.max(0, parseFloat(valorInput.value) || 0);
+    // Pega o total a cobrar do resumo
+    const resumoEl = document.getElementById('entrada-resumo-valor');
+    let totalCobrar = 0;
+    if (resumoEl) {
+        const txt = resumoEl.innerText || resumoEl.textContent || '';
+        totalCobrar = parseFloat(txt.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0;
+    }
+    // Desconta ticket/voucher se houver
+    const tvSel = (typeof _getTicketVoucherSelecionado === 'function') ? _getTicketVoucherSelecionado() : null;
+    const tvAbate = (tvSel && totalCobrar > 0) ? Math.min(tvSel.valor, totalCobrar) : 0;
+    const aCobrar = Math.max(0, totalCobrar - tvAbate);
+    const saldoApos = valorPago - aCobrar;
+    if (saldoApos >= 0) {
+        preview.style.borderColor = 'rgba(34,197,94,.2)';
+        preview.style.background = 'rgba(34,197,94,.06)';
+        preview.style.color = '#22c55e';
+        preview.innerHTML = '<span>Saldo após entrada</span><span style="font-family:var(--font-mono,\'JetBrains Mono\',monospace);font-weight:800;">R$ ' + Math.abs(saldoApos).toFixed(2).replace('.', ',') + ' ✓</span>';
+    } else {
+        preview.style.borderColor = 'rgba(245,158,11,.2)';
+        preview.style.background = 'rgba(245,158,11,.06)';
+        preview.style.color = '#f59e0b';
+        preview.innerHTML = '<span>Saldo restante</span><span style="font-family:var(--font-mono,\'JetBrains Mono\',monospace);font-weight:800;">-R$ ' + Math.abs(saldoApos).toFixed(2).replace('.', ',') + '</span>';
+    }
+}
+
+/** Lê configuração do pago na hora da UI — retorna null se desativado */
+function _getPagoNaHoraConfig() {
+    const toggle = document.getElementById('pago-na-hora-toggle');
+    if (!toggle || !toggle.checked) return null;
+    const valorInput = document.getElementById('pago-na-hora-valor');
+    const valor = Math.max(0, parseFloat(valorInput?.value) || 0);
+    if (valor <= 0) return null;
+    const metodo = window._pagoNaHoraMetodo || 'pix';
+    return { valor, metodo };
 }
 
 function registrarEntrada() {
@@ -31409,6 +31570,25 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         }
     }
 
+    // PAGO NA HORA: registra pagamento junto com o combo
+    let _pnhRegistradoCombo = 0;
+    let _pnhMetodoCombo = '';
+    const _pnhConfigCombo = _getPagoNaHoraConfig();
+    if (_pnhConfigCombo && _pnhConfigCombo.valor > 0) {
+        const metodoInfo = PAYMENT_METHODS[_pnhConfigCombo.metodo] || PAYMENT_METHODS.pix;
+        const labelsCombo = acoesOrdenadas.map(a => descMap[a] || a).join(' + ');
+        registrarTransacao({
+            jogadorId: jid,
+            tipo: 'pagamento',
+            valor: _pnhConfigCombo.valor,
+            descricao: `Pagamento no ato (${metodoInfo.label}) — ${labelsCombo}`,
+            metodo: _pnhConfigCombo.metodo,
+            origem: 'caixa',
+        });
+        _pnhRegistradoCombo = _pnhConfigCombo.valor;
+        _pnhMetodoCombo = metodoInfo.label;
+    }
+
     saveData();
     closeModal('modal-entrada');
     updateModalTorneio();
@@ -31435,7 +31615,8 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         if (e.passaporte && e.passaporte.cobrado) totalGeral += Number(e.passaporte.valor) || 0;
     });
     const tvLabelCombo = tvAbatidoCombo > 0 ? ` · 🎟️ Desconto R$ ${tvAbatidoCombo.toFixed(2).replace('.',',')}` : '';
-    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}${tvLabelCombo}`);
+    const pnhLabelCombo = _pnhRegistradoCombo > 0 ? ` · 💵 Pago ${_pnhMetodoCombo} R$ ${_pnhRegistradoCombo.toFixed(2).replace('.',',')}` : '';
+    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}${tvLabelCombo}${pnhLabelCombo}`);
 
     // Lembrete de Jackpot pendente: combo tem buy-in? Se sim, dispara
     // (mesma regra do single — só pra primeira entrada do jogador)
@@ -31686,6 +31867,24 @@ async function _registrarEntradaImpl() {
         tvAbatido = await _consumirTicketVoucher(tvSelecionado, jid, valorTotal, t.id, t.nome);
     }
 
+    // PAGO NA HORA: registra pagamento junto com a entrada
+    let _pnhRegistrado = 0;
+    let _pnhMetodo = '';
+    const _pnhConfig = _getPagoNaHoraConfig();
+    if (_pnhConfig && _pnhConfig.valor > 0) {
+        const metodoInfo = PAYMENT_METHODS[_pnhConfig.metodo] || PAYMENT_METHODS.pix;
+        registrarTransacao({
+            jogadorId: jid,
+            tipo: 'pagamento',
+            valor: _pnhConfig.valor,
+            descricao: `Pagamento no ato (${metodoInfo.label}) — ${descMap[tipo] || tipo}`,
+            metodo: _pnhConfig.metodo,
+            origem: 'caixa',
+        });
+        _pnhRegistrado = _pnhConfig.valor;
+        _pnhMetodo = metodoInfo.label;
+    }
+
     saveData();
     closeModal('modal-entrada');
     updateModalTorneio();
@@ -31695,7 +31894,7 @@ async function _registrarEntradaImpl() {
     // UNDO: permite desfazer entrada
     const snapshot = JSON.stringify(t);
     const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0) + (tvAbatido > 0 ? 1 : 0);
+    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0) + (tvAbatido > 0 ? 1 : 0) + (_pnhRegistrado > 0 ? 1 : 0);
     const txsBefore = transacoes.length - numTxsAdicionadas;
     const nomeJog = getJogadorNome(jid);
     registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
@@ -31709,7 +31908,8 @@ async function _registrarEntradaImpl() {
 
     const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
     const tvLabel = tvAbatido > 0 ? ` · 🎟️ Desconto R$ ${tvAbatido.toFixed(2).replace('.',',')}` : '';
-    showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}${tvLabel}`);
+    const pnhLabel = _pnhRegistrado > 0 ? ` · 💵 Pago ${_pnhMetodo} R$ ${_pnhRegistrado.toFixed(2).replace('.',',')}` : '';
+    showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}${tvLabel}${pnhLabel}`);
 
     // Lembrete de Jackpot pendente (só dispara em buy-in, e se jogador ainda não tem jackpot)
     _lembreteJackpotPosCompra(t, jid, tipo);
