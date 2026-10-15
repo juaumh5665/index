@@ -31594,7 +31594,8 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     const _pnhConfigCombo = _getPagoNaHoraConfig();
     if (_pnhConfigCombo && _pnhConfigCombo.valor > 0) {
         const metodoInfo = PAYMENT_METHODS[_pnhConfigCombo.metodo] || PAYMENT_METHODS.pix;
-        const labelsCombo = acoesOrdenadas.map(a => descMap[a] || a).join(' + ');
+        const _pnhDescMap = { buyin:'Buy-in', buyin_duplo:'Buy-in Duplo', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance', reentry:'Re-entry' };
+        const labelsCombo = acoesOrdenadas.map(a => _pnhDescMap[a] || a).join(' + ');
         registrarTransacao({
             jogadorId: jid,
             tipo: 'pagamento',
