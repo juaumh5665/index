@@ -3997,18 +3997,36 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <!-- ABA: TRANSAÇÕES -->
                 <div id="caixa-transacoes" class="caixatab-content" style="display:none;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-                        <div style="font-size:.7rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Todas as Transações</div>
-                        <select id="caixa-trans-filtro" class="inp" style="padding:.4rem .75rem;font-size:.8rem;width:200px;" onchange="renderCaixaTransacoes()">
-                            <option value="todas">Todos os tipos</option>
-                            <option value="buyin">Buy-ins torneio</option>
-                            <option value="reentry">Re-entries</option>
-                            <option value="bar">Bar & Vendas</option>
-                            <option value="pagamento">Pagamentos</option>
-                            <option value="deposito">Depósitos</option>
-                            <option value="estorno">↩ Estornos</option>
-                        </select>
+                    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;margin-bottom:1rem;">
+                        <div style="flex:1;min-width:130px;">
+                            <label style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.25rem;">Tipo</label>
+                            <select id="caixa-trans-filtro" class="inp" style="padding:.4rem .6rem;font-size:.75rem;width:100%;" onchange="renderCaixaTransacoes()">
+                                <option value="todas">Todos os tipos</option>
+                                <option value="buyin">Buy-ins torneio</option>
+                                <option value="reentry">Re-entries</option>
+                                <option value="bar">Bar & Vendas</option>
+                                <option value="pagamento">Pagamentos</option>
+                                <option value="deposito">Depósitos</option>
+                                <option value="estorno">↩ Estornos</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;min-width:150px;">
+                            <label style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.25rem;">Torneio</label>
+                            <select id="caixa-trans-torneio" class="inp" style="padding:.4rem .6rem;font-size:.75rem;width:100%;" onchange="renderCaixaTransacoes()">
+                                <option value="todos">Todos os torneios</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;min-width:120px;">
+                            <label style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.25rem;">Data início</label>
+                            <input type="date" id="caixa-trans-data-ini" class="inp" style="padding:.4rem .6rem;font-size:.75rem;width:100%;" onchange="renderCaixaTransacoes()">
+                        </div>
+                        <div style="flex:1;min-width:120px;">
+                            <label style="font-size:.6rem;color:#52525b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:.25rem;">Data fim</label>
+                            <input type="date" id="caixa-trans-data-fim" class="inp" style="padding:.4rem .6rem;font-size:.75rem;width:100%;" onchange="renderCaixaTransacoes()">
+                        </div>
+                        <button onclick="_limparFiltrosTransacoes()" style="background:rgba(113,113,122,.1);border:1px solid #2a2a30;color:#71717a;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.7rem;font-weight:600;white-space:nowrap;font-family:inherit;" title="Limpar filtros"><i class="fa-solid fa-filter-circle-xmark"></i> Limpar</button>
                     </div>
+                    <div id="caixa-trans-contador" style="font-size:.65rem;color:#52525b;margin-bottom:.5rem;"></div>
                     <div id="caixa-transacoes-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:600px;overflow-y:auto;"></div>
                 </div>
             </div>
@@ -47244,15 +47262,60 @@ function renderCaixaHistorico() {
         </div>`).join('');
 }
 
+function _popularFiltroTorneioTransacoes() {
+    const sel = document.getElementById('caixa-trans-torneio');
+    if (!sel) return;
+    const valorAtual = sel.value;
+    // Coleta torneios que têm transações
+    const torneioIds = new Set();
+    transacoes.forEach(tx => { if (tx.refId) torneioIds.add(tx.refId); });
+    const torneioOpts = [];
+    torneios.forEach(t => {
+        if (torneioIds.has(t.id)) {
+            torneioOpts.push({ id: t.id, nome: t.nome, ts: t.criadoEm || 0 });
+        }
+    });
+    // Adiciona torneios que já foram apagados mas têm transações (mostra ID parcial)
+    torneioIds.forEach(tid => {
+        if (!torneioOpts.find(o => o.id === tid)) {
+            torneioOpts.push({ id: tid, nome: '(Torneio removido)', ts: 0 });
+        }
+    });
+    torneioOpts.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    sel.innerHTML = '<option value="todos">Todos os torneios</option>' +
+        torneioOpts.map(o => `<option value="${o.id}"${o.id === valorAtual ? ' selected' : ''}>${o.nome}</option>`).join('');
+}
+
+function _limparFiltrosTransacoes() {
+    const f1 = document.getElementById('caixa-trans-filtro');
+    const f2 = document.getElementById('caixa-trans-torneio');
+    const f3 = document.getElementById('caixa-trans-data-ini');
+    const f4 = document.getElementById('caixa-trans-data-fim');
+    if (f1) f1.value = 'todas';
+    if (f2) f2.value = 'todos';
+    if (f3) f3.value = '';
+    if (f4) f4.value = '';
+    renderCaixaTransacoes();
+}
+
 function renderCaixaTransacoes() {
     const el = document.getElementById('caixa-transacoes-list');
     if (!el) return;
+
+    // Popula filtro de torneios
+    _popularFiltroTorneioTransacoes();
+
     const filtro = (document.getElementById('caixa-trans-filtro') || {}).value || 'todas';
+    const filtroTorneio = (document.getElementById('caixa-trans-torneio') || {}).value || 'todos';
+    const dataIni = (document.getElementById('caixa-trans-data-ini') || {}).value || '';
+    const dataFim = (document.getElementById('caixa-trans-data-fim') || {}).value || '';
+
     // CAIXA GERAL: esconde transações de cash (têm caixa próprio por mesa)
     let lista = transacoes
         .filter(t => !_isTransacaoCash(t))
         .sort((a,b) => b.ts - a.ts);
 
+    // Filtro por tipo
     const mapFiltro = {
         buyin: ['buyin'],
         reentry: ['reentry'],
@@ -47261,18 +47324,39 @@ function renderCaixaTransacoes() {
         deposito: ['deposito'],
     };
     if (mapFiltro[filtro]) lista = lista.filter(t => mapFiltro[filtro].includes(t.tipo));
-
-    if (!lista.length) {
-        el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma transação neste filtro</div>`;
-        return;
-    }
     // Adiciona filtro de estornos ao mapa
     if (filtro === 'estorno') lista = transacoes.filter(t => !_isTransacaoCash(t) && (t.estornada || t.tipo === 'estorno')).sort((a,b) => b.ts - a.ts);
 
+    // Filtro por torneio
+    if (filtroTorneio !== 'todos') {
+        lista = lista.filter(t => t.refId === filtroTorneio);
+    }
+
+    // Filtro por data
+    if (dataIni) {
+        const tsIni = new Date(dataIni + 'T00:00:00').getTime();
+        lista = lista.filter(t => t.ts >= tsIni);
+    }
+    if (dataFim) {
+        const tsFim = new Date(dataFim + 'T23:59:59').getTime();
+        lista = lista.filter(t => t.ts <= tsFim);
+    }
+
+    // Contador
+    const contadorEl = document.getElementById('caixa-trans-contador');
+    const totalOriginal = transacoes.filter(t => !_isTransacaoCash(t)).length;
+    if (contadorEl) {
+        const temFiltro = filtro !== 'todas' || filtroTorneio !== 'todos' || dataIni || dataFim;
+        contadorEl.textContent = temFiltro
+            ? `Mostrando ${lista.length} de ${totalOriginal} transações`
+            : `${totalOriginal} transações`;
+    }
+
     if (!lista.length) {
         el.innerHTML = `<div style="padding:3rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma transação neste filtro</div>`;
         return;
     }
+
     el.innerHTML = lista.slice(0, 300).map(t => {
         const j = jogadores.find(x => x.id === t.jogadorId);
         const positivo = t.valor >= 0;
