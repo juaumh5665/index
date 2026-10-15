@@ -31421,6 +31421,10 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     const ordemFixa = ['buyin', 'buyin_duplo', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
     const acoesOrdenadas = ordemFixa.filter(tp => acoes.includes(tp));
 
+    // 🛡 ROLLBACK GUARD: se qualquer erro acontecer após gravar transações,
+    // reverte entries e transações pra evitar duplicidade em retry
+    try {
+
     let i = 0;
     for (const tipo of acoesOrdenadas) {
         // Calcula valor base por tipo (mesma lógica do _registrarEntradaImpl single)
@@ -31609,6 +31613,28 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     }
 
     saveData();
+
+    } catch (errCombo) {
+        // 🛡 ROLLBACK: reverte entries e transações criadas nesta operação
+        console.error('[COMBO] Erro — revertendo operação:', errCombo);
+        entriesCriadas.forEach(e => {
+            const idx = t.entries.indexOf(e);
+            if (idx >= 0) t.entries.splice(idx, 1);
+        });
+        if (transacoes.length > txsBefore) {
+            transacoes = transacoes.slice(0, txsBefore);
+        }
+        // Restaura eliminados e bounties do snapshot
+        try {
+            const snap = JSON.parse(snapshot);
+            t.eliminados = snap.eliminados;
+            if (snap.bounties) t.bounties = snap.bounties;
+        } catch(_) {}
+        saveData();
+        showToast('❌ Erro ao registrar combo — operação revertida, tente novamente');
+        return;
+    }
+
     closeModal('modal-entrada');
     updateModalTorneio();
     renderTorneiosList();
@@ -31709,6 +31735,15 @@ async function _registrarEntradaImpl() {
     // Suspender realtime durante toda a inscrição (8s)
     if (typeof _suspenderRealtime === 'function') _suspenderRealtime(8000);
     if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
+
+    // 🛡 Snapshot pra rollback em caso de erro
+    const _snapshotSingle = JSON.stringify(t);
+    const _tornIdxSingle = torneios.indexOf(t);
+    const _txsBeforeSingle = transacoes.length;
+
+    // 🛡 ROLLBACK GUARD: se qualquer erro acontecer após gravar transações,
+    // reverte tudo pra evitar duplicidade em retry
+    try {
 
     // Se re-entry: reativar (remover da lista de eliminados)
     if (tipo === 'reentry') {
@@ -31905,6 +31940,22 @@ async function _registrarEntradaImpl() {
     }
 
     saveData();
+
+    } catch (errSingle) {
+        // 🛡 ROLLBACK: reverte tudo pra estado anterior
+        console.error('[SINGLE] Erro — revertendo operação:', errSingle);
+        try {
+            const snap = JSON.parse(_snapshotSingle);
+            torneios[_tornIdxSingle] = snap;
+        } catch(_) {}
+        if (transacoes.length > _txsBeforeSingle) {
+            transacoes = transacoes.slice(0, _txsBeforeSingle);
+        }
+        saveData();
+        showToast('❌ Erro ao registrar entrada — operação revertida, tente novamente');
+        return;
+    }
+
     closeModal('modal-entrada');
     updateModalTorneio();
     renderTorneiosList();
