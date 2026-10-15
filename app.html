@@ -25098,8 +25098,10 @@ const _FEATURE_LIST = [
 
 async function adminAbrirModalFeatureOverride(clubeId, nome) {
     // Busca dados atuais do clube e seu plano
-    const { data: clube, error } = await sb.from('clubes').select('*').eq('id', clubeId).single();
+    const { data: clubes, error } = await sb.from('clubes').select('*').eq('id', clubeId);
     if (error) { alert('Erro ao carregar clube: ' + error.message); return; }
+    if (!clubes || clubes.length === 0) { alert('Clube não encontrado (id: ' + clubeId + ')'); return; }
+    const clube = clubes[0];
 
     const overrides = clube.feature_overrides || {};
 
