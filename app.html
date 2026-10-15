@@ -6014,6 +6014,22 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
         </div>
 
+        <!-- Velocidade de exibição na TV -->
+        <div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;padding:.65rem .85rem;margin-bottom:.5rem;">
+            <div style="font-size:.7rem;color:#a1a1aa;font-weight:700;margin-bottom:.5rem;display:flex;align-items:center;gap:.35rem;">
+                <i class="fa-solid fa-gauge-high" style="color:var(--gold);font-size:.7rem;"></i>
+                Velocidade de exibição
+            </div>
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <span style="font-size:.65rem;color:#71717a;white-space:nowrap;">🐢 Lenta</span>
+                <input type="range" id="prm-velocidade" min="1" max="5" step="1" value="3" style="flex:1;accent-color:var(--gold);cursor:pointer;">
+                <span style="font-size:.65rem;color:#71717a;white-space:nowrap;">Rápida 🐇</span>
+            </div>
+            <div style="text-align:center;margin-top:.3rem;">
+                <span id="prm-velocidade-label" style="font-size:.7rem;font-weight:700;color:var(--gold);">Normal</span>
+            </div>
+        </div>
+
         <!-- Ações -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
             <label style="display:flex;align-items:center;gap:.6rem;padding:.65rem .85rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;cursor:pointer;">
@@ -8583,7 +8599,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <button onclick="abrirEditarTorneio(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;color:#a78bfa;border-color:rgba(167,139,250,.3);" title="Editar torneio (travas, breaks, impressão)"><i class="fa-solid fa-gear"></i> Editar</button>
                 <button onclick="abrirTV(activeTorneioIdx)" class="btn-ghost" style="font-size:.8rem;"><i class="fa-solid fa-tv"></i> Abrir TV</button>
-                <button onclick="copiarLinkRanking()" class="btn-ghost" style="font-size:.8rem;" title="Copiar link público do ranking"><i class="fa-solid fa-share-nodes"></i> Copiar Link</button>
+                <button onclick="copiarLinkTV()" class="btn-ghost" style="font-size:.8rem;" title="Copiar link da TV pública do clube"><i class="fa-solid fa-tv"></i> Copiar Link TV</button>
                 <button onclick="compartilharWhatsApp()" class="btn-ghost" style="font-size:.8rem;color:#25d366;border-color:rgba(37,211,102,.3);" title="Compartilhar no WhatsApp"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
                 <button onclick="abrirRelatorioParticipantes()" class="btn-ghost" style="font-size:.8rem;color:#06b6d4;border-color:rgba(6,182,212,.3);" title="Lista de participantes para envio de mensagens"><i class="fa-solid fa-users"></i> Participantes</button>
                 <button onclick="abrirResumoFinanceiroTorneio()" class="btn-ghost" style="font-size:.8rem;color:#f59e0b;border-color:rgba(245,158,11,.3);" title="Resumo financeiro para enviar ao dono"><i class="fa-solid fa-file-invoice-dollar"></i> Resumo</button>
@@ -14139,6 +14155,39 @@ async function copiarLinkRanking() {
         ta.select();
         try { document.execCommand('copy'); showToast('✓ Link copiado!'); }
         catch { prompt('Copie o link:', url); }
+        document.body.removeChild(ta);
+    }
+}
+
+async function copiarLinkTV() {
+    // Copia a URL da TV pública do clube (atalho direto do modal de torneio)
+    if (!sbClube?.id) return showToast('⚠️ Clube não carregado');
+
+    // Se já temos o slug em cache, monta a URL direto
+    if (!_tvSlugCache) {
+        // Tenta carregar
+        try {
+            const { data } = await sb.rpc('obter_tv_slug', { p_clube_id: sbClube.id });
+            if (data) _tvSlugCache = data;
+        } catch(e) {}
+    }
+
+    if (!_tvSlugCache) {
+        showToast('⚠️ URL da TV não disponível. Configure em Config > TV Pública.', 3000);
+        return;
+    }
+
+    const url = window.location.origin + '/tv/' + _tvSlugCache;
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('✓ Link da TV copiado!', 2500);
+    } catch(e) {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast('✓ Link da TV copiado!'); }
+        catch { prompt('Copie o link da TV:', url); }
         document.body.removeChild(ta);
     }
 }
@@ -32172,6 +32221,7 @@ function updateTV(idx) {
             vagas: _idx.map(i => ((_pp.vagas || [])[i]) || ''),
             // Estilo de exibição: 'horizontal' (atual) | 'vertical' | 'destaque'
             estiloPremiacao: t.premiacaoProjetada.estiloPremiacao || 'horizontal',
+            velocidadePremiacao: t.premiacaoProjetada.velocidadePremiacao || 3,
             // Modo Copa — campos opcionais. TV só renderiza o bloco extra se modoCopa=true
             modoCopa: !!t.premiacaoProjetada.modoCopa,
             percentEquipe: Number(t.premiacaoProjetada.percentEquipe) || 0,
@@ -50332,6 +50382,14 @@ function abrirPremiacaoProjetada() {
     const estiloAtual = pp.estiloPremiacao || 'horizontal';
     const radioEstilo = document.querySelector(`input[name="prm-estilo"][value="${estiloAtual}"]`);
     if (radioEstilo) radioEstilo.checked = true;
+
+    // Velocidade de exibição (1=muito lenta, 2=lenta, 3=normal, 4=rápida, 5=muito rápida)
+    const velSlider = document.getElementById('prm-velocidade');
+    if (velSlider) {
+        velSlider.value = pp.velocidadePremiacao || 3;
+        _atualizarLabelVelocidade(velSlider.value);
+        velSlider.oninput = function() { _atualizarLabelVelocidade(this.value); };
+    }
     
     // Modo Copa — setup dos campos visuais
     document.getElementById('prm-copa-toggle').checked = !!pp.modoCopa;
@@ -50668,6 +50726,12 @@ window.prmAtualizarVisualCopa = prmAtualizarVisualCopa;
 window.recalcularPayoutDistEquipes = recalcularPayoutDistEquipes;
 window.atualizarTotalEquipes = atualizarTotalEquipes;
 
+const _VELOCIDADE_LABELS = { 1: 'Muito lenta', 2: 'Lenta', 3: 'Normal', 4: 'Rápida', 5: 'Muito rápida' };
+function _atualizarLabelVelocidade(val) {
+    const lbl = document.getElementById('prm-velocidade-label');
+    if (lbl) lbl.textContent = _VELOCIDADE_LABELS[val] || 'Normal';
+}
+
 function salvarPremiacaoProjetada() {
     const t = torneios[activeTorneioIdx];
     if (!t || !t.premiacaoProjetada) return;
@@ -50675,6 +50739,9 @@ function salvarPremiacaoProjetada() {
     // Estilo de exibição na TV (horizontal | vertical | destaque)
     const radioMarcado = document.querySelector('input[name="prm-estilo"]:checked');
     t.premiacaoProjetada.estiloPremiacao = radioMarcado ? radioMarcado.value : 'horizontal';
+    // Velocidade de exibição (1-5, default 3)
+    const velSlider = document.getElementById('prm-velocidade');
+    t.premiacaoProjetada.velocidadePremiacao = velSlider ? parseInt(velSlider.value) : 3;
 
     saveData();
     closeModal('modal-premiacao-proj');

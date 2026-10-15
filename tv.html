@@ -2049,6 +2049,7 @@ function _iniciarSpotlight(pp) {
         v: pp.valores,
         mc: !!pp.modoCopa,
         eqv: (pp.equipes && pp.equipes.valores) || null,
+        vel: pp.velocidadePremiacao || 3,
     });
 
     // Já está rodando com os MESMOS dados? Só garante que está visível e sai.
@@ -2070,6 +2071,8 @@ function _iniciarSpotlight(pp) {
     var itensIndividual = pp.valores.map(function(v, i) { return { idx: i, valor: v }; });
     var itensEquipes = combinarEquipes ? pp.equipes.valores.map(function(v, i) { return { idx: i, valor: v }; }) : [];
 
+    var multSpot = _getMultiplicadorVelocidade(pp);
+    var intervaloSpot = Math.max(2000, Math.round(5500 * multSpot));
     _prizeSpotlightState.interval = setInterval(function() {
         var atual = _prizeSpotlightState;
         var listaAtual = atual.isEquipes ? itensEquipes : itensIndividual;
@@ -2082,7 +2085,7 @@ function _iniciarSpotlight(pp) {
             atual.index = 0;
         }
         _renderSpotlightItem();
-    }, 5500);
+    }, intervaloSpot);
 }
 
 function _esconderTodosEstilosPremiacao(preservar) {
@@ -2119,6 +2122,7 @@ function _montarVertical(pp) {
         v: pp.valores,
         mc: !!pp.modoCopa,
         eqv: (pp.equipes && pp.equipes.valores) || null,
+        vel: pp.velocidadePremiacao || 3,
     });
 
     // Sempre garante visibilidade dos elementos do vertical (mesmo se dataKey é igual)
@@ -2160,9 +2164,10 @@ function _montarVertical(pp) {
     }
     var pct = (100 / conjuntos);
     strip.style.setProperty('--ticker-end-v', '-' + pct + '%');
-    // 2 cols: ceil(N/2) linhas por conjunto. Tempo ~3s por linha (mais lento que antes, melhor leitura)
+    // 2 cols: ceil(N/2) linhas por conjunto. Tempo ~3s por linha (ajustado pela velocidade)
+    var multV = _getMultiplicadorVelocidade(pp);
     var linhasPorConjunto = Math.ceil(pp.valores.length / 2);
-    var seg = Math.max(30, linhasPorConjunto * conjuntos * 3);
+    var seg = Math.max(15, linhasPorConjunto * conjuntos * 3 * multV);
     strip.style.animationDuration = seg + 's';
     carousel.classList.add('show');
 
@@ -2193,9 +2198,17 @@ function _montarVertical(pp) {
     var pctEq = (100 / conjEq);
     stripEq.style.setProperty('--ticker-end-v', '-' + pctEq + '%');
     var linhasPorConjuntoEq = Math.ceil(pp.equipes.valores.length / 2);
-    var segEq = Math.max(30, linhasPorConjuntoEq * conjEq * 3);
+    var segEq = Math.max(15, linhasPorConjuntoEq * conjEq * 3 * multV);
     stripEq.style.animationDuration = segEq + 's';
     carouselEq.classList.add('show');
+}
+
+// Multiplicador de velocidade da premiação: vel 1=muito lenta (2.5x duração), 3=normal (1x), 5=muito rápida (0.4x duração)
+function _getMultiplicadorVelocidade(pp) {
+    var v = (pp && pp.velocidadePremiacao) ? pp.velocidadePremiacao : 3;
+    // Mapa: 1→2.5, 2→1.6, 3→1.0, 4→0.65, 5→0.4
+    var mapa = { 1: 2.5, 2: 1.6, 3: 1.0, 4: 0.65, 5: 0.4 };
+    return mapa[v] || 1.0;
 }
 
 function montarCarouselPremiacao(d) {
@@ -2236,6 +2249,7 @@ function montarCarouselPremiacao(d) {
             v: pp.valores,
             mc: pp.modoCopa,
             eqv: (pp.equipes && pp.equipes.valores) || null,
+            vel: pp.velocidadePremiacao || 3,
         });
         if (_prizeTicker.dataKey === dataKey && strip.children.length > 0) {
             // Dados iguais - só garante que está visível
@@ -2265,8 +2279,9 @@ function montarCarouselPremiacao(d) {
         var pctTranslate = (100 / conjuntos);
         strip.style.setProperty('--ticker-end', '-' + pctTranslate + '%');
 
-        // Duração proporcional
-        var segundos = Math.max(20, pp.valores.length * conjuntos * 0.8);
+        // Duração proporcional (ajustada pela velocidade configurada)
+        var mult = _getMultiplicadorVelocidade(pp);
+        var segundos = Math.max(10, pp.valores.length * conjuntos * 0.8 * mult);
         strip.style.animationDuration = segundos + 's';
 
         carousel.classList.add('show');
@@ -2296,7 +2311,7 @@ function montarCarouselPremiacao(d) {
                 }
                 var pctTranslateEq = (100 / conjuntosEq);
                 stripEq.style.setProperty('--ticker-end', '-' + pctTranslateEq + '%');
-                var segundosEq = Math.max(20, pp.equipes.valores.length * conjuntosEq * 0.8);
+                var segundosEq = Math.max(10, pp.equipes.valores.length * conjuntosEq * 0.8 * mult);
                 stripEq.style.animationDuration = segundosEq + 's';
                 carouselEq.classList.add('show');
             }
@@ -2327,7 +2342,7 @@ function montarCarouselPremiacao(d) {
             if (ov) ov.style.display = 'none';
 
             // Verifica mudanças
-            var dataKey = JSON.stringify(pp.valores);
+            var dataKey = JSON.stringify({ v: pp.valores, vel: pp.velocidadePremiacao || 3 });
             if (_globalTicker.dataKey === dataKey && strip.children.length > 0) {
                 if (!ticker.classList.contains('show')) ticker.classList.add('show');
                 return;
@@ -2379,8 +2394,9 @@ function montarCarouselPremiacao(d) {
             var pctTranslate = (100 / conjuntos);
             strip.style.setProperty('--ticker-end', '-' + pctTranslate + '%');
 
-            // Duração proporcional
-            var seg = Math.max(20, pp.valores.length * conjuntos * 0.8);
+            // Duração proporcional (ajustada pela velocidade configurada)
+            var multG = _getMultiplicadorVelocidade(pp);
+            var seg = Math.max(10, pp.valores.length * conjuntos * 0.8 * multG);
             strip.style.animationDuration = seg + 's';
 
             ticker.classList.add('show');
@@ -4080,6 +4096,7 @@ function montarCarouselPremiacao(d) {
           percentuais: _idx.map(function(i) { return (_pp.percentuais || [])[i] || 0; }),
           vagas: _idx.map(function(i) { return ((_pp.vagas || [])[i]) || ''; }),
           estiloPremiacao: _pp.estiloPremiacao || 'horizontal',
+          velocidadePremiacao: _pp.velocidadePremiacao || 3,
           modoCopa: !!_pp.modoCopa,
           percentEquipe: Number(_pp.percentEquipe) || 0,
           equipes: (_pp.modoCopa && _pp.equipes) ? {
@@ -4090,7 +4107,7 @@ function montarCarouselPremiacao(d) {
         };
       })() : null,
     };
-    
+
     // Enviar pra MESMA função onmessage que a popup já tem!
     window.postMessage(payload, '*');
   }
