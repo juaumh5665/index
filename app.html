@@ -24961,13 +24961,23 @@ function adminRenderClubes(clubes) {
             <td style="padding:.75rem 1rem;text-align:right;font-weight:600;">${valor}</td>
             <td style="padding:.75rem 1rem;text-align:center;">
                 <div style="display:flex;gap:.25rem;justify-content:center;flex-wrap:wrap;">
-                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', 7)" 
-                            style="padding:.3rem .55rem;background:#1e3a8a;border:1px solid #3b82f6;color:#fff;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;" 
+                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', -7)"
+                            style="padding:.3rem .55rem;background:#4a1520;border:1px solid #ef4444;color:#fca5a5;border-radius:.3rem;font-size:.65rem;cursor:pointer;font-weight:700;"
+                            title="Subtrair 7 dias de validade">
+                        −7d
+                    </button>
+                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', -30)"
+                            style="padding:.3rem .55rem;background:#4a1520;border:1px solid #ef4444;color:#fca5a5;border-radius:.3rem;font-size:.65rem;cursor:pointer;font-weight:700;"
+                            title="Subtrair 30 dias de validade">
+                        −30d
+                    </button>
+                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', 7)"
+                            style="padding:.3rem .55rem;background:#1e3a8a;border:1px solid #3b82f6;color:#fff;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;"
                             title="Adicionar 7 dias de validade">
                         +7d
                     </button>
-                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', 30)" 
-                            style="padding:.3rem .55rem;background:#14532d;border:1px solid #22c55e;color:#fff;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;" 
+                    <button onclick="adminEstenderTrialRapido('${c.id}', '${(c.nome || '').replace(/'/g, "\\'")}', 30)"
+                            style="padding:.3rem .55rem;background:#14532d;border:1px solid #22c55e;color:#fff;border-radius:.3rem;font-size:.7rem;cursor:pointer;font-weight:700;"
                             title="Adicionar 30 dias de validade (1 mês)">
                         +30d
                     </button>
@@ -24997,15 +25007,17 @@ function adminRenderClubes(clubes) {
 // ============================================================
 async function adminEstenderTrialRapido(clubeId, nome, dias) {
     // Confirma pra evitar clique acidental
-    if (!confirm(`Estender +${dias} dias de validade para "${nome}"?`)) return;
-    
+    const acao = dias > 0 ? `Adicionar +${dias} dias` : `Subtrair ${dias} dias`;
+    if (!confirm(`${acao} de validade para "${nome}"?`)) return;
+
     try {
         // Calcula nova data: usa data_validade atual se for futura, senão usa hoje
         const clube = _adminClubesCache.find(c => c.id === clubeId);
         if (!clube) { alert('Clube não encontrado em cache'); return; }
-        
+
         const base = clube.data_validade ? new Date(clube.data_validade) : new Date();
-        if (base < new Date()) base.setTime(Date.now()); // se já venceu, parte de hoje
+        // Para adição: se já venceu, parte de hoje. Para subtração: sempre parte da data atual
+        if (dias > 0 && base < new Date()) base.setTime(Date.now());
         base.setDate(base.getDate() + dias);
         const novaData = base.toISOString().split('T')[0];
         
@@ -25046,10 +25058,11 @@ async function adminEstenderTrialRapido(clubeId, nome, dias) {
         
         // Feedback visual
         const dataFmt = new Date(novaData).toLocaleDateString('pt-BR');
+        const msgDias = dias > 0 ? `+${dias}d` : `${dias}d`;
         if (typeof showToast === 'function') {
-            showToast(`✓ "${nome}" estendido +${dias}d até ${dataFmt}`);
+            showToast(`✓ "${nome}" ${dias > 0 ? 'estendido' : 'reduzido'} ${msgDias} → ${dataFmt}`);
         } else {
-            alert(`✓ Validade estendida até ${dataFmt}`);
+            alert(`✓ Validade ${dias > 0 ? 'estendida' : 'reduzida'} para ${dataFmt}`);
         }
         
         // Recarrega tabela e dashboard
@@ -25079,14 +25092,14 @@ async function adminAcoesClube(clubeId, nome) {
     
     try {
         if (opcao === '1') {
-            const dias = prompt('Quantos dias estender? (ex: 30 para 1 mês)');
+            const dias = prompt('Quantos dias? (positivo = adicionar, negativo = subtrair)\nEx: 30 para +1 mês, -7 para tirar 7 dias');
             if (!dias) return;
             const diasNum = parseInt(dias, 10);
-            if (isNaN(diasNum) || diasNum <= 0) { alert('Número inválido'); return; }
+            if (isNaN(diasNum) || diasNum === 0) { alert('Número inválido'); return; }
             // Calcular nova data
             const clube = _adminClubesCache.find(c => c.id === clubeId);
             const base = clube?.data_validade ? new Date(clube.data_validade) : new Date();
-            if (base < new Date()) base.setTime(Date.now());
+            if (diasNum > 0 && base < new Date()) base.setTime(Date.now());
             base.setDate(base.getDate() + diasNum);
             const novaData = base.toISOString().split('T')[0];
             const { error } = await sb.rpc('estender_validade', { p_clube_id: clubeId, p_nova_data: novaData });
@@ -25096,7 +25109,8 @@ async function adminAcoesClube(clubeId, nome) {
             await sb.from('clubes').update({ status: _novoStatus }).eq('id', clubeId);
             const _statusAss = _novoStatus === 'ativo' ? 'ativa' : 'expirada';
             await sb.from('assinaturas').update({ status: _statusAss, data_validade: novaData }).eq('clube_id', clubeId);
-            alert(`✓ Validade estendida até ${new Date(novaData).toLocaleDateString('pt-BR')}`);
+            const _acaoLabel = diasNum > 0 ? 'estendida' : 'reduzida';
+            alert(`✓ Validade ${_acaoLabel} (${diasNum > 0 ? '+' : ''}${diasNum}d) até ${new Date(novaData).toLocaleDateString('pt-BR')}`);
             await adminCarregarClubes();
             await adminCarregarDashboard();
         }
