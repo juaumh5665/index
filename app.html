@@ -40389,8 +40389,8 @@ async function convConfigCarregar() {
         const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
         setVal('conv-cfg-max-semana', conviteConfig.max_semana);
         setVal('conv-cfg-cooldown', conviteConfig.cooldown_dias);
-        setVal('conv-cfg-hora-inicio', conviteConfig.hora_inicio);
-        setVal('conv-cfg-hora-fim', conviteConfig.hora_fim);
+        setVal('conv-cfg-hora-inicio', conviteConfig.horario_inicio || conviteConfig.hora_inicio);
+        setVal('conv-cfg-hora-fim', conviteConfig.horario_fim || conviteConfig.hora_fim);
         setVal('conv-cfg-assinatura', conviteConfig.assinatura || '');
         setVal('conv-cfg-link-rodape', conviteConfig.link_rodape || '');
 
@@ -40416,8 +40416,8 @@ async function convConfigSalvar() {
         clube_id: sbClube.id,
         max_semana: getInt('conv-cfg-max-semana', 2, 0, 50),
         cooldown_dias: getInt('conv-cfg-cooldown', 30, 0, 365),
-        hora_inicio: getInt('conv-cfg-hora-inicio', 9, 0, 23),
-        hora_fim: getInt('conv-cfg-hora-fim', 22, 0, 23),
+        horario_inicio: getInt('conv-cfg-hora-inicio', 9, 0, 23),
+        horario_fim: getInt('conv-cfg-hora-fim', 22, 0, 23),
         assinatura: ((document.getElementById('conv-cfg-assinatura') || {}).value || '').trim(),
         link_rodape: ((document.getElementById('conv-cfg-link-rodape') || {}).value || '').trim(),
         wa_provider: ((document.getElementById('conv-wa-provider') || {}).value || 'manual'),
@@ -40426,7 +40426,7 @@ async function convConfigSalvar() {
         wa_session_name: ((document.getElementById('conv-wa-session') || {}).value || 'default').trim(),
         wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
     };
-    if (payload.hora_fim <= payload.hora_inicio) {
+    if (payload.horario_fim <= payload.horario_inicio) {
         showToast('⚠️ Horário fim precisa ser maior que início');
         return;
     }
