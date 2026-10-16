@@ -3327,6 +3327,16 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <textarea id="conv-cfg-assinatura" class="inp" rows="3" placeholder="—&#10;TudonoPanoTV Club · Pra não receber: responda SAIR" style="width:100%;font-family:var(--font-mono,monospace);font-size:.78rem;resize:vertical;"></textarea>
                             </div>
 
+                            <!-- Link do rodapé (substitui link da API no envio por API com imagem) -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                                    <div style="font-size:1.2rem;">🔗</div>
+                                    <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Link do rodapé</h3>
+                                </div>
+                                <p style="font-size:.72rem;color:#71717a;margin-bottom:.75rem;line-height:1.5;">Link opcional exibido no final da mensagem (ex: Instagram, site). No envio por API com imagem, substitui o link técnico da plataforma. Deixe vazio para não exibir nenhum link.</p>
+                                <input id="conv-cfg-link-rodape" class="inp" type="url" placeholder="https://instagram.com/seuclube" style="width:100%;font-size:.82rem;">
+                            </div>
+
                             <!-- Botão salvar -->
                             <div>
                                 <button id="conv-cfg-salvar" onclick="convConfigSalvar()" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;border:none;padding:.75rem 1.25rem;border-radius:.5rem;font-weight:800;cursor:pointer;font-family:'Manrope',sans-serif;font-size:.85rem;">💾 Salvar configurações</button>
@@ -39609,7 +39619,8 @@ let conviteConfig = {
     cooldown_dias: 30,
     hora_inicio: 9,
     hora_fim: 22,
-    assinatura: ''
+    assinatura: '',
+    link_rodape: ''
 };
 
 // Estado da campanha em execução
@@ -40371,7 +40382,8 @@ async function convConfigCarregar() {
             cooldown_dias: 30,
             hora_inicio: 9,
             hora_fim: 22,
-            assinatura: ''
+            assinatura: '',
+            link_rodape: ''
         };
         // Preenche o form
         const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
@@ -40380,6 +40392,7 @@ async function convConfigCarregar() {
         setVal('conv-cfg-hora-inicio', conviteConfig.hora_inicio);
         setVal('conv-cfg-hora-fim', conviteConfig.hora_fim);
         setVal('conv-cfg-assinatura', conviteConfig.assinatura || '');
+        setVal('conv-cfg-link-rodape', conviteConfig.link_rodape || '');
 
         // Popular dropdown de opt-out + lista atual
         convConfigPopularDropdownOptout();
@@ -40406,6 +40419,7 @@ async function convConfigSalvar() {
         hora_inicio: getInt('conv-cfg-hora-inicio', 9, 0, 23),
         hora_fim: getInt('conv-cfg-hora-fim', 22, 0, 23),
         assinatura: ((document.getElementById('conv-cfg-assinatura') || {}).value || '').trim(),
+        link_rodape: ((document.getElementById('conv-cfg-link-rodape') || {}).value || '').trim(),
         wa_provider: ((document.getElementById('conv-wa-provider') || {}).value || 'manual'),
         wa_api_url: ((document.getElementById('conv-wa-url') || {}).value || '').trim(),
         wa_api_token: ((document.getElementById('conv-wa-token') || {}).value || '').trim(),
@@ -40880,6 +40894,20 @@ async function _convEnviarUm(idx) {
 
     // ─── ENVIO: API ou manual ───
     const metodo = _waProvider.isApi() ? _waProvider.getConfig().provider : 'manual';
+
+    // [LINK RODAPÉ] Quando envio é por API com imagem, o flyer já vai como anexo.
+    // O link OG (/api/flyer?s=...) é redundante — remove e coloca link customizado se houver.
+    const linkRodape = (conviteConfig && conviteConfig.link_rodape) ? String(conviteConfig.link_rodape).trim() : '';
+    const enviaImagemApi = (metodo !== 'manual' && flyerUrl && _convCampanha.flyerUrlPublica);
+    if (enviaImagemApi) {
+        // Remove link OG da API (redundante quando imagem vai como anexo)
+        mensagem = mensagem.replace(/\n*https?:\/\/[^\s]*\/api\/flyer\?[^\s]*/g, '').replace(/\s+$/, '');
+        // Adiciona link customizado se configurado
+        if (linkRodape) mensagem = mensagem + '\n\n' + linkRodape;
+    } else if (linkRodape) {
+        // Envio manual: mantém link OG (preview) e adiciona custom link
+        mensagem = mensagem + '\n\n' + linkRodape;
+    }
     let envioOk = false;
 
     if (metodo !== 'manual') {
