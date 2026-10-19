@@ -31078,6 +31078,12 @@ function atualizarResumoEntrada() {
             && t.staffFixoCobrarFree) {
             v = Number(t.staffFixoValor) || 0;
         }
+        // FASE G: Em adicional V2 + cobrarFree, buy-in free vira valor do staff
+        if (tipo === 'buyin' && v === 0
+            && _isStaffFixoAdicionalV2(t)
+            && t.staffFixoCobrarFree) {
+            v = Number(t.staffFixoValor) || 0;
+        }
         valorBase += v;
     });
 
@@ -31615,22 +31621,35 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     }
 
     // PAGO NA HORA: registra pagamento junto com o combo
+    // Fallback: se toggle ON mas valor do input é 0 (ex: buy-in free com staff fixo),
+    // usa o total real das entries pra cobrir o débito
     let _pnhRegistradoCombo = 0;
     let _pnhMetodoCombo = '';
     const _pnhConfigCombo = _getPagoNaHoraConfig();
-    if (_pnhConfigCombo && _pnhConfigCombo.valor > 0) {
-        const metodoInfo = PAYMENT_METHODS[_pnhConfigCombo.metodo] || PAYMENT_METHODS.pix;
+    const _pnhToggleCombo = document.getElementById('pago-na-hora-toggle');
+    let _pnhValorCombo = (_pnhConfigCombo && _pnhConfigCombo.valor > 0) ? _pnhConfigCombo.valor : 0;
+    if (_pnhValorCombo <= 0 && _pnhToggleCombo && _pnhToggleCombo.checked) {
+        entriesCriadas.forEach(e => {
+            _pnhValorCombo += Number(e.valor) || 0;
+            _pnhValorCombo += Number(e.staff) || 0;
+            _pnhValorCombo += Number(e.taxaAdm) || 0;
+            if (e.passaporte && e.passaporte.cobrado) _pnhValorCombo += Number(e.passaporte.valor) || 0;
+        });
+    }
+    if (_pnhValorCombo > 0) {
+        const _pnhMetodoKeyCombo = (_pnhConfigCombo ? _pnhConfigCombo.metodo : null) || window._pagoNaHoraMetodo || 'pix';
+        const metodoInfo = PAYMENT_METHODS[_pnhMetodoKeyCombo] || PAYMENT_METHODS.pix;
         const _pnhDescMap = { buyin:'Buy-in', buyin_duplo:'Buy-in Duplo', rebuy_simples:'Rebuy Simples', rebuy_duplo:'Rebuy Duplo', addon:'Add-on', last_chance:'Last Chance', reentry:'Re-entry' };
         const labelsCombo = acoesOrdenadas.map(a => _pnhDescMap[a] || a).join(' + ');
         registrarTransacao({
             jogadorId: jid,
             tipo: 'pagamento',
-            valor: _pnhConfigCombo.valor,
+            valor: _pnhValorCombo,
             descricao: `Pagamento no ato (${metodoInfo.label}) — ${labelsCombo}`,
-            metodo: _pnhConfigCombo.metodo,
+            metodo: _pnhMetodoKeyCombo,
             origem: 'caixa',
         });
-        _pnhRegistradoCombo = _pnhConfigCombo.valor;
+        _pnhRegistradoCombo = _pnhValorCombo;
         _pnhMetodoCombo = metodoInfo.label;
     }
 
@@ -31955,20 +31974,27 @@ async function _registrarEntradaImpl() {
     }
 
     // PAGO NA HORA: registra pagamento junto com a entrada
+    // Fallback: se toggle ON mas valor do input é 0 (ex: buy-in free com staff fixo),
+    // usa o valorTotal real pra cobrir o débito
     let _pnhRegistrado = 0;
     let _pnhMetodo = '';
     const _pnhConfig = _getPagoNaHoraConfig();
-    if (_pnhConfig && _pnhConfig.valor > 0) {
-        const metodoInfo = PAYMENT_METHODS[_pnhConfig.metodo] || PAYMENT_METHODS.pix;
+    const _pnhToggleEl = document.getElementById('pago-na-hora-toggle');
+    const _pnhValorEfetivo = (_pnhConfig && _pnhConfig.valor > 0)
+        ? _pnhConfig.valor
+        : (_pnhToggleEl && _pnhToggleEl.checked && valorTotal > 0 ? valorTotal : 0);
+    if (_pnhValorEfetivo > 0) {
+        const _pnhMetodoKey = (_pnhConfig ? _pnhConfig.metodo : null) || window._pagoNaHoraMetodo || 'pix';
+        const metodoInfo = PAYMENT_METHODS[_pnhMetodoKey] || PAYMENT_METHODS.pix;
         registrarTransacao({
             jogadorId: jid,
             tipo: 'pagamento',
-            valor: _pnhConfig.valor,
+            valor: _pnhValorEfetivo,
             descricao: `Pagamento no ato (${metodoInfo.label}) — ${descMap[tipo] || tipo}`,
-            metodo: _pnhConfig.metodo,
+            metodo: _pnhMetodoKey,
             origem: 'caixa',
         });
-        _pnhRegistrado = _pnhConfig.valor;
+        _pnhRegistrado = _pnhValorEfetivo;
         _pnhMetodo = metodoInfo.label;
     }
 
