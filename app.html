@@ -31135,9 +31135,10 @@ function atualizarResumoEntrada() {
     }
 
     // Em V2 o staff já está dentro do valorBase — total = valorBase + extras (sem somar staff)
-    const total = isV2Resumo
+    // Math.round garante precisão de centavos (evita -0.01 por ponto flutuante)
+    const total = Math.round((isV2Resumo
         ? (valorBase + taxaAdm + passaporte)
-        : (valorBase + staff + taxaAdm + passaporte);
+        : (valorBase + staff + taxaAdm + passaporte)) * 100) / 100;
     if (resumoVal) {
         const partes = [];
         const acoesLabel = acoes.length > 1 ? ` (${acoes.length} ações)` : '';
@@ -31285,8 +31286,8 @@ function _atualizarPagoNaHoraPreview() {
     // Desconta ticket/voucher se houver
     const tvSel = (typeof _getTicketVoucherSelecionado === 'function') ? _getTicketVoucherSelecionado() : null;
     const tvAbate = (tvSel && totalCobrar > 0) ? Math.min(tvSel.valor, totalCobrar) : 0;
-    const aCobrar = Math.max(0, totalCobrar - tvAbate);
-    const saldoApos = valorPago - aCobrar;
+    const aCobrar = Math.round(Math.max(0, totalCobrar - tvAbate) * 100) / 100;
+    const saldoApos = Math.round((valorPago - aCobrar) * 100) / 100;
     if (saldoApos >= 0) {
         preview.style.borderColor = 'rgba(34,197,94,.2)';
         preview.style.background = 'rgba(34,197,94,.06)';
