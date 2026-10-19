@@ -31657,13 +31657,43 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         return;
     }
 
+    // 📋 COMPROVANTE COMBO: agenda ANTES de qualquer manipulação DOM —
+    // garante que o prompt dispara mesmo se closeModal/render/undo lançar erro
+    const _comboNomeJog = getJogadorNome(jid);
+    let _comboTotalGeral = 0;
+    entriesCriadas.forEach(e => {
+        _comboTotalGeral += Number(e.valor) || 0;
+        _comboTotalGeral += Number(e.staff) || 0;
+        _comboTotalGeral += Number(e.taxaAdm) || 0;
+        if (e.passaporte && e.passaporte.cobrado) _comboTotalGeral += Number(e.passaporte.valor) || 0;
+    });
+    if (t.imprimirComprovanteCompra) {
+        const _compEntries = entriesCriadas.slice();
+        const _compNome = _comboNomeJog;
+        const _compTotal = _comboTotalGeral;
+        const _compQtd = acoesOrdenadas.length;
+        console.log('[COMPROVANTE-COMBO] agendando prompt — entries:', _compQtd, 'jogador:', _compNome, 'flag:', t.imprimirComprovanteCompra);
+        setTimeout(() => {
+            try {
+                console.log('[COMPROVANTE-COMBO] disparando _abrirModalPromptImpressao');
+                _abrirModalPromptImpressao({
+                    titulo: 'Imprimir comprovante de compra?',
+                    descricao: `${_compQtd} ações de ${_compNome} · Total R$ ${_compTotal.toFixed(2).replace('.', ',')}`,
+                    onConfirm: () => imprimirComprovanteCombo(t, { entries: _compEntries, jogadorNome: _compNome })
+                });
+            } catch (errComp) { console.error('[COMPROVANTE-COMBO] erro:', errComp); }
+        }, 300);
+    } else {
+        console.log('[COMPROVANTE-COMBO] flag desligada — t.imprimirComprovanteCompra:', t.imprimirComprovanteCompra);
+    }
+
     closeModal('modal-entrada');
     updateModalTorneio();
     renderTorneiosList();
     renderDashboard();
 
     // UNDO
-    const nomeJog = getJogadorNome(jid);
+    const nomeJog = _comboNomeJog;
     registrarUndo(`💰 Combo (${acoesOrdenadas.length} ações) de ${nomeJog}`, () => {
         torneios[tornIdx] = JSON.parse(snapshot);
         if (transacoes.length > txsBefore) transacoes = transacoes.slice(0, txsBefore);
@@ -31673,17 +31703,9 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         renderDashboard();
     });
 
-    // Total geral
-    let totalGeral = 0;
-    entriesCriadas.forEach(e => {
-        totalGeral += Number(e.valor) || 0;
-        totalGeral += Number(e.staff) || 0;   // FASE G: staff adicional soma ao total cobrado
-        totalGeral += Number(e.taxaAdm) || 0;
-        if (e.passaporte && e.passaporte.cobrado) totalGeral += Number(e.passaporte.valor) || 0;
-    });
     const tvLabelCombo = tvAbatidoCombo > 0 ? ` · 🎟️ Desconto R$ ${tvAbatidoCombo.toFixed(2).replace('.',',')}` : '';
     const pnhLabelCombo = _pnhRegistradoCombo > 0 ? ` · 💵 Pago ${_pnhMetodoCombo} R$ ${_pnhRegistradoCombo.toFixed(2).replace('.',',')}` : '';
-    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}${tvLabelCombo}${pnhLabelCombo}`);
+    showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${_comboTotalGeral.toFixed(2).replace('.', ',')}${tvLabelCombo}${pnhLabelCombo}`);
 
     // Lembrete de Jackpot pendente: combo tem buy-in? Se sim, dispara
     // (mesma regra do single — só pra primeira entrada do jogador)
@@ -31691,17 +31713,6 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         const temBuyin = (entriesCriadas || []).some(e => e && e.tipo === 'buyin');
         if (temBuyin) _lembreteJackpotPosCompra(t, jid, 'buyin');
     } catch(e) { console.warn('[combo] lembrete jackpot:', e); }
-
-    // Comprovante consolidado (uma única impressão pro combo)
-    if (t.imprimirComprovanteCompra) {
-        setTimeout(() => {
-            _abrirModalPromptImpressao({
-                titulo: 'Imprimir comprovante de compra?',
-                descricao: `${acoesOrdenadas.length} ações de ${nomeJog} · Total R$ ${totalGeral.toFixed(2).replace('.', ',')}`,
-                onConfirm: () => imprimirComprovanteCombo(t, { entries: entriesCriadas, jogadorNome: nomeJog })
-            });
-        }, 300);
-    }
 }
 
 async function _registrarEntradaImpl() {
@@ -31978,6 +31989,28 @@ async function _registrarEntradaImpl() {
         return;
     }
 
+    // 📋 COMPROVANTE: agenda ANTES de qualquer manipulação DOM —
+    // garante que o prompt dispara mesmo se closeModal/render/undo lançar erro
+    if (t.imprimirComprovanteCompra) {
+        const _compEntry = t.entries[t.entries.length - 1];
+        const _compJid = jid;
+        if (_compEntry) {
+            console.log('[COMPROVANTE-SINGLE] agendando prompt — entry:', _compEntry.tipo, 'jogador:', _compJid, 'flag:', t.imprimirComprovanteCompra);
+            setTimeout(() => {
+                try {
+                    console.log('[COMPROVANTE-SINGLE] disparando _abrirModalPromptImpressao');
+                    _abrirModalPromptImpressao({
+                        titulo: 'Imprimir comprovante de compra?',
+                        descricao: `${_labelTipoEntry(_compEntry.tipo)} de ${getJogadorNome(_compJid)}`,
+                        onConfirm: () => imprimirComprovanteCompra(t, { entry: _compEntry, jogadorNome: getJogadorNome(_compJid) })
+                    });
+                } catch (errComp) { console.error('[COMPROVANTE-SINGLE] erro:', errComp); }
+            }, 300);
+        }
+    } else {
+        console.log('[COMPROVANTE-SINGLE] flag desligada — t.imprimirComprovanteCompra:', t.imprimirComprovanteCompra);
+    }
+
     closeModal('modal-entrada');
     updateModalTorneio();
     renderTorneiosList();
@@ -32004,21 +32037,7 @@ async function _registrarEntradaImpl() {
     showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}${tvLabel}${pnhLabel}`);
 
     // Lembrete de Jackpot pendente (só dispara em buy-in, e se jogador ainda não tem jackpot)
-    _lembreteJackpotPosCompra(t, jid, tipo);
-
-    // FASE E: oferecer impressão de comprovante (se torneio configurado pra isso)
-    if (t.imprimirComprovanteCompra) {
-        const novaEntryRef = t.entries[t.entries.length - 1];
-        if (novaEntryRef) {
-            setTimeout(() => {
-                _abrirModalPromptImpressao({
-                    titulo: 'Imprimir comprovante de compra?',
-                    descricao: `${_labelTipoEntry(novaEntryRef.tipo)} de ${getJogadorNome(jid)}`,
-                    onConfirm: () => imprimirComprovanteCompra(t, { entry: novaEntryRef, jogadorNome: getJogadorNome(jid) })
-                });
-            }, 300);
-        }
-    }
+    try { _lembreteJackpotPosCompra(t, jid, tipo); } catch(e) { console.warn('[single] lembrete jackpot:', e); }
 }
 
 function openModalEliminar(idx) {
