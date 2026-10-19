@@ -19204,12 +19204,9 @@ function _reimprimirLancamento(kind, refId) {
 // FASE E: modal pequeno perguntando se quer imprimir comprovante
 // opcoes = { titulo, descricao, onConfirm, onCancel? }
 function _abrirModalPromptImpressao(opcoes) {
-    // Gate: se não tem feature de impressão, não mostra nem o prompt.
-    // Resultado: a compra/operação é finalizada normalmente, só não oferece imprimir.
-    if (typeof window.hasFeature === 'function' && !window.hasFeature('impressao_termica')) {
-        if (opcoes && opcoes.onCancel) opcoes.onCancel();
-        return;
-    }
+    // O prompt pergunta se quer imprimir — sempre mostra quando o torneio
+    // tem a opção de comprovante habilitada. O gate de plano (impressao_termica)
+    // fica em abrirPreviewImpressao, onde mostra modal de upgrade se necessário.
     const existing = document.getElementById('modal-prompt-impressao');
     if (existing) existing.remove();
 
