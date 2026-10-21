@@ -27870,13 +27870,15 @@ function _imprimirExtratoBarJogador(jogadorId) {
     const j = jogadores.find(x => String(x.id) === String(jogadorId));
     if (!j) return showToast('⚠️ Jogador não encontrado');
 
-    // Pega todas as comandas do jogador (abertas e fechadas)
+    // Pega comandas do jogador das últimas 24h (abertas e fechadas)
+    const limiteMs = Date.now() - (24 * 60 * 60 * 1000);
     const comandas = (typeof barComandas !== 'undefined' ? barComandas : [])
-        .filter(c => String(c.jogadorId) === String(jogadorId))
+        .filter(c => String(c.jogadorId) === String(jogadorId)
+            && (c.abertoEm || 0) >= limiteMs)
         .sort((a, b) => (a.abertoEm || 0) - (b.abertoEm || 0));
 
     if (!comandas.length) {
-        return showToast('ℹ️ Nenhum consumo de bar registrado para este jogador');
+        return showToast('ℹ️ Nenhum consumo de bar nas últimas 24h para este jogador');
     }
 
     const col = (typeof _printColWidth === 'function') ? _printColWidth() : 32;
@@ -27896,6 +27898,7 @@ function _imprimirExtratoBarJogador(jogadorId) {
         txt += _printHeader();
     }
     txt += _printCenter('EXTRATO DE CONSUMO - BAR', col) + '\n';
+    txt += _printCenter('(ultimas 24 horas)', col) + '\n';
     txt += _printLine('-', col) + '\n';
     txt += `Jogador: ${(j.nome || '').substring(0, col - 10)}\n`;
     txt += `Data: ${new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}\n`;
