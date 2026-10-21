@@ -520,6 +520,29 @@
     background: rgba(245, 158, 11, .1);
   }
 
+  /* Itens expandidos ao clicar no histórico */
+  .hist-itens {
+    display: none;
+    margin-top: 8px;
+    padding: 8px 0 2px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .hist-item.expanded .hist-itens { display: block; }
+  .hist-item.expanded { cursor: pointer; }
+  .hist-item-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 3px 0;
+    font-size: 11px;
+    color: #a1a1aa;
+  }
+  .hist-item-row .item-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-item-row .item-valor { flex-shrink: 0; font-weight: 700; color: #c4b5fd; margin-left: 8px; }
+  .hist-chevron {
+    font-size: 10px; color: #52525b; transition: transform .2s;
+    margin-left: 6px; flex-shrink: 0;
+  }
+  .hist-item.expanded .hist-chevron { transform: rotate(180deg); color: #a855f7; }
+
   /* === CONFIG MODAL === */
   .modal {
     position: fixed; inset: 0;
@@ -1795,18 +1818,47 @@ function renderHistorico() {
       botaoEstorno = `<button class="btn-estorno" data-vid="${v.id}">⚠️ Solicitar estorno</button>`;
     }
 
+    // Monta HTML dos itens expandíveis
+    const itens = Array.isArray(v.itens_json) ? v.itens_json : [];
+    let itensHtml = '';
+    if (itens.length > 0) {
+      itensHtml = '<div class="hist-itens">' + itens.map(it => {
+        const qtd = Number(it.qtd) || 1;
+        const sub = Number(it.subtotal) || (qtd * Number(it.valor || 0));
+        return `<div class="hist-item-row">
+          <span class="item-nome">${qtd}x ${esc(it.nome || 'Item')}</span>
+          <span class="item-valor">${fmtMoney(sub)}</span>
+        </div>`;
+      }).join('') + '</div>';
+    }
+
+    const chevron = itens.length > 0 ? '<span class="hist-chevron">▼</span>' : '';
+
     return `
-      <div class="hist-item" style="${estiloItem}">
+      <div class="hist-item${itens.length > 0 ? ' has-itens' : ''}" style="${estiloItem}cursor:${itens.length > 0 ? 'pointer' : 'default'};" data-vid="${v.id}">
         <div class="hist-icon ${v.tipo}">${icon}</div>
-        <div class="hist-info">
+        <div class="hist-info" style="flex:1;min-width:0;">
           <div class="hist-jogador">${esc(v.jogador_nome || '—')} ${badge}</div>
-          <div class="hist-meta">${hora} • ${esc(formaTxt)}</div>
+          <div class="hist-meta">${hora} • ${esc(formaTxt)}${itens.length > 0 ? ` • ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}` : ''}</div>
           ${botaoEstorno}
+          ${itensHtml}
         </div>
-        <div class="hist-total" style="${estiloTotal}">${fmtMoney(v.total)}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;">
+          <div class="hist-total" style="${estiloTotal}">${fmtMoney(v.total)}</div>
+          ${chevron}
+        </div>
       </div>
     `;
   }).join('');
+
+  // Bind expand/collapse nos itens do histórico
+  $('histList').querySelectorAll('.hist-item.has-itens').forEach(el => {
+    el.addEventListener('click', (e) => {
+      // Não expande se clicou no botão de estorno
+      if (e.target.closest('.btn-estorno')) return;
+      el.classList.toggle('expanded');
+    });
+  });
 
   // Bind botões de estorno
   $('histList').querySelectorAll('.btn-estorno').forEach(b => {
