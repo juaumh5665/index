@@ -40006,6 +40006,7 @@ async function renderConvitesPage() {
     convPopularTorneios();
     convRenderListaTemplates();
     convAtualizarPreview();
+    if (typeof convPartPopularTorneios === 'function') convPartPopularTorneios();
 }
 
 function convSetTab(tab) {
@@ -41627,17 +41628,26 @@ async function convPartPopularTorneios() {
             .select('id,nome,status,iniciado_em,criado_em,encerrado_em')
             .eq('clube_id', sbClube.id)
             .order('criado_em', { ascending: false })
-            .limit(40);
+            .limit(60);
         if (error) throw error;
         const anterior = sel.value;
+        const statusLabel = (t) => {
+            const st = String(t.status || '').toLowerCase();
+            if (t.encerrado_em || st === 'finished' || st === 'encerrado') return 'Encerrado';
+            if (st === 'running') return 'Em andamento';
+            if (st === 'paused' || st === 'break') return 'Pausado';
+            return 'Não iniciado';
+        };
         const opts = ['<option value="">— Selecione o torneio —</option>'];
         (data || []).forEach(t => {
             const ref = t.iniciado_em || t.criado_em;
-            const dt = ref ? new Date(ref).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
-            const st = String(t.status || '').toLowerCase();
-            const fim = (t.encerrado_em || st === 'finished' || st === 'encerrado') ? ' ✓' : '';
-            opts.push(`<option value="${t.id}">${esc(t.nome || 'Torneio')}${dt ? ' (' + dt + ')' : ''}${fim}</option>`);
+            const dt = ref ? new Date(ref).toLocaleString('pt-BR', {
+                timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            }).replace(',', '') : 'sem data';
+            opts.push(`<option value="${t.id}">📅 ${dt} · ${esc(t.nome || 'Torneio')} · ${statusLabel(t)}</option>`);
         });
+        if (!data || !data.length) opts[0] = '<option value="">Nenhum torneio cadastrado</option>';
         sel.innerHTML = opts.join('');
         if (anterior) sel.value = anterior;
     } catch (e) {
