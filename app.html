@@ -3073,6 +3073,19 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <option value="">— Nenhum (mensagem avulsa) —</option>
                                     </select>
                                 </div>
+
+                                <!-- Participantes de um torneio (agradecimento pós-torneio) -->
+                                <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1rem;">
+                                    <div style="font-size:.65rem;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.25rem;">🏆 Enviar para quem jogou um torneio</div>
+                                    <div style="font-size:.66rem;color:#52525b;margin-bottom:.6rem;line-height:1.4;">Ideal para agradecimento. Escolha o torneio e a lista "Pra quem enviar" é preenchida com os participantes.</div>
+                                    <div style="display:flex;gap:.4rem;">
+                                        <select id="conv-part-torneio" class="inp" style="flex:1;min-width:0;">
+                                            <option value="">Carregando torneios...</option>
+                                        </select>
+                                        <button id="conv-part-btn" onclick="convPartCarregar()" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);color:#22c55e;padding:0 .85rem;border-radius:.45rem;font-size:.7rem;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;">Carregar</button>
+                                    </div>
+                                    <div id="conv-part-info" style="font-size:.68rem;margin-top:.45rem;color:#71717a;"></div>
+                                </div>
                             </div>
 
                             <!-- Coluna 2: Preview + Enviar -->
@@ -40022,6 +40035,7 @@ function convSetTab(tab) {
         convEnviarPopularTorneios();
         convEnviarRenderTemplates();
         convEnviarAtualizarCount();
+        if (typeof convPartPopularTorneios === 'function') convPartPopularTorneios();
     }
     // [SESSÃO 2] Lazy-load das abas novas
     if (tab === 'historico' && typeof convHistoricoCarregar === 'function') {
@@ -40484,6 +40498,7 @@ function _convFiltrarJogadores(filtro) {
                 return false;
             }
             case 'todos':   return true;
+            case 'participantes_torneio': return _convPartIds.has(String(j.id));
             default: return true;
         }
     });
@@ -41597,6 +41612,85 @@ function convEnviarPopularTorneios() {
     }
     sel.innerHTML = opts.join('');
 }
+
+// --- Participantes de um torneio (agradecimento pós-torneio) ---
+// Somente leitura: consulta torneios e torneio_entries, não altera nada no banco.
+let _convPartIds = new Set();
+let _convPartTorneioNome = '';
+
+async function convPartPopularTorneios() {
+    const sel = document.getElementById('conv-part-torneio');
+    if (!sel) return;
+    if (!sb || !sbClube) { sel.innerHTML = '<option value="">Sem conexão com o servidor</option>'; return; }
+    try {
+        const { data, error } = await sb.from('torneios')
+            .select('id,nome,status,iniciado_em,criado_em,encerrado_em')
+            .eq('clube_id', sbClube.id)
+            .order('criado_em', { ascending: false })
+            .limit(40);
+        if (error) throw error;
+        const anterior = sel.value;
+        const opts = ['<option value="">— Selecione o torneio —</option>'];
+        (data || []).forEach(t => {
+            const ref = t.iniciado_em || t.criado_em;
+            const dt = ref ? new Date(ref).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
+            const st = String(t.status || '').toLowerCase();
+            const fim = (t.encerrado_em || st === 'finished' || st === 'encerrado') ? ' ✓' : '';
+            opts.push(`<option value="${t.id}">${esc(t.nome || 'Torneio')}${dt ? ' (' + dt + ')' : ''}${fim}</option>`);
+        });
+        sel.innerHTML = opts.join('');
+        if (anterior) sel.value = anterior;
+    } catch (e) {
+        console.warn('[Convites] erro ao listar torneios p/ participantes:', e);
+        sel.innerHTML = '<option value="">Erro ao carregar torneios</option>';
+    }
+}
+
+async function convPartCarregar() {
+    const sel = document.getElementById('conv-part-torneio');
+    const info = document.getElementById('conv-part-info');
+    const btn = document.getElementById('conv-part-btn');
+    const torneioId = sel?.value;
+    if (!torneioId) { showToast('⚠️ Selecione um torneio'); return; }
+    if (!sb || !sbClube) { showToast('⚠️ Sem conexão com o servidor'); return; }
+
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+    try {
+        const ids = new Set();
+        const pagina = 1000;
+        for (let de = 0; ; de += pagina) {
+            const { data, error } = await sb.from('torneio_entries')
+                .select('jogador_id')
+                .eq('torneio_id', torneioId)
+                .eq('clube_id', sbClube.id)
+                .range(de, de + pagina - 1);
+            if (error) throw error;
+            (data || []).forEach(r => { if (r.jogador_id) ids.add(String(r.jogador_id)); });
+            if (!data || data.length < pagina) break;
+        }
+
+        _convPartIds = ids;
+        _convPartTorneioNome = sel.options[sel.selectedIndex]?.text || '';
+        convSetFiltro('participantes_torneio');
+
+        const noFiltro = _convFiltrarJogadores('participantes_torneio');
+        const comWa = noFiltro.filter(j => _normalizarWhatsappE164(j.whatsapp).valido).length;
+        const foraLista = ids.size - noFiltro.length;
+        if (info) {
+            info.innerHTML = ids.size === 0
+                ? '<span style="color:#f59e0b;">Nenhum participante encontrado neste torneio.</span>'
+                : `<span style="color:#22c55e;font-weight:700;">✅ ${ids.size} participantes</span> · ${comWa} com WhatsApp válido`
+                  + (foraLista > 0 ? ` <span style="color:#52525b;">(${foraLista} fora por opt-out ou bloqueio)</span>` : '');
+        }
+        showToast(`🏆 ${ids.size} participantes carregados`);
+    } catch (e) {
+        console.error('[Convites] erro ao carregar participantes:', e);
+        showToast('❌ Erro ao carregar participantes do torneio');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Carregar'; }
+    }
+}
+window.convPartCarregar = convPartCarregar;
 
 // --- Atualizar contagem de jogadores ao selecionar filtro ---
 function convEnviarAtualizarCount() {
