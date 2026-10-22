@@ -4296,6 +4296,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <button class="tab-btn"        id="cfgtab-btn-importar"    onclick="switchConfigTab('cfg-importar', this); resetarImportJogadores();"><i class="fa-solid fa-file-import"></i> Importar Jogadores</button>
                     <button class="tab-btn"        id="cfgtab-btn-integracoes" onclick="switchConfigTab('cfg-integracoes', this)"><i class="fa-solid fa-plug"></i> Integrações</button>
                     <button class="tab-btn"        id="cfgtab-btn-tv"          onclick="switchConfigTab('cfg-tv', this); renderConfigTV();"><i class="fa-solid fa-tv"></i> TV Pública</button>
+                    <button class="tab-btn"        id="cfgtab-btn-somtv"       onclick="switchConfigTab('cfg-somtv', this); renderConfigSomTv();"><i class="fa-solid fa-volume-high"></i> Som da TV</button>
                     <button class="tab-btn feature-gated"        id="cfgtab-btn-patrocinadores" data-feature="patrocinadores_tv" data-feature-label="Patrocinadores na tela de Break" onclick="switchConfigTab('cfg-patrocinadores', this); renderConfigPatrocinadores();"><i class="fa-solid fa-handshake"></i> Patrocinadores</button>
                 </div>
 
@@ -4919,6 +4920,85 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
 
                 <!-- ABA: PATROCINADORES -->
+                <!-- ABA: SOM DA TV (alerta de troca de blinds) -->
+                <div id="cfg-somtv" class="configtab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.25rem;align-items:start;">
+                        <div class="stat-card" style="padding:1.5rem;display:flex;flex-direction:column;gap:1.1rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+                                <div>
+                                    <div style="font-size:.95rem;font-weight:800;">🔊 Alerta sonoro da troca de blinds</div>
+                                    <div style="font-size:.72rem;color:#71717a;margin-top:.2rem;">Toca na TV do torneio (link da TV e botão Abrir TV)</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="somtv-ativo" onchange="_somTvSet('ativo', this.checked)"><span class="slider"></span></label>
+                            </div>
+
+                            <div>
+                                <label class="inp-label">Bipes dos últimos 5 segundos</label>
+                                <div class="somtv-opts" data-key="contagem" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.45rem;">
+                                    <button type="button" data-v="half">2 por segundo<small>Igual ao exemplo: 10 bipes</small></button>
+                                    <button type="button" data-v="one">1 por segundo<small>5 bipes: 5, 4, 3, 2, 1</small></button>
+                                    <button type="button" data-v="accel">Acelerando<small>Acelera até a troca</small></button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="inp-label">Bipe da troca de nível</label>
+                                <div class="somtv-opts" data-key="troca" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.45rem;">
+                                    <button type="button" data-v="long">Contínuo 1,5s<small>Um bipe longo</small></button>
+                                    <button type="button" data-v="long2">Contínuo duplo<small>Dois tons, mais encorpado</small></button>
+                                    <button type="button" data-v="triple">Três longos<small>Bem chamativo</small></button>
+                                </div>
+                            </div>
+
+                            <div class="pref-toggle">
+                                <div>
+                                    <div style="font-size:.85rem;font-weight:700;">Aviso de 1 minuto</div>
+                                    <div style="font-size:.7rem;color:#71717a;">2 bipes quando faltar 1 minuto para subir</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="somtv-aviso1min" onchange="_somTvSet('aviso1min', this.checked)"><span class="slider"></span></label>
+                            </div>
+
+                            <div>
+                                <label class="inp-label">Volume <span id="somtv-vol-label" style="color:var(--gold);">80%</span></label>
+                                <input type="range" id="somtv-volume" min="10" max="100" step="5" value="80" oninput="_somTvSet('volume', Number(this.value))" style="width:100%;accent-color:var(--gold);">
+                            </div>
+
+                            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                                <button type="button" class="btn-ghost" style="font-size:.75rem;" onclick="_somTvTestar('contagem')"><i class="fa-solid fa-play"></i> Bipe curto</button>
+                                <button type="button" class="btn-ghost" style="font-size:.75rem;" onclick="_somTvTestar('troca')"><i class="fa-solid fa-play"></i> Bipe da troca</button>
+                                <button type="button" class="btn-ghost" style="font-size:.75rem;" onclick="_somTvTestar('aviso')"><i class="fa-solid fa-play"></i> Aviso 1 min</button>
+                            </div>
+
+                            <button type="button" class="btn-gold" onclick="salvarConfigSomTv()" id="somtv-salvar"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                            <div id="somtv-status" style="font-size:.72rem;color:#71717a;min-height:1em;"></div>
+                        </div>
+
+                        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+                            <!-- Simulação -->
+                            <div class="stat-card" style="padding:1.5rem;text-align:center;">
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;">Simulação da TV</div>
+                                <div id="somtv-sim-nivel" style="font-size:.7rem;color:#f59e0b;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">Nível 4</div>
+                                <div id="somtv-sim-clock" style="font-family:var(--font-mono, 'JetBrains Mono', monospace);font-variant-numeric:tabular-nums;font-size:3.4rem;font-weight:800;line-height:1.1;">00:10</div>
+                                <div id="somtv-sim-banner" style="min-height:1.3em;font-size:.8rem;font-weight:800;color:var(--gold);"></div>
+                                <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-top:.75rem;">
+                                    <button type="button" class="btn-gold" style="font-size:.75rem;" onclick="_somTvSimular(10)">▶ Simular últimos 10s</button>
+                                    <button type="button" class="btn-ghost" style="font-size:.75rem;" onclick="_somTvSimular(65)">⏳ A partir de 1:05</button>
+                                    <button type="button" class="btn-ghost" style="font-size:.75rem;" onclick="_somTvSimularParar()">⏹ Parar</button>
+                                </div>
+                                <div style="font-size:.65rem;color:#52525b;margin-top:.6rem;">A simulação usa as opções marcadas ao lado, mesmo antes de salvar.</div>
+                            </div>
+
+                            <!-- Permissão de som -->
+                            <div class="stat-card" style="padding:1.25rem 1.5rem;font-size:.75rem;color:#a1a1aa;line-height:1.55;">
+                                <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6rem;">Sobre a permissão de som</div>
+                                <div><strong style="color:#e4e4e7;">Botão "Abrir TV":</strong> não precisa clicar na TV. O som sai pelo próprio computador do app.</div>
+                                <div style="margin-top:.45rem;"><strong style="color:#e4e4e7;">Link da TV (Smart TV, TV Box, outro PC):</strong> os navegadores só liberam som depois de um toque. A TV mostra um aviso no canto. Basta um toque (ou OK no controle) uma vez ao abrir, e o som fica ativo a noite toda.</div>
+                                <div style="margin-top:.45rem;"><strong style="color:#e4e4e7;">Para nunca precisar tocar:</strong> no Edge, em Configurações › Cookies e permissões › Reprodução automática de mídia, escolha "Permitir". No Firefox, clique no cadeado da TV › Reprodução automática › "Permitir áudio e vídeo".</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="cfg-patrocinadores" class="configtab-content" style="display:none;">
                     <div style="margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
                         <div>
@@ -44627,6 +44707,123 @@ function renderFontOptions() {
     `).join('');
 }
 
+// =====================================================================
+// SOM DA TV — alerta de troca de blinds (Configurações › Som da TV)
+// Salva em clubes.tv_som. A TV (tv.html + tv-som.js) lê e toca os alertas.
+// =====================================================================
+let _somTvCfg = null;
+let _somTvSimTimer = null;
+
+function _somTvCtx() {
+    try { return (typeof getAudioCtx === 'function') ? getAudioCtx() : null; } catch (e) { return null; }
+}
+
+function renderConfigSomTv() {
+    if (!window.StackTvSom) {
+        const s = document.getElementById('somtv-status');
+        if (s) s.textContent = '⚠️ Módulo de som não carregou. Recarregue a página.';
+        return;
+    }
+    _somTvCfg = StackTvSom.norm(sbClube && sbClube.tv_som);
+    _somTvPintar();
+}
+
+function _somTvPintar() {
+    const c = _somTvCfg; if (!c) return;
+    const a = document.getElementById('somtv-ativo'); if (a) a.checked = !!c.ativo;
+    const m = document.getElementById('somtv-aviso1min'); if (m) m.checked = !!c.aviso1min;
+    const v = document.getElementById('somtv-volume'); if (v) v.value = c.volume;
+    const vl = document.getElementById('somtv-vol-label'); if (vl) vl.textContent = c.volume + '%';
+    document.querySelectorAll('#cfg-somtv .somtv-opts').forEach(grp => {
+        const key = grp.dataset.key;
+        grp.querySelectorAll('button').forEach(b => {
+            b.classList.toggle('on', b.dataset.v === c[key]);
+            b.onclick = () => { _somTvSet(key, b.dataset.v); if (key === 'contagem') _somTvTestar('contagem'); if (key === 'troca') _somTvTestar('troca'); };
+        });
+    });
+}
+
+function _somTvSet(key, val) {
+    if (!_somTvCfg) _somTvCfg = StackTvSom.norm(null);
+    _somTvCfg[key] = val;
+    _somTvPintar();
+    const s = document.getElementById('somtv-status');
+    if (s) s.innerHTML = '<span style="color:#f59e0b;">Alterações não salvas</span>';
+}
+
+function _somTvTestar(tipo) {
+    const ctx = _somTvCtx(); if (!ctx || !window.StackTvSom) return;
+    try { if (ctx.state === 'suspended') ctx.resume(); } catch (e) {}
+    const cfg = _somTvCfg || StackTvSom.norm(null);
+    if (tipo === 'contagem') StackTvSom.countSecond(ctx, cfg, 2);
+    else if (tipo === 'troca') StackTvSom.troca(ctx, cfg);
+    else StackTvSom.aviso1min(ctx, cfg);
+}
+
+function _somTvSimularParar() {
+    if (_somTvSimTimer) clearInterval(_somTvSimTimer);
+    _somTvSimTimer = null;
+    const b = document.getElementById('somtv-sim-banner'); if (b) b.textContent = '';
+    const ck = document.getElementById('somtv-sim-clock'); if (ck) ck.style.color = '';
+}
+
+function _somTvSimular(inicio) {
+    _somTvSimularParar();
+    const ctx = _somTvCtx(); if (!ctx || !window.StackTvSom) return;
+    try { if (ctx.state === 'suspended') ctx.resume(); } catch (e) {}
+    let rest = inicio, nivel = 4;
+    const ck = document.getElementById('somtv-sim-clock');
+    const nv = document.getElementById('somtv-sim-nivel');
+    const bn = document.getElementById('somtv-sim-banner');
+    const fmt = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+    const pintar = () => {
+        if (ck) { ck.textContent = fmt(rest); ck.style.color = (rest <= 5 && rest > 0) ? 'var(--gold)' : ''; }
+        if (nv) nv.textContent = 'Nível ' + nivel;
+    };
+    pintar();
+    _somTvSimTimer = setInterval(() => {
+        const cfg = _somTvCfg || StackTvSom.norm(null);
+        rest--;
+        if (rest === 60 && cfg.aviso1min) { StackTvSom.aviso1min(ctx, cfg); if (bn) bn.textContent = '⏳ 1 minuto para subir os blinds'; }
+        if (rest === 50 && bn) bn.textContent = '';
+        if (rest >= 1 && rest <= 5) StackTvSom.countSecond(ctx, cfg, rest);
+        if (rest <= 0) {
+            StackTvSom.troca(ctx, cfg);
+            nivel++; rest = 0; pintar();
+            if (bn) bn.textContent = '🔔 BLINDS SUBIRAM';
+            clearInterval(_somTvSimTimer); _somTvSimTimer = null;
+            return;
+        }
+        pintar();
+    }, 1000);
+}
+
+async function salvarConfigSomTv() {
+    if (!sb || !sbClube?.id || !_somTvCfg) return;
+    const btn = document.getElementById('somtv-salvar');
+    const s = document.getElementById('somtv-status');
+    const cfg = StackTvSom.norm(_somTvCfg);
+    if (btn) btn.disabled = true;
+    try {
+        const { error } = await sb.from('clubes').update({ tv_som: cfg }).eq('id', sbClube.id);
+        if (error) throw error;
+        sbClube.tv_som = cfg;
+        if (s) s.innerHTML = '<span style="color:#22c55e;">✓ Salvo. TVs abertas atualizam em até 1 minuto.</span>';
+        showToast(cfg.ativo ? '🔊 Som da TV ativado' : '🔇 Som da TV desligado');
+    } catch (e) {
+        console.error('[SOM TV] erro ao salvar:', e);
+        if (s) s.innerHTML = '<span style="color:#ef4444;">Erro ao salvar. Tente novamente.</span>';
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+window.renderConfigSomTv = renderConfigSomTv;
+window.salvarConfigSomTv = salvarConfigSomTv;
+window._somTvSet = _somTvSet;
+window._somTvTestar = _somTvTestar;
+window._somTvSimular = _somTvSimular;
+window._somTvSimularParar = _somTvSimularParar;
+
 // Salva fonte no clube pra TV pública carregar a mesma
 async function syncFontePraTvPublica(id) {
     if (!sb || !sbClube?.id) return;
@@ -51692,32 +51889,34 @@ function notificarDesktop(titulo, corpo, icone) {
 // Hook no tick do timer para disparar alertas
 function checarAlertasTorneio(t) {
     if (!t || !t.rodando || !isNotificacaoAtiva()) return;
+    // Som da TV ativo com a TV aberta neste computador: a TV toca o alerta novo (evita som em dobro)
+    const _somViaTv = !!(sbClube && sbClube.tv_som && sbClube.tv_som.ativo && tvWindow && !tvWindow.closed);
     const key = t.id;
     if (!_lastNotifSec[key]) _lastNotifSec[key] = {};
 
     // Alerta aos 60s restantes
     if (t.tempoRestante === 60 && _lastNotifSec[key].sec60 !== t.nivelAtual) {
         _lastNotifSec[key].sec60 = t.nivelAtual;
-        somAlerta60s();
+        if (!_somViaTv) somAlerta60s();
         notificarDesktop(`⏰ 1 minuto — ${t.nome}`, `Nível ${t.nivelAtual + 1} terminando em 60 segundos`);
     }
 
     // Alerta aos 30s
     if (t.tempoRestante === 30 && _lastNotifSec[key].sec30 !== t.nivelAtual) {
         _lastNotifSec[key].sec30 = t.nivelAtual;
-        somAlerta60s();
+        if (!_somViaTv) somAlerta60s();
     }
 
     // Fim do nível (tempo zerou)
     if (t.tempoRestante === 0 && _lastNotifSec[key].fim !== t.nivelAtual) {
         _lastNotifSec[key].fim = t.nivelAtual;
         if (t.isBreak) {
-            somFimNivel();
+            if (!_somViaTv) somFimNivel();
             notificarDesktop(`▶️ Intervalo acabou — ${t.nome}`, `Voltando ao jogo!`);
         } else {
             const prox = t.blinds[t.nivelAtual + 1];
             if (prox) {
-                somFimNivel();
+                if (!_somViaTv) somFimNivel();
                 notificarDesktop(`🔔 Nível ${t.nivelAtual + 1} terminou — ${t.nome}`, `Próximo: ${prox.sb}/${prox.bb}`);
             }
         }
@@ -54148,6 +54347,13 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 
 <!-- [STACKCLOCK] alertas em tempo real do app dealer -->
 <script src="/stackclock-operador.js" defer></script>
+<script src="/tv-som.js"></script>
+<style>
+#cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }
+#cfg-somtv .somtv-opts button small { display:block; color:#71717a; font-weight:500; font-size:.66rem; margin-top:.15rem; }
+#cfg-somtv .somtv-opts button.on { border-color:var(--gold); background:rgba(245,158,11,.08); color:var(--gold); }
+#cfg-somtv .somtv-opts button:hover { border-color:#3f3f46; }
+</style>
 
 <!-- ============================================================
      UI HELPER — alterna painéis de configuração do modo de staff
