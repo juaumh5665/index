@@ -18995,7 +18995,7 @@ function gerarExtratoCashJogador(mesa, sessao) {
             if (mv.tipo !== 'buyin' && mv.tipo !== 'recompra') return;
             compraNum++;
             const dt = new Date(mv.ts || Date.now());
-            const dtFmt = dt.toLocaleString('pt-BR').substring(0, 16);
+            const dtFmt = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             const label = (mv.tipo === 'buyin' ? 'Buy-in' : 'Recompra') + ' #' + compraNum;
             txt += _printPad(label, formatMoney(Number(mv.valor) || 0), col) + '\n';
             txt += '   ' + dtFmt + '\n';
@@ -19020,7 +19020,7 @@ function gerarExtratoCashJogador(mesa, sessao) {
         txt += _printLine('-', col) + '\n';
         retiradas.forEach((mv, i) => {
             const dt = new Date(mv.ts || Date.now());
-            const dtFmt = dt.toLocaleString('pt-BR').substring(0, 16);
+            const dtFmt = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             txt += _printPad('Retirada #' + (i + 1), formatMoney(Number(mv.valor) || 0), col) + '\n';
             txt += '   ' + dtFmt + '\n';
         });
