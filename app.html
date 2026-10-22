@@ -11910,7 +11910,7 @@ function _cashToDb(m) {
         contagem_final: m.contagemFinal || null,
         status: m.status || 'aberta',
         abertura_ts: m.aberturaTs ? new Date(m.aberturaTs).toISOString() : new Date().toISOString(),
-        fechamento_ts: m.fechamentoTs ? new Date(m.fechamentoTs).toISOString() : null,
+        fechamento_ts: (m.fechamentoTs || m.fechadoEm) ? new Date(m.fechamentoTs || m.fechadoEm).toISOString() : null,
         operador: m.operador || null,
         rake_lancamentos: Array.isArray(m.rakeLancamentos) ? m.rakeLancamentos : [],
         capile_lancamentos: Array.isArray(m.capileLancamentos) ? m.capileLancamentos : [],
@@ -39499,7 +39499,9 @@ function encerrarMesaCash(mesaId) {
 function renderCashHistorico() {
     const el = document.getElementById('cash-historico-list');
     if (!el) return;
-    const encerradas = [...cashMesas].filter(m => m.status === 'encerrada').reverse();
+    // Mais recentes primeiro: ordena pelo fechamento (ou abertura, se não houver fechamento salvo)
+    const _tsHist = (m) => Number(m.fechadoEm || m.fechamentoTs || m.abertoEm || m.aberturaTs || 0);
+    const encerradas = [...cashMesas].filter(m => m.status === 'encerrada').sort((a, b) => _tsHist(b) - _tsHist(a));
     if (!encerradas.length) {
         el.innerHTML = '<div style="padding:2rem;text-align:center;color:#3f3f46;font-size:.85rem;">Nenhuma mesa encerrada ainda</div>';
         return;
@@ -39507,7 +39509,8 @@ function renderCashHistorico() {
     el.innerHTML = encerradas.map(m => {
         const volume = m.jogadores.reduce((s, j) => s + j.totalInvestido, 0);
         const rake   = getCashRake(m);
-        const dur    = formatDuration((m.fechadoEm||Date.now()) - m.abertoEm);
+        const _fechTs = m.fechadoEm || m.fechamentoTs;
+        const dur    = _fechTs ? formatDuration(_fechTs - m.abertoEm) : '—';
         // Bateria de caixa
         const hasBat = typeof m.fichasDiferenca === 'number';
         let batTag = '';
