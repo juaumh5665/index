@@ -37165,6 +37165,61 @@ function removeItemComanda(itemIdx) {
     renderComandas();
 }
 
+// Extrato das comandas ABERTAS do jogador (as mesmas que entram no acerto do Caixa).
+// Somente exibição/impressão: não altera comandas, saldos nem cálculos.
+function _imprimirExtratoComandasAbertas(jogadorId) {
+    const j = jogadores.find(x => String(x.id) === String(jogadorId));
+    const comandas = (typeof barComandas !== 'undefined' ? barComandas : [])
+        .filter(c => String(c.jogadorId) === String(jogadorId) && c.status === 'aberta')
+        .sort((a, b) => (a.abertoEm || 0) - (b.abertoEm || 0));
+    if (!comandas.length) return showToast('ℹ️ Nenhuma comanda aberta para este jogador');
+
+    const col = (typeof _printColWidth === 'function') ? _printColWidth() : 32;
+    const fmtLinha = (desc, valor) => {
+        const valorStr = formatMoney(valor);
+        const espacoDesc = Math.max(1, col - valorStr.length - 1);
+        const d = desc.length > espacoDesc ? desc.substring(0, espacoDesc) : desc;
+        return d.padEnd(espacoDesc, ' ') + ' ' + valorStr;
+    };
+    const fmtData = (ts) => {
+        const d = new Date(ts);
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
+               d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    let txt = _printHeaderCfg();
+    txt += _printCenter('EXTRATO DE CONSUMO - BAR', col) + '\n';
+    txt += _printCenter('(comandas em aberto)', col) + '\n';
+    txt += _printLine('-', col) + '\n';
+    txt += 'Jogador: ' + ((j && j.nome) || '—').substring(0, col - 9) + '\n';
+    txt += 'Data: ' + fmtData(Date.now()) + '\n';
+    if (currentUser && currentUser.nome) txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    let totalGeral = 0, totalQtd = 0;
+    comandas.forEach((c, idx) => {
+        txt += 'Comanda ' + (idx + 1) + (c.abertoEm ? ' - ' + fmtData(c.abertoEm) : '') + '\n';
+        const itens = Array.isArray(c.itens) ? c.itens : [];
+        if (!itens.length) txt += '  (sem itens)\n';
+        itens.forEach(it => {
+            const qtd = Number(it.qtd || 0);
+            const sub = (it.subtotal != null && !isNaN(it.subtotal)) ? Number(it.subtotal) : qtd * Number(it.valor || 0);
+            txt += fmtLinha('  ' + (qtd || 1) + 'x ' + (it.nome || 'Item'), sub) + '\n';
+            totalQtd += qtd || 1;
+        });
+        const totalC = calcTotalComanda(c);
+        if (comandas.length > 1) txt += fmtLinha('  Subtotal', totalC) + '\n';
+        totalGeral += totalC;
+        txt += '\n';
+    });
+    txt += _printLine('-', col) + '\n';
+    txt += fmtLinha('TOTAL (' + totalQtd + ' ' + (totalQtd === 1 ? 'item' : 'itens') + ')', totalGeral) + '\n';
+    txt += _printLine('-', col) + '\n';
+    txt += '\n' + _printFooter();
+    abrirPreviewImpressao('Extrato do Bar', txt);
+}
+window._imprimirExtratoComandasAbertas = _imprimirExtratoComandasAbertas;
+
 function calcTotalComanda(c) {
     if (!c || !c.itens) return 0;
     return c.itens.reduce((s, it) => {
@@ -46020,6 +46075,7 @@ function renderPagarConta() {
             <div class="pj-comp-left">
                 <i class="fa-solid fa-glass-cheers" style="color:#f97316;font-size:.85rem;"></i>
                 <span class="pj-comp-label">Comandas do bar <span class="pj-comp-sub">(${comandasAbertas.length} comanda${comandasAbertas.length>1?'s':''} · ${totalItens} ${totalItens>1?'itens':'item'})</span></span>
+                <button type="button" onclick="event.stopPropagation();_imprimirExtratoComandasAbertas('${pagamentoJogadorId}')" title="Ver o que foi consumido no bar" style="background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);color:#fb923c;padding:.15rem .45rem;border-radius:.3rem;cursor:pointer;font-family:inherit;font-size:.62rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;margin-left:.35rem;"><i class="fa-solid fa-receipt"></i> Ver itens</button>
             </div>
             <div class="pj-comp-val pj-comp-val-orange">- ${formatMoney(totalComandas)}</div>
         </div>` : '';
