@@ -8249,6 +8249,46 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
                 </div>
 
+                <!-- ▶ Reentrada múltipla (NOVO — desligado por padrão) -->
+                <div class="t2-coll" data-section="reentrada-multipla">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('reentrada-multipla')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-repeat" style="margin-right:.3rem;color:#71717a;"></i>Reentrada múltipla</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-rm" style="color:#52525b;font-size:.7rem;">Desligada</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
+                            <i class="fa-solid fa-circle-info" style="color:#38bdf8;"></i>
+                            O jogador <strong>inscrito sem fichas</strong> (ou eliminado) escolhe quantas reentradas faz de uma vez (ex: R$ 60 = 3x = 30k), sem precisar eliminar antes. Cada uma é registrada como uma reentrada normal: rake, staff, chipcount e caixa seguem as mesmas regras de hoje.
+                        </div>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);margin-bottom:.6rem;">
+                            <input type="checkbox" id="t-rm-ativo" onchange="_rmAtualizarForm()" style="accent-color:#a855f7;width:16px;height:16px;">
+                            <span><strong>Permitir reentrada múltipla</strong> — escolha de 1x até o máximo no lançamento</span>
+                        </label>
+                        <div id="t-rm-campos" style="display:none;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">
+                                <div><label class="inp-label">Valor por reentrada R$</label><input id="t-rm-valor" type="number" step="0.01" min="0" value="20" class="inp" oninput="_rmAtualizarForm()"></div>
+                                <div><label class="inp-label">Máximo por lançamento</label>
+                                    <select id="t-rm-max" class="inp" onchange="_rmAtualizarForm()">
+                                        <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option><option value="5" selected>5x</option><option value="6">6x</option><option value="8">8x</option><option value="10">10x</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
+                                <i class="fa-solid fa-coins" style="color:#f59e0b;"></i>
+                                Fichas por reentrada = <strong id="t-rm-stack-label" style="color:#e4e4e7;">stack inicial</strong> (campo Stack do torneio). Quando ligada, quem já entrou no torneio volta sempre pela reentrada (não faz buy-in de novo).
+                            </div>
+                            <div id="t-rm-aviso" style="display:none;font-size:.68rem;color:#f59e0b;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.4rem .55rem;margin-bottom:.55rem;"></div>
+                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.35rem;">Conferência do torneio</div>
+                            <div id="t-rm-checklist" style="display:flex;flex-direction:column;gap:.25rem;margin-bottom:.65rem;"></div>
+                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.35rem;">Como vai cobrar o cliente</div>
+                            <div id="t-rm-preview" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ▶ Travas de Nível -->
                 <div class="t2-coll" data-section="travas">
                     <div class="t2-coll-head" onclick="t2ToggleSection('travas')">
@@ -8503,44 +8543,6 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <input type="checkbox" id="t-staff-fixo-last-chance" style="accent-color:#38bdf8;"> <span>Last Chance</span>
                                 </label>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ▶ Reentrada múltipla (NOVO — desligado por padrão) -->
-                <div class="t2-coll" data-section="reentrada-multipla">
-                    <div class="t2-coll-head" onclick="t2ToggleSection('reentrada-multipla')">
-                        <div style="display:flex;align-items:center;gap:.55rem;">
-                            <span class="t2-chevron">▶</span>
-                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-repeat" style="margin-right:.3rem;color:#71717a;"></i>Reentrada múltipla</span>
-                        </div>
-                        <span class="t2-status" id="t2-status-rm" style="color:#52525b;font-size:.7rem;">Desligada</span>
-                    </div>
-                    <div class="t2-coll-body">
-                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
-                            <i class="fa-solid fa-circle-info" style="color:#38bdf8;"></i>
-                            O jogador <strong>inscrito sem fichas</strong> (ou eliminado) escolhe quantas reentradas faz de uma vez (ex: R$ 60 = 3x = 30k), sem precisar eliminar antes. Cada uma é registrada como uma reentrada normal: rake, staff, chipcount e caixa seguem as mesmas regras de hoje.
-                        </div>
-                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);margin-bottom:.6rem;">
-                            <input type="checkbox" id="t-rm-ativo" onchange="_rmAtualizarForm()" style="accent-color:#a855f7;width:16px;height:16px;">
-                            <span><strong>Permitir reentrada múltipla</strong> — escolha de 1x até o máximo no lançamento</span>
-                        </label>
-                        <div id="t-rm-campos" style="display:none;">
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">
-                                <div><label class="inp-label">Valor por reentrada R$</label><input id="t-rm-valor" type="number" step="0.01" min="0" value="20" class="inp" oninput="_rmAtualizarForm()"></div>
-                                <div><label class="inp-label">Máximo por lançamento</label>
-                                    <select id="t-rm-max" class="inp" onchange="_rmAtualizarForm()">
-                                        <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option><option value="5" selected>5x</option><option value="6">6x</option><option value="8">8x</option><option value="10">10x</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
-                                <i class="fa-solid fa-coins" style="color:#f59e0b;"></i>
-                                Fichas por reentrada = <strong id="t-rm-stack-label" style="color:#e4e4e7;">stack inicial</strong> (campo Stack do torneio). Quando ligada, quem já entrou no torneio volta sempre pela reentrada (não faz buy-in de novo).
-                            </div>
-                            <div id="t-rm-aviso" style="display:none;font-size:.68rem;color:#f59e0b;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.4rem .55rem;margin-bottom:.55rem;"></div>
-                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.35rem;">Como vai cobrar o cliente</div>
-                            <div id="t-rm-preview" style="display:flex;flex-direction:column;gap:.35rem;"></div>
                         </div>
                     </div>
                 </div>
@@ -27067,6 +27069,45 @@ function _fecharAvisoIntervalo(prosseguir) {
 }
 window._fecharAvisoIntervalo = _fecharAvisoIntervalo;
 
+// Aviso ao criar torneio de reentrada múltipla com itens pendentes (não bloqueia: operador decide)
+function _mostrarAvisoRM(pendencias) {
+    document.getElementById('modal-aviso-rm')?.remove();
+    const html = `
+    <div id="modal-aviso-rm" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);">
+        <div style="background:#18181b;border:1px solid #3f3f46;border-radius:.75rem;padding:1.75rem;max-width:460px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem;">
+                <i class="fa-solid fa-triangle-exclamation" style="color:#fbbf24;font-size:1.4rem;"></i>
+                <div style="font-size:1.05rem;font-weight:700;color:#fafafa;">Confira a Reentrada múltipla</div>
+            </div>
+            <div style="font-size:.85rem;color:#d4d4d8;line-height:1.5;margin-bottom:1.25rem;">
+                ${pendencias.length === 1 ? 'Há 1 item' : 'Há ' + pendencias.length + ' itens'} pra conferir antes de criar:
+                <ul style="margin:.6rem 0 0 1.1rem;padding:0;display:flex;flex-direction:column;gap:.35rem;">
+                    ${pendencias.map(p => `<li style="color:#fbbf24;">${p.txt}</li>`).join('')}
+                </ul>
+            </div>
+            <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+                <button onclick="_fecharAvisoRM(false)" class="btn-gold" style="padding:.6rem 1.1rem;font-size:.85rem;font-weight:700;">Voltar e corrigir</button>
+                <button onclick="_fecharAvisoRM(true)" style="padding:.6rem 1rem;font-size:.8rem;background:transparent;border:1px solid #3f3f46;color:#a1a1aa;border-radius:.5rem;cursor:pointer;">Criar assim mesmo</button>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+function _fecharAvisoRM(prosseguir) {
+    document.getElementById('modal-aviso-rm')?.remove();
+    if (prosseguir) {
+        // Chegar neste aviso significa que o aviso de intervalo já passou (ou foi aceito): pula os dois
+        window._pularAvisoRM = true;
+        const _prevInt = window._pularAvisoIntervalo;
+        window._pularAvisoIntervalo = true;
+        try { saveTournament(); } finally { window._pularAvisoRM = false; window._pularAvisoIntervalo = _prevInt || false; }
+    } else {
+        showToast('💡 Ajuste os itens marcados com ⚠️ na seção Reentrada múltipla');
+        try { if (typeof t2ToggleSection === 'function') { const sec = document.querySelector('.t2-coll[data-section="reentrada-multipla"]'); if (sec && !sec.classList.contains('expanded')) t2ToggleSection('reentrada-multipla'); sec?.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {}
+    }
+}
+window._fecharAvisoRM = _fecharAvisoRM;
+
 function saveTournament() {
     const nome = document.getElementById('t-nome').value.trim() || 'Torneio StackOS';
     const tempoNivel = parseInt(document.getElementById('t-tempo').value) || 15;
@@ -27094,6 +27135,13 @@ function saveTournament() {
             _mostrarAvisoIntervaloCompras(addonValor);
             return; // o modal cuida do fluxo: chama saveTournament() de novo via window._continuarSemIntervalo
         }
+    }
+
+    // VALIDAÇÃO EDUCATIVA (NOVO): reentrada múltipla ligada com pendências de configuração
+    if (!window._pularAvisoRM && typeof _rmLerForm === 'function' && _rmLerForm().max > 1
+        && !_rmTipoKO(document.getElementById('t-tipo')?.value)) {
+        const pend = _rmChecklist().filter(i => !i.ok);
+        if (pend.length) { _mostrarAvisoRM(pend); return; }
     }
 
     const tipo = document.getElementById('t-tipo').value || 'normal';
@@ -36016,6 +36064,65 @@ function _rmSimular(cfg, n) {
     return { paga, staff, base, rake: base * (Number(cfg.rakePct) || 0) / 100, fichas: (Number(cfg.stack) || 0) * n };
 }
 
+// Trava do rebuy: torneio de reentrada múltipla não tem rebuy (o jogador volta pela reentrada).
+// Ligada → zera e bloqueia rebuy simples/duplo. Desligada → libera os campos (valores ficam como estão).
+// Add-on e Buy-in Duplo (mesma seção) continuam livres.
+function _rmTravarRebuy(ativo) {
+    const ids = ['t-rebuy-simples', 't-rebuy-simples-fichas', 't-rebuy-duplo', 't-rebuy-duplo-fichas'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (ativo && (id === 't-rebuy-simples' || id === 't-rebuy-duplo') && (parseFloat(el.value) || 0) !== 0) el.value = 0;
+        el.disabled = !!ativo;
+        el.style.opacity = ativo ? '.45' : '';
+        el.title = ativo ? 'Desligado: neste formato o jogador volta pela reentrada múltipla' : '';
+    });
+    const ref = document.getElementById('t-rebuy-duplo');
+    const grid = ref ? ref.closest('div[style*="grid"]') || ref.parentNode : null;
+    let aviso = document.getElementById('t-rm-rebuy-aviso');
+    if (!aviso && grid && grid.parentNode) {
+        aviso = document.createElement('div');
+        aviso.id = 't-rm-rebuy-aviso';
+        aviso.style.cssText = 'display:none;font-size:.68rem;color:#c4b5fd;background:rgba(168,85,247,.07);border:1px solid rgba(168,85,247,.28);border-radius:.4rem;padding:.4rem .55rem;margin:.45rem 0;';
+        aviso.innerHTML = '<i class="fa-solid fa-lock" style="margin-right:.3rem;"></i>Rebuy simples e duplo desligados: neste torneio o jogador volta pela <strong>Reentrada múltipla</strong> (seção abaixo). Add-on e Buy-in Duplo continuam normais.';
+        grid.parentNode.insertBefore(aviso, grid.nextSibling);
+    }
+    if (aviso) aviso.style.display = ativo ? '' : 'none';
+    if (typeof t2AtualizarStatusRebuy === 'function') { try { t2AtualizarStatusRebuy(); } catch (_) {} }
+}
+
+// Pendências de configuração do formato (usado no checklist e na confirmação ao criar)
+function _rmChecklist() {
+    const num = id => parseFloat(document.getElementById(id)?.value) || 0;
+    const chk = id => !!document.getElementById(id)?.checked;
+    const itens = [];
+    // Rebuy desligado
+    const rebuyOk = num('t-rebuy-simples') === 0 && num('t-rebuy-duplo') === 0;
+    itens.push({ ok: rebuyOk, txt: rebuyOk ? 'Rebuy simples e duplo desligados' : 'Rebuy simples/duplo com valor — neste formato deve ficar desligado' });
+    // Valor após FREE vazio quando há Buy-in Duplo
+    const buyinFree = num('t-buyin') === 0;
+    const temDuplo = num('t-buyin-duplo-valor') > 0;
+    const posFree = num('t-buyin-pos-free-valor');
+    if (buyinFree && temDuplo) {
+        itens.push({ ok: posFree === 0, txt: posFree === 0 ? '"Valor após FREE" vazio (depois do FREE, entrada só pelo Buy-in Duplo)'
+            : `"Valor após FREE" está R$ ${posFree.toFixed(2).replace('.', ',')}: depois do FREE o buy-in normal custaria isso com só o stack inicial. Deixe vazio pra usar o Buy-in Duplo` });
+    }
+    // Entradas até nível
+    const ate = parseInt(document.getElementById('t-reentry')?.value) || 0;
+    itens.push({ ok: ate > 0, txt: ate > 0 ? `Entradas/reentradas até o nível ${ate}` : 'Preencha "Entradas até nível" em Travas de nível (sem isso a Re-entry não aparece)' });
+    // Staff fixo em todas as ações usadas
+    if (chk('t-staff-fixo-ativo')) {
+        const faltando = [];
+        if (!chk('t-staff-fixo-buyin')) faltando.push('Buy-in');
+        if (!chk('t-staff-fixo-reentry')) faltando.push('Re-entry');
+        if (num('t-addon-valor') > 0 && !chk('t-staff-fixo-addon')) faltando.push('Add-on');
+        if (chk('t-last-chance-ativo') && !chk('t-staff-fixo-last-chance')) faltando.push('Last Chance');
+        itens.push({ ok: faltando.length === 0, txt: faltando.length === 0 ? 'Staff fixo marcado em todas as ações usadas'
+            : 'Staff fixo não marcado em: ' + faltando.join(', ') + ' (Staff / Comissão)' });
+    }
+    return itens;
+}
+
 function _rmAtualizarForm() {
     const cb = document.getElementById('t-rm-ativo');
     const campos = document.getElementById('t-rm-campos');
@@ -36032,7 +36139,13 @@ function _rmAtualizarForm() {
         status.textContent = ativo ? `Até ${max}x · ${fmt(valor)} cada` : 'Desligada';
         status.style.color = ativo ? '#a855f7' : '#52525b';
     }
+    _rmTravarRebuy(ativo && !_rmTipoKO(document.getElementById('t-tipo')?.value));
     if (!ativo || !prev) return;
+
+    const cl = document.getElementById('t-rm-checklist');
+    if (cl) {
+        cl.innerHTML = _rmChecklist().map(i => `<div style="font-size:.68rem;line-height:1.4;color:${i.ok ? '#86efac' : '#fbbf24'};">${i.ok ? '✅' : '⚠️'} ${i.txt}</div>`).join('');
+    }
 
     const cfg = {
         valor,
@@ -36524,7 +36637,9 @@ async function _rmExecutarEstornoGrupo(t, comboId, motivo, onProgresso) {
 // Atualiza a prévia quando campos relacionados mudam (stack, rake, staff, travas, tipo)
 (function _rmBindForm() {
     const bind = () => {
-        ['t-stack', 't-rake', 't-staff-fixo-ativo', 't-staff-fixo-valor', 't-staff-fixo-reentry', 't-reentry', 't-tipo'].forEach(id => {
+        ['t-stack', 't-rake', 't-staff-fixo-ativo', 't-staff-fixo-valor', 't-staff-fixo-reentry', 't-reentry', 't-tipo',
+         't-buyin', 't-buyin-pos-free-valor', 't-buyin-duplo-valor', 't-addon-valor', 't-last-chance-ativo',
+         't-staff-fixo-buyin', 't-staff-fixo-addon', 't-staff-fixo-last-chance', 't-rebuy-simples', 't-rebuy-duplo'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { el.addEventListener('input', _rmAtualizarForm); el.addEventListener('change', _rmAtualizarForm); }
         });
