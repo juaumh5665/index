@@ -8519,7 +8519,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div class="t2-coll-body">
                         <div style="font-size:.7rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
                             <i class="fa-solid fa-circle-info" style="color:#38bdf8;"></i>
-                            O jogador <strong>eliminado</strong> escolhe quantas reentradas faz de uma vez (ex: R$ 60 = 3x = 30k). Cada uma é registrada como uma reentrada normal: rake, staff, chipcount e caixa seguem as mesmas regras de hoje.
+                            O jogador <strong>inscrito sem fichas</strong> (ou eliminado) escolhe quantas reentradas faz de uma vez (ex: R$ 60 = 3x = 30k), sem precisar eliminar antes. Cada uma é registrada como uma reentrada normal: rake, staff, chipcount e caixa seguem as mesmas regras de hoje.
                         </div>
                         <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);margin-bottom:.6rem;">
                             <input type="checkbox" id="t-rm-ativo" onchange="_rmAtualizarForm()" style="accent-color:#a855f7;width:16px;height:16px;">
@@ -8536,7 +8536,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             </div>
                             <div style="font-size:.68rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
                                 <i class="fa-solid fa-coins" style="color:#f59e0b;"></i>
-                                Fichas por reentrada = <strong id="t-rm-stack-label" style="color:#e4e4e7;">stack inicial</strong> (campo Stack do torneio). Quando ligada, jogador eliminado só volta pela reentrada (não faz buy-in de novo).
+                                Fichas por reentrada = <strong id="t-rm-stack-label" style="color:#e4e4e7;">stack inicial</strong> (campo Stack do torneio). Quando ligada, quem já entrou no torneio volta sempre pela reentrada (não faz buy-in de novo).
                             </div>
                             <div id="t-rm-aviso" style="display:none;font-size:.68rem;color:#f59e0b;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.4rem .55rem;margin-bottom:.55rem;"></div>
                             <div style="font-size:.68rem;color:#71717a;margin-bottom:.35rem;">Como vai cobrar o cliente</div>
@@ -31079,6 +31079,22 @@ function _renderCheckboxesEntrada(t, jid, optsLegado, ctx) {
         }
     }
 
+    // Reentrada múltipla (NOVO): nos torneios com a opção ligada, jogador INSCRITO (sem fichas)
+    // também pode fazer Re-entry sem ser eliminado antes. Desligada → lista igual à de sempre.
+    if (jogadorJaInscrito && typeof _rmMaxTorneio === 'function' && _rmMaxTorneio(t) > 0 && Number(t.reentryAte) > 0) {
+        const trRe = _tipoBloqueadoPorTrava(t, 'reentry');
+        const vRe = _getReentryValor(t);
+        tiposDisponiveis.unshift({
+            tipo: 'reentry',
+            label: 'Re-entry',
+            valor: vRe,
+            valorLabel: vRe > 0 ? 'R$ ' + vRe.toFixed(2).replace('.', ',') : 'GRÁTIS',
+            fichas: _fichasStackPorTipo(t, 'reentry'),
+            bloqueado: trRe.bloqueado,
+            motivo: trRe.motivo
+        });
+    }
+
     // Renderiza
     container.innerHTML = tiposDisponiveis.map((opt, idx) => {
         const id = `entrada-acao-${opt.tipo}`;
@@ -31128,6 +31144,12 @@ function _getAcoesEntradaSelecionadas() {
             const cb = document.getElementById(`entrada-acao-${tipo}`);
             if (cb && cb.checked && !cb.disabled) acoes.push(tipo);
         });
+        // Reentrada múltipla (NOVO): checkbox Re-entry (só existe quando a opção está ligada)
+        const cbRe = document.getElementById('entrada-acao-reentry');
+        if (cbRe && cbRe.checked && !cbRe.disabled) {
+            const q = (typeof _rmQtdSelecionada === 'function') ? _rmQtdSelecionada() : 1;
+            for (let i = 0; i < q; i++) acoes.push('reentry');
+        }
         return acoes;
     }
     // Single mode (jogador eliminado ou sem jogador selecionado)
@@ -32040,9 +32062,16 @@ async function _registrarEntradaImpl() {
         ? _getAcoesEntradaSelecionadas()
         : null;
 
-    // Reentrada múltipla (NOVO): N × 'reentry' → handler próprio (combo comum nunca tem reentry)
-    if (acoesSelecionadas && acoesSelecionadas.length > 1 && acoesSelecionadas.every(a => a === 'reentry')) {
-        return _registrarReentradaMultipla(t, jid, acoesSelecionadas.length);
+    // Reentrada múltipla (NOVO): Re-entry em Nx (eliminado ou inscrito) → handler próprio.
+    // Eliminado em 1x continua no fluxo single de sempre.
+    if (acoesSelecionadas && acoesSelecionadas.includes('reentry') && typeof _rmMaxTorneio === 'function' && _rmMaxTorneio(t) > 0) {
+        if (!acoesSelecionadas.every(a => a === 'reentry')) {
+            return showToast('⚠️ Lance a Re-entry separada das outras ações');
+        }
+        const _rmElimAgora = (t.eliminados || []).some(e => String(e.jogadorId) === String(jid));
+        if (acoesSelecionadas.length > 1 || !_rmElimAgora) {
+            return _registrarReentradaMultipla(t, jid, acoesSelecionadas.length);
+        }
     }
 
     if (acoesSelecionadas && acoesSelecionadas.length > 1) {
@@ -36063,12 +36092,25 @@ function _rmSyncMultUI(t) {
     const max = _rmMaxTorneio(t);
     if (!t || !max) return esconder();
     const multi = document.getElementById('entrada-acoes-multi');
-    if (multi && multi.style.display !== 'none' && multi.children.length > 0) return esconder();
     const sel = document.getElementById('entrada-tipo');
     const jid = document.getElementById('entrada-jogador')?.value;
-    if (!sel || sel.value !== 'reentry' || !jid) return esconder();
+    const modoCheckbox = !!(multi && multi.style.display !== 'none' && multi.children.length > 0);
+    let reentryMarcada;
+    if (modoCheckbox) {
+        const cbRe = document.getElementById('entrada-acao-reentry');
+        reentryMarcada = !!(cbRe && cbRe.checked && !cbRe.disabled);
+    } else {
+        reentryMarcada = !!(sel && sel.value === 'reentry');
+    }
+    if (!reentryMarcada || !jid) return esconder();
     const eliminado = (t.eliminados || []).some(e => String(e.jogadorId) === String(jid));
-    if (!eliminado) return esconder();
+    const inscrito = (t.entries || []).some(e => String(e.jogadorId) === String(jid) && e.tipo !== 'addon');
+    if (!eliminado && !inscrito) return esconder();
+    // Posição: abaixo da lista de checkboxes (modo checkbox) ou abaixo do select (modo single)
+    try {
+        if (modoCheckbox && multi.nextSibling !== box) multi.parentNode.insertBefore(box, multi.nextSibling);
+        else if (!modoCheckbox && box.nextSibling !== multi && multi) multi.parentNode.insertBefore(box, multi);
+    } catch (_) {}
     if (_rmMultJid !== jid) { _rmMultJid = jid; _rmMultSel = 1; }
     if (_rmMultSel > max) _rmMultSel = max;
 
@@ -36109,13 +36151,15 @@ async function _registrarReentradaMultipla(t, jid, n) {
     const max = _rmMaxTorneio(t);
     n = Math.floor(Number(n) || 0);
     if (!max) return showToast('⚠️ Reentrada múltipla não está ativa neste torneio');
-    if (n < 2 || n > max) return showToast(`⚠️ Quantidade inválida (1 a ${max}x)`);
+    if (n < 1 || n > max) return showToast(`⚠️ Quantidade inválida (1 a ${max}x)`);
 
     const tipo = 'reentry';
     const trava = _tipoBloqueadoPorTrava(t, tipo);
     if (trava.bloqueado) return showToast('🔒 ' + trava.motivo);
     const eliminado = (t.eliminados || []).some(e => String(e.jogadorId) === String(jid));
-    if (!eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
+    const inscrito = (t.entries || []).some(e => String(e.jogadorId) === String(jid)
+        && ['buyin', 'buyin_duplo', 'reentry', 'rebuy_simples', 'rebuy_duplo'].includes(e.tipo));
+    if (!eliminado && !inscrito) return showToast('⚠️ Jogador precisa fazer Buy-in para entrar no torneio');
 
     // Extras não suportados no lote (evita qualquer divergência): lance 1x nesses casos
     if (typeof _getTicketVoucherSelecionado === 'function' && _getTicketVoucherSelecionado()) {
@@ -36229,8 +36273,10 @@ async function _registrarReentradaMultipla(t, jid, n) {
             try {
                 _abrirModalPromptImpressao({
                     titulo: 'Imprimir comprovante de compra?',
-                    descricao: `Re-entry ${n}x de ${getJogadorNome(jid)}`,
-                    onConfirm: () => imprimirComprovanteReentradaMultipla(t, { entries: _ents, jogadorNome: getJogadorNome(jid) })
+                    descricao: `Re-entry ${n > 1 ? n + 'x ' : ''}de ${getJogadorNome(jid)}`,
+                    onConfirm: () => (_ents.length > 1)
+                        ? imprimirComprovanteReentradaMultipla(t, { entries: _ents, jogadorNome: getJogadorNome(jid) })
+                        : imprimirComprovanteCompra(t, { entry: _ents[0], jogadorNome: getJogadorNome(jid) })
                 });
             } catch (e) { console.error('[REENTRADA MULTIPLA] comprovante:', e); }
         }, 300);
@@ -36254,7 +36300,7 @@ async function _registrarReentradaMultipla(t, jid, n) {
     });
 
     const pnhLabel = _pnhRegistrado > 0 ? ` · 💵 Pago ${_pnhMetodo} R$ ${_pnhRegistrado.toFixed(2).replace('.', ',')}` : '';
-    showToast(`💰 Re-entry ${n}x registrado! Total R$ ${valorTotalLote.toFixed(2).replace('.', ',')}${pnhLabel}`);
+    showToast(`💰 Re-entry ${n > 1 ? n + 'x ' : ''}registrado! Total R$ ${valorTotalLote.toFixed(2).replace('.', ',')}${pnhLabel}`);
     try { _lembreteJackpotPosCompra(t, jid, tipo); } catch (e) { console.warn('[reentrada multipla] lembrete jackpot:', e); }
 }
 window._registrarReentradaMultipla = _registrarReentradaMultipla;
@@ -36382,7 +36428,7 @@ function _estornarReentradaMultipla(comboId) {
             </div>
             <div style="font-size:.7rem;color:#a1a1aa;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.18);border-radius:.45rem;padding:.5rem .65rem;line-height:1.5;">
                 <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
-                As ${n} reentradas são estornadas de uma vez, com o mesmo estorno usado hoje para cada ação. ${formatMoney(total)} volta ao saldo do jogador e ele volta a ficar eliminado.
+                As ${n} reentradas são estornadas de uma vez, com o mesmo estorno usado hoje para cada ação. ${formatMoney(total)} volta ao saldo do jogador${(t._rmElimBackup && Array.isArray(t._rmElimBackup[comboId]) && t._rmElimBackup[comboId].length) ? ' e ele volta a ficar eliminado' : ''}.
             </div>
             <div>
                 <label class="inp-label">Motivo do estorno</label>
