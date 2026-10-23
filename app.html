@@ -31757,6 +31757,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     const tornIdx = torneios.indexOf(t);
     const txsBefore = transacoes.length;
     const entriesCriadas = [];
+    let _posSaveCombo = null; // valores usados só no aviso final (as variáveis do try não existem fora dele)
     const ts = Date.now();
 
     // === Loop de criação das entries ===
@@ -31968,6 +31969,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         _pnhMetodoCombo = metodoInfo.label;
     }
 
+    _posSaveCombo = { tvAbatidoCombo, _pnhRegistradoCombo, _pnhMetodoCombo };
     saveData();
 
     } catch (errCombo) {
@@ -32037,8 +32039,9 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         renderDashboard();
     });
 
-    const tvLabelCombo = tvAbatidoCombo > 0 ? ` · 🎟️ Desconto R$ ${tvAbatidoCombo.toFixed(2).replace('.',',')}` : '';
-    const pnhLabelCombo = _pnhRegistradoCombo > 0 ? ` · 💵 Pago ${_pnhMetodoCombo} R$ ${_pnhRegistradoCombo.toFixed(2).replace('.',',')}` : '';
+    const _psc = _posSaveCombo || {};
+    const tvLabelCombo = _psc.tvAbatidoCombo > 0 ? ` · 🎟️ Desconto R$ ${_psc.tvAbatidoCombo.toFixed(2).replace('.',',')}` : '';
+    const pnhLabelCombo = _psc._pnhRegistradoCombo > 0 ? ` · 💵 Pago ${_psc._pnhMetodoCombo} R$ ${_psc._pnhRegistradoCombo.toFixed(2).replace('.',',')}` : '';
     showToast(`💰 Combo registrado: ${acoesOrdenadas.length} ações · Total R$ ${_comboTotalGeral.toFixed(2).replace('.', ',')}${tvLabelCombo}${pnhLabelCombo}`);
 
     // Lembrete de Jackpot pendente: combo tem buy-in? Se sim, dispara
@@ -32123,6 +32126,7 @@ async function _registrarEntradaImpl() {
     const _snapshotSingle = JSON.stringify(t);
     const _tornIdxSingle = torneios.indexOf(t);
     const _txsBeforeSingle = transacoes.length;
+    let _posSave = null; // valores usados só no aviso final (as variáveis do try não existem fora dele)
 
     // 🛡 ROLLBACK GUARD: se qualquer erro acontecer após gravar transações,
     // reverte tudo pra evitar duplicidade em retry
@@ -32329,6 +32333,7 @@ async function _registrarEntradaImpl() {
         _pnhMetodo = metodoInfo.label;
     }
 
+    _posSave = { staffCobrado, valorTotal, tvAbatido, _pnhRegistrado, _pnhMetodo, descMap };
     saveData();
 
     } catch (errSingle) {
@@ -32373,25 +32378,15 @@ async function _registrarEntradaImpl() {
     renderTorneiosList();
     renderDashboard();
 
-    // UNDO: permite desfazer entrada
-    const snapshot = JSON.stringify(t);
-    const tornIdx = torneios.indexOf(t);
-    const numTxsAdicionadas = (valorTx > 0 ? 1 : 0) + (staffCobrado > 0 ? 1 : 0) + (taxaAdmCobrada > 0 ? 1 : 0) + (passaporteCobrado > 0 ? 1 : 0) + (tvAbatido > 0 ? 1 : 0) + (_pnhRegistrado > 0 ? 1 : 0);
-    const txsBefore = transacoes.length - numTxsAdicionadas;
-    const nomeJog = getJogadorNome(jid);
-    registrarUndo(`💰 ${descMap[tipo]} de ${nomeJog}`, () => {
-        torneios[tornIdx] = JSON.parse(snapshot);
-        if (transacoes.length > txsBefore) transacoes = transacoes.slice(0, txsBefore);
-        saveData();
-        updateModalTorneio();
-        renderTorneiosList();
-        renderDashboard();
-    });
-
-    const totalLabel = staffCobrado > 0 ? ` (Total R$ ${valorTotal.toFixed(2).replace('.',',')})` : '';
-    const tvLabel = tvAbatido > 0 ? ` · 🎟️ Desconto R$ ${tvAbatido.toFixed(2).replace('.',',')}` : '';
-    const pnhLabel = _pnhRegistrado > 0 ? ` · 💵 Pago ${_pnhMetodo} R$ ${_pnhRegistrado.toFixed(2).replace('.',',')}` : '';
-    showToast(`💰 ${descMap[tipo] || 'Entrada'} registrado!${totalLabel}${tvLabel}${pnhLabel}`);
+    // UNDO do lançamento avulso: DESATIVADO de propósito. A foto usada era tirada DEPOIS de gravar
+    // a entrada, então "desfazer" removeria só as transações (jogador ficaria com fichas sem débito)
+    // e não apaga nada no banco. Desde 15/10 ele já não era registrado. Correção de lançamento = Estorno.
+    const _ps = _posSave || {};
+    const _dm = _ps.descMap || {};
+    const totalLabel = (_ps.staffCobrado > 0 && typeof _ps.valorTotal === 'number') ? ` (Total R$ ${_ps.valorTotal.toFixed(2).replace('.',',')})` : '';
+    const tvLabel = _ps.tvAbatido > 0 ? ` · 🎟️ Desconto R$ ${_ps.tvAbatido.toFixed(2).replace('.',',')}` : '';
+    const pnhLabel = _ps._pnhRegistrado > 0 ? ` · 💵 Pago ${_ps._pnhMetodo} R$ ${_ps._pnhRegistrado.toFixed(2).replace('.',',')}` : '';
+    showToast(`💰 ${_dm[tipo] || 'Entrada'} registrado!${totalLabel}${tvLabel}${pnhLabel}`);
 
     // Lembrete de Jackpot pendente (só dispara em buy-in, e se jogador ainda não tem jackpot)
     try { _lembreteJackpotPosCompra(t, jid, tipo); } catch(e) { console.warn('[single] lembrete jackpot:', e); }
