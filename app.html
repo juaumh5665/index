@@ -31405,7 +31405,11 @@ function atualizarResumoEntrada() {
     const isV2Resumo = _isStaffFixoAdicionalV2(t);
     if (_staffFixoAtivo(t) && (t.staffFixoModo || 'embutido') === 'adicional') {
         const valorStaff = Number(t.staffFixoValor) || 0;
+        // Reentrada múltipla: N × 'reentry' = 1 lançamento → 1 staff (combo comum nunca tem reentry)
+        const _rmLoteResumo = acoes.length > 1 && acoes.every(a => a === 'reentry');
+        let _rmStaffJaContado = false;
         acoes.forEach(tp => {
+            if (_rmLoteResumo) { if (_rmStaffJaContado) return; _rmStaffJaContado = true; }
             // Buy-in free: respeita config cobrarFree
             if (tp === 'buyin' && valorBase === 0 && !t.staffFixoCobrarFree) {
                 // Não soma staff em buy-in free se config não cobra
@@ -36002,9 +36006,10 @@ function _rmAplicarForm(max, valor) {
 function _rmSimular(cfg, n) {
     const paga1 = Number(cfg.valor) || 0;
     const sv = (cfg.staffAtivo && cfg.staffReentry) ? (Number(cfg.staffValor) || 0) : 0;
-    let paga = paga1 * n, staff = sv * n, base = paga;
+    // Staff fixo: 1 por LANÇAMENTO (independe de 1x..Nx)
+    let paga = paga1 * n, staff = sv, base = paga;
     if (sv > 0) {
-        if (cfg.staffModo === 'adicional' && !cfg.v2) { paga = (paga1 + sv) * n; base = paga1 * n; }
+        if (cfg.staffModo === 'adicional' && !cfg.v2) { paga = paga1 * n + sv; base = paga1 * n; }
         else { base = Math.max(0, paga - staff); }
     }
     return { paga, staff, base, rake: base * (Number(cfg.rakePct) || 0) / 100, fichas: (Number(cfg.stack) || 0) * n };
@@ -36055,9 +36060,9 @@ function _rmAtualizarForm() {
         const r = _rmSimular(cfg, n);
         let linhaStaff;
         if (r.staff > 0 && !(cfg.staffModo === 'adicional' && !cfg.v2)) {
-            linhaStaff = `Dentro disso: ${fmt(r.staff)} é staff (${n} × ${fmt(cfg.staffValor)}) → base pro rake = ${fmt(r.base)}`;
+            linhaStaff = `Dentro disso: ${fmt(r.staff)} é staff (1 por lançamento) → base pro rake = ${fmt(r.base)}`;
         } else if (r.staff > 0) {
-            linhaStaff = `${fmt(cfg.valor * n)} + ${fmt(r.staff)} staff por fora → base pro rake = ${fmt(r.base)}`;
+            linhaStaff = `${fmt(cfg.valor * n)} + ${fmt(r.staff)} staff por fora (1 por lançamento) → base pro rake = ${fmt(r.base)}`;
         } else {
             linhaStaff = `Sem staff fixo na reentrada → base pro rake = ${fmt(r.base)}`;
         }
@@ -36182,10 +36187,12 @@ async function _registrarReentradaMultipla(t, jid, n) {
     if ((isAdicionalLegado || isAdicionalV2) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
         staffCobrado = Number(t.staffFixoValor) || 0;
     }
-    let valorEntry = valorBase;
-    if (isAdicionalV2 && staffCobrado > 0) valorEntry = Math.max(0, valorBase - staffCobrado);
-    const valorTotalUnit = isAdicionalV2 ? valorBase : (valorBase + staffCobrado);
-    const valorTotalLote = Math.round(valorTotalUnit * n * 100) / 100;
+    // Staff fixo: 1 por LANÇAMENTO (vai só na 1ª entry do lote; as demais ficam com staff 0).
+    // Embutido: staffCobrado = 0 aqui (o staff já está dentro do valor; _getStaffFixoTotal conta 1 por lote).
+    const _valorEntryDe = (i) => (isAdicionalV2 && staffCobrado > 0 && i === 0) ? Math.max(0, valorBase - staffCobrado) : valorBase;
+    const _staffDe = (i) => (i === 0 ? staffCobrado : 0);
+    // Total pago pelo jogador: V2 = n × valor (staff sai de dentro); legado = n × valor + 1 staff; embutido = n × valor
+    const valorTotalLote = Math.round(((valorBase * n) + (isAdicionalV2 ? 0 : staffCobrado)) * 100) / 100;
 
     // Crédito: valida o TOTAL do lote (mesmo hook usado pelo combo)
     try {
@@ -36214,22 +36221,27 @@ async function _registrarReentradaMultipla(t, jid, n) {
         if (!t._rmElimBackup || typeof t._rmElimBackup !== 'object') t._rmElimBackup = {};
         t._rmElimBackup[comboId] = JSON.parse(JSON.stringify(elimRemovidas));
 
+        let somaTxReentry = 0;
         for (let i = 0; i < n; i++) {
-            const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: ts + i, valor: valorEntry, staff: staffCobrado, taxaAdm: 0, comboId };
+            const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: ts + i, valor: _valorEntryDe(i), staff: _staffDe(i), taxaAdm: 0, comboId };
             const bonusFichas = _calcBonusFichasParaEntry(t, tipo);
             if (bonusFichas > 0) novaEntry.bonusFichas = bonusFichas;
             const fichasPromo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
             if (fichasPromo !== null) { novaEntry.fichasOverride = fichasPromo; novaEntry.isPromo = true; }
             t.entries.push(novaEntry);
             entriesCriadas.push(novaEntry);
-
-            const valorTx = isAdicionalV2 ? valorEntry : valorBase;
-            if (valorTx > 0) {
-                registrarTransacao({ jogadorId: jid, tipo: 'reentry', valor: -valorTx, descricao: descTx, origem: 'torneio', refId: t.id });
-            }
-            if (staffCobrado > 0) {
-                registrarTransacao({ jogadorId: jid, tipo: 'staff', valor: -staffCobrado, descricao: `Staff · ${t.nome} · ${getJogadorNome(jid)}`, origem: 'torneio', refId: t.id });
-            }
+            // Mesmo valor que o single lançaria no caixa pra esta entry (V2: sem staff; demais: valor cheio)
+            somaTxReentry += isAdicionalV2 ? novaEntry.valor : valorBase;
+        }
+        somaTxReentry = Math.round(somaTxReentry * 100) / 100;
+        // UMA transação com o total do lote. (N transações iguais seriam barradas pelo anti-duplicidade de 2s.)
+        if (somaTxReentry > 0) {
+            const txR = registrarTransacao({ jogadorId: jid, tipo: 'reentry', valor: -somaTxReentry, descricao: n > 1 ? `Re-entry ${n}x · ${t.nome}` : descTx, origem: 'torneio', refId: t.id });
+            if (!txR) throw new Error('Transação de reentrada não registrada (bloqueio anti-duplicidade). Aguarde 2s e tente de novo.');
+        }
+        if (staffCobrado > 0) {
+            const txS = registrarTransacao({ jogadorId: jid, tipo: 'staff', valor: -staffCobrado, descricao: `Staff · ${t.nome} · ${getJogadorNome(jid)}`, origem: 'torneio', refId: t.id });
+            if (!txS) throw new Error('Transação de staff não registrada (bloqueio anti-duplicidade). Aguarde 2s e tente de novo.');
         }
         alocarJogadorMesa(t, jid);
 
@@ -36328,7 +36340,8 @@ function gerarComprovanteReentradaMultipla(t, dados) {
         bonusSoma += Number(e.bonusFichas) || 0;
         if (Number(e.staff) > 0 && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) staffSoma += Number(e.staff);
     });
-    const valorUnit = Number(entries[0].valor) || 0;
+    // Valor por reentrada (a 1ª entry pode estar sem o staff no modo adicional V2 — usa a última)
+    const valorUnit = Number(entries[entries.length - 1].valor) || 0;
     const staffMostrar = (fixoModo === 'adicional') ? staffSoma : 0;
 
     let txt = _printHeaderCfg();
@@ -36468,11 +36481,18 @@ async function _rmExecutarEstornoGrupo(t, comboId, motivo, onProgresso) {
         const e = entries[i];
         if (!(t.entries || []).some(x => x.id === e.id)) { ok++; continue; } // já estornada
         if (onProgresso) onProgresso(i + 1);
+        await espera(0);
         window._estornoEmAndamento = _rmDadosEstorno(t, e);
         elMotivo.value = motivo + (entries.length > 1 ? ` (Re-entry ${entries.length}x)` : '');
+        const _txAntes = transacoes.length;
         try { await confirmarEstorno(); } catch (err) { console.error('[RM ESTORNO]', err); }
-        if (!(t.entries || []).some(x => x.id === e.id)) ok++;
-        await espera(650); // comLock libera 500ms após terminar
+        if (!(t.entries || []).some(x => x.id === e.id)) {
+            ok++;
+            const _esperado = (Number(e.valor) || 0) + (Number(e.staff) || 0) > 0;
+            if (_esperado && transacoes.length === _txAntes) console.warn('[RM ESTORNO] entry removida sem crédito registrado:', e.id);
+        }
+        // Cada estorno credita o mesmo valor → precisa passar a janela anti-duplicidade (2s) entre eles
+        if (i < entries.length - 1) await espera((typeof TX_DEDUP_WINDOW === 'number' ? TX_DEDUP_WINDOW : 2000) + 300);
     }
 
     // Restaura a eliminação (se o jogador não fez nada depois deste lote e não foi eliminado de novo)
@@ -36532,8 +36552,16 @@ function _getStaffFixoTotal(t) {
     // FASE G: se cobrarFree=false, buy-in com valor 0 NÃO conta como ação elegível pra staff
     const cobrarFree = !!t.staffFixoCobrarFree;
     let qtd = 0;
+    // Reentrada múltipla: 1 staff por LANÇAMENTO (lote = reentries com o mesmo comboId).
+    // Só afeta entries 'reentry' com comboId — que só existem na reentrada múltipla.
+    const _rmLotesContados = new Set();
     (t.entries || []).forEach(e => {
         const tipo = e.tipo;
+        if (tipo === 'reentry' && e.comboId) {
+            const _k = String(e.comboId);
+            if (_rmLotesContados.has(_k)) return;
+            _rmLotesContados.add(_k);
+        }
         // Mapa: rebuy_simples e rebuy_duplo apontam pra acoes.rebuy; buyin_duplo pra acoes.buyin
         const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : (tipo === 'buyin_duplo' ? 'buyin' : tipo);
         if (tipo === 'last_chance') {
@@ -36561,8 +36589,14 @@ function _getStaffFixoEmbutidoPorTipo(t) {
     const lcPaga = _lastChancePagaRake(t);
     const cobrarFree = !!t.staffFixoCobrarFree;
     const out = { buyin: 0, reentry: 0, rebuys: 0, addon: 0, last_chance: 0, total: 0 };
+    const _rmLotesContados = new Set(); // Reentrada múltipla: 1 staff por lançamento (mesma regra de _getStaffFixoTotal)
     (t.entries || []).forEach(e => {
         const tipo = e.tipo;
+        if (tipo === 'reentry' && e.comboId) {
+            const _k = String(e.comboId);
+            if (_rmLotesContados.has(_k)) return;
+            _rmLotesContados.add(_k);
+        }
         const keyAcao = (tipo === 'rebuy_simples' || tipo === 'rebuy_duplo') ? 'rebuy' : (tipo === 'buyin_duplo' ? 'buyin' : tipo);
         if (tipo === 'last_chance') {
             if (acoes.last_chance && lcPaga) { out.last_chance += valor; out.total += valor; }
