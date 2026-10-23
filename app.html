@@ -7968,6 +7968,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 <button onclick="abrirSalvarTemplate()" class="btn-ghost feature-gated" data-feature="templates_torneio" data-feature-label="Salvar templates personalizados de torneio" style="font-size:.7rem;padding:.3rem .6rem;color:#22c55e;flex-shrink:0;" title="Salvar configurações atuais como template">
                     <i class="fa-solid fa-floppy-disk"></i> Salvar template
                 </button>
+                <!-- BETA (em testes): preencher torneio a partir do flyer — por enquanto só registra interesse -->
+                <button type="button" onclick="_betaFlyerAbrir()" class="btn-ghost" style="font-size:.7rem;padding:.3rem .6rem;color:#fbbf24;flex-shrink:0;display:inline-flex;align-items:center;gap:.35rem;" title="Em fase de testes">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Preencher pelo flyer
+                    <span style="font-size:.55rem;font-weight:800;letter-spacing:.06em;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);color:#fbbf24;border-radius:.25rem;padding:.05rem .3rem;">BETA</span>
+                </button>
             </div>
         </div>
 
@@ -27107,6 +27112,53 @@ function _fecharAvisoRM(prosseguir) {
     }
 }
 window._fecharAvisoRM = _fecharAvisoRM;
+
+// =====================================================================
+// BETA — "Preencher pelo flyer" (EM TESTES). Ainda não lê flyers: só mostra o aviso
+// e registra o interesse/comentário na auditoria (logAudit), pra medir a procura.
+// =====================================================================
+function _betaFlyerAbrir() {
+    document.getElementById('modal-beta-flyer')?.remove();
+    try { logAudit('BETA_FLYER_IA', 'Abriu o aviso "Preencher pelo flyer" (beta)', { acao: 'abriu', clube: (sbClube && sbClube.nome) || null }); } catch (_) {}
+    const html = `
+    <div id="modal-beta-flyer" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);padding:1rem;">
+        <div style="background:#18181b;border:1px solid #3f3f46;border-radius:.75rem;padding:1.6rem;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+            <div style="display:flex;align-items:center;gap:.55rem;margin-bottom:.9rem;">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#fbbf24;font-size:1.3rem;"></i>
+                <div style="font-size:1.05rem;font-weight:700;color:#fafafa;">Preencher torneio pelo flyer</div>
+                <span style="font-size:.6rem;font-weight:800;letter-spacing:.06em;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);color:#fbbf24;border-radius:.25rem;padding:.1rem .4rem;">BETA · EM TESTES</span>
+            </div>
+            <div style="font-size:.85rem;color:#d4d4d8;line-height:1.55;">
+                Estamos testando um recurso em que você <strong>envia o flyer do torneio</strong> e o sistema
+                <strong>preenche o formulário automaticamente</strong> (buy-in, fichas, rebuys, add-on, travas…).
+                Você só revisa e cria.
+            </div>
+            <div style="font-size:.75rem;color:#fbbf24;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:.45rem;padding:.55rem .7rem;margin:.9rem 0;line-height:1.5;">
+                <i class="fa-solid fa-flask"></i> Este recurso está <strong>em fase de testes</strong> e ainda não está disponível. Seu interesse e suas sugestões nos ajudam a priorizar.
+            </div>
+            <label for="beta-flyer-comentario" style="font-size:.7rem;color:#a1a1aa;font-weight:600;">Dúvidas ou sugestões (opcional)</label>
+            <textarea id="beta-flyer-comentario" rows="3" maxlength="500" class="inp" placeholder="Ex: usaria pra todo torneio da semana; queria que lesse também a estrutura de blinds…" style="width:100%;margin-top:.35rem;resize:vertical;font-family:inherit;"></textarea>
+            <div style="display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem;flex-wrap:wrap;">
+                <button type="button" onclick="_betaFlyerFechar(false)" style="padding:.6rem 1rem;font-size:.8rem;background:transparent;border:1px solid #3f3f46;color:#a1a1aa;border-radius:.5rem;cursor:pointer;">Fechar</button>
+                <button type="button" onclick="_betaFlyerFechar(true)" class="btn-gold" style="padding:.6rem 1.1rem;font-size:.85rem;font-weight:700;">Quero usar quando sair</button>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+function _betaFlyerFechar(interesse) {
+    const comentario = (document.getElementById('beta-flyer-comentario')?.value || '').trim().slice(0, 500);
+    if (interesse || comentario) {
+        try {
+            logAudit('BETA_FLYER_IA', interesse ? 'Quer usar "Preencher pelo flyer" quando sair' : 'Deixou comentário sobre "Preencher pelo flyer"',
+                { acao: interesse ? 'interesse' : 'comentario', comentario: comentario || null, clube: (sbClube && sbClube.nome) || null });
+        } catch (_) {}
+    }
+    document.getElementById('modal-beta-flyer')?.remove();
+    if (interesse) showToast('✨ Obrigado! Avisaremos quando o recurso estiver disponível');
+}
+window._betaFlyerAbrir = _betaFlyerAbrir;
+window._betaFlyerFechar = _betaFlyerFechar;
 
 function saveTournament() {
     const nome = document.getElementById('t-nome').value.trim() || 'Torneio StackOS';
