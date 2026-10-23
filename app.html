@@ -54978,6 +54978,12 @@ document.addEventListener('keydown', function(e) {
 // Init
 window.onload = () => {
     aplicarConfigGlobal();
+    // FIX: se o login via Supabase já terminou antes do onload (ex: Ctrl+F5, rede lenta),
+    // este restore legado (usuários locais) NÃO pode apagar o currentUser — senão o app
+    // perde o usuário logado (some estorno/admin e o "operador" das transações fica vazio).
+    if (typeof sbSession !== 'undefined' && sbSession && currentUser) {
+        // Sessão Supabase ativa: nada a fazer aqui (inicializarAuth já cuidou de tudo)
+    } else
     // Restore session if valid
     if (currentUser && usuarios.find(u => u.id === currentUser.id && u.status === 'ativo')) {
         document.getElementById('login-screen').style.display = 'none';
