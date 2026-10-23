@@ -8507,6 +8507,44 @@ document.addEventListener('DOMContentLoaded', function(){
                     </div>
                 </div>
 
+                <!-- ▶ Reentrada múltipla (NOVO — desligado por padrão) -->
+                <div class="t2-coll" data-section="reentrada-multipla">
+                    <div class="t2-coll-head" onclick="t2ToggleSection('reentrada-multipla')">
+                        <div style="display:flex;align-items:center;gap:.55rem;">
+                            <span class="t2-chevron">▶</span>
+                            <span style="color:#e7e9ea;font-size:.85rem;font-weight:500;"><i class="fa-solid fa-repeat" style="margin-right:.3rem;color:#71717a;"></i>Reentrada múltipla</span>
+                        </div>
+                        <span class="t2-status" id="t2-status-rm" style="color:#52525b;font-size:.7rem;">Desligada</span>
+                    </div>
+                    <div class="t2-coll-body">
+                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
+                            <i class="fa-solid fa-circle-info" style="color:#38bdf8;"></i>
+                            O jogador <strong>eliminado</strong> escolhe quantas reentradas faz de uma vez (ex: R$ 60 = 3x = 30k). Cada uma é registrada como uma reentrada normal: rake, staff, chipcount e caixa seguem as mesmas regras de hoje.
+                        </div>
+                        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.78rem;padding:.4rem .55rem;border-radius:.4rem;background:rgba(255,255,255,.02);margin-bottom:.6rem;">
+                            <input type="checkbox" id="t-rm-ativo" onchange="_rmAtualizarForm()" style="accent-color:#a855f7;width:16px;height:16px;">
+                            <span><strong>Permitir reentrada múltipla</strong> — escolha de 1x até o máximo no lançamento</span>
+                        </label>
+                        <div id="t-rm-campos" style="display:none;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">
+                                <div><label class="inp-label">Valor por reentrada R$</label><input id="t-rm-valor" type="number" step="0.01" min="0" value="20" class="inp" oninput="_rmAtualizarForm()"></div>
+                                <div><label class="inp-label">Máximo por lançamento</label>
+                                    <select id="t-rm-max" class="inp" onchange="_rmAtualizarForm()">
+                                        <option value="2">2x</option><option value="3">3x</option><option value="4">4x</option><option value="5" selected>5x</option><option value="6">6x</option><option value="8">8x</option><option value="10">10x</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.55rem;line-height:1.45;">
+                                <i class="fa-solid fa-coins" style="color:#f59e0b;"></i>
+                                Fichas por reentrada = <strong id="t-rm-stack-label" style="color:#e4e4e7;">stack inicial</strong> (campo Stack do torneio). Quando ligada, jogador eliminado só volta pela reentrada (não faz buy-in de novo).
+                            </div>
+                            <div id="t-rm-aviso" style="display:none;font-size:.68rem;color:#f59e0b;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:.4rem;padding:.4rem .55rem;margin-bottom:.55rem;"></div>
+                            <div style="font-size:.68rem;color:#71717a;margin-bottom:.35rem;">Como vai cobrar o cliente</div>
+                            <div id="t-rm-preview" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ▶ Comprovantes -->
                 <div class="t2-coll" data-section="print">
                     <div class="t2-coll-head" onclick="t2ToggleSection('print')">
@@ -9187,6 +9225,8 @@ document.addEventListener('DOMContentLoaded', function(){
                     <option value="reentry">Re-entry</option>
                     <option value="addon">Add-on</option>
                 </select>
+                <!-- Reentrada múltipla (NOVO): botões 1x..Nx — só jogador eliminado + Re-entry -->
+                <div id="entrada-rm-mult" style="display:none;"></div>
                 <!-- Modo MULTI (jogador novo — permite combos: Buy-in + Rebuy Duplo etc.) -->
                 <div id="entrada-acoes-multi" style="display:flex;flex-direction:column;gap:.4rem;"></div>
             </div>
@@ -11918,6 +11958,9 @@ function _torneioToDb(t) {
         rebuy_duplo_fichas: t.rebuyDuploFichas || 0,
         buyin_duplo_valor: t.buyinDuploValor || 0,
         buyin_duplo_fichas: t.buyinDuploFichas || 0,
+        // Reentrada múltipla (só preenchidos quando a opção está ligada no torneio)
+        reentry_valor: (t.reentryValor != null && !isNaN(Number(t.reentryValor))) ? Number(t.reentryValor) : null,
+        reentry_multiplo_max: (Number(t.reentryMultiploMax) > 1) ? Number(t.reentryMultiploMax) : null,
         jackpot_valor: t.jackpotValor || 0,
         jackpot_fichas: t.jackpotFichas || 0,
         jackpot_paga_rake: (t.jackpot_paga_rake === null || t.jackpot_paga_rake === undefined) ? null : (t.jackpot_paga_rake ? 1 : 0),
@@ -13106,6 +13149,9 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         rebuyDuploFichas: r.rebuy_duplo_fichas || 0,
         buyinDuploValor: parseFloat(r.buyin_duplo_valor || 0),
         buyinDuploFichas: parseInt(r.buyin_duplo_fichas || 0),
+        // Reentrada múltipla (NULL = desligado / valor da reentrada segue o buy-in como sempre)
+        reentryValor: (r.reentry_valor != null && !isNaN(Number(r.reentry_valor))) ? Number(r.reentry_valor) : null,
+        reentryMultiploMax: parseInt(r.reentry_multiplo_max || 0) || 0,
         jackpotValor: parseFloat(r.jackpot_valor || 0),
         jackpotFichas: r.jackpot_fichas || 0,
         jackpot_paga_rake: r.jackpot_paga_rake === null || r.jackpot_paga_rake === undefined ? null : Number(r.jackpot_paga_rake),
@@ -19281,6 +19327,9 @@ function _reimprimirLancamento(kind, refId) {
             const entriesDoCombo = (t.entries || [])
                 .filter(e => e.comboId === entry.comboId)
                 .sort((a, b) => (a.ts || 0) - (b.ts || 0)); // ordem cronológica
+            if (entriesDoCombo.length > 1 && typeof _rmIsGrupo === 'function' && _rmIsGrupo(entriesDoCombo)) {
+                return imprimirComprovanteReentradaMultipla(t, { entries: entriesDoCombo, jogadorNome: getJogadorNome(entry.jogadorId) });
+            }
             if (entriesDoCombo.length > 1) {
                 return imprimirComprovanteCombo(t, {
                     entries: entriesDoCombo,
@@ -20976,6 +21025,8 @@ function _capturarConfigTorneio() {
         rebuyDuploFichas: parseInt((document.getElementById('t-rebuy-duplo-fichas') || {}).value) || 0,
         buyinDuploValor: parseFloat((document.getElementById('t-buyin-duplo-valor') || {}).value) || 0,
         buyinDuploFichas: parseInt((document.getElementById('t-buyin-duplo-fichas') || {}).value) || 0,
+        reentryMultiploMax: _rmLerForm().max,
+        reentryValor: _rmLerForm().valor,
         jackpotValor:   parseFloat((document.getElementById('t-jackpot-valor') || {}).value) || 0,
         jackpotFichas:  parseInt((document.getElementById('t-jackpot-fichas') || {}).value) || 0,
         jackpot_paga_rake: (function() {
@@ -21026,6 +21077,7 @@ function _aplicarConfigTorneio(cfg) {
     set('t-rebuy-duplo-fichas', cfg.rebuyDuploFichas);
     set('t-buyin-duplo-valor', cfg.buyinDuploValor);
     set('t-buyin-duplo-fichas', cfg.buyinDuploFichas);
+    if (typeof _rmAplicarForm === 'function') _rmAplicarForm(cfg.reentryMultiploMax, cfg.reentryValor);
     set('t-jackpot-valor', cfg.jackpotValor);
     set('t-jackpot-fichas', cfg.jackpotFichas);
     // Paga rake do jackpot — tri-state
@@ -27161,6 +27213,9 @@ function saveTournament() {
         rebuyDuploFichas:   parseInt(document.getElementById('t-rebuy-duplo-fichas').value)     || 0,
         buyinDuploValor:    parseFloat(document.getElementById('t-buyin-duplo-valor')?.value)   || 0,
         buyinDuploFichas:   parseInt(document.getElementById('t-buyin-duplo-fichas')?.value)    || 0,
+        // Reentrada múltipla — desligada por padrão (0 = desligado, reentryValor null = segue o buy-in)
+        reentryMultiploMax: _rmLerForm().max,
+        reentryValor:       _rmLerForm().valor,
         // Last Chance (3ª compra após add-on)
         last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
         last_chance_valor:  parseFloat(document.getElementById('t-last-chance-valor')?.value) || 0,
@@ -28338,7 +28393,10 @@ function renderTabLancamentosDetalhados() {
 
         // BUG-FIX combo: linha agrupada com badges das ações
         if (l.kind === 'combo') {
-            const badges = l.entriesCombo.map(e => {
+            const _rmGrupoLinha = (typeof _rmIsGrupo === 'function') && _rmIsGrupo(l.entriesCombo);
+            const badges = _rmGrupoLinha
+                ? (() => { const m = _getEstornoTipoLabel('reentry'); return `<span style="display:inline-flex;font-size:.6rem;font-weight:700;padding:.15rem .4rem;border-radius:.2rem;background:${m.color}22;color:${m.color};margin-right:.25rem;">${m.label} ${l.entriesCombo.length}x</span>`; })()
+                : l.entriesCombo.map(e => {
                 const m = _getEstornoTipoLabel(e.tipo);
                 return `<span style="display:inline-flex;font-size:.6rem;font-weight:700;padding:.15rem .4rem;border-radius:.2rem;background:${m.color}22;color:${m.color};margin-right:.25rem;">${m.label}</span>`;
             }).join('');
@@ -28351,7 +28409,9 @@ function renderTabLancamentosDetalhados() {
             const comboKey = 'combo_' + l.comboId;
             const btnExpand = `<button onclick="_toggleComboRow('${comboKey}')" title="Ver detalhes do combo" style="background:transparent;border:1px solid #3f3f46;color:#a78bfa;padding:.25rem .5rem;border-radius:.3rem;cursor:pointer;font-size:.75rem;"><i class="fa-solid fa-chevron-down" id="${comboKey}_icon"></i></button>`;
             // Estorno do combo inteiro (apenas admin): chama estorno individual de cada entry
-            const btnEstornar = isAdmin
+            const btnEstornar = (isAdmin && _rmGrupoLinha)
+                ? `<button onclick="_estornarReentradaMultipla('${l.comboId}')" title="Estornar operação completa (Re-entry ${l.entriesCombo.length}x)" style="background:transparent;border:1px solid #3f3f46;color:#71717a;padding:.25rem .5rem;border-radius:.3rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444';this.style.borderColor='#ef4444';" onmouseout="this.style.color='#71717a';this.style.borderColor='#3f3f46';"><i class="fa-solid fa-trash-can"></i></button>`
+                : isAdmin
                 ? `<button onclick="_estornarComboInteiro('${l.comboId}')" title="Estornar combo completo" style="background:transparent;border:1px solid #3f3f46;color:#71717a;padding:.25rem .5rem;border-radius:.3rem;cursor:pointer;font-size:.75rem;" onmouseover="this.style.color='#ef4444';this.style.borderColor='#ef4444';" onmouseout="this.style.color='#71717a';this.style.borderColor='#3f3f46';"><i class="fa-solid fa-trash-can"></i></button>`
                 : `<span style="font-size:.65rem;color:#3f3f46;">—</span>`;
 
@@ -28383,7 +28443,7 @@ function renderTabLancamentosDetalhados() {
                 <td style="padding:.55rem 1rem;font-size:.8rem;color:#e4e4e7;">${escapeHtml(jogadorNome)}</td>
                 <td style="padding:.55rem 1rem;">
                     <span style="display:inline-flex;align-items:center;font-size:.65rem;font-weight:700;padding:.2rem .5rem;border-radius:.25rem;background:rgba(167,139,250,.18);color:#a78bfa;margin-right:.4rem;">
-                        <i class="fa-solid fa-layer-group" style="margin-right:.25rem;"></i> COMBO
+                        <i class="fa-solid ${_rmGrupoLinha ? 'fa-repeat' : 'fa-layer-group'}" style="margin-right:.25rem;"></i> ${_rmGrupoLinha ? 'MÚLTIPLA' : 'COMBO'}
                     </span>
                     ${badges}
                 </td>
@@ -28666,6 +28726,11 @@ function abrirEditarTorneio(idx) {
                         '<div><label class="inp-label">Add-on fichas</label><input id="edit-fin-addon-fichas" class="inp" type="number" min="0" value="' + (Number(t.addonFichas)||0) + '"></div>' +
                         '<div><label class="inp-label">Buy-in duplo R$</label><input id="edit-fin-buyin-duplo" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.buyinDuploValor)||0) + '"></div>' +
                         '<div><label class="inp-label">Buy-in duplo fichas</label><input id="edit-fin-buyin-duplo-fichas" class="inp" type="number" min="0" value="' + (Number(t.buyinDuploFichas)||0) + '"></div>' +
+                        // Reentrada múltipla (NOVO)
+                        '<div><label class="inp-label">Reentrada múltipla</label><select id="edit-fin-rm-max" class="inp">' +
+                            [0,2,3,4,5,6,8,10].map(function(n){ var cur = (Number(t.reentryMultiploMax) > 1) ? Number(t.reentryMultiploMax) : 0; return '<option value="' + n + '"' + (n === cur ? ' selected' : '') + '>' + (n ? ('Até ' + n + 'x') : 'Desligada') + '</option>'; }).join('') +
+                        '</select></div>' +
+                        '<div><label class="inp-label">Valor por reentrada R$</label><input id="edit-fin-rm-valor" class="inp" type="number" min="0" step="0.01" value="' + ((t.reentryValor != null) ? Number(t.reentryValor) : 20) + '"></div>' +
                     '</div>' +
                 '</div>' +
             '</div>'
@@ -28969,6 +29034,7 @@ async function _salvarEditarTorneio() {
     // === EDIÇÃO FINANCEIRA (somente torneios sem entries — aguardando início) ===
     const _editTemEntries = (t.entries && t.entries.length > 0);
     let _finAlterado = false;
+    let _rmEditAlterado = false; // Reentrada múltipla (NOVO) — tratado à parte do bloco financeiro
     const _finAntes = {};
     const _finDepois = {};
 
@@ -29045,6 +29111,25 @@ async function _salvarEditarTorneio() {
         }
     }
 
+    // === Reentrada múltipla (NOVO) — só existe no modal quando o torneio ainda não tem entradas ===
+    {
+        const elRmMax = document.getElementById('edit-fin-rm-max');
+        const elRmVal = document.getElementById('edit-fin-rm-valor');
+        if (!_editTemEntries && elRmMax && elRmVal) {
+            const novoMax = parseInt(elRmMax.value) || 0;
+            const novoVal = parseFloat(elRmVal.value);
+            const rmMax = novoMax > 1 ? novoMax : 0;
+            const rmVal = (rmMax && !isNaN(novoVal) && novoVal >= 0) ? novoVal : null;
+            const antesMax = (Number(t.reentryMultiploMax) > 1) ? Number(t.reentryMultiploMax) : 0;
+            const antesVal = (t.reentryValor != null) ? Number(t.reentryValor) : null;
+            if (rmMax !== antesMax || rmVal !== antesVal) {
+                t.reentryMultiploMax = rmMax;
+                t.reentryValor = rmVal;
+                _rmEditAlterado = true;
+            }
+        }
+    }
+
     // === Aplica no objeto JS (memória) ===
     t.nome = novoNome;
     t.reentryAte = (isNaN(novoReentry) || novoReentry < 0) ? (t.reentryAte || 0) : novoReentry;
@@ -29078,6 +29163,11 @@ async function _salvarEditarTorneio() {
                 buyin_promo_fichas:    t.buyinPromoFichas,
                 buyin_promo_ate_nivel: t.buyinPromoAteNivel,
             };
+            // Reentrada múltipla (NOVO)
+            if (_rmEditAlterado) {
+                payload.reentry_multiplo_max = (Number(t.reentryMultiploMax) > 1) ? Number(t.reentryMultiploMax) : null;
+                payload.reentry_valor        = (t.reentryValor != null) ? Number(t.reentryValor) : null;
+            }
             // Campos financeiros (somente se editados em torneio aguardando)
             if (_finAlterado) {
                 payload.buyin              = t.buyin;
@@ -31042,6 +31132,11 @@ function _getAcoesEntradaSelecionadas() {
     }
     // Single mode (jogador eliminado ou sem jogador selecionado)
     const sel = document.getElementById('entrada-tipo');
+    // Reentrada múltipla (NOVO): Re-entry escolhida em Nx → N ações 'reentry' (1x continua igual)
+    if (sel && sel.value === 'reentry' && typeof _rmQtdSelecionada === 'function') {
+        const q = _rmQtdSelecionada();
+        if (q > 1) return Array.from({ length: q }, () => 'reentry');
+    }
     if (sel && sel.value) return [sel.value];
     return [];
 }
@@ -31234,6 +31329,8 @@ async function _consumirTicketVoucher(tv, jogadorId, valorEntrada, torneioId, to
 function atualizarResumoEntrada() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
+    // Reentrada múltipla (NOVO): mostra/esconde os botões 1x..Nx (sem efeito se a opção estiver desligada)
+    if (typeof _rmSyncMultUI === 'function') { try { _rmSyncMultUI(t); } catch (e) { console.warn('[RM] UI:', e); } }
 
     // FASE F: detecta modo (single vs combo) — pega lista de ações marcadas
     const acoes = (typeof _getAcoesEntradaSelecionadas === 'function')
@@ -31943,6 +32040,11 @@ async function _registrarEntradaImpl() {
         ? _getAcoesEntradaSelecionadas()
         : null;
 
+    // Reentrada múltipla (NOVO): N × 'reentry' → handler próprio (combo comum nunca tem reentry)
+    if (acoesSelecionadas && acoesSelecionadas.length > 1 && acoesSelecionadas.every(a => a === 'reentry')) {
+        return _registrarReentradaMultipla(t, jid, acoesSelecionadas.length);
+    }
+
     if (acoesSelecionadas && acoesSelecionadas.length > 1) {
         // COMBO: redireciona pro handler de múltiplas ações
         return _registrarEntradasCombo(t, jid, acoesSelecionadas);
@@ -31963,6 +32065,10 @@ async function _registrarEntradaImpl() {
     const eliminado = t.eliminados.some(e => String(e.jogadorId) === String(jid));
 
     if (tipo === 'buyin' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Use Rebuy ou Re-entry.');
+    // Reentrada múltipla (NOVO): neste tipo de torneio o eliminado só volta pela Re-entry
+    if ((tipo === 'buyin' || tipo === 'buyin_duplo') && jaEntrou && eliminado && typeof _rmMaxTorneio === 'function' && _rmMaxTorneio(t) > 0) {
+        return showToast('⚠️ Jogador eliminado só pode voltar pela Re-entry neste torneio');
+    }
     if (tipo === 'buyin_duplo' && jaEntrou && !eliminado) return showToast('⚠️ Jogador já inscrito. Buy-in Duplo só pra entrada inicial.');
     // (validações de nível agora são feitas pela trava unificada acima — _tipoBloqueadoPorTrava)
     if (tipo === 'reentry' && !eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
@@ -35813,6 +35919,553 @@ function _getReentryValor(t) {
     if (t.reentryValor != null && !isNaN(Number(t.reentryValor))) return Number(t.reentryValor);
     return Number(t.buyin) || 0;
 }
+
+// =====================================================================
+// REENTRADA MÚLTIPLA — helpers (NOVO; não altera nenhum cálculo existente)
+// Cada reentrada do lote é uma entry tipo 'reentry' normal. Este bloco só
+// cuida de configuração, UI e de chamar as mesmas rotinas de sempre.
+// =====================================================================
+// Tipos KO ficam de fora (bounty por entrada). Função (não const) pra nunca cair em TDZ.
+function _rmTipoKO(tipo) { return tipo === 'bounty' || tipo === 'pko' || tipo === 'knockout'; }
+
+// Máximo configurado no torneio (0 = desligado). KO fica de fora (bounty por entrada).
+function _rmMaxTorneio(t) {
+    if (!t) return 0;
+    if (_rmTipoKO(t.tipo)) return 0;
+    const m = Number(t.reentryMultiploMax) || 0;
+    return m > 1 ? m : 0;
+}
+
+// Lê a seção do formulário "Novo torneio". Desligado → { max:0, valor:null } (comportamento atual).
+function _rmLerForm() {
+    const ativo = !!document.getElementById('t-rm-ativo')?.checked;
+    if (!ativo) return { max: 0, valor: null };
+    const max = parseInt(document.getElementById('t-rm-max')?.value) || 0;
+    const valor = parseFloat(document.getElementById('t-rm-valor')?.value);
+    return { max: max > 1 ? max : 0, valor: (max > 1 && !isNaN(valor) && valor >= 0) ? valor : null };
+}
+
+// Preenche a seção (usado por templates)
+function _rmAplicarForm(max, valor) {
+    const cb = document.getElementById('t-rm-ativo');
+    if (!cb) return;
+    const ativo = Number(max) > 1;
+    cb.checked = ativo;
+    if (ativo) {
+        const sel = document.getElementById('t-rm-max');
+        if (sel) {
+            if (![...sel.options].some(o => Number(o.value) === Number(max))) {
+                const o = document.createElement('option'); o.value = String(max); o.textContent = max + 'x'; sel.appendChild(o);
+            }
+            sel.value = String(max);
+        }
+        const v = document.getElementById('t-rm-valor');
+        if (v && valor != null) v.value = valor;
+    }
+    _rmAtualizarForm();
+}
+
+// Simula a cobrança de N reentradas com as MESMAS regras do lançamento/getRake:
+// - embutido: staff sai de dentro do valor; rake sobre (valor − staff)
+// - adicional V2: cliente paga o valor; staff separado de dentro; rake sobre (valor − staff)
+// - adicional legado: staff por fora; rake sobre o valor
+// - sem staff fixo (ou re-entry não marcado): rake sobre o valor
+function _rmSimular(cfg, n) {
+    const paga1 = Number(cfg.valor) || 0;
+    const sv = (cfg.staffAtivo && cfg.staffReentry) ? (Number(cfg.staffValor) || 0) : 0;
+    let paga = paga1 * n, staff = sv * n, base = paga;
+    if (sv > 0) {
+        if (cfg.staffModo === 'adicional' && !cfg.v2) { paga = (paga1 + sv) * n; base = paga1 * n; }
+        else { base = Math.max(0, paga - staff); }
+    }
+    return { paga, staff, base, rake: base * (Number(cfg.rakePct) || 0) / 100, fichas: (Number(cfg.stack) || 0) * n };
+}
+
+function _rmAtualizarForm() {
+    const cb = document.getElementById('t-rm-ativo');
+    const campos = document.getElementById('t-rm-campos');
+    const status = document.getElementById('t2-status-rm');
+    const prev = document.getElementById('t-rm-preview');
+    const aviso = document.getElementById('t-rm-aviso');
+    if (!cb || !campos) return;
+    const ativo = cb.checked;
+    campos.style.display = ativo ? '' : 'none';
+    const fmt = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');
+    const max = parseInt(document.getElementById('t-rm-max')?.value) || 0;
+    const valor = parseFloat(document.getElementById('t-rm-valor')?.value) || 0;
+    if (status) {
+        status.textContent = ativo ? `Até ${max}x · ${fmt(valor)} cada` : 'Desligada';
+        status.style.color = ativo ? '#a855f7' : '#52525b';
+    }
+    if (!ativo || !prev) return;
+
+    const cfg = {
+        valor,
+        stack: parseInt(document.getElementById('t-stack')?.value) || 0,
+        rakePct: parseFloat(document.getElementById('t-rake')?.value) || 0,
+        staffAtivo: !!document.getElementById('t-staff-fixo-ativo')?.checked,
+        staffReentry: !!document.getElementById('t-staff-fixo-reentry')?.checked,
+        staffValor: parseFloat(document.getElementById('t-staff-fixo-valor')?.value) || 0,
+        staffModo: (document.querySelector('input[name="t-staff-fixo-modo"]:checked')?.value) || 'embutido',
+        v2: true, // torneios novos nascem com staffFixoAdicionalV2 = true
+    };
+    const sl = document.getElementById('t-rm-stack-label');
+    if (sl) sl.textContent = cfg.stack.toLocaleString('pt-BR') + ' fichas';
+
+    // Avisos de configuração (não bloqueiam, só orientam)
+    const avisos = [];
+    const tipo = document.getElementById('t-tipo')?.value;
+    if (_rmTipoKO(tipo)) avisos.push('Torneios KO/PKO não usam reentrada múltipla (o bounty é por entrada). A opção ficará desligada neste torneio.');
+    const reentryAte = parseInt(document.getElementById('t-reentry')?.value) || 0;
+    if (reentryAte <= 0) avisos.push('Re-entry só aparece no lançamento com "Entradas até nível" preenchido (Travas de nível).');
+    else avisos.push(`Reentradas liberadas até o nível ${reentryAte} (Travas de nível).`);
+    if (aviso) { aviso.style.display = avisos.length ? '' : 'none'; aviso.innerHTML = avisos.map(a => '⚠ ' + a).join('<br>'); }
+
+    let h = '';
+    for (let n = 1; n <= max; n++) {
+        const r = _rmSimular(cfg, n);
+        let linhaStaff;
+        if (r.staff > 0 && !(cfg.staffModo === 'adicional' && !cfg.v2)) {
+            linhaStaff = `Dentro disso: ${fmt(r.staff)} é staff (${n} × ${fmt(cfg.staffValor)}) → base pro rake = ${fmt(r.base)}`;
+        } else if (r.staff > 0) {
+            linhaStaff = `${fmt(cfg.valor * n)} + ${fmt(r.staff)} staff por fora → base pro rake = ${fmt(r.base)}`;
+        } else {
+            linhaStaff = `Sem staff fixo na reentrada → base pro rake = ${fmt(r.base)}`;
+        }
+        h += `<div style="background:rgba(255,255,255,.02);border:1px solid #27272a;border-radius:.45rem;padding:.45rem .6rem;font-size:.68rem;color:#71717a;line-height:1.5;">
+            <div style="display:flex;justify-content:space-between;gap:.5rem;font-size:.75rem;"><strong style="color:#e4e4e7;">${n}x · ${r.fichas.toLocaleString('pt-BR')} fichas</strong><strong style="color:#fbbf24;">Jogador paga: ${fmt(r.paga)}</strong></div>
+            ${linhaStaff}<br>
+            Rake ${cfg.rakePct}% sobre ${fmt(r.base)} = <span style="color:#fbbf24;">${fmt(r.rake)}</span> · conta como <strong style="color:#a855f7;">${n} re-entr${n > 1 ? 'adas' : 'ada'}</strong>
+        </div>`;
+    }
+    prev.innerHTML = h;
+}
+window._rmAtualizarForm = _rmAtualizarForm;
+window._rmAplicarForm = _rmAplicarForm;
+
+// ---------------------------------------------------------------------
+// MODAL "Registrar entrada": botões 1x..Nx (só jogador ELIMINADO + Re-entry)
+// ---------------------------------------------------------------------
+var _rmMultSel = 1;
+var _rmMultJid = null;
+
+// Está mostrando os botões agora? (lido por _getAcoesEntradaSelecionadas)
+function _rmQtdSelecionada() {
+    const box = document.getElementById('entrada-rm-mult');
+    if (!box || box.style.display === 'none') return 1;
+    return Math.max(1, _rmMultSel || 1);
+}
+
+function _rmSyncMultUI(t) {
+    const box = document.getElementById('entrada-rm-mult');
+    if (!box) return;
+    const esconder = () => { box.style.display = 'none'; box.innerHTML = ''; };
+    const max = _rmMaxTorneio(t);
+    if (!t || !max) return esconder();
+    const multi = document.getElementById('entrada-acoes-multi');
+    if (multi && multi.style.display !== 'none' && multi.children.length > 0) return esconder();
+    const sel = document.getElementById('entrada-tipo');
+    const jid = document.getElementById('entrada-jogador')?.value;
+    if (!sel || sel.value !== 'reentry' || !jid) return esconder();
+    const eliminado = (t.eliminados || []).some(e => String(e.jogadorId) === String(jid));
+    if (!eliminado) return esconder();
+    if (_rmMultJid !== jid) { _rmMultJid = jid; _rmMultSel = 1; }
+    if (_rmMultSel > max) _rmMultSel = max;
+
+    const valor = _getReentryValor(t);
+    const fichas = _fichasStackPorTipo(t, 'reentry');
+    const fmt = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(',00', '');
+    let h = '<div style="font-size:.62rem;color:#a1a1aa;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:.55rem 0 .35rem;">Quantas reentradas?</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(' + Math.min(max, 5) + ',1fr);gap:.35rem;">';
+    for (let n = 1; n <= max; n++) {
+        const on = n === _rmMultSel;
+        h += `<button type="button" onclick="_rmEscolherQtd(${n})" style="font-family:inherit;cursor:pointer;border-radius:.5rem;padding:.5rem .2rem;line-height:1.25;border:1px solid ${on ? 'var(--gold)' : '#27272a'};background:${on ? 'rgba(245,158,11,.1)' : '#18181b'};color:${on ? 'var(--gold)' : '#e4e4e7'};">
+            <div style="font-size:.95rem;font-weight:800;">${n}x</div>
+            <div style="font-size:.66rem;font-weight:700;">${fmt(valor * n)}</div>
+            <div style="font-size:.6rem;color:${on ? '#fbbf24' : '#71717a'};">${((fichas * n) / 1000).toLocaleString('pt-BR')}k fichas</div>
+        </button>`;
+    }
+    h += '</div>';
+    if (_rmMultSel > 1) {
+        h += `<div style="font-size:.66rem;color:#71717a;margin-top:.35rem;">Registra <strong style="color:#a855f7;">${_rmMultSel} reentradas</strong> · ${(fichas * _rmMultSel).toLocaleString('pt-BR')} fichas</div>`;
+    }
+    box.innerHTML = h;
+    box.style.display = '';
+}
+
+function _rmEscolherQtd(n) {
+    _rmMultSel = Math.max(1, Number(n) || 1);
+    atualizarResumoEntrada();
+}
+window._rmEscolherQtd = _rmEscolherQtd;
+
+// ---------------------------------------------------------------------
+// REGISTRO DO LOTE — N entries 'reentry' com as MESMAS regras do lançamento
+// single de Re-entry (_registrarEntradaImpl). Não altera nenhuma função existente:
+// usa _getReentryValor, _isTipoStaffFixoElegivel, registrarTransacao etc.
+// Todas as entries do lote compartilham o mesmo comboId (agrupa na lista e no estorno).
+// ---------------------------------------------------------------------
+async function _registrarReentradaMultipla(t, jid, n) {
+    const max = _rmMaxTorneio(t);
+    n = Math.floor(Number(n) || 0);
+    if (!max) return showToast('⚠️ Reentrada múltipla não está ativa neste torneio');
+    if (n < 2 || n > max) return showToast(`⚠️ Quantidade inválida (1 a ${max}x)`);
+
+    const tipo = 'reentry';
+    const trava = _tipoBloqueadoPorTrava(t, tipo);
+    if (trava.bloqueado) return showToast('🔒 ' + trava.motivo);
+    const eliminado = (t.eliminados || []).some(e => String(e.jogadorId) === String(jid));
+    if (!eliminado) return showToast('⚠️ Só eliminados podem fazer re-entry');
+
+    // Extras não suportados no lote (evita qualquer divergência): lance 1x nesses casos
+    if (typeof _getTicketVoucherSelecionado === 'function' && _getTicketVoucherSelecionado()) {
+        return showToast('⚠️ Ticket/voucher: lance a reentrada 1x por vez');
+    }
+    const cbPassRm = document.getElementById('entrada-passaporte-comprar');
+    if (t.passaporteAtivo && cbPassRm && cbPassRm.checked) {
+        return showToast('⚠️ Passaporte: lance a reentrada 1x por vez');
+    }
+
+    // Valor por reentrada — exatamente como o single
+    let valorBase = _getReentryValor(t);
+    const valorPromo = (typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+    if (valorPromo !== null) valorBase = valorPromo;
+
+    // Staff — mesma regra do single (adicional legado soma por fora; V2 sai de dentro; embutido não grava)
+    let staffCobrado = 0;
+    const isAdicionalV2 = _isStaffFixoAdicionalV2(t);
+    const isAdicionalLegado = _staffFixoAtivo(t) && (t.staffFixoModo || 'embutido') === 'adicional' && !isAdicionalV2;
+    if ((isAdicionalLegado || isAdicionalV2) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) {
+        staffCobrado = Number(t.staffFixoValor) || 0;
+    }
+    let valorEntry = valorBase;
+    if (isAdicionalV2 && staffCobrado > 0) valorEntry = Math.max(0, valorBase - staffCobrado);
+    const valorTotalUnit = isAdicionalV2 ? valorBase : (valorBase + staffCobrado);
+    const valorTotalLote = Math.round(valorTotalUnit * n * 100) / 100;
+
+    // Crédito: valida o TOTAL do lote (mesmo hook usado pelo combo)
+    try {
+        if (valorTotalLote > 0 && typeof credito_validarAntesDe === 'function') {
+            const ok = await credito_validarAntesDe(jid, valorTotalLote, 'buyin');
+            if (!ok) return;
+        }
+    } catch (e) { console.warn('[CRED] validacao reentrada multipla:', e); }
+
+    if (typeof _suspenderRealtime === 'function') _suspenderRealtime(10000);
+    if (typeof _marcarIdRecente === 'function') _marcarIdRecente(t.id);
+
+    const _snapshot = JSON.stringify(t);
+    const _tornIdx = torneios.indexOf(t);
+    const _txsBefore = transacoes.length;
+    const ts = Date.now();
+    const comboId = String(ts);
+    const entriesCriadas = [];
+    const descTx = `Re-entry · ${t.nome}`;
+    let _pnhRegistrado = 0, _pnhMetodo = '';
+
+    try {
+        // Reativa o jogador (igual ao single) — guarda a eliminação pra poder restaurar no estorno do lote
+        const elimRemovidas = (t.eliminados || []).filter(e => String(e.jogadorId) === String(jid));
+        t.eliminados = (t.eliminados || []).filter(e => e.jogadorId !== jid);
+        if (!t._rmElimBackup || typeof t._rmElimBackup !== 'object') t._rmElimBackup = {};
+        t._rmElimBackup[comboId] = JSON.parse(JSON.stringify(elimRemovidas));
+
+        for (let i = 0; i < n; i++) {
+            const novaEntry = { id: _genUuid(), jogadorId: jid, tipo, ts: ts + i, valor: valorEntry, staff: staffCobrado, taxaAdm: 0, comboId };
+            const bonusFichas = _calcBonusFichasParaEntry(t, tipo);
+            if (bonusFichas > 0) novaEntry.bonusFichas = bonusFichas;
+            const fichasPromo = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
+            if (fichasPromo !== null) { novaEntry.fichasOverride = fichasPromo; novaEntry.isPromo = true; }
+            t.entries.push(novaEntry);
+            entriesCriadas.push(novaEntry);
+
+            const valorTx = isAdicionalV2 ? valorEntry : valorBase;
+            if (valorTx > 0) {
+                registrarTransacao({ jogadorId: jid, tipo: 'reentry', valor: -valorTx, descricao: descTx, origem: 'torneio', refId: t.id });
+            }
+            if (staffCobrado > 0) {
+                registrarTransacao({ jogadorId: jid, tipo: 'staff', valor: -staffCobrado, descricao: `Staff · ${t.nome} · ${getJogadorNome(jid)}`, origem: 'torneio', refId: t.id });
+            }
+        }
+        alocarJogadorMesa(t, jid);
+
+        // PAGO NA HORA — mesma lógica do single, sobre o total do lote
+        const _pnhConfig = _getPagoNaHoraConfig();
+        const _pnhToggleEl = document.getElementById('pago-na-hora-toggle');
+        const _pnhValorEfetivo = (_pnhConfig && _pnhConfig.valor > 0)
+            ? _pnhConfig.valor
+            : (_pnhToggleEl && _pnhToggleEl.checked && valorTotalLote > 0 ? valorTotalLote : 0);
+        if (_pnhValorEfetivo > 0) {
+            const _pnhMetodoKey = (_pnhConfig ? _pnhConfig.metodo : null) || window._pagoNaHoraMetodo || 'pix';
+            const metodoInfo = PAYMENT_METHODS[_pnhMetodoKey] || PAYMENT_METHODS.pix;
+            registrarTransacao({
+                jogadorId: jid, tipo: 'pagamento', valor: _pnhValorEfetivo,
+                descricao: `Pagamento no ato (${metodoInfo.label}) — Re-entry ${n}x`,
+                metodo: _pnhMetodoKey, origem: 'caixa',
+            });
+            _pnhRegistrado = _pnhValorEfetivo;
+            _pnhMetodo = metodoInfo.label;
+        }
+
+        saveData();
+    } catch (err) {
+        console.error('[REENTRADA MULTIPLA] Erro — revertendo operação:', err);
+        try { torneios[_tornIdx] = JSON.parse(_snapshot); } catch (_) {}
+        if (transacoes.length > _txsBefore) transacoes = transacoes.slice(0, _txsBefore);
+        saveData();
+        showToast('❌ Erro ao registrar reentradas — operação revertida, tente novamente');
+        return;
+    }
+
+    try {
+        logAudit && logAudit('REENTRADA_MULTIPLA', `Re-entry ${n}x · ${getJogadorNome(jid)} · ${formatMoney(valorTotalLote)}`,
+            { torneioId: t.id, jogadorId: jid, comboId, qtd: n, valorUnit: valorBase });
+    } catch (_) {}
+
+    // Comprovante agrupado
+    if (t.imprimirComprovanteCompra) {
+        const _ents = entriesCriadas.slice();
+        setTimeout(() => {
+            try {
+                _abrirModalPromptImpressao({
+                    titulo: 'Imprimir comprovante de compra?',
+                    descricao: `Re-entry ${n}x de ${getJogadorNome(jid)}`,
+                    onConfirm: () => imprimirComprovanteReentradaMultipla(t, { entries: _ents, jogadorNome: getJogadorNome(jid) })
+                });
+            } catch (e) { console.error('[REENTRADA MULTIPLA] comprovante:', e); }
+        }, 300);
+    }
+
+    closeModal('modal-entrada');
+    updateModalTorneio();
+    renderTorneiosList();
+    renderDashboard();
+
+    // UNDO (mesmo padrão do single/combo)
+    const tornIdxUndo = torneios.indexOf(t);
+    const txsAntesUndo = _txsBefore;
+    registrarUndo(`💰 Re-entry ${n}x de ${getJogadorNome(jid)}`, () => {
+        try { torneios[tornIdxUndo] = JSON.parse(_snapshot); } catch (_) {}
+        if (transacoes.length > txsAntesUndo) transacoes = transacoes.slice(0, txsAntesUndo);
+        saveData();
+        updateModalTorneio();
+        renderTorneiosList();
+        renderDashboard();
+    });
+
+    const pnhLabel = _pnhRegistrado > 0 ? ` · 💵 Pago ${_pnhMetodo} R$ ${_pnhRegistrado.toFixed(2).replace('.', ',')}` : '';
+    showToast(`💰 Re-entry ${n}x registrado! Total R$ ${valorTotalLote.toFixed(2).replace('.', ',')}${pnhLabel}`);
+    try { _lembreteJackpotPosCompra(t, jid, tipo); } catch (e) { console.warn('[reentrada multipla] lembrete jackpot:', e); }
+}
+window._registrarReentradaMultipla = _registrarReentradaMultipla;
+
+// Grupo de reentrada múltipla = comboId com 2+ entries, TODAS tipo reentry
+// (o combo comum nunca contém reentry, então não há ambiguidade)
+function _rmIsGrupo(entries) {
+    return Array.isArray(entries) && entries.length > 1 && entries.every(e => e && e.tipo === 'reentry');
+}
+
+// ---------------------------------------------------------------------
+// COMPROVANTE AGRUPADO — mesmo layout do "COMPROVANTE DE COMPRA"
+// ---------------------------------------------------------------------
+function gerarComprovanteReentradaMultipla(t, dados) {
+    if (!t || !dados || !_rmIsGrupo(dados.entries)) return '';
+    const col = _printColWidth();
+    const entries = dados.entries.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const n = entries.length;
+    const fixoModo = t.staffFixoModo || 'embutido';
+
+    let valorSoma = 0, fichasSoma = 0, bonusSoma = 0, staffSoma = 0;
+    entries.forEach(e => {
+        valorSoma += Number(e.valor) || 0;
+        fichasSoma += (Number(e.fichasOverride) > 0) ? Number(e.fichasOverride) : _fichasStackPorTipo(t, e.tipo);
+        bonusSoma += Number(e.bonusFichas) || 0;
+        if (Number(e.staff) > 0 && _isTipoStaffFixoElegivel(t, e.tipo, Number(e.valor) || 0)) staffSoma += Number(e.staff);
+    });
+    const valorUnit = Number(entries[0].valor) || 0;
+    const staffMostrar = (fixoModo === 'adicional') ? staffSoma : 0;
+
+    let txt = _printHeaderCfg();
+    txt += _printCenter('COMPROVANTE DE COMPRA', col) + '\n';
+    if (dados.viaLabel) txt += _printCenter(dados.viaLabel, col) + '\n';
+    txt += _printLine('-', col) + '\n';
+    txt += 'Torneio: ' + (t.nome || '—').substring(0, col - 9) + '\n';
+    txt += 'Data: ' + new Date(entries[0].ts || Date.now()).toLocaleString('pt-BR') + '\n';
+    if (t.iniciadoEm) { try { txt += 'Nivel: ' + _nivelHumano(t) + '\n'; } catch (_) {} }
+    if (currentUser && currentUser.nome) txt += 'Operador: ' + currentUser.nome.substring(0, col - 10) + '\n';
+    txt += _printLine('-', col) + '\n';
+    txt += _printCenter('JOGADOR', col) + '\n';
+    txt += _printCenter((dados.jogadorNome || '—').toUpperCase().substring(0, col), col) + '\n';
+    txt += _printLine('-', col) + '\n';
+    txt += 'ITENS COMPRADOS' + '\n';
+    txt += _printLine('-', col) + '\n';
+
+    txt += _printPad('Re-entry ' + n + 'x', valorSoma > 0 ? formatMoney(valorSoma) : 'GRATIS', col) + '\n';
+    if (valorUnit > 0) txt += '   ' + n + ' x ' + formatMoney(valorUnit) + '\n';
+    if (fichasSoma > 0) txt += '   + ' + fichasSoma.toLocaleString('pt-BR') + ' fichas\n';
+    if (bonusSoma > 0) txt += '   + ' + bonusSoma.toLocaleString('pt-BR') + ' fichas (bonus de registro)\n';
+    if (staffMostrar > 0) txt += _printPad('Staff Fixo', formatMoney(staffMostrar), col) + '\n';
+
+    txt += _printLine('-', col) + '\n';
+    txt += _printPad('TOTAL', formatMoney(valorSoma + staffMostrar), col) + '\n';
+    if (fichasSoma + bonusSoma > 0) txt += _printPad('Fichas entregues', (fichasSoma + bonusSoma).toLocaleString('pt-BR'), col) + '\n';
+
+    if (t.comprovanteAssinatura !== false) {
+        txt += '\n\n';
+        txt += _printCenter('_'.repeat(Math.min(col - 4, 26)), col) + '\n';
+        txt += _printCenter('Assinatura do jogador', col) + '\n';
+    }
+    txt += '\n' + _printFooter();
+    return txt;
+}
+
+function imprimirComprovanteReentradaMultipla(t, dados) {
+    if (!t || !dados || !_rmIsGrupo(dados.entries)) return;
+    const vias = Math.max(1, Math.min(3, Number(t.comprovanteVias) || 1));
+    const labels = vias === 1 ? [null] : (vias === 2 ? ['VIA DO JOGADOR', 'VIA DO CLUBE'] : ['VIA DO JOGADOR', 'VIA DO CLUBE', '3a VIA']);
+    let txt = '';
+    for (let i = 0; i < vias; i++) {
+        if (i > 0) txt += '\n\n' + _printLine('=', _printColWidth()) + '\n\n';
+        txt += gerarComprovanteReentradaMultipla(t, { ...dados, viaLabel: labels[i] });
+    }
+    abrirPreviewImpressao('Comprovante de Compra', txt);
+    logAudit && logAudit('IMPRESSAO', `Comprovante de compra impresso · ${dados.jogadorNome || '—'} · Re-entry ${dados.entries.length}x`);
+}
+window.imprimirComprovanteReentradaMultipla = imprimirComprovanteReentradaMultipla;
+
+// ---------------------------------------------------------------------
+// ESTORNO DA OPERAÇÃO COMPLETA — 1 confirmação, executa o estorno EXISTENTE
+// (confirmarEstorno) uma vez por entry do lote. Depois restaura a eliminação.
+// ---------------------------------------------------------------------
+function _rmDadosEstorno(t, entry) {
+    // Mesmo objeto que abrirModalEstorno monta pra uma entry
+    return {
+        kind: 'entry',
+        entryId: entry.id,
+        jogadorId: entry.jogadorId,
+        jogadorNome: getJogadorNome(entry.jogadorId),
+        tipo: entry.tipo,
+        valor: Number(entry.valor) || 0,
+        staffValor: Number(entry.staff) || 0,
+        taxaAdmValor: Number(entry.taxaAdm) || 0,
+        fichas: _calcularFichasReverter(t, entry),
+        passaporteValor: (entry.passaporte && entry.passaporte.cobrado) ? (Number(entry.passaporte.valor) || 0) : 0,
+        passaporteFichas: (entry.passaporte && entry.passaporte.cobrado) ? (Number(entry.passaporte.fichas) || 0) : 0,
+    };
+}
+
+function _estornarReentradaMultipla(comboId) {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.papel !== 'admin')) {
+        return showToast('🔒 Apenas administradores podem estornar lançamentos');
+    }
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const entries = (t.entries || []).filter(e => String(e.comboId) === String(comboId)).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    if (!_rmIsGrupo(entries)) return showToast('⚠️ Lançamento não encontrado');
+
+    const n = entries.length;
+    const total = entries.reduce((s, e) => s + (Number(e.valor) || 0) + (Number(e.staff) || 0), 0);
+    const fichas = entries.reduce((s, e) => s + _calcularFichasReverter(t, e), 0);
+    const nome = getJogadorNome(entries[0].jogadorId);
+
+    document.getElementById('rm-estorno-overlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'rm-estorno-overlay';
+    ov.className = 'modal-overlay open';
+    ov.style.zIndex = '1000';
+    ov.innerHTML = `
+        <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;width:100%;max-width:440px;padding:1.25rem 1.35rem;display:flex;flex-direction:column;gap:.85rem;">
+            <div style="font-size:1rem;font-weight:800;color:#ef4444;"><i class="fa-solid fa-rotate-left"></i> Estornar operação completa</div>
+            <div style="font-size:.8rem;line-height:1.6;color:#a1a1aa;">
+                Jogador: <strong style="color:#fff;">${escapeHtml(nome)}</strong><br>
+                <strong style="color:#f59e0b;">Re-entry ${n}x</strong> · <span class="mono">${formatMoney(total)}</span> · ${fichas.toLocaleString('pt-BR')} fichas
+            </div>
+            <div style="font-size:.7rem;color:#a1a1aa;background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.18);border-radius:.45rem;padding:.5rem .65rem;line-height:1.5;">
+                <i class="fa-solid fa-circle-info" style="color:#06b6d4;"></i>
+                As ${n} reentradas são estornadas de uma vez, com o mesmo estorno usado hoje para cada ação. ${formatMoney(total)} volta ao saldo do jogador e ele volta a ficar eliminado.
+            </div>
+            <div>
+                <label class="inp-label">Motivo do estorno</label>
+                <input id="rm-estorno-motivo" class="inp" placeholder="Ex: lançado 3x por engano (era 2x)" style="width:100%;">
+            </div>
+            <div id="rm-estorno-status" style="font-size:.72rem;color:#71717a;min-height:1em;"></div>
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+                <button type="button" class="btn-ghost" id="rm-estorno-cancelar">Cancelar</button>
+                <button type="button" id="rm-estorno-confirmar" style="background:#ef4444;border:none;color:#fff;font-weight:800;padding:.6rem 1rem;border-radius:.5rem;cursor:pointer;font-family:inherit;">Estornar ${n}x</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    const fechar = () => ov.remove();
+    ov.querySelector('#rm-estorno-cancelar').onclick = fechar;
+    setTimeout(() => ov.querySelector('#rm-estorno-motivo')?.focus(), 50);
+    ov.querySelector('#rm-estorno-confirmar').onclick = async () => {
+        const motivo = (ov.querySelector('#rm-estorno-motivo').value || '').trim();
+        if (motivo.length < 5) return showToast('⚠️ Informe o motivo (mínimo 5 caracteres)');
+        const btn = ov.querySelector('#rm-estorno-confirmar');
+        const st = ov.querySelector('#rm-estorno-status');
+        btn.disabled = true; ov.querySelector('#rm-estorno-cancelar').disabled = true;
+        await _rmExecutarEstornoGrupo(t, comboId, motivo, (i) => { if (st) st.textContent = `Estornando ${i} de ${n}...`; });
+        fechar();
+    };
+}
+window._estornarReentradaMultipla = _estornarReentradaMultipla;
+
+async function _rmExecutarEstornoGrupo(t, comboId, motivo, onProgresso) {
+    const espera = (ms) => new Promise(r => setTimeout(r, ms));
+    const elMotivo = document.getElementById('mod-estorno-motivo');
+    if (!elMotivo || typeof confirmarEstorno !== 'function') return showToast('❌ Estorno indisponível — recarregue a página');
+    const entries = (t.entries || []).filter(e => String(e.comboId) === String(comboId)).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const jid = entries[0] && entries[0].jogadorId;
+    const tsGrupo = entries[0] ? (entries[0].ts || 0) : 0;
+    let ok = 0;
+    for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        if (!(t.entries || []).some(x => x.id === e.id)) { ok++; continue; } // já estornada
+        if (onProgresso) onProgresso(i + 1);
+        window._estornoEmAndamento = _rmDadosEstorno(t, e);
+        elMotivo.value = motivo + (entries.length > 1 ? ` (Re-entry ${entries.length}x)` : '');
+        try { await confirmarEstorno(); } catch (err) { console.error('[RM ESTORNO]', err); }
+        if (!(t.entries || []).some(x => x.id === e.id)) ok++;
+        await espera(650); // comLock libera 500ms após terminar
+    }
+
+    // Restaura a eliminação (se o jogador não fez nada depois deste lote e não foi eliminado de novo)
+    let restaurou = false;
+    try {
+        const backup = t._rmElimBackup && t._rmElimBackup[comboId];
+        const jaEliminado = (t.eliminados || []).some(x => String(x.jogadorId) === String(jid));
+        const fezAlgoDepois = (t.entries || []).some(x => String(x.jogadorId) === String(jid) && (x.ts || 0) > tsGrupo);
+        if (ok === entries.length && Array.isArray(backup) && backup.length && !jaEliminado && !fezAlgoDepois) {
+            backup.forEach(b => t.eliminados.push(b));
+            removerJogadorMesa(t, jid);
+            restaurou = true;
+        }
+        if (t._rmElimBackup && ok === entries.length) delete t._rmElimBackup[comboId];
+        saveData();
+    } catch (err) { console.warn('[RM ESTORNO] restaurar eliminação:', err); }
+
+    updateModalTorneio();
+    if (typeof renderTabJogadoresTorneio === 'function') renderTabJogadoresTorneio();
+    if (typeof renderTabEstornosTorneio === 'function') renderTabEstornosTorneio();
+    if (ok === entries.length) {
+        showToast(`✅ Re-entry ${entries.length}x estornado${restaurou ? ' · jogador voltou a eliminado' : ''}`);
+    } else {
+        showToast(`⚠️ ${ok} de ${entries.length} reentradas estornadas. Confira a aba Lançamentos.`);
+    }
+}
+
+// Atualiza a prévia quando campos relacionados mudam (stack, rake, staff, travas, tipo)
+(function _rmBindForm() {
+    const bind = () => {
+        ['t-stack', 't-rake', 't-staff-fixo-ativo', 't-staff-fixo-valor', 't-staff-fixo-reentry', 't-reentry', 't-tipo'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.addEventListener('input', _rmAtualizarForm); el.addEventListener('change', _rmAtualizarForm); }
+        });
+        document.querySelectorAll('input[name="t-staff-fixo-modo"]').forEach(r => r.addEventListener('change', _rmAtualizarForm));
+        _rmAtualizarForm();
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else setTimeout(bind, 0);
+})();
 
 // Resolve nível máximo de buy-in free (separado do entradasAteNivel).
 // Em torneio free, buy-in só fica disponível até este nível.
