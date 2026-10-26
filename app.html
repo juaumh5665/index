@@ -10521,7 +10521,9 @@ let _syncQueue = {
     transacoes: new Set(),
     auditoria: new Set(),
     deletes: { torneios: new Set(), cashMesas: new Set(), barGrupos: new Set(),
-               barProdutos: new Set(), barComandas: new Set() },
+               barProdutos: new Set(), barComandas: new Set(),
+               // Filhas do torneio removidas por estorno / re-entry (ver _marcarRemocaoFilhaTorneio)
+               torneioEntries: new Set(), torneioEliminados: new Set(), torneioJackpot: new Set() },
 };
 let _syncTimer = null;
 let _syncEmAndamento = false;
@@ -10813,6 +10815,21 @@ async function _sincronizarPendenciasOffline() {
                     } catch(e) { console.warn('[OFFLINE-QUEUE] delete ' + tipo + ':', e); }
                 }
             }
+            // Filhas do torneio removidas por estorno / re-entry (nunca apaga o que ainda existe no local)
+            try {
+                const torneiosLocalDel = JSON.parse(localStorage.getItem('ps_torneios') || '[]');
+                for (const tipo of Object.keys(_FILHAS_TORNEIO_DELETE)) {
+                    const emUso = _idsFilhaEmUso(tipo, torneiosLocalDel);
+                    const ids = (pending.deletes[tipo] || []).map(String).filter(id => !emUso.has(id));
+                    if (!ids.length) continue;
+                    const { error } = await sb.from(_FILHAS_TORNEIO_DELETE[tipo].tabela).delete().in('id', ids).eq('clube_id', cid);
+                    if (error) console.warn('[OFFLINE-QUEUE] delete ' + tipo + ':', error.message);
+                    else {
+                        console.log('[OFFLINE-QUEUE] ✅ ' + ids.length + ' delete(s) ' + tipo);
+                        ids.forEach(id => _syncQueue.deletes[tipo] && _syncQueue.deletes[tipo].delete(id));
+                    }
+                }
+            } catch(e) { console.warn('[OFFLINE-QUEUE] delete filhas torneio:', e); }
         }
 
         // Limpa fila persistida (só se não teve erros críticos)
@@ -11590,12 +11607,16 @@ async function _processarMudancaRealtime(tipo, payload) {
                         }
                         return all;
                     }
-                    const [eRows, elRows, jpRows, tmRows] = await Promise.all([
+                    const [eRowsDb, elRowsDb, jpRowsDb, tmRows] = await Promise.all([
                         _rtLoadAll(sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
                         _rtLoadAll(sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
                         _rtLoadAll(sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
                         _rtLoadAll(sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', clubeId)),
                     ]);
+                    // Ignora registros na fila de remoção (estorno/re-entry ainda não apagados no banco)
+                    const eRows  = _semRemocoesPendentes('torneioEntries', eRowsDb);
+                    const elRows = _semRemocoesPendentes('torneioEliminados', elRowsDb);
+                    const jpRows = _semRemocoesPendentes('torneioJackpot', jpRowsDb);
                     
                     torneios = tRows.map(r => {
                         const t = _torneioFromDb(r);
@@ -11915,6 +11936,67 @@ function _markDelete(tipo, id) {
 }
 
 // ============================================================
+// REMOÇÃO DE FILHAS DO TORNEIO (entries / eliminados / jackpot)
+// O sync só faz upsert e nunca apaga (proteção contra memória incompleta).
+// Então, quando uma AÇÃO EXPLÍCITA remove um desses registros (estorno,
+// re-entry de eliminado), ela marca o ID aqui pra ser apagado no banco.
+// Sem isso o registro "volta" quando o app é recarregado.
+// Não passa pelo bloqueio de assinatura: é só a conclusão de uma ação já feita.
+// ============================================================
+const _FILHAS_TORNEIO_DELETE = {
+    torneioEntries:    { tabela: 'torneio_entries',         lista: 'entries',        snap: 'entries' },
+    torneioEliminados: { tabela: 'torneio_eliminados',      lista: 'eliminados',     snap: 'eliminados' },
+    torneioJackpot:    { tabela: 'torneio_jackpot_compras', lista: 'jackpotCompras', snap: 'jackpotCompras' },
+};
+
+function _marcarRemocaoFilhaTorneio(tipo, id) {
+    try {
+        if (!id || !_FILHAS_TORNEIO_DELETE[tipo] || !_syncQueue.deletes[tipo]) return;
+        if (typeof _isUuid === 'function' && !_isUuid(String(id))) return; // nunca foi pro banco
+        _syncQueue.deletes[tipo].add(String(id));
+        _persistirFilaPendencias();
+        _agendarSync();
+    } catch (e) { console.warn('[REMOCAO-FILHA] não marcou', tipo, id, e); }
+}
+
+// IDs que existem na memória (lista de torneios informada) — esses NUNCA são apagados
+// (ex.: eliminação restaurada pelo estorno de uma re-entry, rollback de lançamento)
+function _idsFilhaEmUso(tipo, listaTorneios) {
+    const cfg = _FILHAS_TORNEIO_DELETE[tipo];
+    const s = new Set();
+    (listaTorneios || []).forEach(t => ((t && t[cfg.lista]) || []).forEach(x => { if (x && x.id) s.add(String(x.id)); }));
+    return s;
+}
+
+// Filtra linhas vindas do banco que estão na fila de remoção (ainda não apagadas)
+function _semRemocoesPendentes(tipo, rows) {
+    const fila = _syncQueue && _syncQueue.deletes && _syncQueue.deletes[tipo];
+    if (!fila || !fila.size || !Array.isArray(rows)) return rows;
+    return rows.filter(r => !(r && fila.has(String(r.id))));
+}
+
+async function _sincronizarRemocoesFilhasTorneio() {
+    if (!sbClube) return;
+    for (const tipo of Object.keys(_FILHAS_TORNEIO_DELETE)) {
+        const fila = _syncQueue.deletes[tipo];
+        if (!fila || !fila.size) continue;
+        const cfg = _FILHAS_TORNEIO_DELETE[tipo];
+        const emUso = _idsFilhaEmUso(tipo, torneios);
+        [...fila].forEach(id => { if (emUso.has(id)) fila.delete(id); }); // voltou a existir: não apaga
+        const ids = [...fila];
+        if (!ids.length) continue;
+        const { error } = await sb.from(cfg.tabela).delete().in('id', ids).eq('clube_id', sbClube.id);
+        if (error) { console.warn('[REMOCAO-FILHA] ' + cfg.tabela + ':', error.message || error); continue; }
+        ids.forEach(id => {
+            fila.delete(id);
+            // Esquece o hash: se o registro for restaurado depois, o diff manda de novo
+            if (_syncSnapshots[cfg.snap]) _syncSnapshots[cfg.snap].delete(id);
+        });
+        console.log('[REMOCAO-FILHA] ✅ ' + ids.length + ' removido(s) de ' + cfg.tabela);
+    }
+}
+
+// ============================================================
 // CONVERSORES UI ↔ BANCO (snake_case ↔ camelCase)
 // ============================================================
 function _torneioToDb(t) {
@@ -12026,7 +12108,19 @@ function _torneioToDb(t) {
         tv_show_prize: t.tvShowPrize !== false,
         pw_stats_visiveis: t.pwStatsVisiveis || null,
         premiacao_proj: t.premiacaoProjetada || null,
+        // Só exibição: TV pública (link externo) mostra o MESMO prize do app
+        prize_pool: _prizePoolParaTv(t),
     };
+}
+
+// Prize pool exatamente como o app mostra (getPrize) — gravado só pra TV pública ler.
+// Não é lido por nenhum cálculo do app.
+function _prizePoolParaTv(t) {
+    try {
+        if (!t || !Array.isArray(t.entries)) return null;
+        const v = getPrize(t);
+        return (typeof v === 'number' && isFinite(v)) ? Math.round(v * 100) / 100 : null;
+    } catch (_) { return null; }
 }
 
 function _cashToDb(m) {
@@ -12749,6 +12843,10 @@ async function sincronizarEstado() {
             }
         }
 
+        // === DELETES de filhas do torneio (estorno / re-entry) — isolado pra não afetar o resto do sync
+        try { await _sincronizarRemocoesFilhasTorneio(); }
+        catch (eRem) { console.warn('[REMOCAO-FILHA] falhou, tenta no próximo sync:', eRem); }
+
         // AÇÃO 1: marca full-sync como executado (próximo em 5min)
         if (_isFullSync) {
             _syncLastFullTs = Date.now();
@@ -12883,7 +12981,11 @@ async function carregarEstadoDoSupabase() {
                 _loadAllPages(sb.from('torneio_estornos').select('*').in('torneio_id', ids).eq('clube_id', clubeIdEsperado)).catch(() => []),
             ]);
             // Reconstruir torneios em formato de UI
-            torneios = tRows.map(r => _torneioFromDb(r, eData, elData, jData, mData));
+            // (ignora registros que estão na fila de remoção e ainda não foram apagados no banco)
+            torneios = tRows.map(r => _torneioFromDb(r,
+                _semRemocoesPendentes('torneioEntries', eData),
+                _semRemocoesPendentes('torneioEliminados', elData),
+                _semRemocoesPendentes('torneioJackpot', jData), mData));
             // Anexa estornos a cada torneio
             const estornosByT = {};
             esData.forEach(es => {
@@ -32240,7 +32342,11 @@ async function _registrarEntradaImpl() {
 
     // Se re-entry: reativar (remover da lista de eliminados)
     if (tipo === 'reentry') {
+        const _elimRemovidas = t.eliminados.filter(e => e.jogadorId === jid);
         t.eliminados = t.eliminados.filter(e => e.jogadorId !== jid);
+        // Apaga a eliminação no banco (o sync só faz upsert) — senão ele volta a "eliminado" ao recarregar.
+        // Se o lançamento der erro e for revertido, a eliminação volta pra memória e NÃO é apagada.
+        _elimRemovidas.forEach(e => _marcarRemocaoFilhaTorneio('torneioEliminados', e && e.id));
     }
 
     // Determina valor BASE em R$ com base no tipo
@@ -35839,7 +35945,11 @@ function repararTorneio(idx) {
         t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'reentry')
                  .map(e => String(e.jogadorId))
     );
+    const _elimOrfas = t.eliminados.filter(e => !comBuyin.has(String(e.jogadorId)));
     t.eliminados = t.eliminados.filter(e => comBuyin.has(String(e.jogadorId)));
+    // Apaga também no banco (o sync só faz upsert) — senão o reparo se desfaz ao recarregar
+    orfanIds.forEach(id => _marcarRemocaoFilhaTorneio('torneioEntries', id));
+    _elimOrfas.forEach(e => _marcarRemocaoFilhaTorneio('torneioEliminados', e && e.id));
 
     saveData();
     if (typeof logAudit === 'function') {
@@ -36384,6 +36494,9 @@ async function _registrarReentradaMultipla(t, jid, n) {
         // Reativa o jogador (igual ao single) — guarda a eliminação pra poder restaurar no estorno do lote
         const elimRemovidas = (t.eliminados || []).filter(e => String(e.jogadorId) === String(jid));
         t.eliminados = (t.eliminados || []).filter(e => e.jogadorId !== jid);
+        // Apaga no banco (o sync só faz upsert). Se o lote for estornado e a eliminação
+        // restaurada, ela volta pra memória e o sync grava de novo (nada se perde).
+        elimRemovidas.forEach(e => _marcarRemocaoFilhaTorneio('torneioEliminados', e && e.id));
         if (!t._rmElimBackup || typeof t._rmElimBackup !== 'object') t._rmElimBackup = {};
         t._rmElimBackup[comboId] = JSON.parse(JSON.stringify(elimRemovidas));
 
@@ -50295,7 +50408,10 @@ async function confirmarEstorno() {
 
         // 1. Remove a entry ou jackpot compra do torneio
         if (dados.kind === 'jackpot') {
+            const _jpRemovidas = (t.jackpotCompras || []).filter(j => (j.jogadorId === dados.jogadorId && (dados.compraRef ? j.compraRef === dados.compraRef : true)));
             t.jackpotCompras = (t.jackpotCompras || []).filter(j => !(j.jogadorId === dados.jogadorId && (dados.compraRef ? j.compraRef === dados.compraRef : true)));
+            // Apaga também no banco (o sync só faz upsert) — senão a compra volta ao recarregar
+            _jpRemovidas.forEach(j => _marcarRemocaoFilhaTorneio('torneioJackpot', j && j.id));
 
             // 1a. Estorna a movimentação na Caixa do Jackpot do clube
             if (dados.compraRef) {
@@ -50310,6 +50426,8 @@ async function confirmarEstorno() {
             }
         } else {
             t.entries = (t.entries || []).filter(e => e.id !== dados.entryId);
+            // Apaga também no banco (o sync só faz upsert) — senão a entrada volta ao recarregar
+            _marcarRemocaoFilhaTorneio('torneioEntries', dados.entryId);
         }
 
         // 2. Devolve o valor ao jogador (saldo) — transação de crédito

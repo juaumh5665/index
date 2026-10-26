@@ -3286,6 +3286,7 @@ function montarCarouselPremiacao(d) {
       addonFichas: t.addon_fichas,
       lastChanceFichas: t.last_chance_fichas,
       buyinDuploFichas: t.buyin_duplo_fichas,
+      prizePool: t.prize_pool,
     });
   }
   
@@ -3385,7 +3386,7 @@ function montarCarouselPremiacao(d) {
         const ids = rodando.map(t => t.id);
         const { data: extras, error: errExtras } = await sb
           .from('torneios')
-          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_prolive_bg, tv_prolive_text, tv_prolive_custom, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor, buyin_duplo_fichas, buyin_duplo_valor')
+          .select('id, pw_stats_visiveis, last_chance_valor, last_chance_fichas, tv_layout, tv_prolive_bg, tv_prolive_text, tv_prolive_custom, tv_show_prize, stack, rebuy_fichas, rebuy_duplo_fichas, addon_fichas, rebuy_valor, rebuy_duplo_valor, addon_valor, buyin_duplo_fichas, buyin_duplo_valor, prize_pool')
           .in('id', ids);
         
         if (!errExtras && Array.isArray(extras)) {
@@ -3402,6 +3403,8 @@ function montarCarouselPremiacao(d) {
               // Personalização premium (logo, marca d'água, galeria, frase) — JSON pode ser null
               t.tv_prolive_custom = ext.tv_prolive_custom || null;
               if (ext.tv_show_prize != null) t.tv_show_prize = ext.tv_show_prize;
+              // Prize pool gravado pelo app (mesmo valor da tela do operador e da TV interna)
+              t.prize_pool = (ext.prize_pool != null) ? ext.prize_pool : null;
               // 🆕 Fichas e valores — só sobrescreve se RPC não retornou
               // (preserva valor do RPC se já vier, evita race con. com cache)
               if (ext.stack != null && (t.stack == null || t.stack === 0)) t.stack = ext.stack;
@@ -3997,7 +4000,10 @@ function montarCarouselPremiacao(d) {
     const buyin = Number(t.buyin || 0);
     const rakePct = Number(t.rake || 0);
     const totalArrecadado = (buyinsQtd + reentriesQtd) * buyin;
-    const prize = totalArrecadado * (1 - rakePct/100);
+    // Usa o prize calculado pelo próprio app (getPrize) quando ele já foi gravado.
+    // Fallback (app antigo / torneio sem sync): cálculo simplificado de antes.
+    const _prizeApp = (t.prize_pool != null && t.prize_pool !== '') ? Number(t.prize_pool) : NaN;
+    const prize = isFinite(_prizeApp) ? _prizeApp : totalArrecadado * (1 - rakePct/100);
     
     // Tempo restante formatado
     const ts = Math.max(0, t.tempo_restante || 0);
