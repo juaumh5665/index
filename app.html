@@ -8087,6 +8087,10 @@ document.addEventListener('DOMContentLoaded', function(){
                             <input id="t-rake" type="number" value="20" class="inp">
                         </div>
                     </div>
+                    <label style="display:flex;align-items:flex-start;gap:.5rem;font-size:.72rem;color:#a1a1aa;cursor:pointer;margin:-.15rem 0 .1rem;">
+                        <input type="checkbox" id="t-taxa-adm-so-free" style="accent-color:#fb923c;margin-top:.1rem;">
+                        <span><strong style="color:#fb923c;">Cobrar a taxa adm só no buy-in FREE</strong> — ex.: "FREE + 20". A taxa vai pro clube (fora do rake e da cascata) e não é cobrada no buy-in duplo nem depois da janela FREE.</span>
+                    </label>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;">
                         <div>
                             <label class="inp-label">Stack inicial</label>
@@ -12044,6 +12048,7 @@ function _torneioToDb(t) {
         buyin: t.buyin || 0,
         rake: t.rake || 0,
         taxa_administrativa: t.taxaAdm || 0,
+        taxa_adm_so_free: !!t.taxaAdmSoFree,
         stack: t.stack || 0,
         tempo_nivel: t.tempoNivel || 15,
         reentry_ate: t.reentryAte || 0,
@@ -13241,6 +13246,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         buyin: parseFloat(r.buyin || 0),
         rake: parseFloat(r.rake || 0),
         taxaAdm: parseFloat(r.taxa_administrativa || 0),
+        taxaAdmSoFree: !!r.taxa_adm_so_free,
         stack: r.stack || 0,
         tempoNivel: r.tempo_nivel || 15,
         reentryAte: r.reentry_ate || 0,
@@ -21161,6 +21167,7 @@ function _capturarConfigTorneio() {
         buyin:          parseFloat((document.getElementById('t-buyin') || {}).value) || 0,
         rake:           parseFloat((document.getElementById('t-rake') || {}).value) || 0,
         taxaAdm:        parseFloat((document.getElementById('t-taxa-adm') || {}).value) || 0,
+        taxaAdmSoFree:  !!(document.getElementById('t-taxa-adm-so-free') || {}).checked,
         stack:          parseInt((document.getElementById('t-stack') || {}).value) || 0,
         tempoNivel:     parseInt((document.getElementById('t-tempo') || {}).value) || 15,
         reentryAte:     parseInt((document.getElementById('t-reentry') || {}).value) || 0,
@@ -21213,6 +21220,7 @@ function _aplicarConfigTorneio(cfg) {
     set('t-buyin', cfg.buyin);
     set('t-rake', cfg.rake);
     set('t-taxa-adm', cfg.taxaAdm);
+    { const cbTaxaFree = document.getElementById('t-taxa-adm-so-free'); if (cbTaxaFree) cbTaxaFree.checked = !!cfg.taxaAdmSoFree; }
     set('t-stack', cfg.stack);
     set('t-tempo', cfg.tempoNivel);
     set('t-reentry', cfg.reentryAte);
@@ -27362,6 +27370,7 @@ function saveTournament() {
             return (isNaN(v) || v < 0) ? 20 : v;
         })(),
         taxaAdm:      parseFloat(document.getElementById('t-taxa-adm')?.value) || 0,
+        taxaAdmSoFree: !!(document.getElementById('t-taxa-adm-so-free') || {}).checked,
         buyinFreeAteNivel: (function() {
             const v = parseInt(document.getElementById('t-buyin-free-ate-nivel')?.value);
             return (isNaN(v) || v <= 0) ? null : v;
@@ -29762,8 +29771,11 @@ function renderTabFinanceiro() {
     linhas.push({ label: 'Prize Pool', sub: '', val: formatMoney(prize), tipo: 'prize' });
     
     // LOTE 5: Taxa Administrativa — soma à parte (não entra no rake nem no prize)
-    const taxaAdmEntries = buyinEntries.length; // taxa cobrada só no buy-in
-    const taxaAdmTotal = taxaAdmEntries * (Number(t.taxaAdm) || 0);
+    // Opção "só no FREE": usa o que foi de fato cobrado em cada entrada
+    const taxaAdmEntries = t.taxaAdmSoFree ? (t.entries || []).filter(e => Number(e.taxaAdm) > 0).length : buyinEntries.length; // taxa cobrada só no buy-in
+    const taxaAdmTotal = t.taxaAdmSoFree
+        ? Math.round((t.entries || []).reduce((s, e) => s + (Number(e.taxaAdm) || 0), 0) * 100) / 100
+        : taxaAdmEntries * (Number(t.taxaAdm) || 0);
     if (taxaAdmTotal > 0) {
         linhas.push({ label: 'Taxa Administrativa', sub: `${taxaAdmEntries} × ${formatMoney(Number(t.taxaAdm) || 0)} · separada do prize`, val: formatMoney(taxaAdmTotal), tipo: 'taxa-adm' });
     }
@@ -31669,7 +31681,10 @@ function atualizarResumoEntrada() {
 
     // LOTE 5: Taxa administrativa — cobrada apenas no buy-in
     let taxaAdm = 0;
-    if (acoes.includes('buyin') && Number(t.taxaAdm) > 0) {
+    if (t.taxaAdmSoFree) {
+        // Opção "só no buy-in FREE": prévia igual ao que será cobrado
+        if (acoes.includes('buyin') && _taxaAdmAplica(t, 'buyin')) taxaAdm = Number(t.taxaAdm);
+    } else if (acoes.includes('buyin') && Number(t.taxaAdm) > 0) {
         taxaAdm = Number(t.taxaAdm);
     }
 
@@ -32040,7 +32055,7 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         }
 
         // Taxa adm: só no buy-in/buyin_duplo
-        const taxaAdm = ((tipo === 'buyin' || tipo === 'buyin_duplo') && Number(t.taxaAdm) > 0) ? Number(t.taxaAdm) : 0;
+        const taxaAdm = _taxaAdmAplica(t, tipo) ? Number(t.taxaAdm) : 0;
 
         // Passaporte: anexar SÓ na primeira entry (buy-in geralmente) pra evitar duplicação
         // mas com TODAS as fichas extras somadas (do combo inteiro)
@@ -32415,7 +32430,7 @@ async function _registrarEntradaImpl() {
     // LOTE 5: Taxa Administrativa — cobrada APENAS no buy-in (1ª entrada)
     // Não entra no rake, mas vai pro caixa do clube (separada contabilmente).
     let taxaAdmCobrada = 0;
-    if ((tipo === 'buyin' || tipo === 'buyin_duplo') && Number(t.taxaAdm) > 0) {
+    if (_taxaAdmAplica(t, tipo)) {
         taxaAdmCobrada = Number(t.taxaAdm);
     }
     
@@ -36169,6 +36184,17 @@ function _isStaffFixoAdicionalV2(t) {
 function _isBuyinFree(t) {
     if (!t) return false;
     return (Number(t.buyin) || 0) === 0;
+}
+
+// Taxa administrativa: em quais lançamentos ela é cobrada.
+// Padrão (sempre foi assim): buy-in e buy-in duplo.
+// Opção "só no buy-in FREE" (t.taxaAdmSoFree): apenas no buy-in gratuito (janela FREE).
+function _taxaAdmAplica(t, tipo) {
+    if (!t || !(Number(t.taxaAdm) > 0)) return false;
+    if (t.taxaAdmSoFree) {
+        return tipo === 'buyin' && _isBuyinFree(t) && (Number(_getBuyinEfetivo(t)) || 0) === 0;
+    }
+    return tipo === 'buyin' || tipo === 'buyin_duplo';
 }
 
 // Retorna o VALOR EFETIVO do buy-in considerando torneios FREE com transição pós-FREE.
@@ -51622,7 +51648,9 @@ function renderRelTorneios() {
         jackpot = money(jackpot + (t.jackpotCompras || []).reduce((s, j) => s + (Number(j.valor) || 0), 0));
         // Taxa administrativa: cobrada só no buy-in × valor da taxa
         const buyinsQtd = t.entries.filter(e => e.tipo === 'buyin' || e.tipo === 'buyin_duplo').length;
-        taxaAdm = money(taxaAdm + buyinsQtd * (Number(t.taxaAdm) || 0));
+        taxaAdm = t.taxaAdmSoFree
+            ? money(taxaAdm + t.entries.reduce((s, e) => s + (Number(e.taxaAdm) || 0), 0))
+            : money(taxaAdm + buyinsQtd * (Number(t.taxaAdm) || 0));
     });
     
     // === Totais financeiros (usando funções unificadas) ===
@@ -56080,6 +56108,7 @@ function atualizarComprovanteUI() {
       buyin: original.buyin,
       rake: original.rake,
       taxaAdm: original.taxaAdm || 0,
+      taxaAdmSoFree: !!original.taxaAdmSoFree,
       stack: original.stack,
       tempoNivel: original.tempoNivel,
       reentryAte: original.reentryAte || 0,
