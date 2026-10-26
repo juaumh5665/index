@@ -119,7 +119,7 @@
     function aplicarCfg(raw) {
       st.cfg = norm(raw);
       if (st.cfg.ativo) getCtx();
-      atualizarOverlay();
+      atualizarUI();
     }
 
     // ---- Áudio ----
@@ -136,16 +136,17 @@
         if (!AC) return null;
         try { st.ctx = new AC(); } catch (e) { return null; }
       }
-      try { st.ctx.onstatechange = atualizarOverlay; } catch (e) { }
+      try { st.ctx.onstatechange = atualizarUI; } catch (e) { }
       try { if (st.ctx.state === 'suspended') st.ctx.resume(); } catch (e) { }
-      setTimeout(atualizarOverlay, 1500);
+      setTimeout(atualizarUI, 1500);
       return st.ctx;
     }
     function destravar() {
-      if (!st.cfg.ativo) return;
+      // Qualquer toque/OK já libera o áudio, mesmo que a configuração ainda não tenha
+      // chegado (a TV busca a config alguns segundos depois de abrir).
       var c = getCtx();
       if (!c) return;
-      try { if (c.state !== 'running') c.resume().then(atualizarOverlay, atualizarOverlay); } catch (e) { }
+      try { if (c.state !== 'running') c.resume().then(atualizarUI, atualizarUI); } catch (e) { }
     }
     ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(function (ev) {
       document.addEventListener(ev, destravar, { capture: true, passive: true });
@@ -177,9 +178,68 @@
     function tocar(fn, arg) {
       if (!st.cfg.ativo) return;
       var c = getCtx();
-      if (!c || c.state !== 'running') return;
-      fn(c, st.cfg, arg);
+      if (!c) return;
+      if (c.state === 'running') { fn(c, st.cfg, arg); return; }
+      // Navegador suspendeu o áudio (ex.: Fire Stick depois de um tempo parado):
+      // tenta reativar — funciona quando já houve um toque na página — e toca em seguida.
+      try { c.resume().then(function () { if (c.state === 'running') fn(c, st.cfg, arg); atualizarUI(); }, atualizarUI); } catch (e) { }
     }
+
+    // Mantém o áudio "acordado": um sinal silencioso a cada 20s evita que o navegador
+    // ou a saída HDMI desliguem o áudio entre um nível e outro (e cortem o 1º bipe).
+    setInterval(function () {
+      if (!st.cfg.ativo || !st.ctx) return;
+      try {
+        if (st.ctx.state !== 'running') { st.ctx.resume().then(atualizarUI, atualizarUI); return; }
+        var o = st.ctx.createOscillator(), g = st.ctx.createGain();
+        g.gain.value = 0.00001; o.connect(g); g.connect(st.ctx.destination);
+        o.start(); o.stop(st.ctx.currentTime + 0.05);
+      } catch (e) { }
+    }, 20000);
+
+    // ---- Botão de som ao lado do zoom (mostra o estado + libera com bipe) ----
+    function criarBotao() {
+      if (st.btn) return st.btn;
+      var barra = document.getElementById('tv-zoom-controls');
+      if (!barra) return null;
+      var b = document.createElement('button');
+      b.id = 'stack-tv-som-btn';
+      b.type = 'button';
+      b.setAttribute('style',
+        'background:transparent;border:none;color:#fff;height:2rem;padding:0 .55rem;border-radius:.3rem;cursor:pointer;' +
+        'font-size:.72rem;font-weight:700;line-height:1;display:none;align-items:center;gap:.3rem;font-family:inherit;' +
+        'border-right:1px solid rgba(255,255,255,.15);margin-right:.15rem;white-space:nowrap;');
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var c = getCtx();
+        if (!c) { b.textContent = '🔇 Sem áudio'; return; }
+        var confirmar = function () {
+          atualizarUI();
+          if (c.state === 'running') aviso1min(c, st.cfg.ativo ? st.cfg : norm({ volume: 80 })); // bipe de confirmação
+        };
+        try { if (c.state !== 'running') c.resume().then(confirmar, confirmar); else confirmar(); } catch (e) { confirmar(); }
+      });
+      barra.insertBefore(b, barra.firstChild);
+      st.btn = b;
+      return b;
+    }
+    function atualizarBotao() {
+      var b = criarBotao();
+      if (!b) return;
+      if (!st.cfg.ativo) { b.style.display = 'none'; return; }
+      b.style.display = 'inline-flex';
+      if (st.ctx && st.ctx.state === 'running') {
+        b.textContent = '🔊 Som ativo';
+        b.style.color = '#4ade80';
+        b.title = 'Som ligado — clique para ouvir um bipe de teste';
+      } else {
+        b.textContent = '🔇 Ativar som';
+        b.style.color = '#fbbf24';
+        b.title = 'Clique (ou OK no controle) para liberar o som da TV';
+      }
+    }
+    function atualizarUI() { atualizarOverlay(); atualizarBotao(); }
+    setInterval(atualizarBotao, 1000);
     function dispararTroca() {
       var agora = Date.now();
       if (agora - st.lastTrocaAt < 5000) return; // evita tocar 2x na mesma troca
