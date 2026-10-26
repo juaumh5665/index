@@ -29700,13 +29700,14 @@ function renderTabFinanceiro() {
     if (buyinPromoEntries.length > 0 && buyinNormalEntries.length > 0) {
         // Misto: tem promo e normal
         const promoVal = Number(t.buyinPromoValor || t.buyin_promo_valor || 0);
-        buyinSub = `${buyinPromoEntries.length} × ${formatMoney(promoVal)} <span style="color:#a78bfa;font-size:.65rem;">PROMO</span> + ${buyinNormalEntries.length} × ${formatMoney(t.buyin)}`;
+        buyinSub = `${buyinPromoEntries.length} × ${formatMoney(promoVal)} <span style="color:#a78bfa;font-size:.65rem;">PROMO</span> + ${_isBuyinFree(t) ? _finSubPorValores(buyinNormalEntries, t.buyin) : (buyinNormalEntries.length + ' × ' + formatMoney(t.buyin))}`;
     } else if (buyinPromoEntries.length > 0) {
         // Só promo
         const promoVal = Number(t.buyinPromoValor || t.buyin_promo_valor || 0);
         buyinSub = `${buyinPromoEntries.length} × ${formatMoney(promoVal)} <span style="color:#a78bfa;font-size:.65rem;">PROMO</span>`;
     } else {
-        buyinSub = `${buyinEntries.length} × ${formatMoney(t.buyin)}`;
+        // FREE: mostra o que foi cobrado (ex.: staff) em vez de "R$ 0,00"; pago: igual sempre foi
+        buyinSub = _isBuyinFree(t) ? _finSubPorValores(buyinEntries, t.buyin) : `${buyinEntries.length} × ${formatMoney(t.buyin)}`;
     }
     linhas.push({ label: 'Buy-ins', sub: buyinSub, val: formatMoney(buyinTotal), tipo: 'normal' });
 
@@ -29717,7 +29718,8 @@ function renderTabFinanceiro() {
     }
 
     if (t.reentryAte > 0 || reentryEntries.length > 0) {
-        linhas.push({ label: 'Re-entries', sub: `${reentryEntries.length} × ${formatMoney(t.buyin)}`, val: formatMoney(reentryTotal), tipo: 'normal' });
+        // Usa o valor configurado da re-entry (reentrada múltipla / FREE); sem valor próprio = buy-in, igual sempre foi
+        linhas.push({ label: 'Re-entries', sub: `${reentryEntries.length} × ${formatMoney((typeof _getReentryValor === 'function') ? _getReentryValor(t) : t.buyin)}`, val: formatMoney(reentryTotal), tipo: 'normal' });
     }
     
     if (t.rebuyValor > 0 || t.rebuySimples > 0 || rebuyS.length > 0) {
@@ -30683,11 +30685,12 @@ function _tipoBloqueadoPorTrava(t, tipo) {
         if (!t.last_chance_ativo) {
             return { bloqueado: true, motivo: 'Last Chance não está ativo neste torneio' };
         }
-        const maxAddon = _resolverNivelMaxAddon(t);
-        if (maxAddon != null && nivelAtual <= maxAddon) {
-            return { 
-                bloqueado: true, 
-                motivo: `Last Chance só após o nível ${maxAddon} (atual: ${nivelAtual}) — período de add-on em andamento` 
+        // Início do Last Chance: depois do add-on (nível de add-on → intervalo de compras → fim das entradas)
+        const lcDe = _resolverNivelInicioLastChance(t);
+        if (lcDe != null && nivelAtual < lcDe) {
+            return {
+                bloqueado: true,
+                motivo: `Last Chance só a partir do nível ${lcDe} (atual: ${nivelAtual}) — abre depois do add-on`
             };
         }
         // 🔥 NOVO: Last Chance tem nível MÁXIMO configurável (last_chance_ate)
@@ -30702,6 +30705,28 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     }
     
     return { bloqueado: false, motivo: '' };
+}
+
+// Resolve o PRIMEIRO nível em que o Last Chance pode ser vendido ("3ª compra após add-on").
+// 1) "Add-on até o nível N" configurado → a partir de N+1 (regra de sempre)
+// 2) Intervalo marcado como "de compras" → a partir do 1º nível depois desse intervalo
+// 3) "Entradas até o nível N" → a partir de N+1
+// 4) Nada configurado → sem trava de início (null)
+function _resolverNivelInicioLastChance(t) {
+    if (!t) return null;
+    const maxAddon = _resolverNivelMaxAddon(t);
+    if (maxAddon != null) return maxAddon + 1;
+    if (typeof _torneioTemBreakDeCompras === 'function' && _torneioTemBreakDeCompras(t)) {
+        let jogados = 0;
+        for (const b of (t.blinds || [])) {
+            if (!b) continue;
+            if (b.isBreak && (b.breakDeCompras || b.break_de_compras)) return jogados + 1;
+            if (!b.isBreak) jogados++;
+        }
+    }
+    const maxCompras = _resolverNivelMaxCompras(t);
+    if (maxCompras != null) return maxCompras + 1;
+    return null;
 }
 
 // Resolve nível máximo onde Last Chance fica disponível (configurável por torneio ou padrão clube)
@@ -36196,6 +36221,18 @@ function _isStaffFixoAdicionalV2(t) {
 function _isBuyinFree(t) {
     if (!t) return false;
     return (Number(t.buyin) || 0) === 0;
+}
+
+// Só exibição (aba Financeiro): "N × R$ X" com os valores REALMENTE lançados,
+// pra conta do subtítulo bater com o total ao lado (FREE com staff, re-entry com valor próprio).
+function _finSubPorValores(entries, valorPadrao) {
+    if (!entries || !entries.length) return `0 × ${formatMoney(Number(valorPadrao) || 0)}`;
+    const grupos = new Map();
+    entries.forEach(e => {
+        const v = Math.round((Number(e.valor) || 0) * 100) / 100;
+        grupos.set(v, (grupos.get(v) || 0) + 1);
+    });
+    return [...grupos.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => `${n} × ${formatMoney(v)}`).join(' + ');
 }
 
 // Taxa administrativa: em quais lançamentos ela é cobrada.
