@@ -30566,6 +30566,18 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     // Inclui Buy-in pra novos jogadores que chegam só no intervalo do add-on
     if (_emJanelaBreakEspecial(t)) {
         if (['buyin', 'buyin_duplo', 'reentry', 'rebuy_simples', 'rebuy_duplo', 'addon'].includes(tipo)) {
+            // Exceção: o buy-in FREE tem janela própria (definida na criação). Fora dela, o
+            // intervalo NÃO reabre o FREE — a não ser que exista "Valor após FREE" (aí cobra esse valor).
+            if (tipo === 'buyin' && _isBuyinFree(t)) {
+                const maxFree = _resolverNivelMaxBuyinFree(t);
+                const nivelNoBreak = _nivelHumano(t);
+                if (maxFree != null && nivelNoBreak > maxFree && !(Number(t.buyinPosFreeValor) > 0)) {
+                    return {
+                        bloqueado: true,
+                        motivo: `Buy-in FREE só até o nível ${maxFree} — no intervalo use o Buy-in Duplo ou a Re-entry`
+                    };
+                }
+            }
             return { bloqueado: false, motivo: '' };
         }
     }
