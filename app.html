@@ -45926,14 +45926,20 @@ async function salvarConfigSomTv() {
     const cfg = StackTvSom.norm(_somTvCfg);
     if (btn) btn.disabled = true;
     try {
-        const { error } = await sb.from('clubes').update({ tv_som: cfg }).eq('id', sbClube.id);
+        const { data: salvo, error } = await sb.from('clubes').update({ tv_som: cfg }).eq('id', sbClube.id).select('id');
         if (error) throw error;
+        // Sem linha de volta = o banco não gravou (ex.: usuário sem permissão de admin do clube)
+        if (!salvo || !salvo.length) throw new Error('nao_gravou');
         sbClube.tv_som = cfg;
         if (s) s.innerHTML = '<span style="color:#22c55e;">✓ Salvo. TVs abertas atualizam em até 1 minuto.</span>';
         showToast(cfg.ativo ? '🔊 Som da TV ativado' : '🔇 Som da TV desligado');
     } catch (e) {
         console.error('[SOM TV] erro ao salvar:', e);
-        if (s) s.innerHTML = '<span style="color:#ef4444;">Erro ao salvar. Tente novamente.</span>';
+        const semPermissao = e && e.message === 'nao_gravou';
+        if (s) s.innerHTML = '<span style="color:#ef4444;">' + (semPermissao
+            ? 'Não foi salvo: só o administrador do clube pode alterar o som da TV.'
+            : 'Erro ao salvar. Tente novamente.') + '</span>';
+        showToast(semPermissao ? '⚠️ Som da TV NÃO foi salvo (sem permissão)' : '❌ Erro ao salvar o som da TV');
     } finally {
         if (btn) btn.disabled = false;
     }
