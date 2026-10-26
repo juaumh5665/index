@@ -7197,6 +7197,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="tab-btn active" id="pjtab-btn-extrato"    onclick="switchPagamentoTab('pj-extrato', this)">Extrato</button>
             <button class="tab-btn"        id="pjtab-btn-pagar"      onclick="switchPagamentoTab('pj-pagar', this)">Pagar Conta</button>
             <button class="tab-btn"        id="pjtab-btn-depositar"  onclick="switchPagamentoTab('pj-depositar', this)">Depositar</button>
+            <button class="tab-btn"        id="pjtab-btn-debito"     onclick="switchPagamentoTab('pj-debito', this)">Lançar Débito</button>
             <button class="tab-btn"        id="pjtab-btn-transferir" onclick="switchPagamentoTab('pj-transferir', this)">Transferir</button>
         </div>
         <div style="flex:1;overflow:auto;padding:1.5rem;">
@@ -7211,6 +7212,10 @@ document.addEventListener('DOMContentLoaded', function(){
             <!-- TAB: DEPOSITAR -->
             <div id="pj-depositar" class="pj-tab-content" style="display:none;">
                 <div id="pj-depositar-content"></div>
+            </div>
+            <!-- TAB: LANÇAR DÉBITO -->
+            <div id="pj-debito" class="pj-tab-content" style="display:none;">
+                <div id="pj-debito-content"></div>
             </div>
             <!-- TAB: TRANSFERIR -->
             <div id="pj-transferir" class="pj-tab-content" style="display:none;">
@@ -47109,6 +47114,7 @@ function switchPagamentoTab(tabId, btn) {
     if (tabId === 'pj-extrato')     renderExtratoJogador();
     if (tabId === 'pj-pagar')       renderPagarConta();
     if (tabId === 'pj-depositar')   renderDepositar();
+    if (tabId === 'pj-debito')      renderDebitoJogador();
     if (tabId === 'pj-transferir')  renderTransferir();
 }
 
@@ -48469,40 +48475,102 @@ function _debAtualizarPreview() {
         (valor > 0 ? ` → após o débito: <strong style="color:${cor(depois)};">${formatMoney(depois)}</strong>` : '');
 }
 
+// Regra única do débito (usada pelo botão do Caixa e pela aba do jogador).
+// Retorna a transação criada ou null (já avisou o motivo com toast).
+function _executarDebitoManual(jid, valorBruto, motivoBruto, metodoBruto) {
+    const valor = Math.round((parseFloat(valorBruto) || 0) * 100) / 100;
+    const motivo = String(motivoBruto || '').trim();
+    const metodo = metodoBruto || null;
+    const j = jogadores.find(x => x.id === jid);
+
+    if (!jid || !j) { showToast('⚠️ Selecione o jogador'); return null; }
+    if (!(valor > 0) || !isFinite(valor)) { showToast('⚠️ Informe um valor maior que zero'); return null; }
+    if (motivo.length < 5) { showToast('⚠️ Informe o motivo (mínimo 5 caracteres)'); return null; }
+    if (metodo && !PAYMENT_METHODS[metodo]) { showToast('⚠️ Forma inválida'); return null; }
+
+    const saldoAntes = getSaldoJogador(jid);
+    const tx = registrarTransacao({
+        jogadorId: jid,
+        tipo: 'debito_manual',
+        valor: -valor,
+        descricao: `Débito lançado${metodo ? ' (saiu via ' + PAYMENT_METHODS[metodo].label + ')' : ''} — ${motivo}`,
+        metodo: metodo,
+        origem: 'caixa',
+    });
+    if (!tx) { showToast('⚠️ Lançamento igual acabou de ser feito — confira o extrato antes de repetir'); return null; }
+
+    if (typeof logAudit === 'function') {
+        logAudit('CAIXA_DEBITO_MANUAL', `Débito de ${formatMoney(valor)} lançado para ${j.nome}`,
+            { jogadorId: jid, valor, motivo, metodo, transacaoId: tx.id, saldoAntes, saldoDepois: getSaldoJogador(jid) });
+    }
+    showToast(`📝 Débito de ${formatMoney(valor)} lançado para ${j.nome}`);
+    return tx;
+}
+
 function confirmarDebitoManual() {
     return comLock('confirmarDebitoManual', function() {
         const jid = document.getElementById('deb-jogador').value;
-        const valor = Math.round((parseFloat(document.getElementById('deb-valor').value) || 0) * 100) / 100;
-        const motivo = (document.getElementById('deb-motivo').value || '').trim();
-        const metodo = document.getElementById('deb-metodo').value || null;
-        const j = jogadores.find(x => x.id === jid);
-
-        if (!jid || !j) return showToast('⚠️ Selecione o jogador');
-        if (!(valor > 0) || !isFinite(valor)) return showToast('⚠️ Informe um valor maior que zero');
-        if (motivo.length < 5) return showToast('⚠️ Informe o motivo (mínimo 5 caracteres)');
-        if (metodo && !PAYMENT_METHODS[metodo]) return showToast('⚠️ Forma inválida');
-
-        const saldoAntes = getSaldoJogador(jid);
-        const tx = registrarTransacao({
-            jogadorId: jid,
-            tipo: 'debito_manual',
-            valor: -valor,
-            descricao: `Débito lançado${metodo ? ' (saiu via ' + PAYMENT_METHODS[metodo].label + ')' : ''} — ${motivo}`,
-            metodo: metodo,
-            origem: 'caixa',
-        });
-        if (!tx) return showToast('⚠️ Lançamento igual acabou de ser feito — confira o extrato antes de repetir');
-
-        if (typeof logAudit === 'function') {
-            logAudit('CAIXA_DEBITO_MANUAL', `Débito de ${formatMoney(valor)} lançado para ${j.nome}`,
-                { jogadorId: jid, valor, motivo, metodo, transacaoId: tx.id, saldoAntes, saldoDepois: getSaldoJogador(jid) });
-        }
+        const tx = _executarDebitoManual(jid,
+            document.getElementById('deb-valor').value,
+            document.getElementById('deb-motivo').value,
+            document.getElementById('deb-metodo').value);
+        if (!tx) return;
         closeModal('modal-debito-manual');
         renderCaixaAberto();
         if (typeof pagamentoJogadorId !== 'undefined' && pagamentoJogadorId === jid) {
             try { renderSaldoCard(getSaldoJogador(jid)); renderExtratoJogador(); } catch (_) {}
         }
-        showToast(`📝 Débito de ${formatMoney(valor)} lançado para ${j.nome}`);
+    }, '⏳ Lançando débito...');
+}
+
+// Aba "Lançar Débito" na ficha do jogador (modal com Extrato / Pagar Conta / Depositar)
+function renderDebitoJogador() {
+    const el = document.getElementById('pj-debito-content');
+    if (!el) return;
+    const opcoes = '<option value="">Não — só lançar a dívida</option>' +
+        Object.entries(PAYMENT_METHODS).filter(([k]) => k !== 'credito_sistema')
+            .map(([k, m]) => `<option value="${k}">Sim — saiu via ${m.label}</option>`).join('');
+    el.innerHTML = `
+        <div style="padding:1rem;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.18);border-radius:.6rem;margin-bottom:1rem;font-size:.8rem;color:#a1a1aa;">
+            <i class="fa-solid fa-info-circle" style="color:#f87171;"></i> Registra um valor que o jogador <strong style="color:#fca5a5;">deve ao clube</strong> (dívida anterior, empréstimo, consumo não lançado…). Aumenta o saldo devedor e é quitado em "Pagar Conta". Se lançar errado, estorne pelo extrato/histórico.
+        </div>
+        <label class="inp-label">Valor do Débito R$</label>
+        <input id="pj-deb-valor" type="number" step="0.01" min="0" class="inp" placeholder="Ex: 200" oninput="_debAtualizarPreviewJogador()">
+        <label class="inp-label" style="margin-top:1rem;">Motivo *</label>
+        <input id="pj-deb-motivo" class="inp" maxlength="120" placeholder="Ex: Dívida da semana passada, empréstimo...">
+        <label class="inp-label" style="margin-top:1rem;">Saiu dinheiro do caixa?</label>
+        <select id="pj-deb-metodo" class="inp">${opcoes}</select>
+        <div style="font-size:.68rem;color:#52525b;margin-top:.3rem;">Só escolha uma forma se o valor saiu do caixa agora (ex.: empréstimo em dinheiro). Assim ele aparece como saída no fechamento.</div>
+        <div id="pj-deb-preview" style="font-size:.8rem;color:#a1a1aa;padding:.6rem .8rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.5rem;margin-top:1rem;"></div>
+        <button onclick="confirmarDebitoNoModal()" style="width:100%;padding:.85rem;border-radius:.6rem;margin-top:1.25rem;background:#dc2626;color:#fff;border:none;font-family:'Manrope',sans-serif;font-weight:800;cursor:pointer;font-size:.9rem;">
+            <i class="fa-solid fa-minus-circle"></i> Confirmar Débito
+        </button>`;
+    _debAtualizarPreviewJogador();
+}
+
+function _debAtualizarPreviewJogador() {
+    const el = document.getElementById('pj-deb-preview');
+    if (!el || !pagamentoJogadorId) return;
+    const valor = Math.round((parseFloat((document.getElementById('pj-deb-valor') || {}).value) || 0) * 100) / 100;
+    const saldo = getSaldoJogador(pagamentoJogadorId);
+    const depois = Math.round((saldo - (valor > 0 ? valor : 0)) * 100) / 100;
+    const cor = (v) => v < 0 ? '#ef4444' : v > 0 ? '#22c55e' : '#a1a1aa';
+    el.innerHTML = `Saldo atual: <strong style="color:${cor(saldo)};">${formatMoney(saldo)}</strong>` +
+        (valor > 0 ? ` → após o débito: <strong style="color:${cor(depois)};">${formatMoney(depois)}</strong>` : '');
+}
+
+function confirmarDebitoNoModal() {
+    return comLock('confirmarDebitoManual', function() {
+        const jid = pagamentoJogadorId;
+        const tx = _executarDebitoManual(jid,
+            (document.getElementById('pj-deb-valor') || {}).value,
+            (document.getElementById('pj-deb-motivo') || {}).value,
+            (document.getElementById('pj-deb-metodo') || {}).value);
+        if (!tx) return;
+        renderDebitoJogador();               // limpa o formulário
+        renderSaldoCard(getSaldoJogador(jid));
+        renderExtratoJogador();
+        renderCaixaAberto();
     }, '⏳ Lançando débito...');
 }
 
