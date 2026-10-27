@@ -55144,7 +55144,7 @@ function renderDashAlertas() {
         return;
     }
     // Visual: alertas soltos (críticos, mesas, torneios, bar) ficam no topo, um por linha;
-    // devedores e estoque baixo viram 1 grupo cada, que expande ao clicar.
+    // devedores e estoque baixo viram 2 cartões lado a lado (lista vertical).
     // Só exibição — as regras de cada alerta acima não mudam.
     const soltos = alertas.filter(a => !a.grupo);
     const devedores = alertas.filter(a => a.grupo === 'devedores').sort((a, b) => b._valor - a._valor);
@@ -55156,47 +55156,57 @@ function renderDashAlertas() {
     const grupos = [];
     if (devedores.length) grupos.push({
         id: 'devedores', icone: 'fa-hand-holding-dollar', cor: '#06b6d4', bg: 'rgba(6,182,212,.06)', border: 'rgba(6,182,212,.2)',
-        titulo: `${devedores.length} jogador${devedores.length !== 1 ? 'es' : ''} com saldo devedor elevado`,
-        desc: _resumoNomes(devedores),
-        pill: formatMoney(devedores.reduce((s, a) => s + a._valor, 0)),
+        titulo: `${devedores.length} devedor${devedores.length !== 1 ? 'es' : ''}`,
+        sub: 'Saldo devedor acima de R$ 500',
+        destaque: formatMoney(devedores.reduce((s, a) => s + a._valor, 0)),
+        colNome: 'Jogador', colValor: 'Deve',
         linhas: devedores.map(a => ({ nome: a._nome, valor: formatMoney(a._valor) })),
         verTodos: "showPage('jogadores')",
     });
     if (estoque.length) grupos.push({
         id: 'estoque', icone: 'fa-triangle-exclamation', cor: 'var(--gold)', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)',
         titulo: `${estoque.length} produto${estoque.length !== 1 ? 's' : ''} com estoque baixo`,
-        desc: _resumoNomes(estoque),
-        pill: String(estoque.length),
-        linhas: estoque.map(a => ({ nome: a._nome, valor: a._detalhe })),
+        sub: 'Abaixo do estoque mínimo',
+        destaque: '',
+        colNome: 'Produto', colValor: 'Atual / mínimo',
+        linhas: estoque.map(a => ({ nome: a._nome, valor: a._detalhe, pct: Math.max(0, Math.min(100, Math.round((a._ordem || 0) * 100))) })),
         verTodos: "showPage('bar')",
     });
     if (!window._dashAlertasAbertos) {
         try { window._dashAlertasAbertos = JSON.parse(localStorage.getItem('dashAlertasAbertos') || '{}') || {}; } catch (_) { window._dashAlertasAbertos = {}; }
     }
     const _abertos = window._dashAlertasAbertos;
-    const htmlGrupos = grupos.map(g => {
+    const _MAX_LINHAS = 5;
+    // Cartões lado a lado (2 colunas em tela larga, 1 no celular). Cada cartão mostra
+    // os 5 primeiros; "Mostrar mais" expande a lista inteira dentro do próprio cartão.
+    const htmlGrupos = grupos.length ? `<div style="display:grid;grid-template-columns:${grupos.length > 1 ? 'repeat(auto-fit,minmax(min(100%,340px),1fr))' : 'minmax(0,640px)'};gap:.6rem;margin-bottom:.5rem;">${grupos.map(g => {
         const aberto = !!_abertos[g.id];
-        return `<div style="background:${g.bg};border:1px solid ${g.border};border-radius:.6rem;margin-bottom:.5rem;">
-            <div onclick="_toggleDashAlertaGrupo('${g.id}')" style="padding:.7rem 1.25rem;display:flex;align-items:center;gap:.85rem;cursor:pointer;user-select:none;">
+        // Se sobraria só 1 escondido, mostra todos (não vale um botão pra 1 linha)
+        const resto = g.linhas.length > _MAX_LINHAS + 1 ? g.linhas.length - _MAX_LINHAS : 0;
+        const visiveis = (aberto || !resto) ? g.linhas : g.linhas.slice(0, _MAX_LINHAS);
+        return `<div style="background:${g.bg};border:1px solid ${g.border};border-radius:.6rem;padding:.8rem 1.1rem;min-width:0;display:flex;flex-direction:column;">
+            <div style="display:flex;align-items:center;gap:.7rem;">
                 <i class="fa-solid ${g.icone}" style="color:${g.cor};font-size:1rem;"></i>
                 <div style="min-width:0;flex:1;">
                     <div style="font-size:.85rem;font-weight:700;">${g.titulo}</div>
-                    <div style="font-size:.7rem;color:#71717a;margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${g.desc}</div>
+                    <div style="font-size:.68rem;color:#71717a;margin-top:.1rem;">${g.sub}</div>
                 </div>
-                <span style="font-size:.75rem;font-weight:800;color:${g.cor};border:1px solid ${g.border};padding:.15rem .5rem;border-radius:.35rem;white-space:nowrap;">${g.pill}</span>
-                <i class="fa-solid fa-chevron-down" style="color:#71717a;font-size:.75rem;transition:transform .15s;${aberto ? 'transform:rotate(180deg);' : ''}"></i>
+                ${g.destaque ? `<span style="font-size:.95rem;font-weight:800;color:${g.cor};white-space:nowrap;font-variant-numeric:tabular-nums;">${g.destaque}</span>` : ''}
             </div>
-            ${aberto ? `<div style="border-top:1px solid ${g.border};padding:.4rem 1.25rem .75rem;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));column-gap:1.5rem;">
-                    ${g.linhas.map(l => `<div style="display:flex;justify-content:space-between;gap:.75rem;font-size:.78rem;padding:.35rem 0;border-bottom:1px solid rgba(255,255,255,.05);">
-                        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(l.nome)}</span>
-                        <span style="font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">${l.valor}</span>
-                    </div>`).join('')}
-                </div>
-                <div style="text-align:right;margin-top:.5rem;"><button onclick="event.stopPropagation();${g.verTodos}" class="btn-ghost" style="padding:.3rem .7rem;font-size:.72rem;">Ver todos</button></div>
-            </div>` : ''}
+            <div style="display:flex;justify-content:space-between;font-size:.62rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-top:.7rem;padding-bottom:.3rem;border-bottom:1px solid ${g.border};">
+                <span>${g.colNome}</span><span>${g.colValor}</span>
+            </div>
+            ${visiveis.map(l => `<div style="display:flex;align-items:center;gap:.75rem;font-size:.78rem;padding:.38rem 0;border-bottom:1px solid rgba(255,255,255,.05);">
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(l.nome)}</span>
+                ${l.pct != null ? `<span style="width:28%;max-width:140px;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${l.pct}%;background:${g.cor};"></span></span>` : ''}
+                <span style="font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:4.5rem;text-align:right;">${l.valor}</span>
+            </div>`).join('')}
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:auto;padding-top:.55rem;">
+                ${resto > 0 ? `<button onclick="_toggleDashAlertaGrupo('${g.id}')" class="btn-ghost" style="padding:.3rem .7rem;font-size:.72rem;">${aberto ? 'Mostrar menos' : `Mostrar mais ${resto}`}</button>` : '<span></span>'}
+                <button onclick="${g.verTodos}" class="btn-ghost" style="padding:.3rem .7rem;font-size:.72rem;">Ver todos</button>
+            </div>
         </div>`;
-    }).join('');
+    }).join('')}</div>` : '';
     el.innerHTML = soltos.map((a, i) => {
         const cores = {
             erro:   { bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.25)',  icon:'#ef4444' },
