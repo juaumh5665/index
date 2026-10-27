@@ -30250,8 +30250,24 @@ function renderPayout(t, containerId, full = false) {
     const valoresCustom = (t.premiacaoProjetada && Array.isArray(t.premiacaoProjetada.valores))
         ? t.premiacaoProjetada.valores : [];
     
-    c.innerHTML = splits.map((s, i) => {
+    // Aba Financeiro (full): lista TODAS as posições configuradas na premiação
+    // (a tabela padrão corta no 7º). Só exibição — valores vêm de valoresCustom.
+    const linhasPayout = splits.slice();
+    if (full) {
+        for (let k = linhasPayout.length; k < valoresCustom.length; k++) {
+            if (valoresCustom[k] == null) break;
+            linhasPayout.push({ label: (k + 1) + 'º', pct: 0 });
+        }
+    }
+    // Nome do colocado pela POSIÇÃO gravada (não pela ordem do array, que vem
+    // fora de ordem quando o torneio é carregado do banco).
+    const _nomePorPosicao = (pos) => {
+        const el = (t.eliminados || []).find(e => Number(e.posicao) === pos);
+        return el ? getJogadorNome(el.jogadorId) : '';
+    };
+    c.innerHTML = linhasPayout.map((s, i) => {
         const valor = valoresCustom[i] != null ? valoresCustom[i] : (prize * s.pct);
+        const _nomeCol = full ? _nomePorPosicao(i + 1) : '';
         const vaga = (vagas[i] || '').trim();
         const vagaBadge = vaga 
             ? `<span class="vaga-badge" style="display:inline-flex;align-items:center;gap:.25rem;background:linear-gradient(135deg,rgba(245,158,11,.18) 0%,rgba(245,158,11,.08) 100%);border:1px solid rgba(245,158,11,.4);color:var(--gold);font-size:.65rem;font-weight:800;padding:.15rem .45rem;border-radius:.3rem;letter-spacing:.02em;margin-left:.4rem;white-space:nowrap;"><i class="fa-solid fa-ticket" style="font-size:.6rem;"></i> ${vaga.toUpperCase()}</span>`
@@ -30262,7 +30278,7 @@ function renderPayout(t, containerId, full = false) {
                 <span style="font-size:.7rem;font-weight:800;color:${i===0?'#f59e0b':i===1?'#a1a1aa':i===2?'#92610a':'#52525b'};width:1.5rem;flex-shrink:0;">
                     ${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º'}
                 </span>
-                <span style="font-size:.8rem;font-weight:700;">${s.label}${full&&t.eliminados[ativos-i-2]?' — '+getJogadorNome(t.eliminados[ativos-i-2]?.jogadorId):''}</span>
+                <span style="font-size:.8rem;font-weight:700;">${s.label}${_nomeCol ? ' — ' + escapeHtml(_nomeCol) : ''}</span>
                 ${vagaBadge}
             </div>
             <span style="font-size:.85rem;font-weight:800;color:#22c55e;white-space:nowrap;">${formatMoney(valor)}</span>
