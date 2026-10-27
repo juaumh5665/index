@@ -55106,8 +55106,10 @@ function renderDashAlertas() {
     });
 
     // Alerta: saldos muito altos a receber
+    const _todosDevedores = []; // todos com saldo negativo (só pra exibir o total no cartão)
     jogadores.forEach(j => {
         const s = getSaldoJogador(j.id);
+        if (s < 0) _todosDevedores.push({ _nome: j.nome, _valor: Math.abs(s) });
         if (s < -500) alertas.push({ tipo:'info', icone:'fa-hand-holding-dollar', titulo:`${j.nome} deve ${formatMoney(Math.abs(s))}`, desc:'Saldo devedor elevado', grupo:'devedores', _nome:j.nome, _valor:Math.abs(s) });
     });
 
@@ -55154,14 +55156,17 @@ function renderDashAlertas() {
         return lista.length > 3 ? `${n} e mais ${lista.length - 3}` : n;
     };
     const grupos = [];
+    // O cartão aparece quando há devedor acima de R$ 500 (regra do alerta), mas mostra
+    // TODOS os devedores: quantidade e total iguais ao "Total a receber" do dashboard.
+    const _todosDevOrd = _todosDevedores.sort((a, b) => b._valor - a._valor);
     if (devedores.length) grupos.push({
         id: 'devedores', icone: 'fa-hand-holding-dollar', cor: '#06b6d4', bg: 'rgba(6,182,212,.06)', border: 'rgba(6,182,212,.2)',
-        titulo: `${devedores.length} devedor${devedores.length !== 1 ? 'es' : ''}`,
-        sub: 'Saldo devedor acima de R$ 500',
-        resumo: _resumoNomes(devedores),
-        destaque: formatMoney(devedores.reduce((s, a) => s + a._valor, 0)),
+        titulo: `${_todosDevOrd.length} devedor${_todosDevOrd.length !== 1 ? 'es' : ''}`,
+        sub: `${devedores.length} com saldo devedor acima de R$ 500`,
+        resumo: _resumoNomes(_todosDevOrd),
+        destaque: formatMoney(_todosDevOrd.reduce((s, a) => s + a._valor, 0)),
         colNome: 'Jogador', colValor: 'Deve',
-        linhas: devedores.map(a => ({ nome: a._nome, valor: formatMoney(a._valor) })),
+        linhas: _todosDevOrd.map(a => ({ nome: a._nome, valor: formatMoney(a._valor) })),
         verTodos: "showPage('jogadores')",
     });
     if (estoque.length) grupos.push({
@@ -55184,9 +55189,9 @@ function renderDashAlertas() {
     const htmlGrupos = grupos.length ? `<div style="display:grid;grid-template-columns:${grupos.length > 1 ? 'repeat(auto-fit,minmax(min(100%,340px),1fr))' : 'minmax(0,640px)'};gap:.6rem;align-items:start;margin-bottom:.5rem;">${grupos.map(g => {
         const expandido = !!_abertos[g.id];              // cartão aberto (fechado = 1 linha só)
         const completo = !!_abertos[g.id + '_todos'];    // lista inteira x 5 primeiros
-        // Se sobraria só 1 escondido, mostra todos (não vale um botão pra 1 linha)
-        const resto = g.linhas.length > _MAX_LINHAS + 1 ? g.linhas.length - _MAX_LINHAS : 0;
-        const visiveis = (completo || !resto) ? g.linhas : g.linhas.slice(0, _MAX_LINHAS);
+        // Sempre 5 linhas (os dois cartões ficam alinhados); o resto em "Mostrar mais"
+        const resto = Math.max(0, g.linhas.length - _MAX_LINHAS);
+        const visiveis = completo ? g.linhas : g.linhas.slice(0, _MAX_LINHAS);
         return `<div style="background:${g.bg};border:1px solid ${g.border};border-radius:.6rem;padding:.7rem 1.1rem;min-width:0;display:flex;flex-direction:column;">
             <div onclick="_toggleDashAlertaGrupo('${g.id}')" style="display:flex;align-items:center;gap:.7rem;cursor:pointer;user-select:none;">
                 <i class="fa-solid ${g.icone}" style="color:${g.cor};font-size:1rem;"></i>
