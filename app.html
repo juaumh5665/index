@@ -10579,6 +10579,7 @@ let _syncSnapshots = {
     barProdutos:    new Map(),
     barComandas:    new Map(),
     barItens:       new Map(),
+    barItensIds:    new Map(), // comanda_id → lista de ids de itens confirmada no banco
 };
 let _syncLastFullTs = 0;
 let _syncFullNextRun = false;
@@ -10890,6 +10891,39 @@ function _syncHash(row) {
     try { return JSON.stringify(row); }
     catch (_) { return String(Date.now()); }
 }
+// Linha de bar_comanda_itens montada a partir do item local (mesma regra de sempre)
+function _barItemToRow(c, it) {
+    const prod = barProdutos.find(p => p.id === it.produtoId);
+    // Calcular valor unitário corretamente
+    // Local: { produtoId, qtd, subtotal } — valor unitário = subtotal / qtd
+    let valorUnit = 0;
+    if (it.valor && it.valor > 0) {
+        valorUnit = Number(it.valor);
+    } else if (it.subtotal && it.qtd) {
+        valorUnit = Number(it.subtotal) / Number(it.qtd);
+    } else if (prod) {
+        valorUnit = Number(prod.valor || 0);
+    }
+    const qtd = Number(it.qtd || 1);
+    return {
+        id: it.id,
+        comanda_id: c.id,
+        clube_id: sbClube.id,
+        produto_id: it.produtoId || null,
+        nome: prod ? prod.nome : (it.nome || '?'),
+        qtd,
+        valor_unit: valorUnit,
+        subtotal: qtd * valorUnit,
+        ts: it.ts ? new Date(it.ts).toISOString() : new Date().toISOString(),
+    };
+}
+
+// Torneio encerrado: não entra na conferência completa de 5 min (só no diff).
+// Já foi gravado e confirmado; qualquer alteração posterior continua indo no diff.
+function _syncTorneioEncerrado(t) {
+    const st = t && t.status;
+    return st === 'finished' || st === 'encerrado';
+}
 function _syncDeveFull() {
     if (_syncFullNextRun) return true;
     if (!_syncLastFullTs)  return true;
@@ -10915,7 +10949,10 @@ async function _syncUpsertDiff(rows, tabela, snapshotKey, opts) {
             // NÃO alimenta snapshot dos que não foram confirmados
             if (resp.data && resp.data.length > 0) {
                 const idsConfirmados = new Set(resp.data.map(r => r.id));
-                if (snap) resp.data.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
+                // Snapshot guarda o hash da linha LOCAL que foi confirmada (o formato que o
+                // banco devolve é diferente — antes isso fazia TODAS as linhas parecerem
+                // pendentes pra sempre, reenviando o torneio inteiro a cada ciclo).
+                if (snap) rows.forEach(r => { if (r && r.id && idsConfirmados.has(r.id)) snap.set(r.id, _syncHash(r)); });
                 // Log quais IDs falharam pra debug
                 const falharam = rows.filter(r => r && r.id && !idsConfirmados.has(r.id));
                 if (falharam.length > 0) {
@@ -10947,7 +10984,8 @@ async function _syncUpsertDiff(rows, tabela, snapshotKey, opts) {
         console.error('[SYNC:RLS] ⚠️ ' + tabela + ': diff enviou ' + dirty.length + ', banco confirmou ' + confirmados);
         if (resp.data && resp.data.length > 0) {
             const idsConfirmados = new Set(resp.data.map(r => r.id));
-            resp.data.forEach(r => { if (r && r.id) snap.set(r.id, _syncHash(r)); });
+            // Hash da linha LOCAL confirmada (ver comentário no ramo full acima)
+            dirty.forEach(r => { if (r && r.id && idsConfirmados.has(r.id)) snap.set(r.id, _syncHash(r)); });
         }
         return { data: resp.data, enviados: confirmados, total: rows.length, full: false, rlsBlocked: dirty.length - confirmados };
     }
@@ -12442,8 +12480,20 @@ async function sincronizarEstado() {
                 // 1. Sync torneios principais
                 let dataT;
                 try {
-                    const resTor = await _syncUpsertDiff(payload, 'torneios', 'torneios', { withSelect: true, forcarFull: _isFullSync });
-                    dataT = resTor.data;
+                    // Conferência completa (5 min) só pros torneios NÃO encerrados. Encerrados
+                    // seguem no modo diff: qualquer alteração neles continua sendo enviada.
+                    const _encIds = new Set(torneiosRows.filter(_syncTorneioEncerrado).map(t => t.id));
+                    const payloadAtivos = payload.filter(p => !_encIds.has(p.id));
+                    const payloadEnc = payload.filter(p => _encIds.has(p.id));
+                    dataT = [];
+                    if (payloadAtivos.length) {
+                        const resTor = await _syncUpsertDiff(payloadAtivos, 'torneios', 'torneios', { withSelect: true, forcarFull: _isFullSync });
+                        if (resTor.data) dataT = dataT.concat(resTor.data);
+                    }
+                    if (payloadEnc.length) {
+                        const resTorE = await _syncUpsertDiff(payloadEnc, 'torneios', 'torneios', { withSelect: true, forcarFull: false });
+                        if (resTorE.data) dataT = dataT.concat(resTorE.data);
+                    }
                 } catch (errT) {
                     console.error('[SYNC] ❌ Erro torneios:', errT);
                     showToast('⚠️ Erro sync torneio: ' + (errT.message || errT));
@@ -12464,6 +12514,8 @@ async function sincronizarEstado() {
                     // FIX SYNC-TV: acumula IDs que falharam pra re-marcar APÓS o clear
                     const _syncRetryIds = [];
                     for (const t of torneiosRows) {
+                        // Conferência completa só em torneio não encerrado (ver _syncTorneioEncerrado)
+                        const _fullT = _isFullSync && !_syncTorneioEncerrado(t);
                         try {
                             // === ENTRIES ===
                             // Garante IDs estáveis (entries já têm via _genUuid, mas defensivo)
@@ -12494,7 +12546,7 @@ async function sincronizarEstado() {
                                 // FIX SYNC-TV: tenta batch completo; se falhar, faz fallback
                                 // individual pra isolar entries problemáticas (ex: jogador_id FK inválido)
                                 try {
-                                    await _syncUpsertDiff(entryRows, 'torneio_entries', 'entries', { forcarFull: _isFullSync });
+                                    await _syncUpsertDiff(entryRows, 'torneio_entries', 'entries', { forcarFull: _fullT });
                                 } catch (errE) {
                                     console.warn('[SYNC] ⚠️ Batch entries falhou para torneio ' + t.id + ' (' + entryRows.length + ' entries): ' + errE.message);
                                     console.warn('[SYNC] Tentando upsert individual para isolar entry problemática...');
@@ -12552,7 +12604,7 @@ async function sincronizarEstado() {
                                     operador: e.operador || null,
                                 }));
                                 try {
-                                    await _syncUpsertDiff(elimRows, 'torneio_eliminados', 'eliminados', { forcarFull: _isFullSync });
+                                    await _syncUpsertDiff(elimRows, 'torneio_eliminados', 'eliminados', { forcarFull: _fullT });
                                 } catch (errEl) {
                                     throw new Error('Upsert eliminados: ' + (errEl.message || errEl));
                                 }
@@ -12576,7 +12628,7 @@ async function sincronizarEstado() {
                                     ts: j.ts ? new Date(j.ts).toISOString() : new Date().toISOString(),
                                 }));
                                 try {
-                                    await _syncUpsertDiff(jackRows, 'torneio_jackpot_compras', 'jackpotCompras', { forcarFull: _isFullSync });
+                                    await _syncUpsertDiff(jackRows, 'torneio_jackpot_compras', 'jackpotCompras', { forcarFull: _fullT });
                                 } catch (errJ) {
                                     throw new Error('Upsert jackpots: ' + (errJ.message || errJ));
                                 }
@@ -12603,7 +12655,7 @@ async function sincronizarEstado() {
                                 try {
                                     await _syncUpsertDiff(mesaRows, 'torneio_mesas', 'mesas', {
                                         upsertOpts: { onConflict: 'torneio_id,numero' },
-                                        forcarFull: _isFullSync,
+                                        forcarFull: _fullT,
                                     });
                                 } catch (errM) {
                                     throw new Error('Upsert mesas: ' + (errM.message || errM));
@@ -12742,9 +12794,25 @@ async function sincronizarEstado() {
             const comandasUI = ids.map(id => barComandas.find(c => c.id === id)).filter(Boolean);
             if (comandasUI.length) {
                 let errC = null;
+                // Comandas FECHADAS/canceladas sem nenhuma mudança desde a última gravação
+                // confirmada são puladas (antes: upsert + DELETE + SELECT de TODAS a cada ciclo).
+                // Abertas seguem exatamente o fluxo de antes. Calculado ANTES do upsert.
+                const _barSnapC = _syncSnapshots.barComandas, _barSnapI = _syncSnapshots.barItens, _barSnapIds = _syncSnapshots.barItensIds;
+                const _comandaPulavel = (c) => {
+                    if (!c || (c.status || 'aberta') === 'aberta') return false;
+                    if (_barSnapC.get(c.id) !== _syncHash(_comandaToDb(c))) return false;
+                    const itens = c.itens || [];
+                    if (itens.some(it => !it.id || !_isUuid(it.id))) return false;
+                    if (_barSnapIds.get(c.id) !== itens.map(it => it.id).sort().join(',')) return false;
+                    // Itens: compara pelo snapshot (mesma linha montada abaixo)
+                    return itens.every(it => _barSnapI.has(it.id) && _barSnapI.get(it.id) === _syncHash(_barItemToRow(c, it)));
+                };
+                const _pularComanda = new Set(comandasUI.filter(_comandaPulavel).map(c => c.id));
                 try {
-                    const comandaRows = comandasUI.map(_comandaToDb);
-                    await _syncUpsertDiff(comandaRows, 'bar_comandas', 'barComandas', { forcarFull: _isFullSync });
+                    const abertasRows = comandasUI.filter(c => (c.status || 'aberta') === 'aberta').map(_comandaToDb);
+                    const outrasRows = comandasUI.filter(c => (c.status || 'aberta') !== 'aberta' && !_pularComanda.has(c.id)).map(_comandaToDb);
+                    if (abertasRows.length) await _syncUpsertDiff(abertasRows, 'bar_comandas', 'barComandas', { forcarFull: _isFullSync });
+                    if (outrasRows.length) await _syncUpsertDiff(outrasRows, 'bar_comandas', 'barComandas', { forcarFull: false });
                 } catch (err) {
                     errC = err;
                     console.warn('Sync bar_comandas:', err);
@@ -12762,38 +12830,16 @@ async function sincronizarEstado() {
                     // Se qualquer passo falhar, NADA é perdido — só fica desatualizado
                     // por alguns segundos até o próximo sync, e marca a comanda como suja.
                     for (const c of comandasUI) {
+                        if (_pularComanda.has(c.id)) continue; // fechada e sem mudança: nada a enviar
+                        let _delItensFalhou = false;
                         try {
                             // Garante IDs estáveis nos itens (defensivo)
                             (c.itens || []).forEach(it => { if (!it.id || !_isUuid(it.id)) it.id = _genUuid(); });
 
                             if (c.itens && c.itens.length) {
-                                const itensRows = c.itens.map(it => {
-                                    const prod = barProdutos.find(p => p.id === it.produtoId);
-                                    // Calcular valor unitário corretamente
-                                    // Local: { produtoId, qtd, subtotal } — valor unitário = subtotal / qtd
-                                    let valorUnit = 0;
-                                    if (it.valor && it.valor > 0) {
-                                        valorUnit = Number(it.valor);
-                                    } else if (it.subtotal && it.qtd) {
-                                        valorUnit = Number(it.subtotal) / Number(it.qtd);
-                                    } else if (prod) {
-                                        valorUnit = Number(prod.valor || 0);
-                                    }
-                                    const qtd = Number(it.qtd || 1);
-                                    return {
-                                        id: it.id,
-                                        comanda_id: c.id,
-                                        clube_id: sbClube.id,
-                                        produto_id: it.produtoId || null,
-                                        nome: prod ? prod.nome : (it.nome || '?'),
-                                        qtd,
-                                        valor_unit: valorUnit,
-                                        subtotal: qtd * valorUnit,
-                                        ts: it.ts ? new Date(it.ts).toISOString() : new Date().toISOString(),
-                                    };
-                                });
+                                const itensRows = c.itens.map(it => _barItemToRow(c, it));
                                 try {
-                                    await _syncUpsertDiff(itensRows, 'bar_comanda_itens', 'barItens', { forcarFull: _isFullSync });
+                                    await _syncUpsertDiff(itensRows, 'bar_comanda_itens', 'barItens', { forcarFull: _isFullSync && (c.status || 'aberta') === 'aberta' });
                                 } catch (errIt) {
                                     throw new Error('Upsert itens: ' + (errIt.message || errIt));
                                 }
@@ -12803,17 +12849,23 @@ async function sincronizarEstado() {
                                 // pelo StackBar mobile via DB function e o estado local pode não tê-los ainda.
                                 const idsLocais = c.itens.map(it => it.id);
                                 if (idsLocais.length) {
-                                    await sb.from('bar_comanda_itens')
+                                    const { error: errDelIt } = await sb.from('bar_comanda_itens')
                                         .delete()
                                         .eq('comanda_id', c.id)
                                         .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`)
                                         .or('origem.is.null,origem.neq.stackbar');
+                                    if (errDelIt) _delItensFalhou = true;
                                 }
                             } else {
                                 // Estado local vazio — apaga itens locais, mas PRESERVA itens do StackBar
-                                await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id)
+                                const { error: errDelIt0 } = await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id)
                                     .or('origem.is.null,origem.neq.stackbar');
+                                if (errDelIt0) _delItensFalhou = true;
                             }
+                            // Lista de itens desta comanda confirmada no banco (usada pra pular
+                            // comanda fechada sem mudança nos próximos ciclos)
+                            // (se o DELETE falhou, não marca: a comanda é reprocessada no próximo ciclo, como antes)
+                            if (!_delItensFalhou) _barSnapIds.set(c.id, (c.itens || []).map(it => it.id).sort().join(','));
 
                             // ⚡ Recalcula total da comanda a partir do banco real
                             // (garante que itens do StackBar sejam contabilizados no total)
