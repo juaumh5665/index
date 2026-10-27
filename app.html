@@ -10918,6 +10918,33 @@ function _barItemToRow(c, it) {
     };
 }
 
+// ============================================================
+// CORTE POR FALTA DE MOVIMENTO (conferência de 5 min)
+// Torneio sem nenhum lançamento/alteração há 30 min recebe UMA última conferência
+// completa e depois sai dela até entrar qualquer dado novo. Qualquer alteração
+// continua sendo enviada na hora pelo modo diff — isso só corta a REGRAVAÇÃO
+// do que o banco já confirmou.
+// ============================================================
+const _SYNC_IDLE_MS = 30 * 60 * 1000;
+const _syncAtividadeTorneio = new Map();  // torneio_id → última alteração local enviada (ms)
+const _syncConferidoTorneio = new Map();  // torneio_id → última conferência completa OK (ms)
+function _syncUltimaAtividadeTorneio(t) {
+    let ult = _syncAtividadeTorneio.get(t.id) || 0;
+    const ver = (lista) => (lista || []).forEach(x => { const v = Number(x && x.ts) || 0; if (v > ult) ult = v; });
+    ver(t.entries); ver(t.eliminados); ver(t.jackpotCompras);
+    return ult;
+}
+function _syncTorneioPrecisaConferir(t) {
+    const conf = _syncConferidoTorneio.get(t.id);
+    if (!conf) return true;                                   // nunca conferido nesta sessão
+    const ult = _syncUltimaAtividadeTorneio(t);
+    if (ult > conf) return true;                              // mexeu desde a última conferência
+    return (Date.now() - ult) < _SYNC_IDLE_MS;                // ainda em movimento
+}
+function _syncMarcarAtividade(tid, res) {
+    if (res && !res.full && res.enviados > 0) _syncAtividadeTorneio.set(tid, Date.now());
+}
+
 // Torneio encerrado: não entra na conferência completa de 5 min (só no diff).
 // Já foi gravado e confirmado; qualquer alteração posterior continua indo no diff.
 function _syncTorneioEncerrado(t) {
@@ -12482,7 +12509,8 @@ async function sincronizarEstado() {
                 try {
                     // Conferência completa (5 min) só pros torneios NÃO encerrados. Encerrados
                     // seguem no modo diff: qualquer alteração neles continua sendo enviada.
-                    const _encIds = new Set(torneiosRows.filter(_syncTorneioEncerrado).map(t => t.id));
+                    // (e torneio parado há 30 min já conferido — ver _syncTorneioPrecisaConferir)
+                    const _encIds = new Set(torneiosRows.filter(t => _syncTorneioEncerrado(t) || !_syncTorneioPrecisaConferir(t)).map(t => t.id));
                     const payloadAtivos = payload.filter(p => !_encIds.has(p.id));
                     const payloadEnc = payload.filter(p => _encIds.has(p.id));
                     dataT = [];
@@ -12515,7 +12543,7 @@ async function sincronizarEstado() {
                     const _syncRetryIds = [];
                     for (const t of torneiosRows) {
                         // Conferência completa só em torneio não encerrado (ver _syncTorneioEncerrado)
-                        const _fullT = _isFullSync && !_syncTorneioEncerrado(t);
+                        const _fullT = _isFullSync && !_syncTorneioEncerrado(t) && _syncTorneioPrecisaConferir(t);
                         try {
                             // === ENTRIES ===
                             // Garante IDs estáveis (entries já têm via _genUuid, mas defensivo)
@@ -12546,7 +12574,7 @@ async function sincronizarEstado() {
                                 // FIX SYNC-TV: tenta batch completo; se falhar, faz fallback
                                 // individual pra isolar entries problemáticas (ex: jogador_id FK inválido)
                                 try {
-                                    await _syncUpsertDiff(entryRows, 'torneio_entries', 'entries', { forcarFull: _fullT });
+                                    _syncMarcarAtividade(t.id, await _syncUpsertDiff(entryRows, 'torneio_entries', 'entries', { forcarFull: _fullT }));
                                 } catch (errE) {
                                     console.warn('[SYNC] ⚠️ Batch entries falhou para torneio ' + t.id + ' (' + entryRows.length + ' entries): ' + errE.message);
                                     console.warn('[SYNC] Tentando upsert individual para isolar entry problemática...');
@@ -12604,7 +12632,7 @@ async function sincronizarEstado() {
                                     operador: e.operador || null,
                                 }));
                                 try {
-                                    await _syncUpsertDiff(elimRows, 'torneio_eliminados', 'eliminados', { forcarFull: _fullT });
+                                    _syncMarcarAtividade(t.id, await _syncUpsertDiff(elimRows, 'torneio_eliminados', 'eliminados', { forcarFull: _fullT }));
                                 } catch (errEl) {
                                     throw new Error('Upsert eliminados: ' + (errEl.message || errEl));
                                 }
@@ -12628,7 +12656,7 @@ async function sincronizarEstado() {
                                     ts: j.ts ? new Date(j.ts).toISOString() : new Date().toISOString(),
                                 }));
                                 try {
-                                    await _syncUpsertDiff(jackRows, 'torneio_jackpot_compras', 'jackpotCompras', { forcarFull: _fullT });
+                                    _syncMarcarAtividade(t.id, await _syncUpsertDiff(jackRows, 'torneio_jackpot_compras', 'jackpotCompras', { forcarFull: _fullT }));
                                 } catch (errJ) {
                                     throw new Error('Upsert jackpots: ' + (errJ.message || errJ));
                                 }
@@ -12653,10 +12681,10 @@ async function sincronizarEstado() {
                                     jogadores: m.jogadores || [],
                                 }));
                                 try {
-                                    await _syncUpsertDiff(mesaRows, 'torneio_mesas', 'mesas', {
+                                    _syncMarcarAtividade(t.id, await _syncUpsertDiff(mesaRows, 'torneio_mesas', 'mesas', {
                                         upsertOpts: { onConflict: 'torneio_id,numero' },
                                         forcarFull: _fullT,
-                                    });
+                                    }));
                                 } catch (errM) {
                                     throw new Error('Upsert mesas: ' + (errM.message || errM));
                                 }
@@ -12671,6 +12699,9 @@ async function sincronizarEstado() {
                             } else {
                                 await sb.from('torneio_mesas').delete().eq('torneio_id', t.id);
                             }
+                            // Conferência completa deste torneio concluída sem erro
+                            // (linhas não confirmadas pelo banco seguem sendo reenviadas pelo diff)
+                            if (_fullT) _syncConferidoTorneio.set(t.id, Date.now());
                         } catch (e) {
                             // ⚠️ Erro de sync NÃO apaga dados locais — re-marca o torneio
                             // como sujo pra retentar no próximo sync (debounce de 800ms)
@@ -15846,6 +15877,7 @@ async function _finalizarLoginComSucesso(authUser) {
             renderTorneiosList();
             renderDashboard();
             console.log('✅ Estado completo carregado');
+            try { setTimeout(_avisarTorneiosParados, 1500); } catch (_) {}
 
             // === ONE-TIME CLEANUP: fechar comandas abertas de jogadores já quitados (Spartan) ===
             _cleanupComandasQuitados();
@@ -37418,7 +37450,7 @@ function showConfirmModal(title, message, onConfirm, opts) {
                 flex:1;padding:.65rem;border-radius:.6rem;border:1px solid #555;
                 background:#2a2a2e;color:#ccc;font-size:.88rem;cursor:pointer;font-family:'Manrope',sans-serif;
                 transition:background .15s;
-            ">Cancelar</button>
+            ">${opts.cancelLabel || 'Cancelar'}</button>
             <button id="_cfm_ok" style="
                 flex:1;padding:.65rem;border-radius:.6rem;border:none;
                 background:${opts.confirmColor || '#dc2626'};color:#fff;font-size:.88rem;cursor:pointer;
@@ -37439,9 +37471,49 @@ function showConfirmModal(title, message, onConfirm, opts) {
         document.head.appendChild(st);
     }
     const close = () => { overlay.style.opacity='0'; setTimeout(() => overlay.remove(), 150); };
-    overlay.querySelector('#_cfm_cancel').onclick = close;
+    overlay.querySelector('#_cfm_cancel').onclick = () => { close(); if (typeof opts.onCancel === 'function') opts.onCancel(); };
     overlay.querySelector('#_cfm_ok').onclick = () => { close(); onConfirm(); };
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+
+// ============================================================
+// AVISO: torneio aberto (rodando/pausado) sem movimento há muito tempo
+// Só lembra o operador ao entrar no app — não encerra nada sozinho.
+// ============================================================
+const _AVISO_PARADO_MS = 6 * 60 * 60 * 1000;         // 6 horas sem lançamentos
+const _AVISO_PARADO_SONECA_MS = 12 * 60 * 60 * 1000; // "Lembrar depois" = 12 horas
+function _avisarTorneiosParados() {
+    try {
+        if (window._modoSuporte || !Array.isArray(torneios) || !torneios.length) return;
+        let soneca = {};
+        try { soneca = JSON.parse(localStorage.getItem('ps_aviso_torneio_parado') || '{}') || {}; } catch (_) { soneca = {}; }
+        const agora = Date.now();
+        const parados = [];
+        torneios.forEach((t, idx) => {
+            if (!t || (t.status !== 'running' && t.status !== 'paused')) return;
+            if (!t.iniciadoEm) return;
+            let ult = Number(new Date(t.iniciadoEm).getTime()) || 0;
+            [t.entries, t.eliminados, t.jackpotCompras].forEach(l => (l || []).forEach(x => { const v = Number(x && x.ts) || 0; if (v > ult) ult = v; }));
+            if (!ult || (agora - ult) < _AVISO_PARADO_MS) return;
+            if (soneca[t.id] && soneca[t.id] > agora) return;
+            parados.push({ t, idx, horas: Math.floor((agora - ult) / 3600000) });
+        });
+        if (!parados.length) return;
+        const fmtH = (h) => h >= 48 ? `${Math.floor(h / 24)} dias` : `${h} horas`;
+        const linhas = parados.map(p => `• ${escapeHtml(p.t.nome)} — ${p.t.status === 'paused' ? 'pausado' : 'rodando'}, sem lançamentos há ${fmtH(p.horas)}`).join('\n');
+        const msg = (parados.length === 1 ? 'Este torneio ainda está aberto:' : 'Estes torneios ainda estão abertos:') +
+            '\n' + linhas + '\n\nSe já terminou, abra e encerre o torneio.';
+        const adiar = () => {
+            parados.forEach(p => { soneca[p.t.id] = Date.now() + _AVISO_PARADO_SONECA_MS; });
+            try { localStorage.setItem('ps_aviso_torneio_parado', JSON.stringify(soneca)); } catch (_) {}
+        };
+        showConfirmModal('Torneio aberto sem movimento', msg, () => {
+            adiar();
+            try { if (typeof showPage === 'function') showPage('torneios'); } catch (_) {}
+            setTimeout(() => { try { abrirDetalhesTorneio(parados[0].idx); } catch (e) { console.warn('[AVISO-PARADO] abrir:', e); } }, 300);
+        }, { icon: '⏸️', iconColor: '#f59e0b', borderColor: '#f59e0b', confirmColor: '#7c3aed',
+             confirmLabel: parados.length === 1 ? 'Abrir torneio' : 'Abrir o primeiro', cancelLabel: 'Lembrar depois', onCancel: adiar });
+    } catch (e) { console.warn('[AVISO-PARADO]', e); }
 }
 
 function showPromptModal(title, message, defaultValue, onConfirm, opts) {
@@ -45098,6 +45170,7 @@ async function _executarTrocaSenhaObrigatoria() {
                 renderJogadores();
                 renderTorneiosList();
                 renderDashboard();
+                try { setTimeout(_avisarTorneiosParados, 1500); } catch (_) {}
             } catch (e) { console.warn('Carregar estado:', e); }
         })();
         showToast(`👋 Bem-vindo, ${currentUser.nome.split(' ')[0]}! · ${sbClube.nome}`);
@@ -55754,6 +55827,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
                     renderJogadores();
                     renderTorneiosList();
                     renderDashboard();
+                    try { setTimeout(_avisarTorneiosParados, 1500); } catch (_) {}
                 } catch (e) { console.warn('Carregar estado:', e); }
             })();
             console.log('✅ Sessão recuperada:', currentUser.nome, '| Clube:', sbClube && sbClube.nome);
