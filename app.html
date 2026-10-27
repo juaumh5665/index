@@ -55158,6 +55158,7 @@ function renderDashAlertas() {
         id: 'devedores', icone: 'fa-hand-holding-dollar', cor: '#06b6d4', bg: 'rgba(6,182,212,.06)', border: 'rgba(6,182,212,.2)',
         titulo: `${devedores.length} devedor${devedores.length !== 1 ? 'es' : ''}`,
         sub: 'Saldo devedor acima de R$ 500',
+        resumo: _resumoNomes(devedores),
         destaque: formatMoney(devedores.reduce((s, a) => s + a._valor, 0)),
         colNome: 'Jogador', colValor: 'Deve',
         linhas: devedores.map(a => ({ nome: a._nome, valor: formatMoney(a._valor) })),
@@ -55167,6 +55168,7 @@ function renderDashAlertas() {
         id: 'estoque', icone: 'fa-triangle-exclamation', cor: 'var(--gold)', bg: 'rgba(245,158,11,.08)', border: 'rgba(245,158,11,.25)',
         titulo: `${estoque.length} produto${estoque.length !== 1 ? 's' : ''} com estoque baixo`,
         sub: 'Abaixo do estoque mínimo',
+        resumo: _resumoNomes(estoque),
         destaque: '',
         colNome: 'Produto', colValor: 'Atual / mínimo',
         linhas: estoque.map(a => ({ nome: a._nome, valor: a._detalhe, pct: Math.max(0, Math.min(100, Math.round((a._ordem || 0) * 100))) })),
@@ -55179,21 +55181,23 @@ function renderDashAlertas() {
     const _MAX_LINHAS = 5;
     // Cartões lado a lado (2 colunas em tela larga, 1 no celular). Cada cartão mostra
     // os 5 primeiros; "Mostrar mais" expande a lista inteira dentro do próprio cartão.
-    const htmlGrupos = grupos.length ? `<div style="display:grid;grid-template-columns:${grupos.length > 1 ? 'repeat(auto-fit,minmax(min(100%,340px),1fr))' : 'minmax(0,640px)'};gap:.6rem;margin-bottom:.5rem;">${grupos.map(g => {
-        const aberto = !!_abertos[g.id];
+    const htmlGrupos = grupos.length ? `<div style="display:grid;grid-template-columns:${grupos.length > 1 ? 'repeat(auto-fit,minmax(min(100%,340px),1fr))' : 'minmax(0,640px)'};gap:.6rem;align-items:start;margin-bottom:.5rem;">${grupos.map(g => {
+        const expandido = !!_abertos[g.id];              // cartão aberto (fechado = 1 linha só)
+        const completo = !!_abertos[g.id + '_todos'];    // lista inteira x 5 primeiros
         // Se sobraria só 1 escondido, mostra todos (não vale um botão pra 1 linha)
         const resto = g.linhas.length > _MAX_LINHAS + 1 ? g.linhas.length - _MAX_LINHAS : 0;
-        const visiveis = (aberto || !resto) ? g.linhas : g.linhas.slice(0, _MAX_LINHAS);
-        return `<div style="background:${g.bg};border:1px solid ${g.border};border-radius:.6rem;padding:.8rem 1.1rem;min-width:0;display:flex;flex-direction:column;">
-            <div style="display:flex;align-items:center;gap:.7rem;">
+        const visiveis = (completo || !resto) ? g.linhas : g.linhas.slice(0, _MAX_LINHAS);
+        return `<div style="background:${g.bg};border:1px solid ${g.border};border-radius:.6rem;padding:.7rem 1.1rem;min-width:0;display:flex;flex-direction:column;">
+            <div onclick="_toggleDashAlertaGrupo('${g.id}')" style="display:flex;align-items:center;gap:.7rem;cursor:pointer;user-select:none;">
                 <i class="fa-solid ${g.icone}" style="color:${g.cor};font-size:1rem;"></i>
                 <div style="min-width:0;flex:1;">
                     <div style="font-size:.85rem;font-weight:700;">${g.titulo}</div>
-                    <div style="font-size:.68rem;color:#71717a;margin-top:.1rem;">${g.sub}</div>
+                    <div style="font-size:.68rem;color:#71717a;margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${expandido ? g.sub : g.resumo}</div>
                 </div>
                 ${g.destaque ? `<span style="font-size:.95rem;font-weight:800;color:${g.cor};white-space:nowrap;font-variant-numeric:tabular-nums;">${g.destaque}</span>` : ''}
+                <i class="fa-solid fa-chevron-down" style="color:#71717a;font-size:.75rem;transition:transform .15s;${expandido ? 'transform:rotate(180deg);' : ''}"></i>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:.62rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-top:.7rem;padding-bottom:.3rem;border-bottom:1px solid ${g.border};">
+            ${expandido ? `<div style="display:flex;justify-content:space-between;font-size:.62rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;margin-top:.7rem;padding-bottom:.3rem;border-bottom:1px solid ${g.border};">
                 <span>${g.colNome}</span><span>${g.colValor}</span>
             </div>
             ${visiveis.map(l => `<div style="display:flex;align-items:center;gap:.75rem;font-size:.78rem;padding:.38rem 0;border-bottom:1px solid rgba(255,255,255,.05);">
@@ -55202,9 +55206,9 @@ function renderDashAlertas() {
                 <span style="font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:4.5rem;text-align:right;">${l.valor}</span>
             </div>`).join('')}
             <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-top:auto;padding-top:.55rem;">
-                ${resto > 0 ? `<button onclick="_toggleDashAlertaGrupo('${g.id}')" class="btn-ghost" style="padding:.3rem .7rem;font-size:.72rem;">${aberto ? 'Mostrar menos' : `Mostrar mais ${resto}`}</button>` : '<span></span>'}
+                ${resto > 0 ? `<button onclick="_toggleDashAlertaGrupo('${g.id}_todos')" class="btn-ghost" style="padding:.3rem .7rem;font-size:.72rem;">${completo ? 'Mostrar menos' : `Mostrar mais ${resto}`}</button>` : '<span></span>'}
                 <button onclick="${g.verTodos}" class="btn-ghost" style="padding:.3rem .7rem;font-size:.72rem;">Ver todos</button>
-            </div>
+            </div>` : ''}
         </div>`;
     }).join('')}</div>` : '';
     el.innerHTML = soltos.map((a, i) => {
