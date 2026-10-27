@@ -28116,10 +28116,14 @@ function renderTabJogadores() {
         }
         // sem_acerto = não mostra nada (nem botão nem badge)
 
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.85;gap:.5rem;flex-wrap:wrap;">
-            <div style="flex:1;min-width:0;">
-                <span style="font-weight:700;font-size:.85rem;">${j ? j.nome : 'Desconhecido'}</span>
+        // Layout em 2 linhas: nome + posição em cima, botões embaixo (nome longo não encavala nos botões)
+        const _nomeElim = j ? j.nome : 'Desconhecido';
+        return `<div style="display:flex;flex-direction:column;gap:.45rem;padding:.6rem 1rem;background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;opacity:.85;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;min-width:0;">
+                <span title="${esc(_nomeElim)}" style="font-weight:700;font-size:.85rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_nomeElim}</span>
+                <span style="font-size:.75rem;color:#ef4444;font-weight:700;white-space:nowrap;flex-shrink:0;">${e.posicao}º lugar</span>
             </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;">
             ${btnAcerto}
             ${btnAddRetro}
             <button onclick="_desfazerEliminacao('${e.jogadorId}')" title="Desfazer eliminação — jogador volta a ficar ativo (sem alterar valores financeiros)" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:#fbbf24;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
@@ -28134,7 +28138,7 @@ function renderTabJogadores() {
             <button onclick="_imprimirExtratoBarJogador('${e.jogadorId}')" title="Extrato de consumo do bar deste jogador" style="background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);color:#fb923c;padding:.25rem .5rem;border-radius:.35rem;cursor:pointer;font-family:inherit;font-size:.65rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;gap:.25rem;">
                 <i class="fa-solid fa-wine-glass"></i> Extrato Bar
             </button>
-            <span style="font-size:.75rem;color:#ef4444;font-weight:700;white-space:nowrap;">${e.posicao}º lugar</span>
+            </div>
         </div>`;
     }).join('') || `<div style="color:#3f3f46;font-size:.8rem;padding:1rem;">${filtro ? 'Nenhum eliminado encontrado' : 'Nenhum eliminado ainda'}</div>`;
 
