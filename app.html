@@ -3540,6 +3540,10 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                         <div id="pd-torn-andamento" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
+                    <div id="pd-torn-lista-wrap" style="display:none;margin-top:.85rem;padding-top:.85rem;border-top:1px solid #27272a;">
+                        <div style="font-size:.6rem;color:#c4b5fd;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Resultado por torneio</div>
+                        <div id="pd-torn-lista" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
                 </div>
 
                 <!-- BAR -->
@@ -44742,6 +44746,74 @@ function renderPainelDono() {
     document.getElementById('pd-torn-staff').textContent = _pdFmtCompact(tornStaff);
     const taxaEl = document.getElementById('pd-torn-taxa');
     if (taxaEl) taxaEl.textContent = tornTaxa > 0 ? `+ ${_pdFmtCompact(tornTaxa)} taxa adm` : '';
+
+    // ─── RESULTADO POR TORNEIO (toque abre o detalhe) ───
+    // Resultado do clube = rake + staff + taxa adm (mesmas funções do app).
+    // Premiação paga/pendente = transações 'premiacao' registradas no sistema.
+    const tornListaWrap = document.getElementById('pd-torn-lista-wrap');
+    const tornListaEl = document.getElementById('pd-torn-lista');
+    if (tornListaWrap && tornListaEl) {
+        const linhasT = [];
+        torneiosNoPeriodo.forEach(t => {
+            try {
+                const ents = t.entries || [];
+                if (!ents.length) return; // torneio sem nenhuma entrada (rascunho/teste vazio)
+                const bruto = ents.reduce((s, e) => s + (Number(e.valor) || 0), 0);
+                const rake = (typeof getRake === 'function') ? getRake(t) : 0;
+                const staff = (typeof getStaff === 'function') ? getStaff(t) : 0;
+                const taxa = ents.reduce((s, e) => s + (Number(e.taxaAdm) || 0), 0);
+                const prize = (typeof getPrize === 'function') ? getPrize(t) : 0;
+                const pp = (t.premiacaoProjetada && Array.isArray(t.premiacaoProjetada.valores)) ? t.premiacaoProjetada.valores : [];
+                const premPrevista = pp.reduce((s, v) => s + (Number(v) || 0), 0);
+                let premPaga = 0, premPend = 0;
+                F.transacoes.forEach(tx => {
+                    if (!tx || tx.tipo !== 'premiacao' || String(tx.refId) !== String(t.id)) return;
+                    if (tx.metodo === 'premio_pendente') premPend += Number(tx.valor) || 0;
+                    else premPaga += Number(tx.valor) || 0;
+                });
+                const jogadoresUnicos = new Set(ents.map(e => e.jogadorId)).size;
+                linhasT.push({ t, data: _pdDataTorneio(t), bruto, rake, staff, taxa, prize, premPrevista, premPaga, premPend,
+                    resultado: rake + staff + taxa, entradas: ents.length, jogadores: jogadoresUnicos });
+            } catch (_) { /* ignora torneio mal formado */ }
+        });
+        linhasT.sort((a, b) => b.resultado - a.resultado);
+        if (linhasT.length) {
+            tornListaWrap.style.display = '';
+            const aberto = window._pdTornAberto || null;
+            const st = (t) => { const s = (t.status || '').toLowerCase(); return (s === 'running' || s === 'paused' || s === 'break') ? ' · <span style="color:#a855f7;">em andamento</span>' : ''; };
+            const lin = (rot, val, cor) => `<div style="display:flex;justify-content:space-between;font-size:.72rem;padding:.22rem 0;border-bottom:1px solid rgba(255,255,255,.04);"><span style="color:#a1a1aa;">${rot}</span><span style="font-family:var(--font-mono);font-weight:700;color:${cor || '#e4e4e7'};">${val}</span></div>`;
+            tornListaEl.innerHTML = linhasT.map(L => {
+                const t = L.t, ab = aberto === t.id;
+                const dt = L.data ? new Date(L.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—';
+                return `
+                <div style="background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-radius:.55rem;">
+                    <div onclick="window._pdTornAberto=(window._pdTornAberto==='${t.id}'?null:'${t.id}');renderPainelDono()" style="padding:.65rem .7rem;display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;cursor:pointer;">
+                        <div style="min-width:0;">
+                            <div style="font-weight:800;color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.nome || 'Torneio')}</div>
+                            <div style="font-size:.62rem;color:#71717a;margin-top:.12rem;">${dt} · ${L.entradas} entradas · ${L.jogadores} jogadores${st(t)}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-family:var(--font-mono);color:#fbbf24;font-weight:800;font-size:.88rem;">${_pdFmtCompact(L.resultado)}</div>
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;">Resultado ${ab ? '▲' : '▼'}</div>
+                        </div>
+                    </div>
+                    ${ab ? `<div style="padding:0 .7rem .65rem;">
+                        ${lin('Total arrecadado (bruto)', formatMoney(L.bruto), '#c4b5fd')}
+                        ${lin('Rake', formatMoney(L.rake), '#fbbf24')}
+                        ${lin('Staff', formatMoney(L.staff), '#f9a8d4')}
+                        ${L.taxa > 0 ? lin('Taxa administrativa', formatMoney(L.taxa), '#fdba74') : ''}
+                        ${lin('Prize pool', formatMoney(L.prize), '#86efac')}
+                        ${L.premPrevista > 0 ? lin('Premiação prevista', formatMoney(L.premPrevista)) : ''}
+                        ${lin('Premiação paga (registrada)', formatMoney(L.premPaga), L.premPaga > 0 ? '#86efac' : '#71717a')}
+                        ${L.premPend > 0 ? lin('Premiação pendente', formatMoney(L.premPend), '#fca5a5') : ''}
+                        ${L.premPrevista > 0 && L.premPaga + L.premPend < L.premPrevista - 0.009 ? `<div style="font-size:.6rem;color:#71717a;margin-top:.35rem;">Prêmios pagos fora do caixa do sistema não aparecem como registrados.</div>` : ''}
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+        } else {
+            tornListaWrap.style.display = 'none';
+        }
+    }
 
     const tornStatusEl = document.getElementById('pd-torn-status');
     if (torneiosAtivos.length > 0) {
