@@ -42396,7 +42396,7 @@ function convRenderListaCampanha() {
         <div class="conv-pl-row ${cls}">
             <div class="conv-pl-avatar" ${isVip ? 'style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a23;"' : ''}>${iniciais}</div>
             <div style="min-width:0;">
-                <div style="font-size:.85rem;font-weight:700;color:#fff;">${esc(j.nome || '?')}${(typeof convGetFadigaBadges === 'function') ? convGetFadigaBadges(j.id) : ''}</div>
+                <div style="font-size:.85rem;font-weight:700;color:#fff;">${esc(j.nome || '?')}${_convSeloUltimoEnvio(j.id)}${(typeof convGetFadigaBadges === 'function') ? convGetFadigaBadges(j.id) : ''}</div>
                 <div style="font-size:.65rem;color:#71717a;margin-top:.1rem;">
                     ${isVip ? '<span style="background:rgba(245,158,11,.15);color:#fbbf24;padding:.05rem .35rem;border-radius:.25rem;font-weight:700;margin-right:.35rem;">VIP</span>' : ''}
                     ${torneiosCnt} torneio${torneiosCnt !== 1 ? 's' : ''} · ${p.valido ? (j.whatsapp || '') : 'sem WhatsApp'}${(typeof convGetScoreEngajamento === 'function' && convGetScoreEngajamento(j.id) !== null) ? ' · <span style="color:#a855f7;font-weight:700;">Score ' + convGetScoreEngajamento(j.id) + '</span>' : ''}
@@ -42547,6 +42547,7 @@ async function _convEnviarUm(idx) {
                 showToast('⚠️ Mensagem enviada, mas não foi possível salvar no histórico');
             }
         } else console.log('[Convites] ✅ registrado envio para', p.jogador.nome);
+        if (envioOk && p.jogador && p.jogador.id) _convUltimoEnvio.set(p.jogador.id, Date.now());
     } catch (e) { console.error('[Convites] erro registrar envio:', e); }
 
     convRenderListaCampanha();
@@ -43164,6 +43165,53 @@ let _convEnviarSelecionados = new Set();
 let _convEnviarUserInteracted = false; // evita auto-selecionar tudo quando user clica "Nenhum"
 
 // Renderizar lista de jogadores com checkboxes
+// =====================================================================
+// SELO "já enviado" — último convite que cada jogador recebeu (histórico)
+// Só leitura do convite_envios (últimos 30 dias). Atualiza na hora após cada envio.
+// =====================================================================
+let _convUltimoEnvio = new Map();   // jogador_id → ts (ms) do último envio
+let _convUltimoEnvioCarregadoEm = 0, _convUltimoEnvioCarregando = false;
+async function _convCarregarUltimosEnvios(forcar) {
+    if (!sb || !sbClube || _convUltimoEnvioCarregando) return;
+    if (!forcar && Date.now() - _convUltimoEnvioCarregadoEm < 60000) return;
+    _convUltimoEnvioCarregando = true;
+    try {
+        const since = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data, error } = await sb.from('convite_envios')
+            .select('jogador_id, status, ts')
+            .eq('clube_id', sbClube.id)
+            .gte('ts', since)
+            .order('ts', { ascending: false })
+            .limit(5000);
+        if (error) throw error;
+        const m = new Map();
+        (data || []).forEach(e => {
+            if (e.status === 'erro' || e.status === 'numero_invalido') return;
+            const v = new Date(e.ts).getTime();
+            if (!m.has(e.jogador_id) || v > m.get(e.jogador_id)) m.set(e.jogador_id, v);
+        });
+        // mantém envios feitos nesta sessão que ainda não voltaram na consulta
+        _convUltimoEnvio.forEach((v, k) => { if (!m.has(k) || v > m.get(k)) m.set(k, v); });
+        _convUltimoEnvio = m;
+        _convUltimoEnvioCarregadoEm = Date.now();
+        try { convEnviarRenderJogadores(); } catch (_) {}
+        try { if (_convCampanha && _convCampanha.listaJogadores && _convCampanha.listaJogadores.length) convRenderListaCampanha(); } catch (_) {}
+    } catch (e) {
+        console.warn('[Convites] erro carregar últimos envios:', e);
+    } finally { _convUltimoEnvioCarregando = false; }
+}
+function _convSeloUltimoEnvio(jogadorId) {
+    const ts = _convUltimoEnvio.get(jogadorId);
+    if (!ts) return '';
+    const d = new Date(ts), hoje = new Date();
+    const dia0 = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const dias = Math.round((dia0(hoje) - dia0(d)) / 86400000);
+    const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const txt = dias <= 0 ? `enviado hoje ${hora}` : dias === 1 ? `enviado ontem ${hora}` : `enviado há ${dias} dias`;
+    const tit = `Último convite: ${d.toLocaleDateString('pt-BR')} às ${hora}`;
+    return `<span title="${tit}" style="background:rgba(168,85,247,.14);color:#c084fc;padding:.08rem .38rem;border-radius:.25rem;font-size:.6rem;font-weight:800;margin-left:.35rem;white-space:nowrap;">📤 ${txt}</span>`;
+}
+
 function convEnviarRenderJogadores() {
     const container = document.getElementById('conv-enviar-jogadores');
     if (!container) return;
@@ -43196,6 +43244,7 @@ function convEnviarRenderJogadores() {
         });
     }
 
+    _convCarregarUltimosEnvios(); // selo "enviado hoje/ontem/há N dias" (cache de 60s)
     container.innerHTML = lista.map(j => {
         const val = _normalizarWhatsappE164(j.whatsapp);
         const checked = _convEnviarSelecionados.has(j.id);
@@ -43209,7 +43258,7 @@ function convEnviarRenderJogadores() {
         return `<label style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;border-bottom:1px solid #1a1a1f;cursor:${disabled ? 'not-allowed' : 'pointer'};opacity:${disabled ? '.4' : '1'};transition:background .15s;${checked && !disabled ? 'background:rgba(34,197,94,.04);' : ''}" onmouseenter="this.style.background='rgba(255,255,255,.02)'" onmouseleave="this.style.background='${checked && !disabled ? 'rgba(34,197,94,.04)' : ''}'">
             <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="convEnviarToggleJogador('${j.id}', this.checked)" style="accent-color:#22c55e;width:14px;height:14px;cursor:inherit;">
             ${waIcon}
-            <span style="font-size:.72rem;font-weight:600;color:${disabled ? '#52525b' : '#e4e4e7'};">${nome}${nomeCompleto}</span>
+            <span style="font-size:.72rem;font-weight:600;color:${disabled ? '#52525b' : '#e4e4e7'};">${nome}${nomeCompleto}${_convSeloUltimoEnvio(j.id)}</span>
         </label>`;
     }).join('');
 
