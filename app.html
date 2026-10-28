@@ -42656,13 +42656,38 @@ function _convIncrementarEnviosHoje() {
 }
 
 // Countdown visual durante pausa longa
+// Espera que NÃO é desacelerada quando a aba fica em segundo plano.
+// O Chrome limita os timers de abas ocultas a ~1 por minuto: a pausa de 2-3 min
+// virava ~2 horas e o envio parecia travado depois das 10 primeiras mensagens.
+// Timer de Web Worker não sofre esse limite; se o worker não puder ser criado,
+// cai no setTimeout normal (comportamento antigo).
+let _convTimerWorker = null, _convTimerSeq = 0;
+const _convTimerPend = new Map();
+function _convDormir(ms) {
+    try {
+        if (!_convTimerWorker) {
+            const src = 'onmessage=function(e){var d=e.data;setTimeout(function(){postMessage(d.id)},d.ms)}';
+            _convTimerWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })));
+            _convTimerWorker.onmessage = (e) => { const f = _convTimerPend.get(e.data); if (f) { _convTimerPend.delete(e.data); f(); } };
+        }
+        return new Promise(r => { const id = ++_convTimerSeq; _convTimerPend.set(id, r); _convTimerWorker.postMessage({ id, ms }); });
+    } catch (e) {
+        _convTimerWorker = null;
+        return new Promise(r => setTimeout(r, ms));
+    }
+}
+
 async function _convPausaLonga(segundos, progressTextoEl) {
-    for (let s = segundos; s > 0; s--) {
-        if (!_convCampanha.enviando) break;
+    // Mesma duração de antes, medida pelo relógio real (não pelo nº de "tiques")
+    const fim = Date.now() + segundos * 1000;
+    while (_convCampanha.enviando) {
+        const restanteMs = fim - Date.now();
+        if (restanteMs <= 0) break;
+        const s = Math.ceil(restanteMs / 1000);
         const min = Math.floor(s / 60);
         const sec = s % 60;
         if (progressTextoEl) progressTextoEl.textContent = `⏸ Pausa de segurança: ${min}:${String(sec).padStart(2,'0')} restantes`;
-        await new Promise(r => setTimeout(r, 1000));
+        await _convDormir(Math.min(1000, restanteMs));
     }
 }
 
@@ -42721,7 +42746,7 @@ async function convIniciarEnvioSequencial() {
         p._enviando = false;
         convRenderListaCampanha();
 
-        await new Promise(r => setTimeout(r, 100));
+        await _convDormir(100);
 
         // Troca pra "enviando"
         p._verificando = false;
@@ -42776,9 +42801,9 @@ async function convIniciarEnvioSequencial() {
             );
             const jitter = (Math.random() - 0.5) * 2 * _CONV_ANTI_BAN.JITTER; // ±5s
             const delay = Math.max(5000, delayBase + jitter);
-            await new Promise(r => setTimeout(r, delay));
+            await _convDormir(delay);
         } else {
-            await new Promise(r => setTimeout(r, 2000));
+            await _convDormir(2000);
         }
     }
 
