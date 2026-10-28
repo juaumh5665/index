@@ -14,7 +14,7 @@
 //             NÃO cacheia POST/PUT/DELETE (não corrompe escritas)
 // =====================================================================
 
-const CACHE_NAME = 'stackos-app-v1';
+const CACHE_NAME = 'stackos-app-v2';
 const SHELL = [
     '/app.html',
     '/app-manifest.json',
@@ -77,7 +77,25 @@ self.addEventListener('fetch', (event) => {
         return; // não intercepta — deixa o navegador (ou outro SW) cuidar
     }
 
-    // 4. App shell: cache-first com background update
+    // 4a. A PÁGINA (app.html) e o manifest: REDE PRIMEIRO — o app instalado sempre
+    //     abre a versão mais nova; a cópia guardada só é usada sem internet.
+    //     (antes: cache primeiro → o celular mostrava a versão antiga até abrir 2x)
+    if (!url.pathname.startsWith('/icons/')) {
+        event.respondWith(
+            fetch(event.request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                    const respClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, respClone));
+                }
+                return networkResponse;
+            }).catch(() => caches.match(event.request).then((c) => c || new Response('Offline', {
+                status: 503, statusText: 'Offline e sem cache desse recurso'
+            })))
+        );
+        return;
+    }
+
+    // 4b. Ícones: cache-first com background update
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
             const fetchPromise = fetch(event.request).then((networkResponse) => {

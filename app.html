@@ -3585,6 +3585,28 @@ document.addEventListener('DOMContentLoaded', function(){
                     <div id="pd-cred-lista" style="display:flex;flex-direction:column;gap:.35rem;"></div>
                 </div>
 
+                <!-- CRÉDITO DOS JOGADORES — saldo positivo (o clube deve ao jogador) -->
+                <div style="background:linear-gradient(135deg,#0a2e1f 0%,#0f1f18 100%);border:1px solid rgba(34,197,94,.25);border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
+                        <div style="width:36px;height:36px;border-radius:.55rem;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;font-size:1rem;">💳</div>
+                        <div>
+                            <div style="font-size:.95rem;font-weight:900;color:#fff;">Crédito dos Jogadores</div>
+                            <div style="font-size:.65rem;color:#71717a;">saldo a favor dos jogadores (a pagar)</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.55rem;">
+                        <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Total em Crédito</div>
+                            <div id="pd-credpos-total" style="font-size:1.15rem;font-weight:900;color:#86efac;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                        </div>
+                        <div style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:.6rem;padding:.7rem;">
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Jogadores com Crédito</div>
+                            <div id="pd-credpos-qtd" style="font-size:1.15rem;font-weight:900;color:#22c55e;font-family:var(--font-mono);margin-top:.2rem;">0</div>
+                        </div>
+                    </div>
+                    <div id="pd-credpos-lista" style="display:flex;flex-direction:column;gap:.35rem;"></div>
+                </div>
+
                 <!-- CONTAS A PAGAR -->
                 <div style="background:linear-gradient(135deg,#1a1a23 0%,#0f0f12 100%);border:1px solid #27272a;border-radius:1rem;padding:1.25rem;margin-bottom:.85rem;">
                     <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;">
@@ -44560,7 +44582,18 @@ async function _pdCarregarDadosFrescos(forcar) {
         const comandasUsar = preferirLocal(barComandas, 'barComandas') || _pdMesclar(comandasF, (barComandas || []).filter(c => c.status === 'aberta' || _pdTs(c.fechadoEm) >= Date.now() - 35 * 86400000));
         const txUsar = _pdMesclar(txF, transacoes || []);
 
-        _pdDados = { torneios: torneiosUsar, cashMesas: cashUsar, barComandas: comandasUsar, transacoes: txUsar, ts: Date.now() };
+        // ── Contas a pagar (o app só carrega quando a página Contas é aberta)
+        let contasF = null;
+        try {
+            const { data: cpRows, error: cpErr } = await sb.from('contas_pagar').select('*').eq('clube_id', cid);
+            if (!cpErr && Array.isArray(cpRows)) contasF = cpRows.map(r => ({
+                id: r.id, nome: r.nome, valor: parseFloat(r.valor) || 0, venc: r.vencimento,
+                status: r.status, pagoEm: r.pago_em || null,
+            }));
+        } catch (_) { contasF = null; }
+
+        _pdDados = { torneios: torneiosUsar, cashMesas: cashUsar, barComandas: comandasUsar, transacoes: txUsar,
+                     contasPagar: contasF ? _pdMesclar(contasF, (typeof contasPagar !== 'undefined' && contasPagar) || []) : null, ts: Date.now() };
         return true;
     } catch (e) {
         console.warn('[PAINEL-DONO] não deu pra buscar dados frescos — usando os da memória:', e);
@@ -44577,6 +44610,7 @@ function _pdFonte() {
         cashMesas:   fresco ? _pdDados.cashMesas   : (cashMesas || []),
         barComandas: fresco ? _pdDados.barComandas : ((typeof barComandas !== 'undefined' && barComandas) || []),
         transacoes:  fresco ? _pdDados.transacoes  : (transacoes || []),
+        contasPagar: (fresco && _pdDados.contasPagar) ? _pdDados.contasPagar : ((typeof contasPagar !== 'undefined' && contasPagar) || []),
         fresco,
     };
 }
@@ -44793,26 +44827,55 @@ function renderPainelDono() {
     const credListaEl = document.getElementById('pd-cred-lista');
     credLista.sort((a, b) => b.valor - a.valor);
     if (credLista.length > 0) {
+        const verTodosDev = !!window._pdVerTodosDevedores;
         credListaEl.innerHTML = `
-            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">Maiores valores a receber</div>
-            ${credLista.slice(0, 5).map(d => `
+            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">${verTodosDev ? 'Todos os valores a receber' : 'Maiores valores a receber'}</div>
+            ${(verTodosDev ? credLista : credLista.slice(0, 5)).map(d => `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);padding:.5rem .7rem;border-radius:.45rem;font-size:.78rem;">
                     <span style="color:#fafafa;font-weight:700;">${esc(d.nome)}${d.comanda > 0 ? ` <span style="font-size:.6rem;color:#fb923c;font-weight:700;">${d.comanda >= d.valor - 0.009 ? 'comanda aberta' : '+ comanda aberta'}</span>` : ''}</span>
                     <span style="font-family:var(--font-mono);color:#fca5a5;font-weight:800;">${formatMoney(d.valor)}</span>
                 </div>
             `).join('')}
+            ${credLista.length > 5 ? `<button onclick="window._pdVerTodosDevedores=!window._pdVerTodosDevedores;renderPainelDono()" style="margin-top:.3rem;background:transparent;border:1px solid rgba(239,68,68,.25);color:#fca5a5;border-radius:.45rem;padding:.45rem;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;">${verTodosDev ? 'Mostrar só os 5 maiores' : `Ver todos (${credLista.length})`}</button>` : ''}
         `;
     } else {
         credListaEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">✅ Nenhum valor a receber</div>';
     }
 
+    // ─── CRÉDITO DOS JOGADORES (saldo positivo = clube deve ao jogador) ───
+    const credPos = [];
+    saldoPorJog.forEach((s, jid) => { if (s > 0.009) credPos.push({ nome: nomeJog(jid) || '(sem nome)', valor: s }); });
+    credPos.sort((a, b) => b.valor - a.valor);
+    const credPosTotal = credPos.reduce((s, d) => s + d.valor, 0);
+    const cpTotEl = document.getElementById('pd-credpos-total');
+    if (cpTotEl) {
+        cpTotEl.textContent = _pdFmtCompact(credPosTotal);
+        document.getElementById('pd-credpos-qtd').textContent = credPos.length;
+        const el = document.getElementById('pd-credpos-lista');
+        const verTodosCred = !!window._pdVerTodosCredito;
+        if (credPos.length > 0) {
+            el.innerHTML = `
+                <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">${verTodosCred ? 'Todos com crédito' : 'Maiores créditos'}</div>
+                ${(verTodosCred ? credPos : credPos.slice(0, 5)).map(d => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);padding:.5rem .7rem;border-radius:.45rem;font-size:.78rem;">
+                        <span style="color:#fafafa;font-weight:700;">${esc(d.nome)}</span>
+                        <span style="font-family:var(--font-mono);color:#86efac;font-weight:800;">${formatMoney(d.valor)}</span>
+                    </div>
+                `).join('')}
+                ${credPos.length > 5 ? `<button onclick="window._pdVerTodosCredito=!window._pdVerTodosCredito;renderPainelDono()" style="margin-top:.3rem;background:transparent;border:1px solid rgba(34,197,94,.25);color:#86efac;border-radius:.45rem;padding:.45rem;font-size:.7rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif;">${verTodosCred ? 'Mostrar só os 5 maiores' : `Ver todos (${credPos.length})`}</button>` : ''}
+            `;
+        } else {
+            el.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">Nenhum jogador com crédito</div>';
+        }
+    }
+
     // ─── CONTAS A PAGAR ─────────────────────────────────
     // CAMPOS REAIS: c.venc (string ISO ou null), c.status ('pago' | 'pendente'), c.pagoEm
     let cpVencido = 0, cpEmBreve = 0;
-    if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
+    {
         const agora = Date.now();
         const em7dias = agora + (7 * 24 * 3600000);
-        contasPagar.forEach(c => {
+        F.contasPagar.forEach(c => {
             if (c.status === 'pago') return;
             const venc = c.venc ? new Date(c.venc).getTime() : 0;
             const valor = Number(c.valor) || 0;
@@ -44829,8 +44892,8 @@ function renderPainelDono() {
     // Saídas: contas a pagar PAGAS no período + quebras de caixa do cash.
     const entradas = tornRake + tornStaff + tornTaxa + cashRakeTotal + barPago;
     let saidas = 0;
-    if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
-        contasPagar.forEach(c => {
+    {
+        F.contasPagar.forEach(c => {
             if (c.status !== 'pago') return;
             const ts = c.pagoEm ? new Date(c.pagoEm).getTime() : 0;
             if (noPeriodo(ts)) saidas += Number(c.valor) || 0;
