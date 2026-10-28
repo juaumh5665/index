@@ -3461,6 +3461,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div id="pd-saldo-liquido" style="font-size:.85rem;color:#fbbf24;font-weight:800;font-family:var(--font-mono);margin-top:.1rem;">R$ 0</div>
                             </div>
                         </div>
+                        <div id="pd-saldo-composicao" style="font-size:.6rem;color:#86efac;opacity:.85;margin-top:.55rem;line-height:1.4;"></div>
                     </div>
                 </div>
 
@@ -3529,6 +3530,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div style="background:rgba(244,114,182,.06);border:1px solid rgba(244,114,182,.15);border-radius:.6rem;padding:.7rem;">
                             <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;">Staff</div>
                             <div id="pd-torn-staff" style="font-size:1.15rem;font-weight:900;color:#f9a8d4;font-family:var(--font-mono);margin-top:.2rem;">R$ 0</div>
+                            <div id="pd-torn-taxa" style="font-size:.55rem;color:#a1a1aa;margin-top:.15rem;"></div>
                         </div>
                     </div>
                     <div id="pd-torn-andamento-wrap" style="display:none;margin-top:.85rem;padding-top:.85rem;border-top:1px solid #27272a;">
@@ -26553,7 +26555,7 @@ function showPage(page) {
         }
     }
     if (page === 'dashboard') renderDashboard();
-    if (page === 'painel-dono') { renderPainelDono(); pdIniciarAutoRefresh(); setTimeout(_pdAtualizarBotaoInstalar, 200); }
+    if (page === 'painel-dono') { renderPainelDono(); _pdCarregarDadosFrescos(false).then(ok => { if (ok) renderPainelDono(); }).catch(() => {}); pdIniciarAutoRefresh(); setTimeout(_pdAtualizarBotaoInstalar, 200); }
     if (page === 'convites') { renderConvitesPage(); _waServerWarm.start(); }
     if (page !== 'painel-dono') pdPararAutoRefresh();
     if (page === 'bar')       renderBarProdutos();
@@ -41080,11 +41082,13 @@ function pdSetPeriodo(per) {
     renderPainelDono();
 }
 
-function pdRefresh() {
+async function pdRefresh() {
     const icon = document.getElementById('pd-icon-refresh');
     if (icon) icon.classList.add('spinning');
-    renderPainelDono();
-    setTimeout(() => { if (icon) icon.classList.remove('spinning'); }, 800);
+    renderPainelDono();                      // mostra já o que tem
+    try { await _pdCarregarDadosFrescos(true); } catch (_) {}
+    renderPainelDono();                      // e atualiza com o banco
+    setTimeout(() => { if (icon) icon.classList.remove('spinning'); }, 400);
 }
 
 // Instalar app (PWA)
@@ -41114,9 +41118,11 @@ window.addEventListener('pwa-instalavel', () => {
 
 function pdIniciarAutoRefresh() {
     pdPararAutoRefresh();
-    _pdAutoRefreshTimer = setInterval(() => {
-        // Só auto-refresh se a aba estiver visível
-        if (!document.hidden) renderPainelDono();
+    _pdAutoRefreshTimer = setInterval(async () => {
+        // Só auto-refresh se a aba estiver visível. Busca no banco no máx. 1x/min.
+        if (document.hidden) return;
+        try { await _pdCarregarDadosFrescos(false); } catch (_) {}
+        renderPainelDono();
     }, 30000); // 30s
 }
 
@@ -44455,44 +44461,187 @@ function convWaPopularForm() {
     convWaUpdateStatusBadge(!!(conviteConfig && conviteConfig.wa_connected));
 }
 
+// =====================================================================
+// PAINEL DO DONO — dados frescos do banco (SOMENTE LEITURA)
+// O painel não altera nada do app: busca uma cópia dos dados no banco,
+// guarda em _pdDados e calcula em cima dela com as MESMAS funções do app
+// de rake, staff e prize. Se a busca falhar, usa
+// o que já está na memória do app (comportamento antigo).
+// =====================================================================
+let _pdDados = null;            // { torneios, cashMesas, barComandas, transacoes, ts }
+let _pdCarregando = false;
+const _PD_FRESCO_MS = 55 * 1000;
+
+function _pdTs(v) {
+    if (v == null || v === '') return 0;
+    const n = typeof v === 'number' ? v : new Date(v).getTime();
+    return isNaN(n) ? 0 : n;
+}
+
+// Junta lista do banco com a da memória: o banco manda, mas o que só existe na
+// memória (lançado e ainda não sincronizado) também aparece.
+function _pdMesclar(doBanco, local) {
+    const out = Array.isArray(doBanco) ? doBanco.slice() : [];
+    const ids = new Set(out.map(x => x && x.id));
+    (local || []).forEach(x => { if (x && !ids.has(x.id)) out.push(x); });
+    return out;
+}
+
+async function _pdCarregarDadosFrescos(forcar) {
+    if (typeof sb === 'undefined' || !sb || !sbClube || _pdCarregando) return false;
+    if (!forcar && _pdDados && (Date.now() - _pdDados.ts) < _PD_FRESCO_MS) return true;
+    _pdCarregando = true;
+    try {
+        const cid = sbClube.id;
+        // Janela: 35 dias (cobre "Mês" e "30d") + tudo que ainda está aberto
+        const desde = new Date(Date.now() - 35 * 86400000).toISOString();
+        const paginas = async (q) => {
+            let all = [], from = 0;
+            while (true) {
+                const { data, error } = await q().range(from, from + 999);
+                if (error) throw error;
+                if (!data || !data.length) break;
+                all = all.concat(data);
+                if (data.length < 1000) break;
+                from += 1000;
+            }
+            return all;
+        };
+
+        // ── Torneios (recentes ou não encerrados) + filhas
+        const tRows = await paginas(() => sb.from('torneios').select('*').eq('clube_id', cid)
+            .or(`criado_em.gte.${desde},iniciado_em.gte.${desde},status.in.(running,paused,break,waiting)`));
+        let torneiosF = [];
+        if (tRows.length) {
+            const ids = tRows.map(r => r.id);
+            const [eD, elD, jD, mD] = await Promise.all([
+                paginas(() => sb.from('torneio_entries').select('*').in('torneio_id', ids).eq('clube_id', cid)),
+                paginas(() => sb.from('torneio_eliminados').select('*').in('torneio_id', ids).eq('clube_id', cid)),
+                paginas(() => sb.from('torneio_jackpot_compras').select('*').in('torneio_id', ids).eq('clube_id', cid)),
+                paginas(() => sb.from('torneio_mesas').select('*').in('torneio_id', ids).eq('clube_id', cid)),
+            ]);
+            torneiosF = tRows.map(r => _torneioFromDb(r,
+                _semRemocoesPendentes('torneioEntries', eD),
+                _semRemocoesPendentes('torneioEliminados', elD),
+                _semRemocoesPendentes('torneioJackpot', jD), mD));
+        }
+
+        // ── Cash (abertas ou fechadas na janela) + sessões
+        const cmRows = await paginas(() => sb.from('cash_mesas').select('*').eq('clube_id', cid)
+            .or(`status.eq.aberta,fechamento_ts.gte.${desde},abertura_ts.gte.${desde}`));
+        let cashF = [];
+        if (cmRows.length) {
+            const sess = await paginas(() => sb.from('cash_sessoes').select('*').eq('clube_id', cid).in('mesa_id', cmRows.map(r => r.id)));
+            const porMesa = new Map();
+            sess.forEach(s => { const a = porMesa.get(s.mesa_id) || []; a.push(_cashSessaoFromDb(s)); porMesa.set(s.mesa_id, a); });
+            cashF = cmRows.map(r => { const m = _cashFromDb(r); m.jogadores = porMesa.get(r.id) || []; return m; });
+        }
+
+        // ── Comandas (abertas ou fechadas na janela) — o painel usa só o total
+        const cRows = await paginas(() => sb.from('bar_comandas').select('*').eq('clube_id', cid)
+            .or(`status.eq.aberta,fechado_em.gte.${desde}`));
+        const comandasF = cRows.map(_comandaFromDb);
+
+        // ── Transações novas (o saldo dos jogadores precisa do histórico todo:
+        //    usa a memória do app + o que entrou no banco desde a última que ela tem)
+        const tsLocal = (transacoes || []).reduce((m, t) => Math.max(m, Number(t.ts) || 0), 0);
+        const txDesde = new Date((tsLocal || Date.now()) - 86400000).toISOString();
+        const txRows = await paginas(() => sb.from('transacoes').select('*').eq('clube_id', cid).gte('ts', txDesde));
+        const txF = txRows.map(_transacaoFromDb);
+
+        // Cash e torneios do banco só substituem os da memória quando o app NÃO
+        // tem nada pendente de envio (senão a memória é mais nova que o banco).
+        const pend = (typeof _syncQueue !== 'undefined' && _syncQueue) ? _syncQueue : {};
+        const temPend = (k) => pend[k] && pend[k].size > 0;
+        const preferirLocal = (lista, k) => temPend(k) ? (lista || []) : null;
+
+        const torneiosUsar = preferirLocal(torneios, 'torneios') || _pdMesclar(torneiosF, (torneios || []).filter(t => !_pdTs(t.criadoEm) || _pdTs(t.criadoEm) >= Date.now() - 35 * 86400000 || !['finished', 'encerrado'].includes(t.status)));
+        const cashUsar = preferirLocal(cashMesas, 'cashMesas') || _pdMesclar(cashF, (cashMesas || []).filter(m => m.status === 'aberta' || _pdTs(m.fechadoEm) >= Date.now() - 35 * 86400000));
+        const comandasUsar = preferirLocal(barComandas, 'barComandas') || _pdMesclar(comandasF, (barComandas || []).filter(c => c.status === 'aberta' || _pdTs(c.fechadoEm) >= Date.now() - 35 * 86400000));
+        const txUsar = _pdMesclar(txF, transacoes || []);
+
+        _pdDados = { torneios: torneiosUsar, cashMesas: cashUsar, barComandas: comandasUsar, transacoes: txUsar, ts: Date.now() };
+        return true;
+    } catch (e) {
+        console.warn('[PAINEL-DONO] não deu pra buscar dados frescos — usando os da memória:', e);
+        return false;
+    } finally {
+        _pdCarregando = false;
+    }
+}
+
+function _pdFonte() {
+    const fresco = _pdDados && (Date.now() - _pdDados.ts) < 5 * 60 * 1000;
+    return {
+        torneios:    fresco ? _pdDados.torneios    : (torneios || []),
+        cashMesas:   fresco ? _pdDados.cashMesas   : (cashMesas || []),
+        barComandas: fresco ? _pdDados.barComandas : ((typeof barComandas !== 'undefined' && barComandas) || []),
+        transacoes:  fresco ? _pdDados.transacoes  : (transacoes || []),
+        fresco,
+    };
+}
+
+// Data em que o torneio ACONTECEU: início > primeira entrada > criação
+function _pdDataTorneio(t) {
+    const ini = _pdTs(t.iniciadoEm);
+    if (ini) return ini;
+    let primeira = 0;
+    (t.entries || []).forEach(e => { const v = _pdTs(e.ts); if (v && (!primeira || v < primeira)) primeira = v; });
+    return primeira || _pdTs(t.criadoEm || t.criado_em || t.dataCriacao) || 0;
+}
+
 function renderPainelDono() {
     const intervalo = _pdIntervalo(_pdPeriodo);
+    const noPeriodo = (ts) => ts >= intervalo.de && ts <= intervalo.ate;
     const infoEl = document.getElementById('pd-periodo-info');
     if (infoEl) infoEl.textContent = intervalo.label;
+    const F = _pdFonte();
 
     // ─── CASH GAME ─────────────────────────────────
-    const cashEncerradas = (cashMesas || []).filter(m => {
+    // Rake e volume contam pelo horário de cada movimento (buy-in, recompra,
+    // lançamento de rake do dealer) — mesas abertas entram com o que já rolou.
+    const cashEncerradas = F.cashMesas.filter(m => {
         if (m.status !== 'encerrada') return false;
         const ts = m.fechadoEm || m.fechamentoTs || m.abertoEm || 0;
-        return ts >= intervalo.de && ts <= intervalo.ate;
+        return noPeriodo(ts);
     });
-    const cashAbertas = (cashMesas || []).filter(m => m.status === 'aberta');
+    const cashAbertas = F.cashMesas.filter(m => m.status === 'aberta');
 
     let cashVolume = 0, cashRakeSistema = 0, cashRakeDealer = 0;
-    let cashSessoes = 0, cashSobra = 0, cashQuebra = 0;
+    let cashSessoes = 0, cashSobra = 0, cashQuebra = 0, cashRakeEmAndamento = 0;
+    F.cashMesas.forEach(m => {
+        (m.jogadores || []).forEach(j => {
+            (j.movimentos || []).forEach(mv => {
+                if (!noPeriodo(_pdTs(mv.ts))) return;
+                const r = Number(mv.rakeCobrado) || 0;
+                if (mv.tipo === 'buyin' || mv.tipo === 'recompra') cashVolume += Number(mv.valor) || 0;
+                if (mv.tipo === 'buyin') cashSessoes++;
+                cashRakeSistema += r;
+                if (m.status === 'aberta') cashRakeEmAndamento += r;
+            });
+        });
+        (m.rakeLancamentos || []).forEach(l => {
+            if (l.estornado || !noPeriodo(_pdTs(l.ts))) return;
+            const v = Number(l.valor) || 0;
+            cashRakeDealer += v;
+            if (m.status === 'aberta') cashRakeEmAndamento += v;
+        });
+    });
     cashEncerradas.forEach(m => {
-        cashVolume += (m.jogadores || []).reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
-        cashRakeSistema += getCashRake(m);
-        cashRakeDealer += (m.rakeLancamentos || []).filter(l => !l.estornado).reduce((s, l) => s + (Number(l.valor) || 0), 0);
-        cashSessoes += (m.jogadores || []).length;
         if (typeof m.fichasDiferenca === 'number') {
             if (m.fichasDiferenca > 0) cashSobra += m.fichasDiferenca;
             else if (m.fichasDiferenca < 0) cashQuebra += Math.abs(m.fichasDiferenca);
         }
     });
-    // Mesas abertas também contam pra volume "em andamento"
-    let cashAbertoVolume = 0;
-    cashAbertas.forEach(m => {
-        cashAbertoVolume += (m.jogadores || []).reduce((s, j) => s + (Number(j.totalInvestido) || 0), 0);
-    });
     const cashRakeTotal = cashRakeSistema + cashRakeDealer;
 
-    document.getElementById('pd-cash-volume').textContent = _pdFmtCompact(cashVolume + cashAbertoVolume);
+    document.getElementById('pd-cash-volume').textContent = _pdFmtCompact(cashVolume);
     document.getElementById('pd-cash-rake').textContent = _pdFmtCompact(cashRakeTotal);
     const rakeDetail = document.getElementById('pd-cash-rake-detail');
-    if (cashRakeSistema > 0 && cashRakeDealer > 0) {
-        rakeDetail.textContent = `Sist ${_pdFmtCompact(cashRakeSistema)} + Dealer ${_pdFmtCompact(cashRakeDealer)}`;
-    } else { rakeDetail.textContent = ''; }
+    const detParts = [];
+    if (cashRakeSistema > 0 && cashRakeDealer > 0) detParts.push(`Sist ${_pdFmtCompact(cashRakeSistema)} + Dealer ${_pdFmtCompact(cashRakeDealer)}`);
+    if (cashRakeEmAndamento > 0) detParts.push(`${_pdFmtCompact(cashRakeEmAndamento)} em mesas abertas`);
+    rakeDetail.textContent = detParts.join(' · ');
     document.getElementById('pd-cash-sessoes').textContent = cashSessoes;
     const dif = cashSobra - cashQuebra;
     const difEl = document.getElementById('pd-cash-dif');
@@ -44506,7 +44655,7 @@ function renderPainelDono() {
         cashStatusEl.textContent = `${cashEncerradas.length} mesa${cashEncerradas.length !== 1 ? 's' : ''} encerrada${cashEncerradas.length !== 1 ? 's' : ''} no período`;
     }
 
-    // Mesas abertas — lista
+    // Mesas abertas — lista (movimento total da mesa desde que abriu)
     const mesasWrap = document.getElementById('pd-mesas-abertas-wrap');
     const mesasEl = document.getElementById('pd-mesas-abertas');
     if (cashAbertas.length > 0) {
@@ -44533,22 +44682,22 @@ function renderPainelDono() {
     }
 
     // ─── TORNEIOS ─────────────────────────────────
-    const torneiosNoPeriodo = (torneios || []).filter(t => {
-        const ts = t.criadoEm || t.criado_em || t.dataCriacao || Date.now();
-        return ts >= intervalo.de && ts <= intervalo.ate;
-    });
-    const torneiosAtivos = (torneios || []).filter(t => {
+    // Entra no período pela data em que ACONTECEU (início do torneio).
+    // Valores pelas mesmas funções de rake/staff do app, sem fórmula nova.
+    const torneiosNoPeriodo = F.torneios.filter(t => noPeriodo(_pdDataTorneio(t)));
+    const torneiosAtivos = F.torneios.filter(t => {
         const s = (t.status || '').toLowerCase();
         return s === 'running' || s === 'paused' || s === 'break';
     });
 
-    let tornBruto = 0, tornRake = 0, tornEntradas = 0, tornStaff = 0;
+    let tornBruto = 0, tornRake = 0, tornEntradas = 0, tornStaff = 0, tornTaxa = 0;
     torneiosNoPeriodo.forEach(t => {
         try {
             const bruto = (t.entries || []).reduce((s, e) => s + (Number(e.valor) || 0), 0);
             tornBruto += bruto;
             if (typeof getRake === 'function')  tornRake += getRake(t);
             if (typeof getStaff === 'function') tornStaff += getStaff(t);
+            tornTaxa += (t.entries || []).reduce((s, e) => s + (Number(e.taxaAdm) || 0), 0);
             tornEntradas += (t.entries || []).length;
         } catch(e) { /* ignora torneio mal formado */ }
     });
@@ -44557,6 +44706,8 @@ function renderPainelDono() {
     document.getElementById('pd-torn-rake').textContent = _pdFmtCompact(tornRake);
     document.getElementById('pd-torn-entradas').textContent = tornEntradas;
     document.getElementById('pd-torn-staff').textContent = _pdFmtCompact(tornStaff);
+    const taxaEl = document.getElementById('pd-torn-taxa');
+    if (taxaEl) taxaEl.textContent = tornTaxa > 0 ? `+ ${_pdFmtCompact(tornTaxa)} taxa adm` : '';
 
     const tornStatusEl = document.getElementById('pd-torn-status');
     if (torneiosAtivos.length > 0) {
@@ -44592,52 +44743,49 @@ function renderPainelDono() {
     // ─── BAR ─────────────────────────────────
     // CAMPOS REAIS: c.status === 'fechada' (NÃO 'paga'), c.total (NÃO totalValor), c.fechadoEm
     let barPago = 0, barAberto = 0;
-    if (typeof barComandas !== 'undefined' && Array.isArray(barComandas)) {
-        barComandas.forEach(c => {
-            const valor = Number(c.total) || 0;
-            if (c.status === 'fechada') {
-                // Comanda fechada/paga conta no período em que foi fechada
-                const ts = c.fechadoEm || c.fechado_em || 0;
-                if (ts >= intervalo.de && ts <= intervalo.ate) {
-                    barPago += valor;
-                }
-            } else if (c.status === 'aberta') {
-                // Comandas abertas: somar SEMPRE (são pendências atuais, independente de período)
-                barAberto += valor;
-            }
-        });
-    }
+    F.barComandas.forEach(c => {
+        const valor = Number(c.total) || 0;
+        if (c.status === 'fechada') {
+            // Comanda fechada conta no período em que foi fechada
+            if (noPeriodo(_pdTs(c.fechadoEm || c.fechado_em))) barPago += valor;
+        } else if (c.status === 'aberta') {
+            // Comandas abertas: somar SEMPRE (são pendências atuais, independente de período)
+            barAberto += valor;
+        }
+    });
     document.getElementById('pd-bar-pago').textContent = _pdFmtCompact(barPago);
     document.getElementById('pd-bar-aberto').textContent = _pdFmtCompact(barAberto);
     const barStatusEl = document.getElementById('pd-bar-status');
-    if (typeof barComandas !== 'undefined') {
-        const aberto = (barComandas || []).filter(c => c.status === 'aberta').length;
-        barStatusEl.textContent = aberto > 0 ? `${aberto} comanda${aberto !== 1 ? 's' : ''} aberta${aberto !== 1 ? 's' : ''}` : 'sem comandas abertas';
-    } else {
-        barStatusEl.textContent = '—';
-    }
+    const qtdAbertas = F.barComandas.filter(c => c.status === 'aberta').length;
+    barStatusEl.textContent = qtdAbertas > 0 ? `${qtdAbertas} comanda${qtdAbertas !== 1 ? 's' : ''} aberta${qtdAbertas !== 1 ? 's' : ''}` : 'sem comandas abertas';
 
     // ─── CRÉDITO / RECEBÍVEIS ─────────────────────────────────
-    // SISTEMA REAL: NÃO há "saldo devedor persistente" nos jogadores.
-    // O que mostramos: COMANDAS ABERTAS (bar) + JACKPOTS pendentes vinculados a jogadores.
-    // Esse é o valor real que o jogador "ficou devendo" e não foi pago ainda.
+    // Saldo devedor dos jogadores (mesma conta do "Total a receber" do Dashboard)
+    // + comandas do bar ainda abertas (essas só viram débito quando fecham).
+    const saldoPorJog = new Map();
+    F.transacoes.forEach(t => {
+        if (!t || !t.jogadorId) return;
+        saldoPorJog.set(t.jogadorId, (saldoPorJog.get(t.jogadorId) || 0) + (Number(t.valor) || 0));
+    });
+    const credPorJogador = {};
     let credTotal = 0;
-    const credPorJogador = {}; // {jogadorId: valor}
-    if (typeof barComandas !== 'undefined') {
-        barComandas.forEach(c => {
-            if (c.status !== 'aberta') return;
-            const valor = Number(c.total) || 0;
-            if (valor <= 0) return;
-            const jid = c.jogadorId || null;
-            const nome = jid
-                ? ((jogadores.find(j => j.id === jid) || {}).nome || c.avulsoNome || '(sem nome)')
-                : (c.avulsoNome || '(avulso)');
-            const key = jid || ('avulso_' + nome);
-            if (!credPorJogador[key]) credPorJogador[key] = { nome, valor: 0 };
-            credPorJogador[key].valor += valor;
-            credTotal += valor;
-        });
-    }
+    const nomeJog = (jid) => ((jogadores || []).find(j => j.id === jid) || {}).nome;
+    saldoPorJog.forEach((s, jid) => {
+        if (s >= -0.009) return;
+        credPorJogador[jid] = { nome: nomeJog(jid) || '(sem nome)', valor: Math.abs(s), comanda: 0 };
+        credTotal += Math.abs(s);
+    });
+    F.barComandas.forEach(c => {
+        if (c.status !== 'aberta') return;
+        const valor = Number(c.total) || 0;
+        if (valor <= 0) return;
+        const jid = c.jogadorId || null;
+        const key = jid || ('avulso_' + (c.avulsoNome || c.id));
+        if (!credPorJogador[key]) credPorJogador[key] = { nome: (jid && nomeJog(jid)) || c.avulsoNome || '(avulso)', valor: 0, comanda: 0 };
+        credPorJogador[key].valor += valor;
+        credPorJogador[key].comanda += valor;
+        credTotal += valor;
+    });
     const credLista = Object.values(credPorJogador);
     document.getElementById('pd-cred-aberto').textContent = _pdFmtCompact(credTotal);
     document.getElementById('pd-cred-qtd').textContent = credLista.length;
@@ -44646,16 +44794,16 @@ function renderPainelDono() {
     credLista.sort((a, b) => b.valor - a.valor);
     if (credLista.length > 0) {
         credListaEl.innerHTML = `
-            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">Comandas em aberto</div>
+            <div style="font-size:.6rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:.4rem;margin-bottom:.3rem;">Maiores valores a receber</div>
             ${credLista.slice(0, 5).map(d => `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);padding:.5rem .7rem;border-radius:.45rem;font-size:.78rem;">
-                    <span style="color:#fafafa;font-weight:700;">${esc(d.nome)}</span>
+                    <span style="color:#fafafa;font-weight:700;">${esc(d.nome)}${d.comanda > 0 ? ` <span style="font-size:.6rem;color:#fb923c;font-weight:700;">${d.comanda >= d.valor - 0.009 ? 'comanda aberta' : '+ comanda aberta'}</span>` : ''}</span>
                     <span style="font-family:var(--font-mono);color:#fca5a5;font-weight:800;">${formatMoney(d.valor)}</span>
                 </div>
             `).join('')}
         `;
     } else {
-        credListaEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">✅ Nenhuma comanda em aberto</div>';
+        credListaEl.innerHTML = '<div style="font-size:.75rem;color:#71717a;text-align:center;padding:.4rem;">✅ Nenhum valor a receber</div>';
     }
 
     // ─── CONTAS A PAGAR ─────────────────────────────────
@@ -44676,17 +44824,16 @@ function renderPainelDono() {
     document.getElementById('pd-cp-em-breve').textContent = _pdFmtCompact(cpEmBreve);
 
     // ─── SALDO DO PERÍODO ─────────────────────────────────
-    // Receitas confirmadas no período: rake cash + rake torneios + bar pago + staff fixo (clube)
-    // Despesas: contas a pagar PAGAS no período + quebras de caixa do cash
-    const entradas = cashRakeTotal + tornRake + barPago + tornStaff;
+    // Entradas do clube: rake torneios + staff (fica com o clube; repasse a critério
+    // do clube) + taxa administrativa + rake do cash + bar fechado no período.
+    // Saídas: contas a pagar PAGAS no período + quebras de caixa do cash.
+    const entradas = tornRake + tornStaff + tornTaxa + cashRakeTotal + barPago;
     let saidas = 0;
     if (typeof contasPagar !== 'undefined' && Array.isArray(contasPagar)) {
         contasPagar.forEach(c => {
             if (c.status !== 'pago') return;
             const ts = c.pagoEm ? new Date(c.pagoEm).getTime() : 0;
-            if (ts >= intervalo.de && ts <= intervalo.ate) {
-                saidas += Number(c.valor) || 0;
-            }
+            if (noPeriodo(ts)) saidas += Number(c.valor) || 0;
         });
     }
     saidas += cashQuebra; // quebras de caixa contam como perda
@@ -44699,6 +44846,14 @@ function renderPainelDono() {
     document.getElementById('pd-saldo-liquido').textContent = (liquido >= 0 ? '+' : '') + _pdFmtCompact(liquido);
     document.getElementById('pd-saldo-liquido').style.color = liquido >= 0 ? '#fbbf24' : '#ef4444';
     document.getElementById('pd-saldo-tendencia').textContent = ''; // sem comparação por ora
+    const compEl = document.getElementById('pd-saldo-composicao');
+    if (compEl) {
+        const partes = [
+            ['Rake torneios', tornRake], ['Staff', tornStaff], ['Taxa adm', tornTaxa],
+            ['Rake cash', cashRakeTotal], ['Bar', barPago],
+        ].filter(p => p[1] > 0.009).map(p => `${p[0]} ${_pdFmtCompact(p[1])}`);
+        compEl.textContent = partes.length ? 'Entradas: ' + partes.join(' · ') : '';
+    }
 
     // ─── TOP JOGADORES ─────────────────────────────────
     const porJogador = {};
@@ -44736,8 +44891,8 @@ function renderPainelDono() {
     }
 
     // ─── Atualizado em ─────────────────────────────────
-    _pdUltimoUpdate = new Date();
-    document.getElementById('pd-atualizado-em').textContent = '🔄 Atualizado em ' + _pdUltimoUpdate.toLocaleTimeString('pt-BR');
+    _pdUltimoUpdate = F.fresco && _pdDados ? new Date(_pdDados.ts) : new Date();
+    document.getElementById('pd-atualizado-em').textContent = (F.fresco ? '🔄 Dados do banco às ' : '🔄 Atualizado em ') + _pdUltimoUpdate.toLocaleTimeString('pt-BR');
 }
 
 function renderCashRelatorio() {
