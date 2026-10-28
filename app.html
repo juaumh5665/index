@@ -42519,19 +42519,34 @@ async function _convEnviarUm(idx) {
 
     // Registra no banco
     try {
+        // template_id/torneio_id só quando forem IDs válidos do banco: o "Envio rápido"
+        // usa um template temporário ('_envio_rapido_...') e o banco recusava o
+        // registro INTEIRO — por isso o histórico parou de gravar.
+        const _uuidOk = (v) => typeof _isUuid === 'function' ? _isUuid(v) : /^[0-9a-f-]{36}$/i.test(String(v || ''));
         const row = {
             clube_id: sbClube.id,
             jogador_id: p.jogador.id,
-            template_id: _convCampanha.templateId || null,
-            torneio_id: _convCampanha.torneioId || null,
+            template_id: _uuidOk(_convCampanha.templateId) ? _convCampanha.templateId : null,
+            torneio_id: _uuidOk(_convCampanha.torneioId) ? _convCampanha.torneioId : null,
             flyer_url: flyerUrl || null,
             status: envioOk ? 'enviado' : 'erro',
             variante: variante,
             metodo: metodo
         };
-        const { error: insErr } = await sb.from('convite_envios').insert(row);
-        if (insErr) console.error('[Convites] erro insert convite_envios:', insErr, row);
-        else console.log('[Convites] ✅ registrado envio para', p.jogador.nome);
+        let { error: insErr } = await sb.from('convite_envios').insert(row);
+        if (insErr) {
+            // 2ª tentativa só com o essencial (quem, quando, status) — o histórico não pode ficar sem o envio
+            console.warn('[Convites] insert convite_envios falhou, tentando registro mínimo:', insErr);
+            const minimo = { clube_id: row.clube_id, jogador_id: row.jogador_id, status: row.status, metodo: row.metodo };
+            ({ error: insErr } = await sb.from('convite_envios').insert(minimo));
+        }
+        if (insErr) {
+            console.error('[Convites] erro insert convite_envios:', insErr, row);
+            if (!_convCampanha._avisouHistorico) {
+                _convCampanha._avisouHistorico = true;
+                showToast('⚠️ Mensagem enviada, mas não foi possível salvar no histórico');
+            }
+        } else console.log('[Convites] ✅ registrado envio para', p.jogador.nome);
     } catch (e) { console.error('[Convites] erro registrar envio:', e); }
 
     convRenderListaCampanha();
