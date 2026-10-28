@@ -3503,6 +3503,10 @@ document.addEventListener('DOMContentLoaded', function(){
                         </div>
                         <div id="pd-mesas-abertas" style="display:flex;flex-direction:column;gap:.4rem;"></div>
                     </div>
+                    <div id="pd-cash-lista-wrap" style="display:none;margin-top:.85rem;padding-top:.85rem;border-top:1px solid #27272a;">
+                        <div style="font-size:.6rem;color:#86efac;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Resultado por mesa</div>
+                        <div id="pd-cash-lista" style="display:flex;flex-direction:column;gap:.4rem;"></div>
+                    </div>
                 </div>
 
                 <!-- TORNEIOS -->
@@ -44717,6 +44721,96 @@ function renderPainelDono() {
         }).join('');
     } else {
         mesasWrap.style.display = 'none';
+    }
+
+    // ─── RESULTADO POR MESA DE CASH (toque abre o detalhe) ───
+    // Mesa entra se esteve aberta em algum momento do período. Valores da SESSÃO
+    // inteira da mesa (desde que abriu): jogadores, compras, ganhos/perdas e rake.
+    const cashListaWrap = document.getElementById('pd-cash-lista-wrap');
+    const cashListaEl = document.getElementById('pd-cash-lista');
+    if (cashListaWrap && cashListaEl) {
+        const mesasPer = F.cashMesas.filter(m => {
+            const ab = _pdTs(m.abertoEm || m.aberturaTs);
+            const fe = m.status === 'aberta' ? Date.now() : _pdTs(m.fechadoEm || m.fechamentoTs);
+            return ab && ab <= intervalo.ate && (fe || ab) >= intervalo.de;
+        });
+        const linhasM = mesasPer.map(m => {
+            const jogs = (m.jogadores || []).map(j => {
+                const compras = Number(j.totalInvestido) || 0;
+                const saiu = j.status !== 'ativo';
+                const retirado = (Number(j.saiuCom) || 0) + (Number(j.saidasAnteriores) || 0);
+                return { nome: ((jogadores || []).find(x => x.id === j.jogadorId) || {}).nome || '(sem nome)',
+                         compras, saiu, resultado: saiu ? retirado - compras : null,
+                         rec: (j.movimentos || []).filter(mv => mv.tipo === 'recompra').length };
+            });
+            // um jogador pode ter mais de uma sessão na mesa: agrupa por nome
+            const porNome = new Map();
+            jogs.forEach(j => {
+                const c = porNome.get(j.nome) || { nome: j.nome, compras: 0, resultado: 0, rec: 0, naMesa: false, sessoes: 0 };
+                c.compras += j.compras; c.rec += j.rec; c.sessoes++;
+                if (j.saiu) c.resultado += j.resultado; else c.naMesa = true;
+                porNome.set(j.nome, c);
+            });
+            const lista = [...porNome.values()].sort((a, b) => b.compras - a.compras);
+            const porDealer = new Map();
+            let rakeDealer = 0;
+            (m.rakeLancamentos || []).forEach(l => {
+                if (l.estornado) return;
+                const v = Number(l.valor) || 0; rakeDealer += v;
+                const k = l.dealerNome || '(sem nome)';
+                const d = porDealer.get(k) || { nome: k, valor: 0, qtd: 0 }; d.valor += v; d.qtd++; porDealer.set(k, d);
+            });
+            const rakeSistema = (m.jogadores || []).reduce((s, j) => s + (j.movimentos || []).reduce((ss, mv) => ss + (Number(mv.rakeCobrado) || 0), 0), 0);
+            const capile = (m.capileLancamentos || []).filter(l => !l.estornado).reduce((s, l) => s + (Number(l.valor) || 0), 0);
+            const volume = jogs.reduce((s, j) => s + j.compras, 0);
+            return { m, lista, dealers: [...porDealer.values()].sort((a, b) => b.valor - a.valor), rakeDealer, rakeSistema,
+                     rake: rakeDealer + rakeSistema, capile, volume,
+                     ganhos: lista.filter(j => !j.naMesa && j.resultado > 0).reduce((s, j) => s + j.resultado, 0),
+                     perdas: lista.filter(j => !j.naMesa && j.resultado < 0).reduce((s, j) => s + j.resultado, 0) };
+        }).sort((a, b) => _pdTs(b.m.abertoEm) - _pdTs(a.m.abertoEm));
+        if (linhasM.length) {
+            cashListaWrap.style.display = '';
+            const abertoM = window._pdCashAberta || null;
+            const lin = (rot, val, cor) => `<div style="display:flex;justify-content:space-between;font-size:.72rem;padding:.22rem 0;border-bottom:1px solid rgba(255,255,255,.04);"><span style="color:#a1a1aa;">${rot}</span><span style="font-family:var(--font-mono);font-weight:700;color:${cor || '#e4e4e7'};">${val}</span></div>`;
+            const sub = (txt) => `<div style="font-size:.58rem;color:#71717a;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin:.6rem 0 .2rem;">${txt}</div>`;
+            cashListaEl.innerHTML = linhasM.map(L => {
+                const m = L.m, ab = abertoM === m.id;
+                const dAb = _pdTs(m.abertoEm) ? new Date(_pdTs(m.abertoEm)) : null;
+                const dt = dAb ? dAb.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + dAb.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+                const aberta = m.status === 'aberta';
+                return `
+                <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:.55rem;">
+                    <div onclick="window._pdCashAberta=(window._pdCashAberta==='${m.id}'?null:'${m.id}');renderPainelDono()" style="padding:.65rem .7rem;display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;cursor:pointer;">
+                        <div style="min-width:0;">
+                            <div style="font-weight:800;color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.nome || 'Mesa')}</div>
+                            <div style="font-size:.62rem;color:#71717a;margin-top:.12rem;">${dt} · ${L.lista.length} jogador${L.lista.length !== 1 ? 'es' : ''} · ${_pdFmtCompact(L.volume)} em compras${aberta ? ' · <span style="color:#22c55e;">aberta</span>' : ''}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-family:var(--font-mono);color:#fbbf24;font-weight:800;font-size:.88rem;">${_pdFmtCompact(L.rake)}</div>
+                            <div style="font-size:.55rem;color:#71717a;text-transform:uppercase;">Rake ${ab ? '▲' : '▼'}</div>
+                        </div>
+                    </div>
+                    ${ab ? `<div style="padding:0 .7rem .65rem;">
+                        ${lin('Compras dos jogadores (volume)', formatMoney(L.volume), '#86efac')}
+                        ${lin('Rake total', formatMoney(L.rake), '#fbbf24')}
+                        ${L.capile > 0 ? lin('Capilés (gorjetas)', formatMoney(L.capile), '#a1a1aa') : ''}
+                        ${lin('Ganhos dos jogadores', '+' + formatMoney(L.ganhos), '#22c55e')}
+                        ${lin('Perdas dos jogadores', formatMoney(L.perdas), '#ef4444')}
+                        ${L.dealers.length ? sub('Rake por dealer') + L.dealers.map(d => lin(esc(d.nome) + ` <span style="color:#52525b;">(${d.qtd})</span>`, formatMoney(d.valor), '#fbbf24')).join('') : ''}
+                        ${L.rakeSistema > 0 ? lin('Rake do sistema (por compra)', formatMoney(L.rakeSistema), '#fbbf24') : ''}
+                        ${sub('Jogadores')}
+                        ${L.lista.map(j => `<div style="display:grid;grid-template-columns:1fr auto auto;gap:.6rem;align-items:center;font-size:.72rem;padding:.25rem 0;border-bottom:1px solid rgba(255,255,255,.04);">
+                            <span style="color:#e4e4e7;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(j.nome)}${j.rec ? ` <span style="color:#52525b;font-size:.6rem;">${j.rec} rec.</span>` : ''}</span>
+                            <span style="font-family:var(--font-mono);color:#a1a1aa;white-space:nowrap;" title="Compras">${formatMoney(j.compras)}</span>
+                            <span style="font-family:var(--font-mono);font-weight:800;white-space:nowrap;min-width:5.5rem;text-align:right;color:${j.naMesa ? '#22c55e' : (j.resultado >= 0 ? '#22c55e' : '#ef4444')};">${j.naMesa ? 'na mesa' : (j.resultado >= 0 ? '+' : '') + formatMoney(j.resultado)}</span>
+                        </div>`).join('')}
+                        <div style="font-size:.58rem;color:#52525b;margin-top:.35rem;">Colunas: compras (buy-in + recompras) · resultado ao sair da mesa</div>
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+        } else {
+            cashListaWrap.style.display = 'none';
+        }
     }
 
     // ─── TORNEIOS ─────────────────────────────────
