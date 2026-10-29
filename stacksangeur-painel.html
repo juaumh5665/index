@@ -121,6 +121,15 @@
   </fieldset>
 
   <fieldset>
+    <legend>Torneios novos começam com o StackSangeur</legend>
+    <div class="linha">
+      <label class="rad"><input type="radio" name="padraoTorneio" value="ligado"> Ligado</label>
+      <label class="rad"><input type="radio" name="padraoTorneio" value="desligado"> Desligado</label>
+    </div>
+    <div class="hint">Em cada torneio o caixa liga ou desliga no painel ao lado do torneio (“StackSangeur neste torneio”). Torneio desligado não aparece no app da sangeur. Salvo na hora.</div>
+  </fieldset>
+
+  <fieldset>
     <legend>O que a sangeur pode solicitar</legend>
     <div class="acoes">
       <label class="chk"><input type="checkbox" data-acao="reentry"> Reentrada</label>
@@ -189,7 +198,15 @@ document.addEventListener('input', (ev) => { if (ev.target.id !== 'corClube') re
 function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800); }
 function show(id) { $('scrLogin').hidden = id !== 'scrLogin'; $('scrPainel').hidden = id !== 'scrPainel'; }
 
+async function carregarPadraoTorneio() {
+  try {
+    const { data } = await sb.rpc('sangeur_status');
+    const v = (data && data.padrao_torneio) || 'ligado';
+    document.querySelectorAll('input[name=padraoTorneio]').forEach(r => r.checked = r.value === v);
+  } catch (_) {}
+}
 async function carregar() {
+  carregarPadraoTorneio();
   const { data, error } = await sb.rpc('sangeur_admin_dados');
   if (error) throw error;
   if (!data || !data.ok) throw new Error(data && data.erro === 'sem_permissao' ? 'Só o administrador do clube acessa as configurações do StackSangeur.' : 'Não foi possível carregar.');
@@ -228,6 +245,14 @@ function syncMultipla() {
 
 document.addEventListener('change', async (ev) => {
   const el = ev.target;
+  if (el.name === 'padraoTorneio') {
+    try {
+      const { data, error } = await sb.rpc('sangeur_salvar_padrao_torneio', { p_padrao: el.value });
+      if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
+      toast(el.value === 'ligado' ? 'Torneios novos começam com o StackSangeur ligado' : 'Torneios novos começam com o StackSangeur desligado');
+    } catch (e) { toast('⚠️ Não salvou: ' + e.message); carregarPadraoTorneio(); }
+    return;
+  }
   if (el.name === 'lado') { try { localStorage.setItem(LADO_KEY, el.value); } catch (_) {} toast(el.value === 'off' ? 'Painel desligado neste computador' : 'Painel à ' + el.value + ' neste computador'); return; }
   if (el.dataset && el.dataset.acao) { syncMultipla(); sujo = true; return; }
   if (el.name === 'entrega' || el.name === 'pag' || el.id === 'fnumClube') { sujo = true; return; }

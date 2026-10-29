@@ -43,21 +43,41 @@
     const pNome = (n) => String(n || '').trim().split(/\s+/)[0] || '';
     const meuId = () => (window.currentUser && window.currentUser.id) || null;
     const modalAberto = (id) => { const m = $(id); return !!(m && m.classList.contains('open')); };
-    // Mesma regra do banco (_sangeur_clube_liberado) e do hasFeature: ajuste do clube > trial > plano.
-    // Retorna true/false, ou null enquanto o plano ainda não carregou (não decide nada).
-    function situacao() {
+    // Fonte única: o BANCO diz se o clube tem o StackSangeur (sangeur_status → _sangeur_clube_liberado).
+    // Nunca decide pelos dados da tela (no modo suporte o clube vem do cache do admin, sem os ajustes).
+    let ST = { clube: null, liberado: null, padrao: 'ligado', torneios: {}, em: 0 };
+    let _stCarregando = false;
+    async function atualizarStatus(forcar) {
         const c = window.sbClube;
-        if (!c || !c.id) return null;
-        const ov = c.feature_overrides;
-        if (ov && typeof ov === 'object' && 'feature_sangeur' in ov) return ov.feature_sangeur === true;
-        if (c.status === 'trial') return true;
+        if (!c || !c.id || window._modoSuporte || _stCarregando) return;
+        if (!forcar && ST.clube === c.id && Date.now() - ST.em < 30000) return;
+        _stCarregando = true;
         try {
-            if (typeof _planosCache === 'undefined' || !_planosCache || !_planosCache.length) return null;
-            const plano = (typeof _planoAtualObj === 'function') ? _planoAtualObj() : null;
-            if (!plano) { const pa = _planosCache.find(x => x.id === c.plano_atual); return pa ? !!pa.feature_sangeur : null; }
-            return !!plano.feature_sangeur;
-        } catch (_) { return null; }
+            const d = await rpc('sangeur_status', {});
+            const atual = window.sbClube && window.sbClube.id;
+            if (d && atual === c.id) ST = { clube: c.id, liberado: d.liberado === true && d.clube_id === c.id, padrao: d.padrao_torneio || 'ligado', torneios: d.torneios || {}, em: Date.now() };
+        } catch (err) { console.warn('[SANGEUR] status:', err); }
+        _stCarregando = false;
     }
+    // 'suporte' | true | false | null (ainda não sabe)
+    function situacao() {
+        if (window._modoSuporte) return 'suporte';
+        const c = window.sbClube;
+        if (!c || !c.id || ST.clube !== c.id) return null;
+        return ST.liberado;
+    }
+    // Ligado/desligado por torneio: ajuste do torneio > padrão do clube
+    function torneioAtivo(tid) {
+        if (!tid) return true;
+        if (ST.torneios && Object.prototype.hasOwnProperty.call(ST.torneios, tid)) return ST.torneios[tid] === true;
+        return ST.padrao !== 'desligado';
+    }
+    function torneioAbertoId() {
+        if (!modalAberto('modal-torneio')) return null;
+        const i = idxAtivo(); try { return (i != null && torneios[i]) ? torneios[i].id : null; } catch (_) { return null; }
+    }
+    let expOff = null;   // torneio desligado que o caixa expandiu nesta visita
+    function expAgora() { const tid = torneioAbertoId(); if (tid && !torneioAtivo(tid)) return expOff === tid; return expandido(); }
     function liberado() { return situacao() === true; }
     function lado() { const l = LSg(LADO_KEY, 'direita'); return ['direita', 'esquerda', 'off'].includes(l) ? l : 'direita'; }
     function telaLarga() { return window.innerWidth >= 1480; }
@@ -90,7 +110,9 @@
     // ---------- ciclo de vida (liga/desliga conforme o clube logado) ----------
     function verificar() {
         const id = window.sbClube && window.sbClube.id;
+        atualizarStatus(false);
         const sit = situacao();
+        if (sit === 'suporte') { if (clubeAtivo) parar(); mostrarMenu(false); return; }
         if (sit === true && id) { if (clubeAtivo !== id) { parar(); iniciar(id); } else mostrarMenu(true); }
         else if (sit === false) { if (clubeAtivo) parar(); mostrarMenu('bloqueado'); }
         else if (!id && clubeAtivo) parar();
@@ -112,7 +134,7 @@
                 .subscribe();
         } catch (err) { console.warn('[SANGEUR] realtime:', err); }
         carregar(); carregarPochete();
-        pollT = setInterval(() => { carregar(); reenviarPendentes(); if (aba === 'pochete') carregarPochete(); }, 30000);
+        pollT = setInterval(() => { carregar(); reenviarPendentes(); if (aba === 'pochete') carregarPochete(); atualizarStatus(true).then(render); }, 30000);
         renderT = setInterval(render, 5000);   // atualiza o "há X min"
         _obs = new MutationObserver(onModais);
         ['modal-torneio', 'modal-entrada'].forEach(mid => { const m = $(mid); if (m) _obs.observe(m, { attributes: true, attributeFilter: ['class'] }); });
@@ -264,6 +286,13 @@
 #sg-painel .sg-ok.sg-sec{background:none;border:1px solid #4c2f7a;color:#c4b5fd}
 #sg-painel .sg-no{width:90px;height:38px;border:1px solid #3f1d1d;border-radius:10px;background:none;color:#fca5a5;font:700 12.5px 'Manrope',sans-serif;cursor:pointer}
 #sg-painel .sg-mot{width:100%;height:36px;border-radius:9px;border:1px solid #3f1d1d;background:#140c0c;color:#fff;padding:0 10px;font:600 13px 'Manrope',sans-serif;outline:none}
+#sg-painel.sg-off{border-color:#2a2a30}
+#sg-painel .sg-tor{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #231e33;font-size:12.5px;color:#e4e4e7}
+#sg-painel .sg-tor small{font-size:11px;color:#9a93b0}
+#sg-painel .sg-sw{position:relative;width:42px;height:24px;border-radius:12px;border:none;background:#2a2a30;cursor:pointer;flex:0 0 auto}
+#sg-painel .sg-sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+#sg-painel .sg-sw.on{background:#a855f7}
+#sg-painel .sg-sw.on i{transform:translateX(18px)}
 #sg-painel .sg-vazio{color:#71717a;font-size:12.5px;text-align:center;padding:28px 10px;line-height:1.5}
 #sg-painel .sg-rod{padding:10px 12px;border-top:1px solid #231e33;font-size:11px;color:#71717a;display:flex;gap:8px;align-items:center}
 #sg-painel .sg-badge{font:700 13px 'JetBrains Mono',monospace;color:#1a1306;background:#fbbf24;border-radius:999px;min-width:30px;height:30px;padding:0 9px;display:flex;align-items:center;justify-content:center}
@@ -296,6 +325,7 @@
     }
 
     function onModais(muts) {
+        if (!modalAberto('modal-torneio')) expOff = null;   // reabrir torneio desligado volta recolhido
         const mudouEntrada = muts.some(m => m.target.id === 'modal-entrada');
         if (mudouEntrada && fluxo && fluxo.abriu && !modalAberto('modal-entrada')) setTimeout(finalizarFluxo, 350);
         render();
@@ -310,7 +340,7 @@
         if (!a) return;
         const vis = !!clubeAtivo && lado() !== 'off' && modalAberto('modal-torneio');
         if (!vis) { a.style.display = 'none'; restaurarPadding(); return; }
-        const exp = expandido(), larg = exp ? LARGURA : FAIXA;
+        const exp = expAgora(), larg = exp ? LARGURA : FAIXA;
         // Tela estreita (celular/tablet): sem faixa — só o aviso flutuante, que abre o painel como gaveta
         if (telaPequena()) {
             restaurarPadding();
@@ -389,7 +419,7 @@
         // Aviso flutuante: torneio fechado e há pedidos esperando
         const torneioFechado = !modalAberto('modal-torneio');
         if (f) {
-            const gaveta = !torneioFechado && telaPequena() && !expandido() && lado() !== 'off' && !modalAberto('modal-entrada');
+            const gaveta = !torneioFechado && telaPequena() && !expAgora() && lado() !== 'off' && !modalAberto('modal-entrada');
             const mostra = gaveta || (torneioFechado && n > 0 && lado() !== 'off' && !document.querySelector('.modal-overlay.open'));
             f.style.display = mostra ? 'flex' : 'none';
             f.style.zIndex = gaveta ? String((parseInt(($('modal-torneio') || {}).style?.zIndex, 10) || 100) + 6) : '90';
@@ -398,9 +428,13 @@
         if (a.style.display === 'none') return;
         // mantém o texto que o caixa está digitando no motivo
         const motAtual = recusando ? (a.querySelector('.sg-mot') || {}).value : null;
-        if (!expandido()) {
-            a.innerHTML = '<span class="sg-badge' + (n ? '' : ' sg-zero') + '">' + n + '</span><span class="sg-vert">SANGEUR' + (n ? ' · ' + n + (n === 1 ? ' PENDENTE' : ' PENDENTES') : '') + '</span>';
-            a.title = 'Abrir solicitações da sangeur';
+        const tidAberto = torneioAbertoId(), offAqui = !!tidAberto && !torneioAtivo(tidAberto);
+        a.classList.toggle('sg-off', offAqui);
+        if (!expAgora()) {
+            a.innerHTML = offAqui
+                ? '<span class="sg-badge sg-zero">–</span><span class="sg-vert" style="color:#71717a">SANGEUR · DESLIGADO NESTE TORNEIO</span>'
+                : '<span class="sg-badge' + (n ? '' : ' sg-zero') + '">' + n + '</span><span class="sg-vert">SANGEUR' + (n ? ' · ' + n + (n === 1 ? ' PENDENTE' : ' PENDENTES') : '') + '</span>';
+            a.title = offAqui ? 'StackSangeur desligado neste torneio — clique para abrir' : 'Abrir solicitações da sangeur';
             return;
         }
         a.title = '';
@@ -410,7 +444,12 @@
             '<button type="button" class="sg-ib" data-a="som" title="' + (som ? 'Som ligado' : 'Som desligado') + '"><i class="fa-solid ' + (som ? 'fa-volume-high' : 'fa-volume-xmark') + '"></i></button>' +
             '<button type="button" class="sg-ib" data-a="lado" title="Mudar de lado"><i class="fa-solid fa-right-left"></i></button>' +
             '<button type="button" class="sg-ib" data-a="recolher" title="Recolher"><i class="fa-solid fa-chevron-' + (lado() === 'esquerda' ? 'left' : 'right') + '"></i></button></div>';
+        if (tidAberto) {
+            h += '<div class="sg-tor"><span style="flex:1">StackSangeur <b>neste torneio</b><br><small>' + (offAqui ? 'Desligado: as sangeurs não veem este torneio' : 'Ligado: as sangeurs podem pedir') + '</small></span>' +
+                 '<button type="button" data-a="tor-toggle" data-tid="' + tidAberto + '" aria-label="Ligar ou desligar o StackSangeur neste torneio" class="sg-sw' + (offAqui ? '' : ' on') + '"><i></i></button></div>';
+        }
         h += '<div class="sg-lista">';
+        if (offAqui && aba === 'pedidos') h += '<div class="sg-vazio" style="padding:14px 8px;border:1px dashed #33294a;border-radius:12px">Desligado neste torneio.<br>O app das sangeurs não mostra este torneio e o banco recusa pedidos para ele. Ligue acima quando quiser usar.</div>';
         if (aba === 'pochete') {
             h += pocheteHtml() + '</div><div class="sg-rod"><span style="flex:1">Fichas do turno (últimas 18h) · a sangeur informa a contagem pelo celular</span></div>';
             const qAtual = movAberto ? (a.querySelector('.sg-qtd') || {}).value : null;
@@ -430,12 +469,17 @@
 
     function cliquePainel(ev) {
         const a = $('sg-painel');
-        if (a.classList.contains('sg-faixa')) { LSs(EXP_KEY, '1'); render(); return; }
+        if (a.classList.contains('sg-faixa')) {
+            const tid = torneioAbertoId();
+            if (tid && !torneioAtivo(tid)) expOff = tid; else LSs(EXP_KEY, '1');
+            render(); return;
+        }
         const b = ev.target.closest('[data-a]'); if (!b) return;
         const ac = b.dataset.a, p = pedidos.find(x => x.id === b.dataset.id);
         if (ac === 'som') { LSs(SOM_KEY, LSg(SOM_KEY, '1') === '0' ? '1' : '0'); render(); return; }
         if (ac === 'lado') { LSs(LADO_KEY, lado() === 'direita' ? 'esquerda' : 'direita'); render(); return; }
-        if (ac === 'recolher') { LSs(EXP_KEY, '0'); render(); return; }
+        if (ac === 'recolher') { const tid = torneioAbertoId(); if (tid && !torneioAtivo(tid)) expOff = null; else LSs(EXP_KEY, '0'); render(); return; }
+        if (ac === 'tor-toggle') { definirTorneio(b.dataset.tid, !torneioAtivo(b.dataset.tid)); return; }
         if (ac === 'aba-pedidos' || ac === 'aba-pochete') { aba = ac.slice(4); movAberto = null; recusando = null; if (aba === 'pochete') carregarPochete(); render(); return; }
         if (ac === 'mov-abrir') { movAberto = { sid: b.dataset.sid, tipo: b.dataset.tipo }; render(); return; }
         if (ac === 'mov-voltar') { movAberto = null; render(); return; }
@@ -472,6 +516,26 @@
     // ---------- ações no servidor ----------
     async function rpc(nome, args) { const { data, error } = await sb.rpc(nome, args); if (error) throw error; return data; }
     async function liberar(p) { try { await rpc('sangeur_caixa_liberar', { p_id: p.id }); } catch (err) { console.warn('[SANGEUR] liberar:', err); } }
+    async function definirTorneio(tid, ativo) {
+        const pend = pedidos.filter(p => p.torneio_id === tid).length;
+        const aplicar = async () => {
+            try {
+                const d = await rpc('sangeur_definir_torneio', { p_torneio_id: tid, p_ativo: ativo });
+                if (!d || !d.ok) throw new Error((d && d.erro) || 'erro');
+                ST.torneios = Object.assign({}, ST.torneios, { [tid]: ativo });
+                expOff = ativo ? null : tid;   // acabou de desligar: mantém aberto para ver o aviso
+                toast(ativo ? '🟢 StackSangeur ligado neste torneio' : '⚪ StackSangeur desligado neste torneio');
+                render();
+            } catch (err) { toast('⚠️ Não salvou: ' + (err.message || 'sem conexão')); }
+        };
+        if (!ativo && pend > 0) {
+            showConfirmModal('Desligar o StackSangeur neste torneio?',
+                'Há ' + pend + (pend === 1 ? ' pedido' : ' pedidos') + ' deste torneio ainda sem resposta. Eles continuam no painel para você aceitar ou recusar; só não entram pedidos novos.',
+                aplicar, { icon: '⚪', confirmLabel: 'Desligar', confirmColor: '#7c3aed', borderColor: '#a855f7' });
+            return;
+        }
+        aplicar();
+    }
     async function confirmarRecusa(id, motivo) {
         motivo = String(motivo || '').trim();
         if (!motivo) { toast('⚠️ Escreva o motivo da recusa'); return; }
@@ -616,5 +680,5 @@
     }
 
     // exposto só para diagnóstico/testes
-    window._stackSangeurCaixa = { verificar, carregar, estado: () => ({ clubeAtivo, pedidos, fluxo }) };
+    window._stackSangeurCaixa = { verificar, carregar, atualizarStatus, estado: () => ({ clubeAtivo, pedidos, fluxo, ST }) };
 })();
