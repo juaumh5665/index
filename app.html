@@ -7740,7 +7740,12 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Conte as fichas que o jogador recebeu por esse buy-in</div>
                     </div>
                     <div id="acj-fichas-total" style="font-size:.7rem;color:#71717a;"></div>
+                    <label onclick="event.preventDefault();_cashContagemToggle('acj')" style="display:flex;align-items:center;gap:.45rem;cursor:pointer;flex-shrink:0;margin-left:.6rem;" title="Desligue para confirmar só pelo valor, sem contar as fichas">
+                        <span style="font-size:.68rem;font-weight:700;color:#e4e4e7;">Contar fichas</span>
+                        <span id="acj-cont-track" style="position:relative;display:inline-block;width:38px;height:22px;border-radius:11px;background:#22c55e;transition:background .15s;"><span id="acj-cont-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transform:translateX(16px);transition:transform .15s;"></span></span>
+                    </label>
                 </div>
+                <div id="acj-sem-contagem" style="display:none;font-size:.75rem;color:#a1a1aa;">Sem contagem de fichas: confirma só pelo valor do buy-in.</div>
                 <div id="acj-fichas-wrap"></div>
                 <div id="acj-fichas-confere" style="display:none;margin-top:.5rem;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;font-weight:700;"></div>
             </div>
@@ -7869,7 +7874,12 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Conte as fichas que o jogador recebeu por essa recompra</div>
                     </div>
                     <div id="rec-fichas-total" style="font-size:.7rem;color:#71717a;"></div>
+                    <label onclick="event.preventDefault();_cashContagemToggle('rec')" style="display:flex;align-items:center;gap:.45rem;cursor:pointer;flex-shrink:0;margin-left:.6rem;" title="Desligue para confirmar só pelo valor, sem contar as fichas">
+                        <span style="font-size:.68rem;font-weight:700;color:#e4e4e7;">Contar fichas</span>
+                        <span id="rec-cont-track" style="position:relative;display:inline-block;width:38px;height:22px;border-radius:11px;background:#22c55e;transition:background .15s;"><span id="rec-cont-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transform:translateX(16px);transition:transform .15s;"></span></span>
+                    </label>
                 </div>
+                <div id="rec-sem-contagem" style="display:none;font-size:.75rem;color:#a1a1aa;">Sem contagem de fichas: confirma só pelo valor da recompra.</div>
                 <div id="rec-fichas-wrap"></div>
                 <div id="rec-fichas-confere" style="display:none;margin-top:.5rem;padding:.5rem .75rem;border-radius:.4rem;font-size:.8rem;font-weight:700;"></div>
             </div>
@@ -39853,6 +39863,7 @@ function abrirAddJogadorCash(mesaId) {
     // Reset contagem de fichas e renderiza inputs por cor
     resetarFichasContagem('acj');
     renderFichasInputs('acj');
+    _cashContagemToggle('acj', true);   // "Contar fichas" sempre começa ligado
     // Esconde o aviso de confronto inicial
     const confEl = document.getElementById('acj-fichas-confere');
     if (confEl) confEl.style.display = 'none';
@@ -39878,14 +39889,15 @@ async function confirmAddCashJogador() {
         }
     } catch(e) { console.warn('[CRED] cash hook:', e); }
 
-    // Valida contagem de fichas (obrigatória)
-    const fichasEntrada = getFichasContagem('acj');
-    const totalFichas = calcularTotalFichas('acj');
-    const qtdFichas = Object.values(fichasEntrada).reduce((s, q) => s + q, 0);
+    // Valida contagem de fichas (obrigatória quando "Contar fichas" está ligado)
+    const _contarAcj = _cashContagemLigada('acj');
+    const fichasEntrada = _contarAcj ? getFichasContagem('acj') : null;
+    const totalFichas = _contarAcj ? calcularTotalFichas('acj') : valor;
+    const qtdFichas = _contarAcj ? Object.values(fichasEntrada).reduce((s, q) => s + q, 0) : 1;
     if (qtdFichas === 0) {
         return showToast('⚠️ Conte as fichas que o jogador recebeu');
     }
-    if (Math.abs(totalFichas - valor) > 0.01) {
+    if (_contarAcj && Math.abs(totalFichas - valor) > 0.01) {
         if (!confirm(`⚠️ As fichas (${formatMoney(totalFichas)}) não batem com o valor do buy-in (${formatMoney(valor)}).\n\nDeseja continuar mesmo assim?`)) {
             return;
         }
@@ -39952,6 +39964,27 @@ async function confirmAddCashJogador() {
     } catch(e) { console.warn('[CASH] imprimir comprovante:', e); }
 }
 
+// "Contar fichas" (buy-in e recompra do cash): ligado = contagem por cor obrigatória (como sempre foi);
+// desligado = confirma só pelo valor. Começa ligado toda vez que o modal abre. Não altera valor/rake/transação.
+const _cashContagem = { acj: true, rec: true };
+function _cashContagemLigada(pre) { return _cashContagem[pre] !== false; }
+function _cashContagemToggle(pre, forcar) {
+    const on = (typeof forcar === 'boolean') ? forcar : !_cashContagemLigada(pre);
+    _cashContagem[pre] = on;
+    // Desligou: zera o que já tinha sido contado (nada de contagem pela metade guardada na sessão)
+    if (!on) { try { resetarFichasContagem(pre); renderFichasInputs(pre); } catch (_) {} }
+    const tr = document.getElementById(pre + '-cont-track'), th = document.getElementById(pre + '-cont-thumb');
+    if (tr) tr.style.background = on ? '#22c55e' : '#2a2a30';
+    if (th) th.style.transform = on ? 'translateX(16px)' : 'translateX(0)';
+    const wrap = document.getElementById(pre + '-fichas-wrap'), tot = document.getElementById(pre + '-fichas-total');
+    const conf = document.getElementById(pre + '-fichas-confere'), sem = document.getElementById(pre + '-sem-contagem');
+    if (wrap) wrap.style.display = on ? '' : 'none';
+    if (tot) tot.style.display = on ? '' : 'none';
+    if (conf && !on) conf.style.display = 'none';
+    if (sem) sem.style.display = on ? 'none' : '';
+}
+window._cashContagemToggle = _cashContagemToggle;
+
 // --- RECOMPRA ---
 function abrirRecompra(mesaId, jogadorId) {
     activeCashContext = { mesaId, jogadorId };
@@ -39969,6 +40002,7 @@ function abrirRecompra(mesaId, jogadorId) {
     // Reset contagem de fichas e renderiza inputs por cor
     resetarFichasContagem('rec');
     renderFichasInputs('rec');
+    _cashContagemToggle('rec', true);   // "Contar fichas" sempre começa ligado
     const confEl = document.getElementById('rec-fichas-confere');
     if (confEl) confEl.style.display = 'none';
 
@@ -39981,14 +40015,15 @@ function confirmRecompra() {
     const valor = parseFloat(document.getElementById('rec-valor').value) || 0;
     if (valor <= 0) return showToast('⚠️ Valor inválido');
 
-    // Valida contagem de fichas (obrigatória)
-    const fichasRecompra = getFichasContagem('rec');
-    const totalFichas = calcularTotalFichas('rec');
-    const qtdFichas = Object.values(fichasRecompra).reduce((s, q) => s + q, 0);
+    // Valida contagem de fichas (obrigatória quando "Contar fichas" está ligado)
+    const _contarRec = _cashContagemLigada('rec');
+    const fichasRecompra = _contarRec ? getFichasContagem('rec') : null;
+    const totalFichas = _contarRec ? calcularTotalFichas('rec') : valor;
+    const qtdFichas = _contarRec ? Object.values(fichasRecompra).reduce((s, q) => s + q, 0) : 1;
     if (qtdFichas === 0) {
         return showToast('⚠️ Conte as fichas que o jogador recebeu');
     }
-    if (Math.abs(totalFichas - valor) > 0.01) {
+    if (_contarRec && Math.abs(totalFichas - valor) > 0.01) {
         if (!confirm(`⚠️ As fichas (${formatMoney(totalFichas)}) não batem com o valor da recompra (${formatMoney(valor)}).\n\nDeseja continuar mesmo assim?`)) {
             return;
         }
