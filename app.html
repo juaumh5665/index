@@ -41927,7 +41927,9 @@ async function _convUploadFlyerSupabase() {
         } catch (e) { console.warn('[Convites] erro shortlink:', e); }
 
         // Se marcou "salvar no torneio", atualiza torneio
-        if (_convCampanha.torneioId && document.getElementById('conv-flyer-salvar-torneio').checked) {
+        // A caixinha "salvar no torneio" não existe mais na tela Enviar: ausente = não salvar (antes quebrava o upload)
+        const _chkSalvarTorneio = document.getElementById('conv-flyer-salvar-torneio');
+        if (_convCampanha.torneioId && _chkSalvarTorneio && _chkSalvarTorneio.checked) {
             try {
                 await sb.from('torneios').update({ flyer_url: publicUrl }).eq('id', _convCampanha.torneioId);
                 const t = (torneios || []).find(x => x.id === _convCampanha.torneioId);
