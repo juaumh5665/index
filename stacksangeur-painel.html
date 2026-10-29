@@ -136,6 +136,11 @@
   <fieldset>
     <legend>Cor do app da sangeur</legend>
     <div class="temas" id="temasClube"></div>
+    <label style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--tx);margin-top:4px">Fonte dos números
+      <select id="fnumClube" style="height:38px;border-radius:9px;border:1px solid var(--line2);background:var(--bg);color:var(--tx);padding:0 10px;font:700 13px Manrope,sans-serif">
+        <option value="manrope">Manrope (padrão)</option><option value="inter">Inter</option><option value="rubik">Rubik</option><option value="space">Space Grotesk</option>
+        <option value="outfit">Outfit</option><option value="oswald">Oswald</option><option value="barlow">Barlow Condensed</option><option value="mono">JetBrains Mono</option>
+      </select></label>
     <div class="hint">É o padrão do clube. Cada sangeur ainda pode trocar a cor no próprio celular (botão de paleta no topo do app).</div>
   </fieldset>
 
@@ -205,6 +210,7 @@ function render() {
   document.querySelectorAll('input[data-acao]').forEach(cb => cb.checked = acoes.includes(cb.dataset.acao));
   syncMultipla();
   TEMA = (c.tema && c.tema.ac) ? c.tema : null; renderTemas();
+  $('fnumClube').value = (c.tema && c.tema.fnum) || 'manrope';
   const ativos = (d.usuarios || []).filter(u => u.status === 'ativo');
   $('listaUsuarios').innerHTML = ativos.length ? ativos.map(u =>
     '<div class="user"><span class="n"><b>' + esc(u.nome) + '</b><span>' + esc(u.email || '') + '</span></span>' +
@@ -224,7 +230,7 @@ document.addEventListener('change', async (ev) => {
   const el = ev.target;
   if (el.name === 'lado') { try { localStorage.setItem(LADO_KEY, el.value); } catch (_) {} toast(el.value === 'off' ? 'Painel desligado neste computador' : 'Painel à ' + el.value + ' neste computador'); return; }
   if (el.dataset && el.dataset.acao) { syncMultipla(); sujo = true; return; }
-  if (el.name === 'entrega' || el.name === 'pag') { sujo = true; return; }
+  if (el.name === 'entrega' || el.name === 'pag' || el.id === 'fnumClube') { sujo = true; return; }
   if (el.dataset && el.dataset.user) {
     el.disabled = true;
     try {
@@ -244,7 +250,7 @@ $('btnSalvar').addEventListener('click', async () => {
   if (!acoes.length) return toast('⚠️ Libere ao menos um tipo de pedido');
   $('btnSalvar').disabled = true;
   try {
-    const { data, error } = await sb.rpc('sangeur_salvar_config', { p_entrega_modo: entrega, p_pagamento_modo: pag, p_acoes: acoes, p_tema: TEMA || TEMAS[0] });
+    const { data, error } = await sb.rpc('sangeur_salvar_config', { p_entrega_modo: entrega, p_pagamento_modo: pag, p_acoes: acoes, p_tema: Object.assign({}, TEMA || TEMAS[0], { fnum: $('fnumClube').value }) });
     if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
     sujo = false; toast('✅ Configuração salva — chega ao app da sangeur em até 1 minuto');
     await carregar();

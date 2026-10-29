@@ -144,18 +144,24 @@
     function pocheteHtml() {
         if (!poc.length) return '<div class="sg-vazio">Nenhuma sangeur com permissão.<br>Libere em <a href="/stacksangeur-painel.html" target="_blank" style="color:#c4b5fd">Configurações</a>.</div>';
         return poc.map(x => {
-            const esperado = (Number(x.cargas) || 0) - (Number(x.devolucoes) || 0) - (Number(x.entregues) || 0);
             const cont = x.contagem, temCarga = Number(x.cargas) > 0;
-            const hr = cont ? new Date(cont.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+            const atual = x.atual == null ? null : Number(x.atual);
+            const hr = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             let h = '<div class="sg-card"><div class="sg-l1"><div style="min-width:0"><div class="sg-nm">' + e(x.nome) + '</div>' +
-                '<div class="sg-sub">' + (cont ? 'Informou ' + fN(cont.quantidade) + ' fichas às ' + hr : 'Ainda não informou a contagem') + '</div></div>' +
-                '<div><div class="sg-val" style="color:#fafafa">' + (cont ? fN(cont.quantidade) : (temCarga ? fN(esperado) : '—')) + '</div><div class="sg-tp">' + (cont ? 'informado' : (temCarga ? 'pelo sistema' : 'fichas')) + '</div></div></div>';
-            if (temCarga && cont) {
-                const dif = Number(cont.quantidade) - esperado;
-                h += dif === 0 ? '<div class="sg-info" style="color:#86efac;font-weight:700">✓ Bate com o sistema (' + fN(esperado) + ')</div>'
-                               : '<div class="sg-info" style="color:#fca5a5;font-weight:700">Diferença de ' + (dif > 0 ? '+' : '−') + fN(Math.abs(dif)) + ' · sistema ' + fN(esperado) + '</div>';
+                '<div class="sg-sub">' + (cont ? 'Tinha ' + fN(cont.quantidade) + ' às ' + hr(cont.em) : (temCarga ? 'Sem contagem · pelo que o caixa entregou' : 'Ainda não informou as fichas')) + '</div></div>' +
+                '<div><div class="sg-val" style="color:' + (atual != null && atual < 0 ? '#fca5a5' : '#fafafa') + '">' + (atual == null ? '—' : fN(atual)) + '</div><div class="sg-tp">com ela agora</div></div></div>';
+            if (cont) {
+                const dist = Number(cont.entregues_desde) || 0, rec = Number(cont.cargas_desde) || 0, dev = Number(cont.devolucoes_desde) || 0;
+                const topo = (Number(cont.quantidade) || 0) + rec;
+                h += '<div style="height:6px;border-radius:99px;background:#231e33;overflow:hidden"><i style="display:block;height:100%;width:' + (topo > 0 ? Math.max(0, Math.min(100, (atual / topo) * 100)) : 0).toFixed(1) + '%;background:linear-gradient(90deg,#c06cff,#5b5bff)"></i></div>';
+                h += '<div class="sg-info">Distribuiu ' + fN(dist) + ' desde a contagem' + (rec ? ' · recebeu +' + fN(rec) : '') + (dev ? ' · devolveu ' + fN(dev) : '') + '</div>';
+                if (temCarga) {
+                    const esp = Number(cont.esperado_na_contagem) || 0, dif = Number(cont.quantidade) - esp;
+                    h += dif === 0 ? '<div class="sg-info" style="color:#86efac;font-weight:700">✓ Na contagem, bateu com o sistema (' + fN(esp) + ')</div>'
+                                   : '<div class="sg-info" style="color:#fca5a5;font-weight:700">Na contagem: diferença de ' + (dif > 0 ? '+' : '−') + fN(Math.abs(dif)) + ' · sistema ' + fN(esp) + '</div>';
+                }
             }
-            h += '<div class="sg-info">Recebeu ' + fN(x.cargas) + ' · entregou ' + fN(x.entregues) + ' · devolveu ' + fN(x.devolucoes) + (Number(x.dinheiro) > 0 ? ' · ' + money(x.dinheiro) + ' em dinheiro' : '') + '</div>';
+            h += '<div class="sg-info">Turno: recebeu ' + fN(x.cargas) + ' · entregou ' + fN(x.entregues) + ' · devolveu ' + fN(x.devolucoes) + (Number(x.dinheiro) > 0 ? ' · ' + money(x.dinheiro) + ' em dinheiro' : '') + '</div>';
             if (movAberto && movAberto.sid === x.sangeur_id) {
                 h += '<input class="sg-mot sg-qtd" data-sid="' + x.sangeur_id + '" inputmode="numeric" style="border-color:#4c2f7a;background:#0c0a12;font-family:\'JetBrains Mono\',monospace" placeholder="' + (movAberto.tipo === 'carga' ? 'Fichas entregues a ela' : 'Fichas recebidas de volta') + '">' +
                      '<div class="sg-bts"><button type="button" class="sg-ok" data-a="mov-ok" data-sid="' + x.sangeur_id + '">' + (movAberto.tipo === 'carga' ? 'Confirmar entrega' : 'Confirmar devolução') + '</button>' +

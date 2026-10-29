@@ -13,7 +13,8 @@
 <link rel="icon" type="image/png" href="/icons/icon-sangeur-192.png">
 <title>StackSangeur</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link id="fonteExtra" rel="stylesheet" href="">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -27,11 +28,12 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--tx);
-    font-family: Manrope, system-ui, -apple-system, sans-serif; overscroll-behavior: none;
+    font-family: var(--ftx); overscroll-behavior: none;
     min-height: 100vh; min-height: 100dvh; }
   button, input { font-family: inherit; font-size: 16px; }
   button { cursor: pointer; border: none; background: none; color: inherit; }
-  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  :root { --fnum: Manrope, system-ui, sans-serif; --ftx: Manrope, system-ui, -apple-system, sans-serif; }
+  .mono { font-family: var(--fnum); font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -.01em; }
   [hidden] { display: none !important; }
 
   /* LOGIN */
@@ -161,6 +163,18 @@
   .tema { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px; border-radius: 14px; border: 1.5px solid var(--line2); font-size: 12.5px; font-weight: 800; color: var(--tx2); }
   .tema i { width: 34px; height: 34px; border-radius: 50%; display: block; }
   .tema.sel { border-color: var(--ac); background: var(--acbg); color: var(--ac2); }
+  .fontes { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .fonte { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line2); color: var(--tx2); }
+  .fonte b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .fonte span { font-size: 11px; font-weight: 700; color: var(--mut); }
+  .fonte.sel { border-color: var(--ac); background: var(--acbg); color: var(--ac2); }
+  .lbl { font-size: 11.5px; font-weight: 800; color: var(--mut); text-transform: uppercase; letter-spacing: .8px; }
+  .poc-barra { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 4px; }
+  .poc-barra i { display: block; height: 100%; border-radius: 99px; background: var(--grad); }
+  .poc-linha { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--tx2); }
+  .poc-main .poc-linha b { font-size: 15px; color: var(--tx); }
+  .poc-main .poc-linha span { font-size: 13px; }
+  .mov .menos { color: var(--err); } .mov .mais { color: var(--ac2); }
   .cor-livre { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line2); font-size: 14px; font-weight: 700; color: var(--tx2); }
   .cor-livre input { width: 46px; height: 34px; border: none; background: none; padding: 0; }
   /* POCHETE */
@@ -177,7 +191,7 @@
   .poc-grid b { display: block; margin-top: 4px; font-size: 19px; }
   .informar { display: flex; flex-direction: column; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
   .informar .row { display: flex; gap: 8px; }
-  .informar .row .inp { flex: 1; min-width: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; }
+  .informar .row .inp { flex: 1; min-width: 0; font-family: var(--fnum); font-size: 19px; font-variant-numeric: tabular-nums; }
   .atalhos { display: flex; gap: 6px; flex-wrap: wrap; }
   .atalhos button { height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line2); font-size: 13px; font-weight: 700; color: var(--tx2); }
   .mov { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--tx2); padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
@@ -253,8 +267,13 @@
 <section id="sheetTema" hidden>
   <div class="box" role="dialog" aria-label="Aparência">
     <div style="display:flex;align-items:center;gap:10px"><b style="flex:1;font-size:17px">Aparência</b><button type="button" class="ic-btn" id="btnTemaFechar" aria-label="Fechar">✕</button></div>
+    <div class="lbl">Cor</div>
     <div class="temas" id="listaTemas"></div>
     <label class="cor-livre"><input type="color" id="corLivre" value="#a855f7"> <span style="flex:1">Cor personalizada</span></label>
+    <div class="lbl">Fonte dos números</div>
+    <div class="fontes" id="listaFNum"></div>
+    <div class="lbl">Fonte do texto</div>
+    <div class="fontes" id="listaFTx"></div>
     <button type="button" class="btn btn-sec" id="btnTemaClube" style="height:46px;font-size:14px">Usar o padrão do clube</button>
     <div style="font-size:12px;color:var(--mut);text-align:center">Vale só para este celular.</div>
   </div>
@@ -622,7 +641,7 @@ $('btnEnviar').addEventListener('click', async () => {
   if (r === 'ok') toast('Pedido enviado ao caixa', 'ok');
   else if (r === 'offline') toast('Sem internet — pedido guardado, envio automático', '');
   if (history.state && history.state.sheet) history.back(); else fecharJogador();
-  renderJogadores(); renderPedidos(); carregarPedidos(); carregarJogadores();
+  renderJogadores(); renderPedidos(); carregarPedidos(); carregarJogadores(); carregarPochete();
 });
 
 // ---------- fila (garante que nenhum pedido se perde se a internet cair) ----------
@@ -742,8 +761,47 @@ function aplicarTema() {
   const L = _lum(mix(g[0], g[1], .5));
   set('--acdk', (t.grad ? false : (L + .05) / .05 > 1.05 / (L + .05)) ? '#111111' : '#ffffff');
   const m = $('metaTema'); if (m) m.setAttribute('content', mix(base, ac, .035));
+  aplicarFontes();
+}
+const FONTES = {
+  manrope: { nome: 'Manrope', css: 'Manrope, system-ui, sans-serif', g: null },
+  inter: { nome: 'Inter', css: "'Inter', system-ui, sans-serif", g: 'Inter:wght@500;600;700;800' },
+  rubik: { nome: 'Rubik', css: "'Rubik', system-ui, sans-serif", g: 'Rubik:wght@500;600;700;800' },
+  space: { nome: 'Space Grotesk', css: "'Space Grotesk', system-ui, sans-serif", g: 'Space+Grotesk:wght@500;600;700' },
+  outfit: { nome: 'Outfit', css: "'Outfit', system-ui, sans-serif", g: 'Outfit:wght@500;600;700;800' },
+  oswald: { nome: 'Oswald', css: "'Oswald', system-ui, sans-serif", g: 'Oswald:wght@500;600;700' },
+  barlow: { nome: 'Barlow Condensed', css: "'Barlow Condensed', system-ui, sans-serif", g: 'Barlow+Condensed:wght@500;600;700' },
+  mono: { nome: 'JetBrains Mono', css: "'JetBrains Mono', ui-monospace, monospace", g: 'JetBrains+Mono:wght@600;700' }
+};
+const FONTES_NUM = ['manrope', 'inter', 'rubik', 'space', 'outfit', 'oswald', 'barlow', 'mono'];
+const FONTES_TXT = ['manrope', 'inter', 'rubik', 'space', 'outfit'];
+function fontesAtivas() {
+  const p = LS.get('stacksangeur_fonte', null) || {};
+  const c = (SESS && SESS.config && SESS.config.tema) || {};
+  const ok = (k) => (k && FONTES[k]) ? k : null;
+  return { num: ok(p.num) || ok(c.fnum) || 'manrope', txt: ok(p.txt) || ok(c.ftx) || 'manrope' };
+}
+function aplicarFontes() {
+  const f = fontesAtivas(), st = document.documentElement.style;
+  const fam = [FONTES[f.num].g, FONTES[f.txt].g].filter(Boolean);
+  const link = $('fonteExtra');
+  const href = fam.length ? 'https://fonts.googleapis.com/css2?' + [...new Set(fam)].map(x => 'family=' + x).join('&') + '&display=swap' : '';
+  if (link && link.getAttribute('href') !== href) link.setAttribute('href', href);
+  st.setProperty('--fnum', FONTES[f.num].css); st.setProperty('--ftx', FONTES[f.txt].css);
+}
+function _carregarTodasFontes() {   // só ao abrir "Aparência", para mostrar a prévia de cada uma
+  if (document.getElementById('fontesPrevia')) return;
+  const l = document.createElement('link'); l.id = 'fontesPrevia'; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?' + Object.values(FONTES).filter(x => x.g).map(x => 'family=' + x.g).join('&') + '&display=swap';
+  document.head.appendChild(l);
+}
+function renderFontes() {
+  const f = fontesAtivas();
+  $('listaFNum').innerHTML = FONTES_NUM.map(k => '<button type="button" class="fonte' + (f.num === k ? ' sel' : '') + '" data-fnum="' + k + '"><b style="font-family:' + FONTES[k].css.replace(/"/g, "'") + '">450.000</b><span>' + FONTES[k].nome + '</span></button>').join('');
+  $('listaFTx').innerHTML = FONTES_TXT.map(k => '<button type="button" class="fonte' + (f.txt === k ? ' sel' : '') + '" data-ftx="' + k + '"><b style="font-size:17px;font-family:' + FONTES[k].css.replace(/"/g, "'") + '">Fichas</b><span>' + FONTES[k].nome + '</span></button>').join('');
 }
 function renderTemas() {
+  renderFontes();
   const at = temaAtivo();
   $('listaTemas').innerHTML = TEMAS.map(t => {
     const fundo = t.grad ? 'linear-gradient(135deg,' + t.grad[0] + ',' + t.grad[1] + ')' : t.ac;
@@ -752,18 +810,21 @@ function renderTemas() {
   $('corLivre').value = at.ac;
   const temClube = _temaValido(SESS && SESS.config && SESS.config.tema);
   $('btnTemaClube').textContent = temClube ? 'Usar o padrão do clube' : 'Voltar ao padrão StackOS';
-  $('btnTemaClube').hidden = !_temaValido(LS.get('stacksangeur_tema', null));
+  $('btnTemaClube').hidden = !_temaValido(LS.get('stacksangeur_tema', null)) && !LS.get('stacksangeur_fonte', null);
 }
-$('btnTema').addEventListener('click', () => { renderTemas(); $('sheetTema').hidden = false; });
+$('btnTema').addEventListener('click', () => { _carregarTodasFontes(); renderTemas(); $('sheetTema').hidden = false; });
 $('btnTemaFechar').addEventListener('click', () => { $('sheetTema').hidden = true; });
 $('sheetTema').addEventListener('click', (e) => {
   if (e.target === $('sheetTema')) { $('sheetTema').hidden = true; return; }
+  const fb = e.target.closest('button[data-fnum],button[data-ftx]');
+  if (fb) { const atual = LS.get('stacksangeur_fonte', null) || {}; if (fb.dataset.fnum) atual.num = fb.dataset.fnum; else atual.txt = fb.dataset.ftx;
+    LS.set('stacksangeur_fonte', atual); aplicarFontes(); renderTemas(); return; }
   const b = e.target.closest('button[data-tema]'); if (!b) return;
   const t = TEMAS.find(x => x.id === b.dataset.tema); if (!t) return;
   LS.set('stacksangeur_tema', t); aplicarTema(); renderTemas();
 });
 $('corLivre').addEventListener('input', (e) => { LS.set('stacksangeur_tema', { id: 'livre', ac: e.target.value }); aplicarTema(); renderTemas(); });
-$('btnTemaClube').addEventListener('click', () => { try { localStorage.removeItem('stacksangeur_tema'); } catch (_) {} aplicarTema(); renderTemas(); });
+$('btnTemaClube').addEventListener('click', () => { try { localStorage.removeItem('stacksangeur_tema'); localStorage.removeItem('stacksangeur_fonte'); } catch (_) {} aplicarTema(); renderTemas(); });
 
 // ============================================================
 // POCHETE — fichas com a sangeur. Ela informa a contagem; o caixa vê
@@ -783,18 +844,29 @@ function renderPochete() {
   const m = $('tabPochete');
   if (!POC) { m.innerHTML = '<div class="vazio">Carregando…</div>'; return; }
   const digitando = document.activeElement && document.activeElement.id === 'inpFichas' ? document.activeElement.value : null;
-  const esperado = (Number(POC.cargas) || 0) - (Number(POC.devolucoes) || 0) - (Number(POC.entregues) || 0);
   const temCarga = Number(POC.cargas) > 0, cont = POC.contagem;
-  let h = '<div class="poc-main"><small>Fichas comigo</small><b class="mono">' + (cont ? fichasN(cont.quantidade) : (temCarga ? fichasN(esperado) : '—')) + '</b>' +
-    '<span>' + (cont ? 'Você informou às ' + hora(cont.em) : (temCarga ? 'Pelo sistema (você ainda não informou)' : 'Informe abaixo quantas fichas estão com você')) + '</span>';
-  if (temCarga && cont) {
-    const dif = Number(cont.quantidade) - esperado;
-    h += dif === 0 ? '<div class="poc-dif ok">Bate com o sistema: ' + fichasN(esperado) + ' fichas</div>'
-                   : '<div class="poc-dif no">Diferença de ' + (dif > 0 ? '+' : '−') + fichasN(Math.abs(dif)) + ' fichas · sistema: ' + fichasN(esperado) + '</div>';
+  const atual = (POC.atual == null) ? null : Number(POC.atual);
+  let h = '<div class="poc-main"><small>Fichas comigo agora</small><b class="mono"' + (atual != null && atual < 0 ? ' style="color:var(--err)"' : '') + '>' + (atual == null ? '—' : fichasN(atual)) + '</b>';
+  if (cont) {
+    const base = Number(cont.quantidade) || 0, dist = Number(cont.entregues_desde) || 0, rec = Number(cont.cargas_desde) || 0, dev = Number(cont.devolucoes_desde) || 0;
+    const topo = base + rec;
+    h += '<div class="poc-barra"><i style="width:' + (topo > 0 ? Math.max(0, Math.min(100, (atual / topo) * 100)) : 0).toFixed(1) + '%"></i></div>';
+    h += '<div class="poc-linha" style="margin-top:6px"><span>Você tinha às ' + hora(cont.em) + '</span><b class="mono">' + fichasN(base) + '</b></div>';
+    if (rec) h += '<div class="poc-linha"><span>Recebeu do caixa depois</span><b class="mono" style="color:var(--ac2)">+' + fichasN(rec) + '</b></div>';
+    h += '<div class="poc-linha"><span>Distribuiu desde então</span><b class="mono" style="color:var(--err)">−' + fichasN(dist) + '</b></div>';
+    if (dev) h += '<div class="poc-linha"><span>Devolveu ao caixa</span><b class="mono" style="color:var(--err)">−' + fichasN(dev) + '</b></div>';
+    if (temCarga) {
+      const esp = Number(cont.esperado_na_contagem) || 0, dif = base - esp;
+      h += dif === 0 ? '<div class="poc-dif ok">Na contagem, bateu com o sistema (' + fichasN(esp) + ')</div>'
+                     : '<div class="poc-dif no">Na contagem: diferença de ' + (dif > 0 ? '+' : '−') + fichasN(Math.abs(dif)) + ' · sistema ' + fichasN(esp) + '</div>';
+    }
+    if (atual < 0) h += '<div class="poc-dif no">Saldo negativo: informe a contagem de novo ou peça fichas ao caixa</div>';
+  } else {
+    h += '<span>' + (temCarga ? 'Pelo que o caixa registrou (você ainda não informou a contagem)' : 'Informe abaixo quantas fichas estão com você. Depois o app vai baixando sozinho a cada entrega.') + '</span>';
   }
   h += '</div>';
   h += '<div class="poc-grid"><div><small>Recebidas do caixa</small><b class="mono">' + fichasN(POC.cargas) + '</b></div>' +
-       '<div><small>Entregues em pedidos</small><b class="mono">' + fichasN(POC.entregues) + '</b></div>' +
+       '<div><small>Entregues no turno</small><b class="mono">' + fichasN(POC.entregues) + '</b></div>' +
        '<div><small>Devolvidas ao caixa</small><b class="mono">' + fichasN(POC.devolucoes) + '</b></div>' +
        '<div><small>Dinheiro comigo</small><b class="mono">' + money(POC.dinheiro) + '</b></div></div>';
   h += '<div class="informar"><div style="font-weight:800;font-size:14px">Quantas fichas estão com você agora?</div>' +
@@ -803,8 +875,13 @@ function renderPochete() {
        '<div style="font-size:12px;color:var(--mut)">O caixa vê o que você informar, na hora.</div></div>';
   const movs = Array.isArray(POC.movimentos) ? POC.movimentos : [];
   if (movs.length) {
-    const NOME = { carga: 'Recebeu do caixa', devolucao: 'Devolveu ao caixa', contagem: 'Você informou' };
-    h += '<div class="sec">Movimentos do turno</div>' + movs.map(x => '<div class="mov"><div>' + NOME[x.tipo] + (x.obs ? ' · ' + esc(x.obs) : '') + '<br><span>' + hora(x.em) + (x.tipo !== 'contagem' && x.por ? ' · ' + esc(primeiroNome(x.por)) : '') + '</span></div><b class="mono">' + fichasN(x.quantidade) + '</b></div>').join('');
+    const NOME = { carga: 'Recebeu do caixa', devolucao: 'Devolveu ao caixa', contagem: 'Você informou', entrega: 'Entregou' };
+    const SINAL = { carga: ['+', 'mais'], devolucao: ['−', 'menos'], entrega: ['−', 'menos'], contagem: ['', ''] };
+    h += '<div class="sec">Movimentos do turno</div>' + movs.map(x => {
+      const det = x.tipo === 'entrega' ? ' · ' + esc(primeiroNome(x.jogador)) + ' (' + (TIPO_NOME[x.pedido] || '') + (x.qtd > 1 ? ' ' + x.qtd + 'x' : '') + ')' + (x.pendente ? ' · aguardando caixa' : '') : (x.obs ? ' · ' + esc(x.obs) : '');
+      const sn = SINAL[x.tipo] || ['', ''];
+      return '<div class="mov"><div>' + NOME[x.tipo] + det + '<br><span>' + hora(x.em) + ((x.tipo === 'carga' || x.tipo === 'devolucao') && x.por ? ' · ' + esc(primeiroNome(x.por)) : '') + '</span></div><b class="mono ' + sn[1] + '">' + sn[0] + fichasN(x.quantidade) + '</b></div>';
+    }).join('');
   }
   m.innerHTML = h;
   if (digitando != null) { const i = $('inpFichas'); i.value = digitando; i.focus(); }
