@@ -24354,6 +24354,7 @@ function _renderCardsPlanoNoModalExpirado() {
         if (p.feature_relatorios_avancados) features.push('📈 Relatórios avançados');
         if (p.feature_stackclock) features.push('⏱ StackClock (Dealer App)');
         if (p.feature_stackbar) features.push('🍻 StackBar (Bar App)');
+        if (p.feature_sangeur) features.push('🪙 StackSangeur (App da Sangeur)');
         if (p.feature_multi_tv) features.push('📺 TV Pública');
         if (p.feature_templates_torneio) features.push('📋 Templates de torneio');
         if (p.feature_suporte_prioritario) features.push('🛟 Suporte prioritário');
@@ -24531,6 +24532,7 @@ function renderPlanosGrid() {
         if (p.feature_patrocinadores_tv) features.push('✓ Patrocinadores na TV');
         if (p.feature_stackclock) features.push('✓ StackClock (Dealer App)');
         if (p.feature_stackbar) features.push('✓ StackBar (Bar App)');
+        if (p.feature_sangeur) features.push('✓ StackSangeur (App da Sangeur)');
         
         return `<div style="background:${isAtual ? cor + '22' : '#0d0d0f'};border:2px solid ${isAtual ? cor : '#27272a'};padding:1.5rem;border-radius:.75rem;position:relative;display:flex;flex-direction:column;min-height:480px;">
             ${isAtual ? `<div style="position:absolute;top:-10px;right:1rem;background:${cor};color:white;padding:.2rem .75rem;font-size:.65rem;font-weight:800;letter-spacing:.05em;border-radius:.25rem;">PLANO ATUAL</div>` : ''}
@@ -25841,6 +25843,7 @@ async function adminCarregarPlanos() {
             if (p.feature_patrocinadores_tv) features.push('Patrocinadores');
             if (p.feature_stackclock) features.push('StackClock');
             if (p.feature_stackbar) features.push('StackBar');
+            if (p.feature_sangeur) features.push('StackSangeur');
             
             // Cor por id conhecido OU baseada na ordem (cores rotativas pra planos novos)
             const coresFixas = { basic: '#10b981', premium: '#f59e0b', pro: '#dc2626' };
@@ -25999,6 +26002,7 @@ function adminAbrirModalPlano(planoId) {
                     {key:'feature_stackbar', label:'StackBar (Bar App)'},
                     {key:'feature_convites_premium', label:'Convites via WhatsApp'},
                     {key:'feature_painel_dono', label:'Painel do Dono (Mobile)'},
+                    {key:'feature_sangeur', label:'StackSangeur (App da Sangeur)'},
                 ].map(f => `<label style="display:flex;align-items:center;gap:.5rem;background:#18181b;border:1px solid #27272a;padding:.55rem;border-radius:.4rem;cursor:pointer;font-size:.85rem;">
                     <input type="checkbox" id="pl-${f.key}" ${plano?.[f.key] ? 'checked' : ''} style="cursor:pointer;width:16px;height:16px;">
                     <span>${f.label}</span>
@@ -26096,6 +26100,7 @@ async function adminSalvarPlano(novo) {
             feature_stackbar: document.getElementById('pl-feature_stackbar').checked,
             feature_convites_premium: document.getElementById('pl-feature_convites_premium').checked,
             feature_painel_dono: document.getElementById('pl-feature_painel_dono').checked,
+            feature_sangeur: document.getElementById('pl-feature_sangeur').checked,
             ativo: document.getElementById('pl-ativo').checked,
             updated_at: new Date().toISOString(),
         };
@@ -56327,7 +56332,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <!-- [STACKCLOCK] alertas em tempo real do app dealer -->
 <script src="/stackclock-operador.js" defer></script>
 <!-- StackSangeur (painel do caixa): só liga em clube com feature_sangeur; não altera nada do app -->
-<script src="/stacksangeur-caixa.js?v=3" defer></script>
+<script src="/stacksangeur-caixa.js?v=4" defer></script>
 <script src="/tv-som.js"></script>
 <style>
 #cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }

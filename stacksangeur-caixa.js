@@ -43,10 +43,22 @@
     const pNome = (n) => String(n || '').trim().split(/\s+/)[0] || '';
     const meuId = () => (window.currentUser && window.currentUser.id) || null;
     const modalAberto = (id) => { const m = $(id); return !!(m && m.classList.contains('open')); };
-    function liberado() {
+    // Mesma regra do banco (_sangeur_clube_liberado) e do hasFeature: ajuste do clube > trial > plano.
+    // Retorna true/false, ou null enquanto o plano ainda não carregou (não decide nada).
+    function situacao() {
         const c = window.sbClube;
-        return !!(c && c.feature_overrides && c.feature_overrides.feature_sangeur === true);
+        if (!c || !c.id) return null;
+        const ov = c.feature_overrides;
+        if (ov && typeof ov === 'object' && 'feature_sangeur' in ov) return ov.feature_sangeur === true;
+        if (c.status === 'trial') return true;
+        try {
+            if (typeof _planosCache === 'undefined' || !_planosCache || !_planosCache.length) return null;
+            const plano = (typeof _planoAtualObj === 'function') ? _planoAtualObj() : null;
+            if (!plano) { const pa = _planosCache.find(x => x.id === c.plano_atual); return pa ? !!pa.feature_sangeur : null; }
+            return !!plano.feature_sangeur;
+        } catch (_) { return null; }
     }
+    function liberado() { return situacao() === true; }
     function lado() { const l = LSg(LADO_KEY, 'direita'); return ['direita', 'esquerda', 'off'].includes(l) ? l : 'direita'; }
     function telaLarga() { return window.innerWidth >= 1480; }
     function telaPequena() { return window.innerWidth < 900; }
@@ -78,8 +90,10 @@
     // ---------- ciclo de vida (liga/desliga conforme o clube logado) ----------
     function verificar() {
         const id = window.sbClube && window.sbClube.id;
-        if (liberado() && id) { if (clubeAtivo !== id) { parar(); iniciar(id); } else mostrarMenu(true); }
-        else if (clubeAtivo) parar();
+        const sit = situacao();
+        if (sit === true && id) { if (clubeAtivo !== id) { parar(); iniciar(id); } else mostrarMenu(true); }
+        else if (sit === false) { if (clubeAtivo) parar(); mostrarMenu('bloqueado'); }
+        else if (!id && clubeAtivo) parar();
     }
     setInterval(verificar, 3000);
     window.addEventListener('stackos:logged-in', () => setTimeout(verificar, 500));
@@ -120,16 +134,25 @@
     }
 
     // Item "StackSangeur" no menu lateral (só admin), abre a página de configuração
+    // on: true (liberado) | 'bloqueado' (cadeado, abre o aviso de upgrade) | false (remove)
     function mostrarMenu(on) {
         const existente = $('nav-stacksangeur');
         if (!on || !window.currentUser || String(window.currentUser.papel || '').toLowerCase() !== 'admin') { if (existente) existente.remove(); return; }
-        if (existente) return;
+        const modo = on === 'bloqueado' ? 'bloqueado' : 'liberado';
+        if (existente && existente.dataset.modo === modo) return;
+        if (existente) existente.remove();
         const ref = $('nav-stackbar') || $('nav-stackclock') || $('nav-config');
         if (!ref || !ref.parentNode) return;
-        const a = document.createElement('a');
-        a.id = 'nav-stacksangeur'; a.href = '/stacksangeur-painel.html'; a.target = '_blank'; a.className = 'nav-item';
+        const a = document.createElement(modo === 'liberado' ? 'a' : 'div');
+        a.id = 'nav-stacksangeur'; a.className = 'nav-item'; a.dataset.modo = modo;
         a.style.cssText = 'display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;text-decoration:none;';
         a.innerHTML = '<i class="fa-solid fa-coins nav-ico" style="width:16px;color:#a855f7;"></i> StackSangeur';
+        if (modo === 'liberado') { a.href = '/stacksangeur-painel.html'; a.target = '_blank'; }
+        else {
+            a.style.opacity = '0.55'; a.style.cursor = 'not-allowed';
+            a.insertAdjacentHTML('beforeend', '<span class="feat-lock" style="margin-left:auto;font-size:14px;opacity:0.7;">🔒</span>');
+            a.addEventListener('click', () => { try { if (typeof mostrarModalUpgrade === 'function') mostrarModalUpgrade('StackSangeur'); } catch (_) {} });
+        }
         ref.parentNode.insertBefore(a, ref.nextSibling);
     }
 
