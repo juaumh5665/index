@@ -157,14 +157,14 @@
   .ic-btn { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line2); display: flex; align-items: center; justify-content: center; color: var(--tx2); flex: 0 0 auto; }
   /* APARÊNCIA */
   #sheetTema { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
-  #sheetTema .box { width: 100%; max-width: 560px; background: var(--bg2); border-top: 1px solid var(--line2); border-radius: 20px 20px 0 0;
+  #sheetTema .box { width: 100%; max-width: 560px; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--bg2); border-top: 1px solid var(--line2); border-radius: 20px 20px 0 0;
     padding: 18px 16px calc(18px + var(--safe-b)); display: flex; flex-direction: column; gap: 14px; }
   .temas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .tema { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px; border-radius: 14px; border: 1.5px solid var(--line2); font-size: 12.5px; font-weight: 800; color: var(--tx2); }
-  .tema i { width: 34px; height: 34px; border-radius: 50%; display: block; }
+  .tema { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 9px 6px; border-radius: 14px; border: 1.5px solid var(--line2); font-size: 12.5px; font-weight: 800; color: var(--tx2); }
+  .tema i { width: 28px; height: 28px; border-radius: 50%; display: block; }
   .tema.sel { border-color: var(--ac); background: var(--acbg); color: var(--ac2); }
-  .fontes { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .fonte { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line2); color: var(--tx2); }
+  .fontes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .fonte { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line2); color: var(--tx2); }
   .fonte b { font-size: 20px; font-variant-numeric: tabular-nums; }
   .fonte span { font-size: 11px; font-weight: 700; color: var(--mut); }
   .fonte.sel { border-color: var(--ac); background: var(--acbg); color: var(--ac2); }
@@ -267,12 +267,13 @@
 <section id="sheetTema" hidden>
   <div class="box" role="dialog" aria-label="Aparência">
     <div style="display:flex;align-items:center;gap:10px"><b style="flex:1;font-size:17px">Aparência</b><button type="button" class="ic-btn" id="btnTemaFechar" aria-label="Fechar">✕</button></div>
-    <div class="lbl">Cor</div>
+    <div class="atalhos" id="atalhosTema"><button type="button" data-ir="lblCor">Cor</button><button type="button" data-ir="lblFNum">Fonte dos números</button><button type="button" data-ir="lblFTx">Fonte do texto</button></div>
+    <div class="lbl" id="lblCor">Cor</div>
     <div class="temas" id="listaTemas"></div>
     <label class="cor-livre"><input type="color" id="corLivre" value="#a855f7"> <span style="flex:1">Cor personalizada</span></label>
-    <div class="lbl">Fonte dos números</div>
+    <div class="lbl" id="lblFNum">Fonte dos números</div>
     <div class="fontes" id="listaFNum"></div>
-    <div class="lbl">Fonte do texto</div>
+    <div class="lbl" id="lblFTx">Fonte do texto</div>
     <div class="fontes" id="listaFTx"></div>
     <button type="button" class="btn btn-sec" id="btnTemaClube" style="height:46px;font-size:14px">Usar o padrão do clube</button>
     <div style="font-size:12px;color:var(--mut);text-align:center">Vale só para este celular.</div>
@@ -509,14 +510,16 @@ async function carregarTorneios() {
     renderTopo();
   } catch (e) { console.warn('[sangeur] torneios', e); }
 }
+function abaAtual() { const b = document.querySelector('nav.tabs button.on'); return b ? b.dataset.tab : 'jogadores'; }
 function torneioAtual() { return TORNEIOS.find(t => t.id === TORNEIO_ID) || null; }
 
 function renderTopo() {
   const t = torneioAtual();
   const sel = $('torSelect');
-  sel.hidden = TORNEIOS.length < 2;
+  const naLista = abaAtual() === 'jogadores';
+  sel.hidden = !naLista || TORNEIOS.length < 2;
   sel.innerHTML = TORNEIOS.map(x => '<button type="button" data-t="' + x.id + '" class="' + (x.id === TORNEIO_ID ? 'on' : '') + '">' + esc(x.nome) + '</button>').join('');
-  $('boxBusca').hidden = !t;
+  $('boxBusca').hidden = !naLista || !t;
   if (!t) { $('hTorneio').textContent = 'Nenhum torneio em andamento'; $('hNivel').textContent = '—'; $('hNivel').className = 'chip chip-mut'; return; }
   $('hTorneio').textContent = t.nome;
   const nivel = 'Nível ' + nivelHumano(t);
@@ -816,6 +819,8 @@ $('btnTema').addEventListener('click', () => { _carregarTodasFontes(); renderTem
 $('btnTemaFechar').addEventListener('click', () => { $('sheetTema').hidden = true; });
 $('sheetTema').addEventListener('click', (e) => {
   if (e.target === $('sheetTema')) { $('sheetTema').hidden = true; return; }
+  const ir = e.target.closest('button[data-ir]');
+  if (ir) { const alvo = $(ir.dataset.ir); if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   const fb = e.target.closest('button[data-fnum],button[data-ftx]');
   if (fb) { const atual = LS.get('stacksangeur_fonte', null) || {}; if (fb.dataset.fnum) atual.num = fb.dataset.fnum; else atual.txt = fb.dataset.ftx;
     LS.set('stacksangeur_fonte', atual); aplicarFontes(); renderTemas(); return; }
