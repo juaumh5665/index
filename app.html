@@ -39863,7 +39863,7 @@ function abrirAddJogadorCash(mesaId) {
     // Reset contagem de fichas e renderiza inputs por cor
     resetarFichasContagem('acj');
     renderFichasInputs('acj');
-    _cashContagemToggle('acj', true);   // "Contar fichas" sempre começa ligado
+    _cashContagemToggle('acj', _cashContagemSalva('acj'));   // 1ª vez ligado; depois como o operador deixou
     // Esconde o aviso de confronto inicial
     const confEl = document.getElementById('acj-fichas-confere');
     if (confEl) confEl.style.display = 'none';
@@ -39965,12 +39965,16 @@ async function confirmAddCashJogador() {
 }
 
 // "Contar fichas" (buy-in e recompra do cash): ligado = contagem por cor obrigatória (como sempre foi);
-// desligado = confirma só pelo valor. Começa ligado toda vez que o modal abre. Não altera valor/rake/transação.
+// desligado = confirma só pelo valor. Na 1ª vez abre ligado; depois abre como o operador deixou
+// (lembrado neste computador, separado para buy-in e recompra). Não altera valor/rake/transação.
 const _cashContagem = { acj: true, rec: true };
+function _cashContagemSalva(pre) { try { return localStorage.getItem('ps_cash_contar_fichas_' + pre) !== '0'; } catch (_) { return true; } }
 function _cashContagemLigada(pre) { return _cashContagem[pre] !== false; }
 function _cashContagemToggle(pre, forcar) {
     const on = (typeof forcar === 'boolean') ? forcar : !_cashContagemLigada(pre);
     _cashContagem[pre] = on;
+    // Só a escolha do operador (clique) fica lembrada
+    if (typeof forcar !== 'boolean') { try { localStorage.setItem('ps_cash_contar_fichas_' + pre, on ? '1' : '0'); } catch (_) {} }
     // Desligou: zera o que já tinha sido contado (nada de contagem pela metade guardada na sessão)
     if (!on) { try { resetarFichasContagem(pre); renderFichasInputs(pre); } catch (_) {} }
     const tr = document.getElementById(pre + '-cont-track'), th = document.getElementById(pre + '-cont-thumb');
@@ -40002,7 +40006,7 @@ function abrirRecompra(mesaId, jogadorId) {
     // Reset contagem de fichas e renderiza inputs por cor
     resetarFichasContagem('rec');
     renderFichasInputs('rec');
-    _cashContagemToggle('rec', true);   // "Contar fichas" sempre começa ligado
+    _cashContagemToggle('rec', _cashContagemSalva('rec'));   // 1ª vez ligado; depois como o operador deixou
     const confEl = document.getElementById('rec-fichas-confere');
     if (confEl) confEl.style.display = 'none';
 
