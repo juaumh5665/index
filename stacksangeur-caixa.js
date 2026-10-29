@@ -27,6 +27,9 @@
     let clubeAtivo = null, canal = null, pedidos = [], pollT = null, renderT = null, carregarT = null;
     let fluxo = null;            // lançamento em andamento { p, tid, antes:Set, pagto, abriu }
     let recusando = null;        // id do pedido com o campo de motivo aberto
+    let aba = 'pedidos';         // 'pedidos' | 'pochete'
+    let poc = [];                // pochetes das sangeurs (sangeur_pochete)
+    let movAberto = null;        // { sid, tipo:'carga'|'devolucao' } com o campo de fichas aberto
     let primeiraCarga = true, _audio = null, _obs = null;
     const vistos = new Set();
 
@@ -87,10 +90,15 @@
         try {
             canal = sb.channel('stacksangeur-caixa-' + id)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'sangeur_solicitacoes', filter: 'clube_id=eq.' + id }, () => agendarCarga())
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sangeur_fichas_mov', filter: 'clube_id=eq.' + id }, (pl) => {
+                    const n = pl && pl.new;
+                    if (n && n.tipo === 'contagem') toast('🪙 ' + pNome(n.criado_nome) + ' informou ' + (Number(n.quantidade) || 0).toLocaleString('pt-BR') + ' fichas');
+                    carregarPochete();
+                })
                 .subscribe();
         } catch (err) { console.warn('[SANGEUR] realtime:', err); }
-        carregar();
-        pollT = setInterval(() => { carregar(); reenviarPendentes(); }, 30000);
+        carregar(); carregarPochete();
+        pollT = setInterval(() => { carregar(); reenviarPendentes(); if (aba === 'pochete') carregarPochete(); }, 30000);
         renderT = setInterval(render, 5000);   // atualiza o "há X min"
         _obs = new MutationObserver(onModais);
         ['modal-torneio', 'modal-entrada'].forEach(mid => { const m = $(mid); if (m) _obs.observe(m, { attributes: true, attributeFilter: ['class'] }); });
@@ -121,12 +129,54 @@
         const a = document.createElement('a');
         a.id = 'nav-stacksangeur'; a.href = '/stacksangeur-painel.html'; a.target = '_blank'; a.className = 'nav-item';
         a.style.cssText = 'display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;border-radius:.5rem;font-size:.85rem;font-weight:700;color:#a1a1aa;text-decoration:none;';
-        a.innerHTML = '<i class="fa-solid fa-coins nav-ico" style="width:16px;color:#34d399;"></i> StackSangeur';
+        a.innerHTML = '<i class="fa-solid fa-coins nav-ico" style="width:16px;color:#a855f7;"></i> StackSangeur';
         ref.parentNode.insertBefore(a, ref.nextSibling);
     }
 
     // ---------- dados ----------
-    function agendarCarga() { clearTimeout(carregarT); carregarT = setTimeout(carregar, 250); }
+    function agendarCarga() { clearTimeout(carregarT); carregarT = setTimeout(() => { carregar(); carregarPochete(); }, 250); }
+    async function carregarPochete() {
+        if (!clubeAtivo) return;
+        try { const d = await rpc('sangeur_pochete', {}); if (d && d.ok) { poc = d.sangeurs || []; render(); } }
+        catch (err) { console.warn('[SANGEUR] pochete:', err); }
+    }
+    const fN = (n) => (Number(n) || 0).toLocaleString('pt-BR');
+    function pocheteHtml() {
+        if (!poc.length) return '<div class="sg-vazio">Nenhuma sangeur com permissão.<br>Libere em <a href="/stacksangeur-painel.html" target="_blank" style="color:#c4b5fd">Configurações</a>.</div>';
+        return poc.map(x => {
+            const esperado = (Number(x.cargas) || 0) - (Number(x.devolucoes) || 0) - (Number(x.entregues) || 0);
+            const cont = x.contagem, temCarga = Number(x.cargas) > 0;
+            const hr = cont ? new Date(cont.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+            let h = '<div class="sg-card"><div class="sg-l1"><div style="min-width:0"><div class="sg-nm">' + e(x.nome) + '</div>' +
+                '<div class="sg-sub">' + (cont ? 'Informou ' + fN(cont.quantidade) + ' fichas às ' + hr : 'Ainda não informou a contagem') + '</div></div>' +
+                '<div><div class="sg-val" style="color:#fafafa">' + (cont ? fN(cont.quantidade) : (temCarga ? fN(esperado) : '—')) + '</div><div class="sg-tp">' + (cont ? 'informado' : (temCarga ? 'pelo sistema' : 'fichas')) + '</div></div></div>';
+            if (temCarga && cont) {
+                const dif = Number(cont.quantidade) - esperado;
+                h += dif === 0 ? '<div class="sg-info" style="color:#86efac;font-weight:700">✓ Bate com o sistema (' + fN(esperado) + ')</div>'
+                               : '<div class="sg-info" style="color:#fca5a5;font-weight:700">Diferença de ' + (dif > 0 ? '+' : '−') + fN(Math.abs(dif)) + ' · sistema ' + fN(esperado) + '</div>';
+            }
+            h += '<div class="sg-info">Recebeu ' + fN(x.cargas) + ' · entregou ' + fN(x.entregues) + ' · devolveu ' + fN(x.devolucoes) + (Number(x.dinheiro) > 0 ? ' · ' + money(x.dinheiro) + ' em dinheiro' : '') + '</div>';
+            if (movAberto && movAberto.sid === x.sangeur_id) {
+                h += '<input class="sg-mot sg-qtd" data-sid="' + x.sangeur_id + '" inputmode="numeric" style="border-color:#4c2f7a;background:#0c0a12;font-family:\'JetBrains Mono\',monospace" placeholder="' + (movAberto.tipo === 'carga' ? 'Fichas entregues a ela' : 'Fichas recebidas de volta') + '">' +
+                     '<div class="sg-bts"><button type="button" class="sg-ok" data-a="mov-ok" data-sid="' + x.sangeur_id + '">' + (movAberto.tipo === 'carga' ? 'Confirmar entrega' : 'Confirmar devolução') + '</button>' +
+                     '<button type="button" class="sg-ok sg-sec" style="flex:0 0 80px" data-a="mov-voltar">Voltar</button></div>';
+            } else {
+                h += '<div class="sg-bts"><button type="button" class="sg-ok sg-sec" data-a="mov-abrir" data-tipo="carga" data-sid="' + x.sangeur_id + '">Entregar fichas</button>' +
+                     '<button type="button" class="sg-ok sg-sec" data-a="mov-abrir" data-tipo="devolucao" data-sid="' + x.sangeur_id + '">Receber de volta</button></div>';
+            }
+            return h + '</div>';
+        }).join('');
+    }
+    async function confirmarMov(sid, valor) {
+        const n = parseInt(String(valor || '').replace(/\D/g, ''), 10) || 0;
+        if (!movAberto || n <= 0) { toast('⚠️ Digite a quantidade de fichas'); return; }
+        try {
+            const d = await rpc('sangeur_caixa_mov_fichas', { p_sangeur: sid, p_tipo: movAberto.tipo, p_quantidade: n });
+            if (!d || !d.ok) throw new Error((d && d.erro) || 'erro');
+            toast(movAberto.tipo === 'carga' ? '🪙 ' + fN(n) + ' fichas entregues à sangeur' : '🪙 Devolução de ' + fN(n) + ' fichas registrada');
+            movAberto = null; carregarPochete();
+        } catch (err) { toast('⚠️ Não salvou: ' + (err.message || 'sem conexão')); }
+    }
     async function carregar() {
         if (!clubeAtivo) return;
         try {
@@ -163,37 +213,37 @@
         if (!$('sg-estilo')) {
             const st = document.createElement('style'); st.id = 'sg-estilo';
             st.textContent = `
-#sg-painel{position:fixed;top:1.5rem;bottom:1.5rem;display:none;flex-direction:column;background:#101618;border:1px solid #1f3a36;border-radius:16px;overflow:hidden;font-family:'Manrope',system-ui,sans-serif;color:#e4e4e7;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+#sg-painel{position:fixed;top:1.5rem;bottom:1.5rem;display:none;flex-direction:column;background:#110f19;border:1px solid #3b2a5c;border-radius:16px;overflow:hidden;font-family:'Manrope',system-ui,sans-serif;color:#e4e4e7;box-shadow:0 20px 50px rgba(0,0,0,.45)}
 #sg-painel.sg-faixa{cursor:pointer;align-items:center;gap:12px;padding:16px 0}
-#sg-painel .sg-h{padding:14px 14px 12px;border-bottom:1px solid #1d2b2d;display:flex;align-items:center;gap:8px}
+#sg-painel .sg-h{padding:14px 14px 12px;border-bottom:1px solid #231e33;display:flex;align-items:center;gap:8px}
 #sg-painel .sg-h b{flex:1;font-size:14.5px;font-weight:800;color:#fafafa}
-#sg-painel .sg-ib{width:32px;height:32px;border-radius:9px;border:1px solid #27403f;background:none;color:#a3b3b1;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px}
-#sg-painel .sg-ib:hover{color:#fff;border-color:#34d399}
+#sg-painel .sg-ib{width:32px;height:32px;border-radius:9px;border:1px solid #33294a;background:none;color:#b4adc8;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px}
+#sg-painel .sg-ib:hover{color:#fff;border-color:#a855f7}
 #sg-painel .sg-lista{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
-#sg-painel .sg-card{background:#0b1012;border:1px solid #23302f;border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+#sg-painel .sg-card{background:#0c0a12;border:1px solid #27213a;border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
 #sg-painel .sg-card.sg-atr{border-color:#7c5a12;box-shadow:inset 3px 0 0 #f59e0b}
-#sg-painel .sg-card.sg-proc{border-color:#1f5a50;opacity:.85}
+#sg-painel .sg-card.sg-proc{border-color:#4c2f7a;opacity:.85}
 #sg-painel .sg-l1{display:flex;justify-content:space-between;gap:8px}
 #sg-painel .sg-nm{font-size:14px;font-weight:800;color:#fafafa;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #sg-painel .sg-sub{font-size:11.5px;color:#a1a1aa;margin-top:2px}
 #sg-painel .sg-val{font:700 14.5px 'JetBrains Mono',ui-monospace,monospace;color:#fbbf24;text-align:right;white-space:nowrap}
 #sg-painel .sg-tp{font-size:11px;font-weight:700;color:#71717a;text-align:right}
 #sg-painel .sg-tp.sg-x{color:#f59e0b}
-#sg-painel .sg-info{font-size:11.5px;color:#8b9a98}
+#sg-painel .sg-info{font-size:11.5px;color:#9a93b0}
 #sg-painel .sg-bts{display:flex;gap:8px}
 #sg-painel .sg-ok{flex:1;height:38px;border:none;border-radius:10px;background:#22c55e;color:#052e16;font:800 13px 'Manrope',sans-serif;cursor:pointer}
-#sg-painel .sg-ok.sg-sec{background:none;border:1px solid #2f4b47;color:#6ee7b7}
+#sg-painel .sg-ok.sg-sec{background:none;border:1px solid #4c2f7a;color:#c4b5fd}
 #sg-painel .sg-no{width:90px;height:38px;border:1px solid #3f1d1d;border-radius:10px;background:none;color:#fca5a5;font:700 12.5px 'Manrope',sans-serif;cursor:pointer}
 #sg-painel .sg-mot{width:100%;height:36px;border-radius:9px;border:1px solid #3f1d1d;background:#140c0c;color:#fff;padding:0 10px;font:600 13px 'Manrope',sans-serif;outline:none}
 #sg-painel .sg-vazio{color:#71717a;font-size:12.5px;text-align:center;padding:28px 10px;line-height:1.5}
-#sg-painel .sg-rod{padding:10px 12px;border-top:1px solid #1d2b2d;font-size:11px;color:#71717a;display:flex;gap:8px;align-items:center}
+#sg-painel .sg-rod{padding:10px 12px;border-top:1px solid #231e33;font-size:11px;color:#71717a;display:flex;gap:8px;align-items:center}
 #sg-painel .sg-badge{font:700 13px 'JetBrains Mono',monospace;color:#1a1306;background:#fbbf24;border-radius:999px;min-width:30px;height:30px;padding:0 9px;display:flex;align-items:center;justify-content:center}
-#sg-painel .sg-badge.sg-zero{background:#1d2b2d;color:#8b9a98}
-#sg-painel .sg-vert{writing-mode:vertical-rl;transform:rotate(180deg);font:800 11.5px 'Manrope',sans-serif;color:#34d399;letter-spacing:1.4px}
-#sg-flutuante{position:fixed;right:22px;bottom:22px;z-index:90;display:none;align-items:center;gap:10px;background:#101618;border:1px solid #7c5a12;color:#fde68a;border-radius:999px;padding:10px 16px 10px 12px;font:800 13px 'Manrope',sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+#sg-painel .sg-badge.sg-zero{background:#231e33;color:#9a93b0}
+#sg-painel .sg-vert{writing-mode:vertical-rl;transform:rotate(180deg);font:800 11.5px 'Manrope',sans-serif;color:#a855f7;letter-spacing:1.4px}
+#sg-flutuante{position:fixed;right:22px;bottom:22px;z-index:90;display:none;align-items:center;gap:10px;background:#110f19;border:1px solid #7c5a12;color:#fde68a;border-radius:999px;padding:10px 16px 10px 12px;font:800 13px 'Manrope',sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.45)}
 #sg-flutuante .sg-badge{font:700 13px 'JetBrains Mono',monospace;color:#1a1306;background:#fbbf24;border-radius:999px;min-width:28px;height:28px;padding:0 8px;display:flex;align-items:center;justify-content:center}
-#sg-entrada-aviso{background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.35);border-radius:.6rem;padding:.65rem .8rem;font-size:.8rem;color:#d1fae5;line-height:1.45}
-#sg-entrada-aviso b{color:#6ee7b7}
+#sg-entrada-aviso{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.4);border-radius:.6rem;padding:.65rem .8rem;font-size:.8rem;color:#ede9fe;line-height:1.45}
+#sg-entrada-aviso b{color:#c4b5fd}
 #sg-entrada-aviso .sg-warn{color:#fbbf24;font-weight:700}
 `;
             document.head.appendChild(st);
@@ -201,7 +251,12 @@
         if (!$('sg-painel')) {
             const a = document.createElement('div'); a.id = 'sg-painel'; a.setAttribute('role', 'complementary'); a.setAttribute('aria-label', 'Solicitações da sangeur');
             a.addEventListener('click', cliquePainel);
-            a.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.classList.contains('sg-mot')) { ev.preventDefault(); const id = ev.target.dataset.id; confirmarRecusa(id, ev.target.value); } });
+            a.addEventListener('keydown', (ev) => {
+                if (ev.key !== 'Enter') return;
+                if (ev.target.classList.contains('sg-qtd')) { ev.preventDefault(); confirmarMov(ev.target.dataset.sid, ev.target.value); return; }
+                if (ev.target.classList.contains('sg-mot')) { ev.preventDefault(); confirmarRecusa(ev.target.dataset.id, ev.target.value); }
+            });
+            a.addEventListener('input', (ev) => { if (!ev.target.classList.contains('sg-qtd')) return; const n = parseInt(ev.target.value.replace(/\D/g, ''), 10) || 0; ev.target.value = n ? n.toLocaleString('pt-BR') : ''; });
             document.body.appendChild(a);
         }
         if (!$('sg-flutuante')) {
@@ -279,10 +334,10 @@
                  '<button type="button" class="sg-ok sg-sec" style="flex:0 0 80px" data-a="recusar-voltar">Voltar</button></div>';
         } else if (outroCaixa) {
             const min = (Date.now() - new Date(p.processando_em).getTime()) / 60000;
-            h += '<div class="sg-info" style="color:#6ee7b7">Em lançamento por outro caixa</div>';
+            h += '<div class="sg-info" style="color:#c4b5fd">Em lançamento por outro caixa</div>';
             if (min > 2) h += '<div class="sg-bts"><button type="button" class="sg-ok sg-sec" data-a="assumir" data-id="' + p.id + '">Assumir (parado há ' + Math.floor(min) + ' min)</button></div>';
         } else if (fluxo && fluxo.p.id === p.id) {
-            h += '<div class="sg-info" style="color:#6ee7b7">Lançando agora — confirme no “Registrar Entrada”</div>';
+            h += '<div class="sg-info" style="color:#c4b5fd">Lançando agora — confirme no “Registrar Entrada”</div>';
         } else if (!t) {
             h += '<div class="sg-info" style="color:#fbbf24">Torneio não carregado neste computador</div>' +
                  '<div class="sg-bts"><button type="button" class="sg-no" style="flex:1;width:auto" data-a="recusar" data-id="' + p.id + '">Recusar</button></div>';
@@ -321,17 +376,25 @@
         }
         a.title = '';
         const som = LSg(SOM_KEY, '1') !== '0';
-        let h = '<div class="sg-h"><b>Solicitações da sangeur</b><span class="sg-badge' + (n ? '' : ' sg-zero') + '">' + n + '</span>' +
+        const abaBt = (id, txt) => '<button type="button" data-a="aba-' + id + '" style="height:32px;padding:0 10px;border-radius:9px;border:1px solid ' + (aba === id ? '#a855f7' : '#33294a') + ';background:' + (aba === id ? 'rgba(168,85,247,.16)' : 'none') + ';color:' + (aba === id ? '#e9d5ff' : '#9a93b0') + ';font:800 12.5px Manrope,sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px">' + txt + '</button>';
+        let h = '<div class="sg-h"><div style="flex:1;display:flex;gap:6px">' + abaBt('pedidos', 'Pedidos <span class="sg-badge' + (n ? '' : ' sg-zero') + '" style="min-width:20px;height:20px;font-size:11px;padding:0 6px">' + n + '</span>') + abaBt('pochete', 'Pochetes') + '</div>' +
             '<button type="button" class="sg-ib" data-a="som" title="' + (som ? 'Som ligado' : 'Som desligado') + '"><i class="fa-solid ' + (som ? 'fa-volume-high' : 'fa-volume-xmark') + '"></i></button>' +
             '<button type="button" class="sg-ib" data-a="lado" title="Mudar de lado"><i class="fa-solid fa-right-left"></i></button>' +
             '<button type="button" class="sg-ib" data-a="recolher" title="Recolher"><i class="fa-solid fa-chevron-' + (lado() === 'esquerda' ? 'left' : 'right') + '"></i></button></div>';
         h += '<div class="sg-lista">';
+        if (aba === 'pochete') {
+            h += pocheteHtml() + '</div><div class="sg-rod"><span style="flex:1">Fichas do turno (últimas 18h) · a sangeur informa a contagem pelo celular</span></div>';
+            const qAtual = movAberto ? (a.querySelector('.sg-qtd') || {}).value : null;
+            a.innerHTML = h;
+            if (movAberto) { const i = a.querySelector('.sg-qtd'); if (i) { if (qAtual) i.value = qAtual; if (document.activeElement !== i) i.focus(); } }
+            return;
+        }
         if (!total) h += '<div class="sg-vazio">Nenhum pedido agora.<br>Quando a sangeur pedir pelo celular, aparece aqui com som.</div>';
         // pedidos do torneio aberto primeiro
         const aberto = (modalAberto('modal-torneio') && idxAtivo() != null && torneios[idxAtivo()]) ? torneios[idxAtivo()].id : null;
         pedidos.slice().sort((x, y) => (x.torneio_id === aberto ? 0 : 1) - (y.torneio_id === aberto ? 0 : 1) || new Date(x.criado_em) - new Date(y.criado_em))
             .forEach(p => { h += cardHtml(p); });
-        h += '</div><div class="sg-rod"><span style="flex:1">Lado e modos em <a href="/stacksangeur-painel.html" target="_blank" style="color:#6ee7b7">Configurações</a></span></div>';
+        h += '</div><div class="sg-rod"><span style="flex:1">Lado e modos em <a href="/stacksangeur-painel.html" target="_blank" style="color:#c4b5fd">Configurações</a></span></div>';
         a.innerHTML = h;
         if (recusando) { const inp = a.querySelector('.sg-mot'); if (inp) { if (motAtual) inp.value = motAtual; if (document.activeElement !== inp) inp.focus(); } }
     }
@@ -344,6 +407,10 @@
         if (ac === 'som') { LSs(SOM_KEY, LSg(SOM_KEY, '1') === '0' ? '1' : '0'); render(); return; }
         if (ac === 'lado') { LSs(LADO_KEY, lado() === 'direita' ? 'esquerda' : 'direita'); render(); return; }
         if (ac === 'recolher') { LSs(EXP_KEY, '0'); render(); return; }
+        if (ac === 'aba-pedidos' || ac === 'aba-pochete') { aba = ac.slice(4); movAberto = null; recusando = null; if (aba === 'pochete') carregarPochete(); render(); return; }
+        if (ac === 'mov-abrir') { movAberto = { sid: b.dataset.sid, tipo: b.dataset.tipo }; render(); return; }
+        if (ac === 'mov-voltar') { movAberto = null; render(); return; }
+        if (ac === 'mov-ok') { const i = a.querySelector('.sg-qtd'); confirmarMov(b.dataset.sid, i ? i.value : ''); return; }
         if (ac === 'recusar-voltar') { recusando = null; render(); return; }
         if (ac === 'recusar') { recusando = b.dataset.id; render(); return; }
         if (ac === 'recusar-ok') { const inp = a.querySelector('.sg-mot'); confirmarRecusa(b.dataset.id, inp ? inp.value : ''); return; }
@@ -430,7 +497,7 @@
                     try { const r = await rpc('sangeur_caixa_reservar', { p_id: p.id, p_forcar: false }); if (r && r.ok) await concluir(p, jaFeitas.map(x => x.id).join(','), null); else toast('⚠️ Pedido indisponível'); }
                     catch (_) { toast('⚠️ Sem conexão'); }
                     carregar();
-                }, { icon: '🛡️', confirmLabel: 'Marcar como aceito', confirmColor: '#16a34a', borderColor: '#34d399', cancelLabel: 'Voltar' });
+                }, { icon: '🛡️', confirmLabel: 'Marcar como aceito', confirmColor: '#16a34a', borderColor: '#a855f7', cancelLabel: 'Voltar' });
             return;
         }
         let r;

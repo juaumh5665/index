@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0b1416">
+<meta name="theme-color" content="#08070d" id="metaTema">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sangeur">
 <link rel="manifest" href="/sangeur-manifest.json">
-<link rel="apple-touch-icon" href="/icons/icon-sangeur-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-sangeur.png">
 <link rel="icon" type="image/png" href="/icons/icon-sangeur-192.png">
 <title>StackSangeur</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,9 +17,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0b1416; --bg2: #0f1a1c; --card: #111d20; --line: #1d2f33; --line2: #27403f;
-    --tx: #f4f4f5; --tx2: #d1dbd9; --mut: #8b9a98; --mut2: #71807e;
-    --ac: #34d399; --ac2: #6ee7b7; --acbg: #10302b; --acdk: #052e26;
+    /* Padrão: preto e roxo do StackOS (o app recalcula tudo em aplicarTema) */
+    --bg: #08070d; --bg2: #0e0c15; --card: #13111c; --line: #221d33; --line2: #2f2847;
+    --tx: #f4f4f5; --tx2: #dcd8e6; --mut: #9a93b0; --mut2: #756e8a;
+    --ac: #a855f7; --ac2: #d8b4fe; --acbg: #1d1430; --acln: #4c2f7a; --acdk: #ffffff;
+    --grad: linear-gradient(135deg, #c06cff 0%, #5b5bff 100%);
     --warn: #fbbf24; --warnbg: #2a2110; --err: #fca5a5; --errbg: #2a1515; --errln: #5b2424;
     --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   }
@@ -47,7 +49,7 @@
   .inp:focus { border-color: var(--ac); }
   .btn { height: 52px; border-radius: 14px; font-weight: 800; font-size: 16px; display: flex; align-items: center;
     justify-content: center; gap: 8px; }
-  .btn-pri { background: var(--ac); color: var(--acdk); }
+  .btn-pri { background: var(--grad); color: var(--acdk); }
   .btn-pri:disabled { opacity: .45; }
   .btn-sec { border: 1px solid var(--line2); color: var(--tx2); }
   .erro { display: none; background: var(--errbg); border: 1px solid var(--errln); color: var(--err); border-radius: 12px;
@@ -67,7 +69,7 @@
   .who .ola { font-size: 17px; font-weight: 800; }
   .who .tor { font-size: 12.5px; color: var(--mut); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chip { font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 5px 10px; white-space: nowrap; }
-  .chip-ac { background: var(--acbg); color: var(--ac2); border: 1px solid #1f5a50; }
+  .chip-ac { background: var(--acbg); color: var(--ac2); border: 1px solid var(--acln); }
   .chip-warn { background: var(--warnbg); color: var(--warn); border: 1px solid #5c4515; }
   .chip-err { background: var(--errbg); color: var(--err); border: 1px solid var(--errln); }
   .chip-mut { background: var(--bg2); color: var(--mut); border: 1px solid var(--line2); }
@@ -79,7 +81,7 @@
   .tor-select { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
   .tor-select button { flex: 0 0 auto; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line2);
     color: var(--tx2); font-size: 13px; font-weight: 700; }
-  .tor-select button.on { background: var(--acbg); border-color: #1f5a50; color: var(--ac2); }
+  .tor-select button.on { background: var(--acbg); border-color: var(--acln); color: var(--ac2); }
 
   main { flex: 1; padding: 14px 16px calc(96px + var(--safe-b)); display: flex; flex-direction: column; gap: 10px; }
   .sec { font-size: 11.5px; font-weight: 800; color: var(--mut); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
@@ -141,15 +143,45 @@
   .ped .acts button { height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--errln); color: var(--err); font-weight: 700; font-size: 13px; }
 
   #toast { position: fixed; left: 50%; bottom: calc(86px + var(--safe-b)); transform: translateX(-50%) translateY(20px); z-index: 40;
-    background: #1b2a2d; color: var(--tx); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 16px; font-size: 14px;
+    background: var(--line); color: var(--tx); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 16px; font-size: 14px;
     font-weight: 700; opacity: 0; transition: .2s; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  #toast.ok { border-color: #1f5a50; color: var(--ac2); }
+  #toast.ok { border-color: var(--acln); color: var(--ac2); }
   #toast.err { border-color: var(--errln); color: var(--err); }
-  #loading { position: fixed; inset: 0; z-index: 50; background: rgba(5,10,11,.6); display: none; align-items: center; justify-content: center; }
+  #loading { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; }
   #loading.show { display: flex; }
   .spin { width: 38px; height: 38px; border-radius: 50%; border: 3px solid var(--line2); border-top-color: var(--ac); animation: sp .8s linear infinite; }
   @keyframes sp { to { transform: rotate(360deg); } }
+  .ic-btn { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--line2); display: flex; align-items: center; justify-content: center; color: var(--tx2); flex: 0 0 auto; }
+  /* APARÊNCIA */
+  #sheetTema { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
+  #sheetTema .box { width: 100%; max-width: 560px; background: var(--bg2); border-top: 1px solid var(--line2); border-radius: 20px 20px 0 0;
+    padding: 18px 16px calc(18px + var(--safe-b)); display: flex; flex-direction: column; gap: 14px; }
+  .temas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .tema { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px; border-radius: 14px; border: 1.5px solid var(--line2); font-size: 12.5px; font-weight: 800; color: var(--tx2); }
+  .tema i { width: 34px; height: 34px; border-radius: 50%; display: block; }
+  .tema.sel { border-color: var(--ac); background: var(--acbg); color: var(--ac2); }
+  .cor-livre { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line2); font-size: 14px; font-weight: 700; color: var(--tx2); }
+  .cor-livre input { width: 46px; height: 34px; border: none; background: none; padding: 0; }
+  /* POCHETE */
+  .poc-main { background: var(--card); border: 1px solid var(--acln); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .poc-main small { font-size: 11.5px; font-weight: 800; color: var(--mut); text-transform: uppercase; letter-spacing: .8px; }
+  .poc-main b { font-size: 34px; color: var(--tx); }
+  .poc-main span { font-size: 13px; color: var(--mut); }
+  .poc-dif { font-size: 13px; font-weight: 800; border-radius: 10px; padding: 8px 10px; }
+  .poc-dif.ok { background: var(--acbg); color: var(--ac2); }
+  .poc-dif.no { background: var(--errbg); color: var(--err); }
+  .poc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .poc-grid div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .poc-grid small { display: block; font-size: 11px; color: var(--mut); font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+  .poc-grid b { display: block; margin-top: 4px; font-size: 19px; }
+  .informar { display: flex; flex-direction: column; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .informar .row { display: flex; gap: 8px; }
+  .informar .row .inp { flex: 1; min-width: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; }
+  .atalhos { display: flex; gap: 6px; flex-wrap: wrap; }
+  .atalhos button { height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line2); font-size: 13px; font-weight: 700; color: var(--tx2); }
+  .mov { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--tx2); padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .mov span { color: var(--mut); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -157,7 +189,7 @@
 <!-- ============ LOGIN ============ -->
 <section id="scr-login" hidden>
   <div class="brand">
-    <svg width="52" height="52" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="18" fill="none" stroke="#34d399" stroke-width="3"/><circle cx="24" cy="24" r="10" fill="none" stroke="#34d399" stroke-width="3" stroke-dasharray="4 4"/><circle cx="24" cy="24" r="3" fill="#34d399"/></svg>
+    <img src="/icons/icon-sangeur-192.png" width="76" height="76" alt="" style="border-radius:20px">
     <h1>StackSangeur</h1>
     <p>Fichas na mesa, direto do celular</p>
   </div>
@@ -180,21 +212,24 @@
         <div class="tor" id="hTorneio">—</div>
       </div>
       <span class="chip chip-mut" id="hNivel">—</span>
+      <button type="button" class="ic-btn" id="btnTema" aria-label="Aparência"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/></svg></button>
     </div>
     <div class="offline" id="hOffline" hidden>Sem internet. Os pedidos ficam guardados e são enviados quando a conexão voltar.</div>
     <div class="tor-select" id="torSelect" hidden></div>
     <label class="search" id="boxBusca">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b9a98" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color:var(--mut)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input type="search" id="inpBusca" placeholder="Buscar jogador pelo nome" autocomplete="off" enterkeyhint="search">
     </label>
   </header>
 
   <main id="tabJogadores"></main>
   <main id="tabPedidos" hidden></main>
+  <main id="tabPochete" hidden></main>
 
   <nav class="tabs">
     <button type="button" class="on" data-tab="jogadores">Jogadores</button>
-    <button type="button" data-tab="pedidos" id="tabBtnPedidos">Meus pedidos</button>
+    <button type="button" data-tab="pedidos" id="tabBtnPedidos">Pedidos</button>
+    <button type="button" data-tab="pochete">Pochete</button>
   </nav>
 </section>
 
@@ -202,7 +237,7 @@
 <section id="sheet" hidden>
   <header>
     <button type="button" class="voltar" id="btnVoltar" aria-label="Voltar">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d1dbd9" stroke-width="2.2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true" style="color:var(--tx2)"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
     <div style="flex:1;min-width:0">
       <div style="font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="sNome">—</div>
@@ -212,6 +247,17 @@
   </header>
   <div class="corpo" id="sCorpo"></div>
   <footer><button class="btn btn-pri" type="button" id="btnEnviar" style="width:100%" disabled>Escolha o pedido</button></footer>
+</section>
+
+<!-- ============ APARÊNCIA ============ -->
+<section id="sheetTema" hidden>
+  <div class="box" role="dialog" aria-label="Aparência">
+    <div style="display:flex;align-items:center;gap:10px"><b style="flex:1;font-size:17px">Aparência</b><button type="button" class="ic-btn" id="btnTemaFechar" aria-label="Fechar">✕</button></div>
+    <div class="temas" id="listaTemas"></div>
+    <label class="cor-livre"><input type="color" id="corLivre" value="#a855f7"> <span style="flex:1">Cor personalizada</span></label>
+    <button type="button" class="btn btn-sec" id="btnTemaClube" style="height:46px;font-size:14px">Usar o padrão do clube</button>
+    <div style="font-size:12px;color:var(--mut);text-align:center">Vale só para este celular.</div>
+  </div>
 </section>
 
 <div id="toast"></div>
@@ -378,8 +424,8 @@ function opcoesJogador(t, j) {
     ops.push({ tipo: 'reentry', valor: valorReentry(t), fichas: Number(t.stack) || 0, maxQtd: permitido('reentry_multipla') ? Math.max(1, rm) : 1, trava: trava(t, 'reentry') });
   }
   if (!j.eliminado) {
-    if (Number(t.rebuy_valor) > 0 && permitido('rebuy_simples')) ops.push({ tipo: 'rebuy_simples', valor: Number(t.rebuy_valor), fichas: Number(t.rebuy_fichas) || 0, trava: trava(t, 'rebuy_simples') });
-    if (Number(t.rebuy_duplo_valor) > 0 && permitido('rebuy_duplo')) ops.push({ tipo: 'rebuy_duplo', valor: Number(t.rebuy_duplo_valor), fichas: Number(t.rebuy_duplo_fichas) || 0, trava: trava(t, 'rebuy_duplo') });
+    if (Number(t.rebuy_valor) > 0 && permitido('rebuy_simples')) ops.push({ tipo: 'rebuy_simples', valor: Number(t.rebuy_valor), fichas: Number(t.rebuy_fichas) || Number(t.stack) || 0, trava: trava(t, 'rebuy_simples') });
+    if (Number(t.rebuy_duplo_valor) > 0 && permitido('rebuy_duplo')) ops.push({ tipo: 'rebuy_duplo', valor: Number(t.rebuy_duplo_valor), fichas: Number(t.rebuy_duplo_fichas) || (Number(t.stack) || 0) * 2, trava: trava(t, 'rebuy_duplo') });
     if (Number(t.addon_fichas) > 0 && permitido('addon')) ops.push({ tipo: 'addon', valor: Number(t.addon_valor) || 0, fichas: Number(t.addon_fichas) || 0, trava: (Number(j.addons) > 0 ? 'Já comprou add-on (1 por jogador)' : trava(t, 'addon')) });
     if (t.last_chance_ativo && (Number(t.last_chance_valor) > 0 || Number(t.last_chance_fichas) > 0) && permitido('last_chance')) ops.push({ tipo: 'last_chance', valor: Number(t.last_chance_valor) || 0, fichas: Number(t.last_chance_fichas) || 0, trava: trava(t, 'last_chance') });
   }
@@ -396,6 +442,7 @@ async function validarEEntrar() {
     throw new Error(ERROS[d?.erro] || ('Acesso recusado (' + (d?.erro || 'desconhecido') + ')'));
   }
   SESS = d;
+  aplicarTema();
   await entrarApp();
 }
 
@@ -430,6 +477,7 @@ async function entrarApp() {
   await Promise.all([carregarJogadores(), carregarPedidos()]);
   assinarRealtime();
   enviarFila();
+  carregarPochete();
 }
 
 async function carregarTorneios() {
@@ -618,7 +666,7 @@ async function carregarPedidos() {
 function renderPedidos() {
   const main = $('tabPedidos');
   const ag = PEDIDOS.filter(p => p.status === 'pendente' || p.status === 'processando').length + FILA.length;
-  $('tabBtnPedidos').textContent = 'Meus pedidos' + (ag ? ' · ' + ag : '');
+  $('tabBtnPedidos').textContent = 'Pedidos' + (ag ? ' · ' + ag : '');
   const aceitos = PEDIDOS.filter(p => p.status === 'aceita');
   const naHora = SESS?.config?.entrega_modo === 'na_hora';
   const comigo = PEDIDOS.filter(p => (p.status === 'aceita' || (naHora && (p.status === 'pendente' || p.status === 'processando'))) && (p.forma_pagto_final || p.forma_pagto) === 'dinheiro')
@@ -656,14 +704,139 @@ $('tabPedidos').addEventListener('click', async (e) => {
   carregarPedidos(); carregarJogadores();
 });
 
+// ============================================================
+// APARÊNCIA — padrão preto e roxo do StackOS; o clube define um padrão
+// (Configurações no StackOS) e cada sangeur pode trocar no próprio celular.
+// ============================================================
+const TEMAS = [
+  { id: 'stackos', nome: 'StackOS', ac: '#a855f7', grad: ['#c06cff', '#5b5bff'] },
+  { id: 'violeta', nome: 'Violeta', ac: '#8b5cf6' },
+  { id: 'esmeralda', nome: 'Esmeralda', ac: '#34d399' },
+  { id: 'oceano', nome: 'Oceano', ac: '#38bdf8' },
+  { id: 'ouro', nome: 'Ouro', ac: '#fbbf24' },
+  { id: 'rubi', nome: 'Rubi', ac: '#f43f5e' }
+];
+const TEMA_PADRAO = TEMAS[0];
+function _hex(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function _rgbHex(a) { return '#' + a.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join(''); }
+function mix(a, b, t) { const x = _hex(a), y = _hex(b); return _rgbHex(x.map((v, i) => v + (y[i] - v) * t)); }
+function _lum(h) { const c = _hex(h).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; }
+function _temaValido(t) { return t && /^#[0-9a-f]{6}$/i.test(t.ac || ''); }
+function temaAtivo() {
+  const pessoal = LS.get('stacksangeur_tema', null);
+  if (_temaValido(pessoal)) return pessoal;
+  const clube = SESS && SESS.config && SESS.config.tema;
+  if (_temaValido(clube)) return clube;
+  return TEMA_PADRAO;
+}
+function aplicarTema() {
+  const t = temaAtivo(), ac = t.ac, base = '#08080c', st = document.documentElement.style;
+  const set = (k, v) => st.setProperty(k, v);
+  set('--bg', mix(base, ac, .035)); set('--bg2', mix('#0e0e13', ac, .05)); set('--card', mix('#131318', ac, .06));
+  set('--line', mix('#1f1f26', ac, .12)); set('--line2', mix('#2a2a33', ac, .16));
+  set('--tx2', mix('#e2e2e8', ac, .06)); set('--mut', mix('#9b9ba6', ac, .12)); set('--mut2', mix('#76767f', ac, .12));
+  set('--ac', ac); set('--ac2', mix(ac, '#ffffff', .45)); set('--acbg', mix(base, ac, .16)); set('--acln', mix(base, ac, .42));
+  const g = (Array.isArray(t.grad) && t.grad.length === 2 && t.grad.every(c => /^#[0-9a-f]{6}$/i.test(c))) ? t.grad : [mix(ac, '#ffffff', .12), mix(ac, '#000000', .2)];
+  set('--grad', 'linear-gradient(135deg, ' + g[0] + ' 0%, ' + g[1] + ' 100%)');
+  // texto do botão: o de maior contraste (WCAG) — degradê do StackOS fica branco
+  const L = _lum(mix(g[0], g[1], .5));
+  set('--acdk', (t.grad ? false : (L + .05) / .05 > 1.05 / (L + .05)) ? '#111111' : '#ffffff');
+  const m = $('metaTema'); if (m) m.setAttribute('content', mix(base, ac, .035));
+}
+function renderTemas() {
+  const at = temaAtivo();
+  $('listaTemas').innerHTML = TEMAS.map(t => {
+    const fundo = t.grad ? 'linear-gradient(135deg,' + t.grad[0] + ',' + t.grad[1] + ')' : t.ac;
+    return '<button type="button" class="tema' + (at.id === t.id ? ' sel' : '') + '" data-tema="' + t.id + '"><i style="background:' + fundo + '"></i>' + t.nome + '</button>';
+  }).join('');
+  $('corLivre').value = at.ac;
+  const temClube = _temaValido(SESS && SESS.config && SESS.config.tema);
+  $('btnTemaClube').textContent = temClube ? 'Usar o padrão do clube' : 'Voltar ao padrão StackOS';
+  $('btnTemaClube').hidden = !_temaValido(LS.get('stacksangeur_tema', null));
+}
+$('btnTema').addEventListener('click', () => { renderTemas(); $('sheetTema').hidden = false; });
+$('btnTemaFechar').addEventListener('click', () => { $('sheetTema').hidden = true; });
+$('sheetTema').addEventListener('click', (e) => {
+  if (e.target === $('sheetTema')) { $('sheetTema').hidden = true; return; }
+  const b = e.target.closest('button[data-tema]'); if (!b) return;
+  const t = TEMAS.find(x => x.id === b.dataset.tema); if (!t) return;
+  LS.set('stacksangeur_tema', t); aplicarTema(); renderTemas();
+});
+$('corLivre').addEventListener('input', (e) => { LS.set('stacksangeur_tema', { id: 'livre', ac: e.target.value }); aplicarTema(); renderTemas(); });
+$('btnTemaClube').addEventListener('click', () => { try { localStorage.removeItem('stacksangeur_tema'); } catch (_) {} aplicarTema(); renderTemas(); });
+
+// ============================================================
+// POCHETE — fichas com a sangeur. Ela informa a contagem; o caixa vê
+// e registra o que entregou/recebeu. Esperado = recebidas − devolvidas − entregues em pedidos.
+// ============================================================
+let POC = null;
+const fichasN = (n) => (Number(n) || 0).toLocaleString('pt-BR');
+async function carregarPochete() {
+  try {
+    const d = await rpc('sangeur_pochete');
+    if (!d || !d.ok) return;
+    POC = (d.sangeurs || []).find(x => x.sangeur_id === SESS.user_id) || { cargas: 0, devolucoes: 0, entregues: 0, dinheiro: 0, contagem: null, movimentos: [] };
+    if (!$('tabPochete').hidden) renderPochete();
+  } catch (e) { console.warn('[sangeur] pochete', e); }
+}
+function renderPochete() {
+  const m = $('tabPochete');
+  if (!POC) { m.innerHTML = '<div class="vazio">Carregando…</div>'; return; }
+  const digitando = document.activeElement && document.activeElement.id === 'inpFichas' ? document.activeElement.value : null;
+  const esperado = (Number(POC.cargas) || 0) - (Number(POC.devolucoes) || 0) - (Number(POC.entregues) || 0);
+  const temCarga = Number(POC.cargas) > 0, cont = POC.contagem;
+  let h = '<div class="poc-main"><small>Fichas comigo</small><b class="mono">' + (cont ? fichasN(cont.quantidade) : (temCarga ? fichasN(esperado) : '—')) + '</b>' +
+    '<span>' + (cont ? 'Você informou às ' + hora(cont.em) : (temCarga ? 'Pelo sistema (você ainda não informou)' : 'Informe abaixo quantas fichas estão com você')) + '</span>';
+  if (temCarga && cont) {
+    const dif = Number(cont.quantidade) - esperado;
+    h += dif === 0 ? '<div class="poc-dif ok">Bate com o sistema: ' + fichasN(esperado) + ' fichas</div>'
+                   : '<div class="poc-dif no">Diferença de ' + (dif > 0 ? '+' : '−') + fichasN(Math.abs(dif)) + ' fichas · sistema: ' + fichasN(esperado) + '</div>';
+  }
+  h += '</div>';
+  h += '<div class="poc-grid"><div><small>Recebidas do caixa</small><b class="mono">' + fichasN(POC.cargas) + '</b></div>' +
+       '<div><small>Entregues em pedidos</small><b class="mono">' + fichasN(POC.entregues) + '</b></div>' +
+       '<div><small>Devolvidas ao caixa</small><b class="mono">' + fichasN(POC.devolucoes) + '</b></div>' +
+       '<div><small>Dinheiro comigo</small><b class="mono">' + money(POC.dinheiro) + '</b></div></div>';
+  h += '<div class="informar"><div style="font-weight:800;font-size:14px">Quantas fichas estão com você agora?</div>' +
+       '<div class="row"><input class="inp" id="inpFichas" inputmode="numeric" autocomplete="off" placeholder="Ex.: 250.000"><button type="button" class="btn btn-pri" id="btnInformar" style="height:50px;padding:0 16px;font-size:15px">Informar</button></div>' +
+       '<div class="atalhos"><button type="button" data-soma="1000">+1K</button><button type="button" data-soma="5000">+5K</button><button type="button" data-soma="10000">+10K</button><button type="button" data-soma="25000">+25K</button><button type="button" data-soma="100000">+100K</button><button type="button" data-soma="0">Limpar</button></div>' +
+       '<div style="font-size:12px;color:var(--mut)">O caixa vê o que você informar, na hora.</div></div>';
+  const movs = Array.isArray(POC.movimentos) ? POC.movimentos : [];
+  if (movs.length) {
+    const NOME = { carga: 'Recebeu do caixa', devolucao: 'Devolveu ao caixa', contagem: 'Você informou' };
+    h += '<div class="sec">Movimentos do turno</div>' + movs.map(x => '<div class="mov"><div>' + NOME[x.tipo] + (x.obs ? ' · ' + esc(x.obs) : '') + '<br><span>' + hora(x.em) + (x.tipo !== 'contagem' && x.por ? ' · ' + esc(primeiroNome(x.por)) : '') + '</span></div><b class="mono">' + fichasN(x.quantidade) + '</b></div>').join('');
+  }
+  m.innerHTML = h;
+  if (digitando != null) { const i = $('inpFichas'); i.value = digitando; i.focus(); }
+}
+function _lerFichas() { return parseInt(String($('inpFichas').value || '').replace(/\D/g, ''), 10) || 0; }
+$('tabPochete').addEventListener('input', (e) => { if (e.target.id !== 'inpFichas') return; const n = _lerFichas(); e.target.value = n ? fichasN(n) : ''; });
+$('tabPochete').addEventListener('click', async (e) => {
+  const at = e.target.closest('button[data-soma]');
+  if (at) { const v = Number(at.dataset.soma); const n = v ? _lerFichas() + v : 0; $('inpFichas').value = n ? fichasN(n) : ''; return; }
+  if (!e.target.closest('#btnInformar')) return;
+  const n = _lerFichas();
+  if ($('inpFichas').value.trim() === '') { toast('Digite quantas fichas estão com você', 'err'); return; }
+  const b = $('btnInformar'); b.disabled = true;
+  try {
+    const d = await rpc('sangeur_informar_fichas', { p_quantidade: n });
+    if (!d || !d.ok) throw new Error(ERROS[d && d.erro] || 'erro');
+    toast('Informado ao caixa: ' + fichasN(n) + ' fichas', 'ok');
+    $('inpFichas').value = '';
+    await carregarPochete(); renderPochete();
+  } catch (err) { toast('Não foi possível enviar. Verifique a internet.', 'err'); }
+  b.disabled = false;
+});
+
 // ---------- abas ----------
 document.querySelector('nav.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-tab]'); if (!b) return;
   document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('on', x === b));
-  const ped = b.dataset.tab === 'pedidos';
-  $('tabJogadores').hidden = ped; $('tabPedidos').hidden = !ped;
-  $('boxBusca').hidden = ped || !torneioAtual(); $('torSelect').hidden = ped || TORNEIOS.length < 2;
-  if (ped) carregarPedidos();
+  const aba = b.dataset.tab;
+  $('tabJogadores').hidden = aba !== 'jogadores'; $('tabPedidos').hidden = aba !== 'pedidos'; $('tabPochete').hidden = aba !== 'pochete';
+  $('boxBusca').hidden = aba !== 'jogadores' || !torneioAtual(); $('torSelect').hidden = aba !== 'jogadores' || TORNEIOS.length < 2;
+  if (aba === 'pedidos') carregarPedidos();
+  if (aba === 'pochete') { renderPochete(); carregarPochete(); }
   window.scrollTo(0, 0);
 });
 
@@ -671,7 +844,11 @@ document.querySelector('nav.tabs').addEventListener('click', (e) => {
 function assinarRealtime() {
   try { if (_canal) sb.removeChannel(_canal); } catch (_) {}
   _canal = sb.channel('sangeur_' + SESS.user_id)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sangeur_solicitacoes', filter: 'sangeur_id=eq.' + SESS.user_id }, () => { carregarPedidos(); carregarJogadores(); })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sangeur_solicitacoes', filter: 'sangeur_id=eq.' + SESS.user_id }, () => { carregarPedidos(); carregarJogadores(); carregarPochete(); })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sangeur_fichas_mov', filter: 'sangeur_id=eq.' + SESS.user_id }, (pl) => {
+      const n = pl && pl.new; if (n && n.tipo === 'carga') { bip(true); toast('Caixa registrou ' + fichasN(n.quantidade) + ' fichas para você', 'ok'); }
+      else if (n && n.tipo === 'devolucao') toast('Caixa registrou devolução de ' + fichasN(n.quantidade) + ' fichas', '');
+      carregarPochete(); })
     .subscribe();
 }
 // A cada minuto relê permissão e configuração (mudança no StackOS vale sem precisar sair e entrar)
@@ -681,11 +858,11 @@ async function revalidar() {
   _ultimaValidacao = Date.now();
   try {
     const d = await rpc('sangeur_validar_acesso');
-    if (d && d.ok) { SESS.config = d.config; if (!$('sheet').hidden && SEL) renderSheet(); }
+    if (d && d.ok) { SESS.config = d.config; aplicarTema(); if (!$('sheet').hidden && SEL) renderSheet(); }
     else if (d && ['sem_permissao', 'app_nao_liberado', 'usuario_inativo'].includes(d.erro)) { toast(ERROS[d.erro], 'err'); sair(); }
   } catch (_) { /* sem rede: tenta no próximo ciclo */ }
 }
-setInterval(() => { if (!SESS || document.hidden) return; revalidar(); carregarTorneios().then(() => { if (!$('tabJogadores').hidden && $('sheet').hidden) carregarJogadores(); else if (!$('sheet').hidden) renderSheet(); }); carregarPedidos(); enviarFila(); }, 20000);
+setInterval(() => { if (!SESS || document.hidden) return; revalidar(); carregarTorneios().then(() => { if (!$('tabJogadores').hidden && $('sheet').hidden) carregarJogadores(); else if (!$('sheet').hidden) renderSheet(); }); carregarPedidos(); enviarFila(); if (!$('tabPochete').hidden) carregarPochete(); }, 20000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && SESS) { carregarTorneios(); carregarPedidos(); carregarJogadores(); enviarFila(); } });
 function atualizaOnline() { $('hOffline').hidden = navigator.onLine; if (navigator.onLine) enviarFila(); }
 window.addEventListener('online', atualizaOnline); window.addEventListener('offline', atualizaOnline);
@@ -714,7 +891,7 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sangeur-s
 
 // ---------- início ----------
 (async function boot() {
-  atualizaOnline(); renderInstall();
+  aplicarTema(); atualizaOnline(); renderInstall();
   try {
     const { data } = await sb.auth.getSession();
     if (data && data.session) { loading(true); await validarEEntrar(); return; }

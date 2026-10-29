@@ -6,12 +6,13 @@
 <meta name="theme-color" content="#0a0a0c">
 <title>StackSangeur — Configurações</title>
 <link rel="icon" type="image/png" href="/icons/icon-sangeur-192.png">
+<meta name="color-scheme" content="dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root { --bg:#0a0a0c; --card:#121216; --line:#1e1e23; --line2:#26262c; --tx:#fafafa; --tx2:#e4e4e7; --mut:#a1a1aa; --mut2:#71717a;
-          --gold:#fbbf24; --ok:#22c55e; --okbg:#0f2a1c; --err:#fca5a5; --errbg:#2a1515; }
+  :root { --bg:#08070d; --card:#12101b; --line:#211c31; --line2:#2d2643; --tx:#fafafa; --tx2:#e4e2ec; --mut:#a49eb8; --mut2:#7a7490;
+          --gold:#c084fc; --ac:#a855f7; --grad:linear-gradient(135deg,#c06cff,#5b5bff); --ok:#22c55e; --okbg:#0f2a1c; --err:#fca5a5; --errbg:#2a1515; }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--tx2); font-family: Manrope, system-ui, sans-serif; }
   button, input { font-family: inherit; }
@@ -28,7 +29,7 @@
   fieldset { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   legend { font-size: 12px; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; padding: 0 6px; }
   .rad { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--tx); cursor: pointer; }
-  .rad input { margin-top: 3px; accent-color: var(--gold); width: 16px; height: 16px; flex: 0 0 auto; }
+  .rad input { margin-top: 3px; accent-color: var(--ac); width: 16px; height: 16px; flex: 0 0 auto; }
   .rad small { display: block; color: var(--mut); font-size: 12px; margin-top: 2px; line-height: 1.4; }
   .linha { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
   .linha .rad { align-items: center; }
@@ -37,7 +38,7 @@
   .acoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   @media (max-width: 760px) { .acoes { grid-template-columns: 1fr; } }
   .chk { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--tx); min-height: 42px; border: 1px solid var(--line2); border-radius: 10px; padding: 0 12px; cursor: pointer; }
-  .chk input { width: 18px; height: 18px; accent-color: var(--ok); flex: 0 0 auto; }
+  .chk input { width: 18px; height: 18px; accent-color: var(--ac); flex: 0 0 auto; }
   .users-h, .user { display: grid; grid-template-columns: minmax(0, 1fr) 110px 150px; gap: 8px; align-items: center; padding: 0 12px; }
   .users-h { font-size: 11px; font-weight: 800; color: var(--mut2); text-transform: uppercase; letter-spacing: .8px; }
   .user { min-height: 52px; border: 1px solid var(--line2); border-radius: 10px; }
@@ -49,16 +50,21 @@
   .tg input { opacity: 0; width: 0; height: 0; position: absolute; }
   .tg span { position: absolute; inset: 0; border-radius: 13px; background: #2a2a30; cursor: pointer; transition: .15s; }
   .tg span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: .15s; }
-  .tg input:checked + span { background: var(--ok); }
+  .tg input:checked + span { background: var(--ac); }
   .tg input:checked + span::after { transform: translateX(20px); }
   .tg input:disabled + span { opacity: .5; cursor: wait; }
   @media (max-width: 560px) { .users-h, .user { grid-template-columns: minmax(0, 1fr) 70px; } .users-h .c-papel, .user .papel { display: none; } }
+  .temas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .tema { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 14px 0 8px; border-radius: 999px; border: 1.5px solid var(--line2); background: none; color: var(--tx2); font: 800 13px Manrope, sans-serif; cursor: pointer; }
+  .tema i { width: 26px; height: 26px; border-radius: 50%; display: block; }
+  .tema.sel { border-color: var(--ac); background: rgba(168,85,247,.12); color: #e9d5ff; }
+  .tema input { width: 30px; height: 26px; border: none; background: none; padding: 0; cursor: pointer; }
   .bar { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; flex-wrap: wrap; }
   .bar .l { flex: 1; min-width: 200px; }
   .mono { font: 600 12.5px 'JetBrains Mono', ui-monospace, monospace; color: var(--mut); margin-top: 3px; word-break: break-all; }
   .btn { height: 42px; padding: 0 16px; border-radius: 10px; font: 800 13px Manrope, sans-serif; cursor: pointer; }
   .btn-sec { border: 1px solid #2c2c33; background: transparent; color: var(--tx); }
-  .btn-pri { border: none; background: var(--gold); color: #1a1306; }
+  .btn-pri { border: none; background: var(--grad); color: #fff; }
   .btn-pri:disabled { opacity: .5; cursor: wait; }
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(16px); background: #18181b; border: 1px solid #2c2c33; color: var(--tx);
     border-radius: 10px; padding: 11px 16px; font-size: 13.5px; font-weight: 700; opacity: 0; transition: .2s; pointer-events: none; max-width: calc(100vw - 32px); }
@@ -81,9 +87,12 @@
 
 <main class="wrap" id="scrPainel" hidden>
   <div class="top">
-    <div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <img src="/icons/icon-sangeur-192.png" width="48" height="48" alt="" style="border-radius:12px">
+      <div>
       <h1>StackSangeur</h1>
       <div class="sub" id="subClube">App das sangeurs nos torneios</div>
+      </div>
     </div>
     <span class="status" id="stLiberado">—</span>
   </div>
@@ -125,6 +134,12 @@
   </fieldset>
 
   <fieldset>
+    <legend>Cor do app da sangeur</legend>
+    <div class="temas" id="temasClube"></div>
+    <div class="hint">É o padrão do clube. Cada sangeur ainda pode trocar a cor no próprio celular (botão de paleta no topo do app).</div>
+  </fieldset>
+
+  <fieldset>
     <legend>Permissões por funcionário</legend>
     <div class="users-h"><span>Usuário</span><span class="c-papel">Papel</span><span style="text-align:center">StackSangeur</span></div>
     <div id="listaUsuarios" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -152,7 +167,20 @@ const sb = supabase.createClient('https://jvvgdkjohfomuafsafsx.supabase.co', 'sb
 const $ = (id) => document.getElementById(id);
 const esc = (s) => s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 const LADO_KEY = 'stacksangeur_lado';
-let DADOS = null, sujo = false;
+let DADOS = null, sujo = false, TEMA = null;
+const TEMAS = [
+  { id: 'stackos', nome: 'StackOS', ac: '#a855f7', grad: ['#c06cff', '#5b5bff'] },
+  { id: 'violeta', nome: 'Violeta', ac: '#8b5cf6' }, { id: 'esmeralda', nome: 'Esmeralda', ac: '#34d399' },
+  { id: 'oceano', nome: 'Oceano', ac: '#38bdf8' }, { id: 'ouro', nome: 'Ouro', ac: '#fbbf24' }, { id: 'rubi', nome: 'Rubi', ac: '#f43f5e' }
+];
+function renderTemas() {
+  const at = TEMA && TEMA.ac ? TEMA : TEMAS[0];
+  $('temasClube').innerHTML = TEMAS.map(t => '<button type="button" class="tema' + (at.id === t.id ? ' sel' : '') + '" data-tema="' + t.id + '"><i style="background:' + (t.grad ? 'linear-gradient(135deg,' + t.grad[0] + ',' + t.grad[1] + ')' : t.ac) + '"></i>' + t.nome + '</button>').join('') +
+    '<label class="tema' + (at.id === 'livre' ? ' sel' : '') + '"><input type="color" id="corClube" value="' + at.ac + '">Personalizada</label>';
+}
+document.addEventListener('click', (ev) => { const b = ev.target.closest('button[data-tema]'); if (!b) return; TEMA = TEMAS.find(t => t.id === b.dataset.tema); sujo = true; renderTemas(); });
+document.addEventListener('input', (ev) => { if (ev.target.id !== 'corClube') return; TEMA = { id: 'livre', ac: ev.target.value }; sujo = true;
+  document.querySelectorAll('#temasClube .tema').forEach(x => x.classList.toggle('sel', !!x.querySelector('#corClube'))); });
 function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800); }
 function show(id) { $('scrLogin').hidden = id !== 'scrLogin'; $('scrPainel').hidden = id !== 'scrPainel'; }
 
@@ -176,6 +204,7 @@ function render() {
   const acoes = Array.isArray(c.acoes_permitidas) ? c.acoes_permitidas : [];
   document.querySelectorAll('input[data-acao]').forEach(cb => cb.checked = acoes.includes(cb.dataset.acao));
   syncMultipla();
+  TEMA = (c.tema && c.tema.ac) ? c.tema : null; renderTemas();
   const ativos = (d.usuarios || []).filter(u => u.status === 'ativo');
   $('listaUsuarios').innerHTML = ativos.length ? ativos.map(u =>
     '<div class="user"><span class="n"><b>' + esc(u.nome) + '</b><span>' + esc(u.email || '') + '</span></span>' +
@@ -215,7 +244,7 @@ $('btnSalvar').addEventListener('click', async () => {
   if (!acoes.length) return toast('⚠️ Libere ao menos um tipo de pedido');
   $('btnSalvar').disabled = true;
   try {
-    const { data, error } = await sb.rpc('sangeur_salvar_config', { p_entrega_modo: entrega, p_pagamento_modo: pag, p_acoes: acoes });
+    const { data, error } = await sb.rpc('sangeur_salvar_config', { p_entrega_modo: entrega, p_pagamento_modo: pag, p_acoes: acoes, p_tema: TEMA || TEMAS[0] });
     if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
     sujo = false; toast('✅ Configuração salva — chega ao app da sangeur em até 1 minuto');
     await carregar();
