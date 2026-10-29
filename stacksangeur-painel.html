@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0c">
+<title>StackSangeur — Configurações</title>
+<link rel="icon" type="image/png" href="/icons/icon-sangeur-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root { --bg:#0a0a0c; --card:#121216; --line:#1e1e23; --line2:#26262c; --tx:#fafafa; --tx2:#e4e4e7; --mut:#a1a1aa; --mut2:#71717a;
+          --gold:#fbbf24; --ok:#22c55e; --okbg:#0f2a1c; --err:#fca5a5; --errbg:#2a1515; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--tx2); font-family: Manrope, system-ui, sans-serif; }
+  button, input { font-family: inherit; }
+  [hidden] { display: none !important; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; display: flex; flex-direction: column; gap: 18px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 22px; font-weight: 800; color: var(--tx); }
+  .sub { font-size: 12.5px; color: var(--mut2); margin-top: 3px; }
+  .status { font-size: 12.5px; font-weight: 800; border-radius: 999px; padding: 7px 12px; }
+  .status.on { background: var(--okbg); color: #86efac; border: 1px solid #1d4a2f; }
+  .status.off { background: var(--errbg); color: var(--err); border: 1px solid #4a1d1d; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  fieldset { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  legend { font-size: 12px; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; padding: 0 6px; }
+  .rad { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--tx); cursor: pointer; }
+  .rad input { margin-top: 3px; accent-color: var(--gold); width: 16px; height: 16px; flex: 0 0 auto; }
+  .rad small { display: block; color: var(--mut); font-size: 12px; margin-top: 2px; line-height: 1.4; }
+  .linha { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .linha .rad { align-items: center; }
+  .linha .rad input { margin-top: 0; }
+  .hint { font-size: 12px; color: var(--mut2); line-height: 1.45; }
+  .acoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 760px) { .acoes { grid-template-columns: 1fr; } }
+  .chk { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--tx); min-height: 42px; border: 1px solid var(--line2); border-radius: 10px; padding: 0 12px; cursor: pointer; }
+  .chk input { width: 18px; height: 18px; accent-color: var(--ok); flex: 0 0 auto; }
+  .users-h, .user { display: grid; grid-template-columns: minmax(0, 1fr) 110px 150px; gap: 8px; align-items: center; padding: 0 12px; }
+  .users-h { font-size: 11px; font-weight: 800; color: var(--mut2); text-transform: uppercase; letter-spacing: .8px; }
+  .user { min-height: 52px; border: 1px solid var(--line2); border-radius: 10px; }
+  .user .n { display: flex; flex-direction: column; min-width: 0; }
+  .user .n b { font-size: 13.5px; color: var(--tx); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user .n span { font-size: 11.5px; color: var(--mut2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .papel { font-size: 12px; color: var(--mut); text-transform: capitalize; }
+  .tg { justify-self: center; position: relative; width: 46px; height: 26px; }
+  .tg input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .tg span { position: absolute; inset: 0; border-radius: 13px; background: #2a2a30; cursor: pointer; transition: .15s; }
+  .tg span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: .15s; }
+  .tg input:checked + span { background: var(--ok); }
+  .tg input:checked + span::after { transform: translateX(20px); }
+  .tg input:disabled + span { opacity: .5; cursor: wait; }
+  @media (max-width: 560px) { .users-h, .user { grid-template-columns: minmax(0, 1fr) 70px; } .users-h .c-papel, .user .papel { display: none; } }
+  .bar { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; flex-wrap: wrap; }
+  .bar .l { flex: 1; min-width: 200px; }
+  .mono { font: 600 12.5px 'JetBrains Mono', ui-monospace, monospace; color: var(--mut); margin-top: 3px; word-break: break-all; }
+  .btn { height: 42px; padding: 0 16px; border-radius: 10px; font: 800 13px Manrope, sans-serif; cursor: pointer; }
+  .btn-sec { border: 1px solid #2c2c33; background: transparent; color: var(--tx); }
+  .btn-pri { border: none; background: var(--gold); color: #1a1306; }
+  .btn-pri:disabled { opacity: .5; cursor: wait; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(16px); background: #18181b; border: 1px solid #2c2c33; color: var(--tx);
+    border-radius: 10px; padding: 11px 16px; font-size: 13.5px; font-weight: 700; opacity: 0; transition: .2s; pointer-events: none; max-width: calc(100vw - 32px); }
+  #toast.show { opacity: 1; transform: translateX(-50%); }
+  .login { max-width: 380px; margin: 12vh auto 0; padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+  .login input { height: 48px; border-radius: 10px; border: 1px solid var(--line2); background: var(--card); color: var(--tx); padding: 0 14px; font-size: 15px; outline: none; }
+  .erro { color: var(--err); background: var(--errbg); border: 1px solid #4a1d1d; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; }
+</style>
+</head>
+<body>
+
+<section class="login" id="scrLogin" hidden>
+  <h1>StackSangeur</h1>
+  <div class="sub">Configurações · entre com seu usuário administrador do StackOS</div>
+  <input type="email" id="inpEmail" placeholder="E-mail" autocomplete="username">
+  <input type="password" id="inpSenha" placeholder="Senha" autocomplete="current-password">
+  <div class="erro" id="erroLogin" hidden></div>
+  <button class="btn btn-pri" id="btnLogin" type="button">Entrar</button>
+</section>
+
+<main class="wrap" id="scrPainel" hidden>
+  <div class="top">
+    <div>
+      <h1>StackSangeur</h1>
+      <div class="sub" id="subClube">App das sangeurs nos torneios</div>
+    </div>
+    <span class="status" id="stLiberado">—</span>
+  </div>
+
+  <div class="grid2">
+    <fieldset>
+      <legend>Entrega das fichas</legend>
+      <label class="rad"><input type="radio" name="entrega" value="apos_aceite"><span><strong>Só depois que o caixa aceitar</strong><small>Mais seguro. A sangeur recebe o aviso no celular e entrega.</small></span></label>
+      <label class="rad"><input type="radio" name="entrega" value="na_hora"><span><strong>Na hora, caixa confirma depois</strong><small>Mais rápido. A sangeur entrega e o caixa lança em seguida.</small></span></label>
+    </fieldset>
+    <fieldset>
+      <legend>Forma de pagamento</legend>
+      <label class="rad"><input type="radio" name="pag" value="sangeur_informa"><span><strong>Sangeur informa, caixa confirma</strong><small>Dinheiro, PIX, débito, crédito ou cheque. Crédito no sistema só no caixa. O caixa pode trocar ao aceitar.</small></span></label>
+      <label class="rad"><input type="radio" name="pag" value="caixa"><span><strong>Sempre resolvido no caixa</strong><small>O app da sangeur não pergunta o pagamento.</small></span></label>
+    </fieldset>
+  </div>
+
+  <fieldset>
+    <legend>Painel de solicitações no caixa · este computador</legend>
+    <div class="linha">
+      <label class="rad"><input type="radio" name="lado" value="direita"> À direita do torneio</label>
+      <label class="rad"><input type="radio" name="lado" value="esquerda"> À esquerda</label>
+      <label class="rad"><input type="radio" name="lado" value="off"> Desligado</label>
+    </div>
+    <div class="hint">Vale só para este computador (cada caixa escolhe o seu) e é salvo na hora. Em telas pequenas o painel vira uma faixa recolhida ao lado do torneio.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>O que a sangeur pode solicitar</legend>
+    <div class="acoes">
+      <label class="chk"><input type="checkbox" data-acao="reentry"> Reentrada</label>
+      <label class="chk"><input type="checkbox" data-acao="reentry_multipla"> Reentrada múltipla (2x, 3x…)</label>
+      <label class="chk"><input type="checkbox" data-acao="rebuy_simples"> Rebuy simples</label>
+      <label class="chk"><input type="checkbox" data-acao="rebuy_duplo"> Rebuy duplo</label>
+      <label class="chk"><input type="checkbox" data-acao="addon"> Add-on</label>
+      <label class="chk"><input type="checkbox" data-acao="last_chance"> Last Chance</label>
+    </div>
+    <div class="hint">As travas do torneio (níveis, intervalo de compras, 1 add-on por jogador) continuam valendo: o app só mostra o que está liberado naquele momento, e o caixa confere no lançamento de sempre.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Permissões por funcionário</legend>
+    <div class="users-h"><span>Usuário</span><span class="c-papel">Papel</span><span style="text-align:center">StackSangeur</span></div>
+    <div id="listaUsuarios" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div class="hint">Sem a permissão StackSangeur o login no app é recusado. É separada do StackBar: uma pessoa pode usar os dois apps. Para criar um usuário novo, use “Usuários” no StackOS. Permissões salvam na hora.</div>
+  </fieldset>
+
+  <div class="bar">
+    <div class="l">
+      <div style="font-size:13.5px;font-weight:800;color:var(--tx)">Link de instalação</div>
+      <div class="mono" id="linkApp">—</div>
+    </div>
+    <button type="button" class="btn btn-sec" id="btnCopiar">Copiar link</button>
+    <button type="button" class="btn btn-pri" id="btnSalvar">Salvar</button>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+// Mesmo login do StackOS (sessão compartilhada no navegador), igual ao painel do StackBar
+const sb = supabase.createClient('https://jvvgdkjohfomuafsafsx.supabase.co', 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA', {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+const LADO_KEY = 'stacksangeur_lado';
+let DADOS = null, sujo = false;
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800); }
+function show(id) { $('scrLogin').hidden = id !== 'scrLogin'; $('scrPainel').hidden = id !== 'scrPainel'; }
+
+async function carregar() {
+  const { data, error } = await sb.rpc('sangeur_admin_dados');
+  if (error) throw error;
+  if (!data || !data.ok) throw new Error(data && data.erro === 'sem_permissao' ? 'Só o administrador do clube acessa as configurações do StackSangeur.' : 'Não foi possível carregar.');
+  DADOS = data; render();
+}
+
+function render() {
+  const d = DADOS, c = d.config;
+  $('subClube').textContent = 'App das sangeurs nos torneios · ' + (d.clube_nome || '');
+  const st = $('stLiberado');
+  st.textContent = d.liberado ? '● Liberado no clube' : '● Ainda não liberado no clube';
+  st.className = 'status ' + (d.liberado ? 'on' : 'off');
+  document.querySelectorAll('input[name=entrega]').forEach(r => r.checked = r.value === c.entrega_modo);
+  document.querySelectorAll('input[name=pag]').forEach(r => r.checked = r.value === c.pagamento_modo);
+  let lado = 'direita'; try { lado = localStorage.getItem(LADO_KEY) || 'direita'; } catch (_) {}
+  document.querySelectorAll('input[name=lado]').forEach(r => r.checked = r.value === lado);
+  const acoes = Array.isArray(c.acoes_permitidas) ? c.acoes_permitidas : [];
+  document.querySelectorAll('input[data-acao]').forEach(cb => cb.checked = acoes.includes(cb.dataset.acao));
+  syncMultipla();
+  const ativos = (d.usuarios || []).filter(u => u.status === 'ativo');
+  $('listaUsuarios').innerHTML = ativos.length ? ativos.map(u =>
+    '<div class="user"><span class="n"><b>' + esc(u.nome) + '</b><span>' + esc(u.email || '') + '</span></span>' +
+    '<span class="papel">' + esc(u.papel || '') + '</span>' +
+    '<label class="tg"><input type="checkbox" data-user="' + u.id + '"' + (u.sangeur ? ' checked' : '') + ' aria-label="Permissão StackSangeur para ' + esc(u.nome) + '"><span></span></label></div>'
+  ).join('') : '<div class="hint">Nenhum usuário ativo no clube.</div>';
+  $('linkApp').textContent = location.origin + '/sangeur';
+}
+// Reentrada múltipla depende da reentrada
+function syncMultipla() {
+  const re = document.querySelector('input[data-acao=reentry]'), mu = document.querySelector('input[data-acao=reentry_multipla]');
+  if (!re.checked) mu.checked = false;
+  mu.disabled = !re.checked; mu.parentNode.style.opacity = re.checked ? '1' : '.5';
+}
+
+document.addEventListener('change', async (ev) => {
+  const el = ev.target;
+  if (el.name === 'lado') { try { localStorage.setItem(LADO_KEY, el.value); } catch (_) {} toast(el.value === 'off' ? 'Painel desligado neste computador' : 'Painel à ' + el.value + ' neste computador'); return; }
+  if (el.dataset && el.dataset.acao) { syncMultipla(); sujo = true; return; }
+  if (el.name === 'entrega' || el.name === 'pag') { sujo = true; return; }
+  if (el.dataset && el.dataset.user) {
+    el.disabled = true;
+    try {
+      const { data, error } = await sb.rpc('sangeur_definir_permissao', { p_user_id: el.dataset.user, p_permitir: el.checked });
+      if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
+      toast(el.checked ? '✅ Permissão StackSangeur liberada' : 'Permissão StackSangeur removida');
+    } catch (e) { el.checked = !el.checked; toast('⚠️ Não salvou: ' + e.message); }
+    el.disabled = false;
+  }
+});
+
+$('btnSalvar').addEventListener('click', async () => {
+  const entrega = (document.querySelector('input[name=entrega]:checked') || {}).value;
+  const pag = (document.querySelector('input[name=pag]:checked') || {}).value;
+  const acoes = Array.from(document.querySelectorAll('input[data-acao]:checked')).filter(cb => !cb.disabled).map(cb => cb.dataset.acao);
+  if (!entrega || !pag) return toast('⚠️ Escolha a entrega e a forma de pagamento');
+  if (!acoes.length) return toast('⚠️ Libere ao menos um tipo de pedido');
+  $('btnSalvar').disabled = true;
+  try {
+    const { data, error } = await sb.rpc('sangeur_salvar_config', { p_entrega_modo: entrega, p_pagamento_modo: pag, p_acoes: acoes });
+    if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
+    sujo = false; toast('✅ Configuração salva — chega ao app da sangeur em até 1 minuto');
+    await carregar();
+  } catch (e) { toast('⚠️ Não salvou: ' + e.message); }
+  $('btnSalvar').disabled = false;
+});
+
+$('btnCopiar').addEventListener('click', async () => {
+  const txt = $('linkApp').textContent;
+  try { await navigator.clipboard.writeText(txt); toast('Link copiado'); }
+  catch (_) { const r = document.createRange(); r.selectNodeContents($('linkApp')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selecionado — copie com Ctrl+C'); }
+});
+window.addEventListener('beforeunload', (ev) => { if (sujo) { ev.preventDefault(); ev.returnValue = ''; } });
+
+async function entrar() {
+  try { await carregar(); show('scrPainel'); }
+  catch (e) { show('scrLogin'); const er = $('erroLogin'); er.textContent = e.message; er.hidden = false; }
+}
+$('btnLogin').addEventListener('click', async () => {
+  const er = $('erroLogin'); er.hidden = true;
+  const { error } = await sb.auth.signInWithPassword({ email: $('inpEmail').value.trim(), password: $('inpSenha').value });
+  if (error) { er.textContent = 'E-mail ou senha incorretos'; er.hidden = false; return; }
+  entrar();
+});
+$('inpSenha').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btnLogin').click(); });
+(async function boot() {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) entrar(); else show('scrLogin');
+})();
+</script>
+</body>
+</html>

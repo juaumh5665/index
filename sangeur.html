@@ -674,7 +674,18 @@ function assinarRealtime() {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sangeur_solicitacoes', filter: 'sangeur_id=eq.' + SESS.user_id }, () => { carregarPedidos(); carregarJogadores(); })
     .subscribe();
 }
-setInterval(() => { if (!SESS || document.hidden) return; carregarTorneios().then(() => { if (!$('tabJogadores').hidden && $('sheet').hidden) carregarJogadores(); else if (!$('sheet').hidden) renderSheet(); }); carregarPedidos(); enviarFila(); }, 20000);
+// A cada minuto relê permissão e configuração (mudança no StackOS vale sem precisar sair e entrar)
+let _ultimaValidacao = Date.now();
+async function revalidar() {
+  if (!SESS || Date.now() - _ultimaValidacao < 55000) return;
+  _ultimaValidacao = Date.now();
+  try {
+    const d = await rpc('sangeur_validar_acesso');
+    if (d && d.ok) { SESS.config = d.config; if (!$('sheet').hidden && SEL) renderSheet(); }
+    else if (d && ['sem_permissao', 'app_nao_liberado', 'usuario_inativo'].includes(d.erro)) { toast(ERROS[d.erro], 'err'); sair(); }
+  } catch (_) { /* sem rede: tenta no próximo ciclo */ }
+}
+setInterval(() => { if (!SESS || document.hidden) return; revalidar(); carregarTorneios().then(() => { if (!$('tabJogadores').hidden && $('sheet').hidden) carregarJogadores(); else if (!$('sheet').hidden) renderSheet(); }); carregarPedidos(); enviarFila(); }, 20000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && SESS) { carregarTorneios(); carregarPedidos(); carregarJogadores(); enviarFila(); } });
 function atualizaOnline() { $('hOffline').hidden = navigator.onLine; if (navigator.onLine) enviarFila(); }
 window.addEventListener('online', atualizaOnline); window.addEventListener('offline', atualizaOnline);
