@@ -21,8 +21,9 @@
     const SOM_KEY = 'stacksangeur_som';            // '0' desliga o som
     const PEND_KEY = 'stacksangeur_concluir_pend'; // aceites que não chegaram ao servidor (reenvio)
     const LARGURA = 340, FAIXA = 58, MARGEM = 20;
-    const TIPO_NOME = { reentry: 'Reentrada', rebuy_simples: 'Rebuy simples', rebuy_duplo: 'Rebuy duplo', addon: 'Add-on', last_chance: 'Last Chance' };
-    const PAG_NOME = { dinheiro: 'Dinheiro', pix: 'PIX', debito: 'Débito', credito: 'Crédito', cheque: 'Cheque' };
+    const TIPO_NOME = { reentry: 'Reentrada', rebuy_simples: 'Rebuy simples', rebuy_duplo: 'Rebuy duplo', addon: 'Add-on', last_chance: 'Last Chance', cash_recompra: 'Recompra' };
+    const PAG_NOME = { dinheiro: 'Dinheiro', pix: 'PIX', debito: 'Débito', credito: 'Crédito', cheque: 'Cheque', conta: 'Na conta' };
+    const ehCash = (p) => !!(p && p.mesa_id);
 
     let clubeAtivo = null, canal = null, pedidos = [], pollT = null, renderT = null, carregarT = null;
     let fluxo = null;            // lançamento em andamento { p, tid, antes:Set, pagto, abriu }
@@ -30,7 +31,8 @@
     let aba = 'pedidos';         // 'pedidos' | 'pochete'
     let poc = [];                // pochetes das sangeurs (sangeur_pochete)
     let movAberto = null;        // { sid, tipo:'carga'|'devolucao' } com o campo de fichas aberto
-    let primeiraCarga = true, _audio = null, _obs = null;
+    let primeiraCarga = true, _audio = null, _obs = null, _obsMesas = null, _mesasT = null;
+    let aberturaMesa = null;     // { antes:Set(ids), ativo } — chave escolhida ao abrir uma mesa de cash
     const vistos = new Set();
 
     // ---------- utilidades ----------
@@ -45,7 +47,7 @@
     const modalAberto = (id) => { const m = $(id); return !!(m && m.classList.contains('open')); };
     // Fonte única: o BANCO diz se o clube tem o StackSangeur (sangeur_status → _sangeur_clube_liberado).
     // Nunca decide pelos dados da tela (no modo suporte o clube vem do cache do admin, sem os ajustes).
-    let ST = { clube: null, liberado: null, padrao: 'ligado', torneios: {}, em: 0 };
+    let ST = { clube: null, liberado: null, padrao: 'ligado', torneios: {}, padraoCash: 'desligado', mesas: {}, em: 0 };
     let _stCarregando = false;
     async function atualizarStatus(forcar) {
         const c = window.sbClube;
@@ -55,7 +57,8 @@
         try {
             const d = await rpc('sangeur_status', {});
             const atual = window.sbClube && window.sbClube.id;
-            if (d && atual === c.id) ST = { clube: c.id, liberado: d.liberado === true && d.clube_id === c.id, padrao: d.padrao_torneio || 'ligado', torneios: d.torneios || {}, em: Date.now() };
+            if (d && atual === c.id) ST = { clube: c.id, liberado: d.liberado === true && d.clube_id === c.id, padrao: d.padrao_torneio || 'ligado', torneios: d.torneios || {},
+                padraoCash: d.padrao_cash === 'ligado' ? 'ligado' : 'desligado', mesas: d.mesas || {}, em: Date.now() };
         } catch (err) { console.warn('[SANGEUR] status:', err); }
         _stCarregando = false;
     }
@@ -72,13 +75,33 @@
         if (ST.torneios && Object.prototype.hasOwnProperty.call(ST.torneios, tid)) return ST.torneios[tid] === true;
         return ST.padrao !== 'desligado';
     }
+    // Ligado/desligado por mesa de cash: ajuste da mesa > padrão do clube (padrão: desligado)
+    function mesaAtiva(mid) {
+        if (!mid) return false;
+        if (ST.mesas && Object.prototype.hasOwnProperty.call(ST.mesas, mid)) return ST.mesas[mid] === true;
+        return ST.padraoCash === 'ligado';
+    }
+    function mesasAbertas() { try { return (typeof cashMesas !== 'undefined' ? cashMesas : []).filter(m => m && (m.status === 'aberta' || m.status === 'ativa')); } catch (_) { return []; } }
+    function mesaPorId(id) { try { return (typeof cashMesas !== 'undefined' ? cashMesas : []).find(m => m && m.id === id) || null; } catch (_) { return null; } }
+    function naPaginaCash() { const pg = $('page-cash'); return !!(pg && pg.style.display !== 'none' && pg.offsetParent !== null); }
+    // Onde o caixa está: 'torneio' (torneio aberto) | 'cash' (tela de Cash Game) | null
+    function contexto() {
+        if (modalAberto('modal-torneio')) return 'torneio';
+        if (naPaginaCash()) return 'cash';
+        return null;
+    }
+    const pedTorneio = () => pedidos.filter(p => !ehCash(p));
+    const pedCash = () => pedidos.filter(ehCash);
     function torneioAbertoId() {
         if (!modalAberto('modal-torneio')) return null;
         const i = idxAtivo(); try { return (i != null && torneios[i]) ? torneios[i].id : null; } catch (_) { return null; }
     }
     let expOff = null;   // torneio desligado que o caixa expandiu nesta visita
     function expAgora() { const tid = torneioAbertoId(); if (tid && !torneioAtivo(tid)) return expOff === tid; return expandido(); }
+    // No cash o painel só aparece se alguma mesa aberta tem o StackSangeur ligado ou há pedido de cash
+    function cashEmUso() { return pedCash().length > 0 || mesasAbertas().some(m => mesaAtiva(m.id)); }
     function liberado() { return situacao() === true; }
+    function expandidoCtx() { return contexto() === 'cash' ? expandido() : expAgora(); }
     function lado() { const l = LSg(LADO_KEY, 'direita'); return ['direita', 'esquerda', 'off'].includes(l) ? l : 'direita'; }
     function telaLarga() { return window.innerWidth >= 1480; }
     function telaPequena() { return window.innerWidth < 900; }
@@ -137,7 +160,10 @@
         pollT = setInterval(() => { carregar(); reenviarPendentes(); if (aba === 'pochete') carregarPochete(); atualizarStatus(true).then(render); }, 30000);
         renderT = setInterval(render, 5000);   // atualiza o "há X min"
         _obs = new MutationObserver(onModais);
-        ['modal-torneio', 'modal-entrada'].forEach(mid => { const m = $(mid); if (m) _obs.observe(m, { attributes: true, attributeFilter: ['class'] }); });
+        ['modal-torneio', 'modal-entrada', 'modal-recompra', 'modal-nova-cash-mesa'].forEach(mid => { const m = $(mid); if (m) _obs.observe(m, { attributes: true, attributeFilter: ['class'] }); });
+        const pc = $('page-cash'); if (pc) _obs.observe(pc, { attributes: true, attributeFilter: ['style'] });
+        const lc = $('cash-mesas-list'); if (lc) { _obsMesas = new MutationObserver(() => { clearTimeout(_mesasT); _mesasT = setTimeout(injetarMesas, 60); }); _obsMesas.observe(lc, { childList: true }); }
+        injetarMesas();
         window.addEventListener('resize', posicionar);
         document.addEventListener('click', capturaConfirmar, true);
         mostrarMenu(true);
@@ -147,6 +173,8 @@
         try { if (canal) sb.removeChannel(canal); } catch (_) {}
         canal = null; clearInterval(pollT); clearInterval(renderT); clearTimeout(carregarT);
         if (_obs) { _obs.disconnect(); _obs = null; }
+        if (_obsMesas) { _obsMesas.disconnect(); _obsMesas = null; }
+        document.querySelectorAll('.sg-mesa-faixa,#sg-nova-mesa').forEach(x => x.remove());
         window.removeEventListener('resize', posicionar);
         document.removeEventListener('click', capturaConfirmar, true);
         restaurarPadding();
@@ -232,7 +260,7 @@
         if (!clubeAtivo) return;
         try {
             const { data, error } = await sb.from('sangeur_solicitacoes')
-                .select('id,torneio_id,jogador_id,jogador_nome,tipo,quantidade,valor_estimado,forma_pagto,sangeur_id,sangeur_nome,status,criado_em,processando_em,processando_por')
+                .select('id,torneio_id,mesa_id,sessao_id,jogador_id,jogador_nome,tipo,quantidade,valor_estimado,forma_pagto,sangeur_id,sangeur_nome,status,criado_em,processando_em,processando_por')
                 .eq('clube_id', clubeAtivo).in('status', ['pendente', 'processando'])
                 .order('criado_em', { ascending: true }).limit(100);
             if (error) throw error;
@@ -243,7 +271,7 @@
             pedidos = novos;
             if (chegouNovo) { bip(); piscarTitulo(); }
             recuperarMeusProcessando();
-            render();
+            render(); injetarMesas();
         } catch (err) { console.warn('[SANGEUR] carregar:', err); }
     }
 
@@ -252,6 +280,7 @@
     function recuperarMeusProcessando() {
         if (fluxo) return;
         pedidos.filter(p => p.status === 'processando' && p.processando_por === meuId()).forEach(p => {
+            if (ehCash(p)) { const f = recomprasDepois(p, p.processando_em || p.criado_em); if (f.length) concluir(p, f.map(x => x.combo).join(','), null); return; }
             const t = torneioPorId(p.torneio_id); if (!t) return;
             const desde = new Date(p.processando_em || p.criado_em).getTime() - 5000;
             const feitas = (t.entries || []).filter(x => String(x.jogadorId) === String(p.jogador_id) && x.tipo === p.tipo && Number(x.ts) >= desde);
@@ -300,6 +329,21 @@
 #sg-painel .sg-vert{writing-mode:vertical-rl;transform:rotate(180deg);font:800 11.5px 'Manrope',sans-serif;color:#a855f7;letter-spacing:1.4px}
 #sg-flutuante{position:fixed;right:22px;bottom:22px;z-index:90;display:none;align-items:center;gap:10px;background:#110f19;border:1px solid #7c5a12;color:#fde68a;border-radius:999px;padding:10px 16px 10px 12px;font:800 13px 'Manrope',sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.45)}
 #sg-flutuante .sg-badge{font:700 13px 'JetBrains Mono',monospace;color:#1a1306;background:#fbbf24;border-radius:999px;min-width:28px;height:28px;padding:0 8px;display:flex;align-items:center;justify-content:center}
+#sg-painel .sg-tag{display:inline-block;font:800 10.5px 'Manrope',sans-serif;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:1px;white-space:nowrap}
+#sg-painel .sg-tag.t{background:rgba(245,158,11,.14);color:#fbbf24;border:1px solid rgba(245,158,11,.35)}
+#sg-painel .sg-tag.c{background:rgba(34,197,94,.12);color:#86efac;border:1px solid rgba(34,197,94,.35)}
+#sg-painel .sg-outro{display:flex;align-items:center;gap:8px;padding:9px 12px;border-top:1px dashed #33294a;font-size:12px;color:#c9c3dc}
+#sg-painel .sg-outro button{margin-left:auto;height:30px;padding:0 10px;border-radius:8px;border:1px solid #4c2f7a;background:none;color:#c4b5fd;font:800 12px 'Manrope',sans-serif;cursor:pointer;white-space:nowrap}
+.sg-mesa-faixa{display:flex;align-items:center;gap:10px;padding:.6rem 1.5rem;border-bottom:1px solid #1e1e23;font-size:.8rem;color:#a1a1aa;font-family:'Manrope',sans-serif}
+.sg-mesa-faixa.on{background:rgba(168,85,247,.08);color:#e9d5ff}
+.sg-mesa-faixa b{font-weight:800}
+.sg-mesa-faixa .sg-pend{font:800 11px 'Manrope',sans-serif;color:#1a1306;background:#fbbf24;border-radius:999px;padding:2px 8px}
+.sg-sw2{position:relative;width:42px;height:24px;border-radius:12px;border:none;background:#2a2a30;cursor:pointer;flex:0 0 auto;margin-left:auto}
+.sg-sw2 i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.sg-sw2.on{background:#a855f7}
+.sg-sw2.on i{transform:translateX(18px)}
+#sg-nova-mesa{display:flex;align-items:center;gap:12px;padding:.75rem .9rem;border:1px solid #2f2847;border-radius:.6rem;background:#0f0d16;font-size:.85rem;color:#e4e4e7}
+#sg-nova-mesa small{display:block;font-size:.72rem;color:#9a93b0;margin-top:2px}
 #sg-entrada-aviso{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.4);border-radius:.6rem;padding:.65rem .8rem;font-size:.8rem;color:#ede9fe;line-height:1.45}
 #sg-entrada-aviso b{color:#c4b5fd}
 #sg-entrada-aviso .sg-warn{color:#fbbf24;font-weight:700}
@@ -327,19 +371,105 @@
     function onModais(muts) {
         if (!modalAberto('modal-torneio')) expOff = null;   // reabrir torneio desligado volta recolhido
         const mudouEntrada = muts.some(m => m.target.id === 'modal-entrada');
-        if (mudouEntrada && fluxo && fluxo.abriu && !modalAberto('modal-entrada')) setTimeout(finalizarFluxo, 350);
+        if (mudouEntrada && fluxo && !fluxo.cash && fluxo.abriu && !modalAberto('modal-entrada')) setTimeout(finalizarFluxo, 350);
+        const mudouRec = muts.some(m => m.target.id === 'modal-recompra');
+        if (mudouRec && fluxo && fluxo.cash && fluxo.abriu && !modalAberto('modal-recompra')) setTimeout(finalizarFluxo, 350);
+        if (muts.some(m => m.target.id === 'modal-nova-cash-mesa')) onNovaMesa();
+        if (muts.some(m => m.target.id === 'page-cash')) injetarMesas();
         render();
     }
 
+    // ---------- CASH: chave por mesa (cartão da mesa e abertura) ----------
+    function injetarMesas() {
+        const lc = $('cash-mesas-list');
+        if (!lc) return;
+        if (!clubeAtivo) { lc.querySelectorAll('.sg-mesa-faixa').forEach(x => x.remove()); return; }
+        // mesa recém-aberta com a chave escolhida na abertura
+        if (aberturaMesa) {
+            const novas = mesasAbertas().filter(m => !aberturaMesa.antes.has(m.id));
+            if (novas.length) { const ab = aberturaMesa; aberturaMesa = null; novas.forEach(m => definirMesa(m.id, ab.ativo, true)); }
+            else if (Date.now() - aberturaMesa.em > 180000) aberturaMesa = null;
+        }
+        mesasAbertas().forEach(m => {
+            const bt = lc.querySelector('button[onclick="abrirAddJogadorCash(\'' + m.id + '\')"]');
+            const card = bt && bt.closest('.t-card'); if (!card) return;
+            const head = card.firstElementChild; if (!head) return;
+            let fx = card.querySelector('.sg-mesa-faixa');
+            if (!fx) { fx = document.createElement('div'); fx.className = 'sg-mesa-faixa'; fx.addEventListener('click', (ev) => { const b = ev.target.closest('[data-mid]'); if (b) definirMesa(b.dataset.mid, !mesaAtiva(b.dataset.mid)); }); head.insertAdjacentElement('afterend', fx); }
+            const on = mesaAtiva(m.id), pend = pedidos.filter(p => p.mesa_id === m.id).length;
+            const html = '<i class="fa-solid fa-coins" style="color:' + (on ? '#a855f7' : '#52525b') + '"></i><span><b>StackSangeur ' + (on ? 'ligado' : 'desligado') + '</b> nesta mesa' +
+                (on ? ' · a sangeur pode pedir recompra' : '') + '</span>' + (pend ? '<span class="sg-pend">' + pend + (pend === 1 ? ' pedido' : ' pedidos') + '</span>' : '') +
+                '<button type="button" class="sg-sw2' + (on ? ' on' : '') + '" data-mid="' + m.id + '" aria-label="Ligar ou desligar o StackSangeur nesta mesa"><i></i></button>';
+            if (fx.dataset.h !== html) { fx.innerHTML = html; fx.dataset.h = html; }
+            fx.classList.toggle('on', on);
+        });
+    }
+    function onNovaMesa() {
+        const md = $('modal-nova-cash-mesa'); if (!md) return;
+        if (modalAberto('modal-nova-cash-mesa')) {
+            if (!clubeAtivo) return;
+            const ativo = ST.padraoCash === 'ligado';
+            aberturaMesa = { antes: new Set(mesasAbertas().map(m => m.id)), ativo, em: Date.now(), aberto: true };
+            let row = $('sg-nova-mesa');
+            if (!row) {
+                const bt = md.querySelector('button[onclick*="criarMesaCash"]');
+                if (!bt || !bt.parentNode) return;
+                row = document.createElement('div'); row.id = 'sg-nova-mesa';
+                row.addEventListener('click', (ev) => { if (!ev.target.closest('.sg-sw2') || !aberturaMesa) return; aberturaMesa.ativo = !aberturaMesa.ativo; pintarNovaMesa(); });
+                bt.parentNode.insertBefore(row, bt);
+            }
+            pintarNovaMesa();
+        } else if (aberturaMesa && aberturaMesa.aberto) {
+            aberturaMesa.aberto = false; aberturaMesa.em = Date.now();
+            setTimeout(injetarMesas, 200);
+        }
+    }
+    function pintarNovaMesa() {
+        const row = $('sg-nova-mesa'); if (!row || !aberturaMesa) return;
+        const on = aberturaMesa.ativo;
+        row.innerHTML = '<i class="fa-solid fa-coins" style="color:' + (on ? '#a855f7' : '#52525b') + '"></i><span style="flex:1">StackSangeur nesta mesa<small>' +
+            (on ? 'Ligado: a sangeur pode pedir recompra pelo celular' : 'Desligado: dá para ligar depois, no cartão da mesa') + '</small></span>' +
+            '<button type="button" class="sg-sw2' + (on ? ' on' : '') + '" aria-label="StackSangeur nesta mesa"><i></i></button>';
+    }
+
     function restaurarPadding() {
-        const ov = $('modal-torneio'); if (!ov) return;
-        if (ov.dataset.sgPad) { ov.style.paddingLeft = ''; ov.style.paddingRight = ''; delete ov.dataset.sgPad; }
+        const ov = $('modal-torneio');
+        if (ov && ov.dataset.sgPad) { ov.style.paddingLeft = ''; ov.style.paddingRight = ''; delete ov.dataset.sgPad; }
+        const pc = $('page-cash');
+        if (pc && pc.dataset.sgPad) { pc.style.paddingLeft = ''; pc.style.paddingRight = ''; delete pc.dataset.sgPad; }
+    }
+    function posicionarCash(a) {
+        const exp = expandido(), larg = exp ? LARGURA : FAIXA, pc = $('page-cash');
+        const rec = $('modal-recompra'), sobre = modalAberto('modal-recompra') ? (parseInt(rec.style.zIndex, 10) || 100) + 5 : 60;
+        // outro modal do app aberto (fora o da recompra): o painel sai da frente
+        const outro = Array.from(document.querySelectorAll('.modal-overlay.open')).some(m => m.id !== 'modal-recompra');
+        if (outro) { a.style.display = 'none'; return; }
+        if (telaPequena()) {
+            if (pc && pc.dataset.sgPad) { pc.style.paddingLeft = ''; pc.style.paddingRight = ''; delete pc.dataset.sgPad; }
+            if (!exp) { a.style.display = 'none'; return; }
+            a.style.display = 'flex'; a.classList.remove('sg-faixa');
+            a.style.width = Math.min(LARGURA, window.innerWidth - 24) + 'px';
+            a.style.left = lado() === 'esquerda' ? '12px' : ''; a.style.right = lado() === 'direita' ? '12px' : '';
+            a.style.zIndex = String(sobre); return;
+        }
+        a.style.display = 'flex'; a.style.width = larg + 'px';
+        a.style.left = lado() === 'esquerda' ? MARGEM + 'px' : ''; a.style.right = lado() === 'direita' ? MARGEM + 'px' : '';
+        a.style.zIndex = String(sobre);
+        a.classList.toggle('sg-faixa', !exp);
+        // abre espaço na tela de Cash para o painel não cobrir os botões das mesas
+        if (pc) { const res = (larg + MARGEM + 8) + 'px'; pc.dataset.sgPad = '1'; pc.style.paddingRight = lado() === 'direita' ? res : ''; pc.style.paddingLeft = lado() === 'esquerda' ? res : ''; }
     }
     function posicionar() {
         const a = $('sg-painel'), ov = $('modal-torneio');
         if (!a) return;
-        const vis = !!clubeAtivo && lado() !== 'off' && modalAberto('modal-torneio');
+        const ctx = contexto();
+        if (ctx === 'cash' && !!clubeAtivo && lado() !== 'off' && cashEmUso()) {
+            if (ov && ov.dataset.sgPad) { ov.style.paddingLeft = ''; ov.style.paddingRight = ''; delete ov.dataset.sgPad; }
+            posicionarCash(a); return;
+        }
+        const vis = !!clubeAtivo && lado() !== 'off' && ctx === 'torneio';
         if (!vis) { a.style.display = 'none'; restaurarPadding(); return; }
+        { const pc = $('page-cash'); if (pc && pc.dataset.sgPad) { pc.style.paddingLeft = ''; pc.style.paddingRight = ''; delete pc.dataset.sgPad; } }
         const exp = expAgora(), larg = exp ? LARGURA : FAIXA;
         // Tela estreita (celular/tablet): sem faixa — só o aviso flutuante, que abre o painel como gaveta
         if (telaPequena()) {
@@ -376,6 +506,7 @@
         return e(sg) + ' · pagamento no caixa';
     }
     function cardHtml(p) {
+        if (ehCash(p)) return cardCashHtml(p);
         const seg = (Date.now() - new Date(p.criado_em).getTime()) / 1000;
         const atrasado = p.status === 'pendente' && seg > 60;
         const t = torneioPorId(p.torneio_id);
@@ -384,7 +515,7 @@
         const noTorneioAberto = modalAberto('modal-torneio') && idxAtivo() === idxTorneio(p.torneio_id);
         let h = '<div class="sg-card' + (atrasado ? ' sg-atr' : '') + (outroCaixa ? ' sg-proc' : '') + '">' +
             '<div class="sg-l1"><div style="min-width:0"><div class="sg-nm">' + e(p.jogador_nome) + '</div>' +
-            '<div class="sg-sub">' + (TIPO_NOME[p.tipo] || e(p.tipo)) + (p.quantidade > 1 ? ' ' + p.quantidade + 'x' : '') + (t ? ' · ' + e(t.nome) : '') + '</div></div>' +
+            '<div class="sg-sub">' + (TIPO_NOME[p.tipo] || e(p.tipo)) + (p.quantidade > 1 ? ' ' + p.quantidade + 'x' : '') + '<span class="sg-tag t">🏆 ' + e(t ? t.nome : 'Torneio') + '</span></div></div>' +
             '<div><div class="sg-val">' + (Number(p.valor_estimado) > 0 ? money(p.valor_estimado) : 'cortesia') + '</div><div class="sg-tp' + (atrasado ? ' sg-x' : '') + '">' + haQuanto(p.criado_em) + '</div></div></div>' +
             '<div class="sg-info">' + linhaInfo(p) + '</div>';
         if (recusando === p.id) {
@@ -410,27 +541,76 @@
         return h + '</div>';
     }
 
+    function cardCashHtml(p) {
+        const seg = (Date.now() - new Date(p.criado_em).getTime()) / 1000;
+        const atrasado = p.status === 'pendente' && seg > 60;
+        const m = mesaPorId(p.mesa_id);
+        const outroCaixa = p.status === 'processando' && p.processando_por !== meuId();
+        const meu = p.status === 'processando' && p.processando_por === meuId();
+        const sg = pNome(p.sangeur_nome) || 'Sangeur';
+        let h = '<div class="sg-card' + (atrasado ? ' sg-atr' : '') + (outroCaixa ? ' sg-proc' : '') + '">' +
+            '<div class="sg-l1"><div style="min-width:0"><div class="sg-nm">' + e(p.jogador_nome) + '</div>' +
+            '<div class="sg-sub">Recompra<span class="sg-tag c">🃏 ' + e(m ? m.nome : 'Mesa de cash') + '</span></div></div>' +
+            '<div><div class="sg-val">' + money(p.valor_estimado) + '</div><div class="sg-tp' + (atrasado ? ' sg-x' : '') + '">' + haQuanto(p.criado_em) + '</div></div></div>' +
+            '<div class="sg-info">' + e(sg) + (p.forma_pagto ? ' · obs.: pagou ' + (PAG_NOME[p.forma_pagto] || e(p.forma_pagto)) : '') + ' · vai para a conta do jogador</div>';
+        if (recusando === p.id) {
+            h += '<input class="sg-mot" data-id="' + p.id + '" maxlength="140" placeholder="Motivo (a sangeur vê no celular)">' +
+                 '<div class="sg-bts"><button type="button" class="sg-no" style="flex:1;width:auto" data-a="recusar-ok" data-id="' + p.id + '">Confirmar recusa</button>' +
+                 '<button type="button" class="sg-ok sg-sec" style="flex:0 0 80px" data-a="recusar-voltar">Voltar</button></div>';
+        } else if (outroCaixa) {
+            const min = (Date.now() - new Date(p.processando_em).getTime()) / 60000;
+            h += '<div class="sg-info" style="color:#c4b5fd">Em lançamento por outro caixa</div>';
+            if (min > 2) h += '<div class="sg-bts"><button type="button" class="sg-ok sg-sec" data-a="assumir" data-id="' + p.id + '">Assumir (parado há ' + Math.floor(min) + ' min)</button></div>';
+        } else if (fluxo && fluxo.p.id === p.id) {
+            h += '<div class="sg-info" style="color:#c4b5fd">Lançando agora — confirme na “Recompra”</div>';
+        } else if (!m) {
+            h += '<div class="sg-info" style="color:#fbbf24">Mesa não carregada neste computador</div>' +
+                 '<div class="sg-bts"><button type="button" class="sg-no" style="flex:1;width:auto" data-a="recusar" data-id="' + p.id + '">Recusar</button></div>';
+        } else if (contexto() !== 'cash') {
+            h += '<div class="sg-bts"><button type="button" class="sg-ok sg-sec" data-a="ir-cash" data-id="' + p.id + '">Ir para Cash Game</button>' +
+                 '<button type="button" class="sg-no" data-a="recusar" data-id="' + p.id + '">Recusar</button></div>';
+        } else {
+            h += '<div class="sg-bts"><button type="button" class="sg-ok" data-a="aceitar" data-id="' + p.id + '">' + (meu ? 'Retomar' : 'Aceitar') + '</button>' +
+                 '<button type="button" class="sg-no" data-a="' + (meu ? 'liberar' : 'recusar') + '" data-id="' + p.id + '">' + (meu ? 'Devolver' : 'Recusar') + '</button></div>';
+        }
+        return h + '</div>';
+    }
+
     function render() {
         const a = $('sg-painel'), f = $('sg-flutuante');
         if (!a || !clubeAtivo) return;
         posicionar();
-        const n = pedidos.filter(p => p.status === 'pendente').length;
-        const total = pedidos.length;
-        // Aviso flutuante: torneio fechado e há pedidos esperando
-        const torneioFechado = !modalAberto('modal-torneio');
+        const ctx = contexto(), noCash = ctx === 'cash';
+        const lista = noCash ? pedCash() : pedTorneio();
+        const nT = pedTorneio().filter(p => p.status === 'pendente').length, nC = pedCash().filter(p => p.status === 'pendente').length;
+        const n = noCash ? nC : nT;
+        const total = lista.length;
+        const painelVisivel = a.style.display !== 'none';
+        // Aviso flutuante: fora do lugar onde o pedido é lançado e há pedidos esperando
         if (f) {
-            const gaveta = !torneioFechado && telaPequena() && !expAgora() && lado() !== 'off' && !modalAberto('modal-entrada');
-            const mostra = gaveta || (torneioFechado && n > 0 && lado() !== 'off' && !document.querySelector('.modal-overlay.open'));
+            const gaveta = !!ctx && telaPequena() && !expandidoCtx() && lado() !== 'off' && !modalAberto('modal-entrada') && !modalAberto('modal-recompra') && (ctx === 'torneio' || cashEmUso());
+            const fora = (nT + nC) > 0 && !painelVisivel && lado() !== 'off' && !document.querySelector('.modal-overlay.open');
+            const mostra = gaveta || fora;
             f.style.display = mostra ? 'flex' : 'none';
-            f.style.zIndex = gaveta ? String((parseInt(($('modal-torneio') || {}).style?.zIndex, 10) || 100) + 6) : '90';
-            if (mostra) f.innerHTML = '<span class="sg-badge">' + n + '</span>Sangeur · ' + (n === 1 ? '1 pedido esperando' : n + ' pedidos esperando');
+            f.style.zIndex = gaveta && ctx === 'torneio' ? String((parseInt(($('modal-torneio') || {}).style?.zIndex, 10) || 100) + 6) : '90';
+            if (mostra) {
+                const partes = [];
+                if (nT) partes.push('🏆 Torneio ' + nT);
+                if (nC) partes.push('🃏 Cash ' + nC);
+                f.innerHTML = '<span class="sg-badge">' + (gaveta ? n : nT + nC) + '</span>Sangeur · ' + (partes.length ? partes.join(' · ') : 'sem pedidos');
+            }
         }
         if (a.style.display === 'none') return;
         // mantém o texto que o caixa está digitando no motivo
         const motAtual = recusando ? (a.querySelector('.sg-mot') || {}).value : null;
-        const tidAberto = torneioAbertoId(), offAqui = !!tidAberto && !torneioAtivo(tidAberto);
+        const tidAberto = noCash ? null : torneioAbertoId(), offAqui = !!tidAberto && !torneioAtivo(tidAberto);
         a.classList.toggle('sg-off', offAqui);
-        if (!expAgora()) {
+        if (!expandidoCtx()) {
+            if (noCash) {
+                a.innerHTML = '<span class="sg-badge' + (n ? '' : ' sg-zero') + '">' + n + '</span><span class="sg-vert">SANGEUR · CASH' + (n ? ' · ' + n + (n === 1 ? ' PENDENTE' : ' PENDENTES') : '') + '</span>';
+                a.title = 'Abrir pedidos de cash da sangeur';
+                return;
+            }
             a.innerHTML = offAqui
                 ? '<span class="sg-badge sg-zero">–</span><span class="sg-vert" style="color:#71717a">SANGEUR · DESLIGADO NESTE TORNEIO</span>'
                 : '<span class="sg-badge' + (n ? '' : ' sg-zero') + '">' + n + '</span><span class="sg-vert">SANGEUR' + (n ? ' · ' + n + (n === 1 ? ' PENDENTE' : ' PENDENTES') : '') + '</span>';
@@ -448,6 +628,10 @@
             h += '<div class="sg-tor"><span style="flex:1">StackSangeur <b>neste torneio</b><br><small>' + (offAqui ? 'Desligado: as sangeurs não veem este torneio' : 'Ligado: as sangeurs podem pedir') + '</small></span>' +
                  '<button type="button" data-a="tor-toggle" data-tid="' + tidAberto + '" aria-label="Ligar ou desligar o StackSangeur neste torneio" class="sg-sw' + (offAqui ? '' : ' on') + '"><i></i></button></div>';
         }
+        if (noCash) {
+            const lig = mesasAbertas().filter(m => mesaAtiva(m.id)).length;
+            h += '<div class="sg-tor"><span style="flex:1"><span class="sg-tag c" style="margin:0 6px 0 0">🃏 Cash</span>Pedidos das mesas<br><small>' + (lig ? lig + (lig === 1 ? ' mesa ligada' : ' mesas ligadas') + ' · liga e desliga no cartão da mesa' : 'Nenhuma mesa ligada · ligue no cartão da mesa') + '</small></span></div>';
+        }
         h += '<div class="sg-lista">';
         if (offAqui && aba === 'pedidos') h += '<div class="sg-vazio" style="padding:14px 8px;border:1px dashed #33294a;border-radius:12px">Desligado neste torneio.<br>O app das sangeurs não mostra este torneio e o banco recusa pedidos para ele. Ligue acima quando quiser usar.</div>';
         if (aba === 'pochete') {
@@ -457,12 +641,17 @@
             if (movAberto) { const i = a.querySelector('.sg-qtd'); if (i) { if (qAtual) i.value = qAtual; if (document.activeElement !== i) i.focus(); } }
             return;
         }
-        if (!total) h += '<div class="sg-vazio">Nenhum pedido agora.<br>Quando a sangeur pedir pelo celular, aparece aqui com som.</div>';
+        if (!total) h += '<div class="sg-vazio">Nenhum pedido ' + (noCash ? 'de cash' : 'de torneio') + ' agora.<br>Quando a sangeur pedir pelo celular, aparece aqui com som.</div>';
         // pedidos do torneio aberto primeiro
         const aberto = (modalAberto('modal-torneio') && idxAtivo() != null && torneios[idxAtivo()]) ? torneios[idxAtivo()].id : null;
-        pedidos.slice().sort((x, y) => (x.torneio_id === aberto ? 0 : 1) - (y.torneio_id === aberto ? 0 : 1) || new Date(x.criado_em) - new Date(y.criado_em))
+        lista.slice().sort((x, y) => (x.torneio_id === aberto ? 0 : 1) - (y.torneio_id === aberto ? 0 : 1) || new Date(x.criado_em) - new Date(y.criado_em))
             .forEach(p => { h += cardHtml(p); });
-        h += '</div><div class="sg-rod"><span style="flex:1">Lado e modos em <a href="/stacksangeur-painel.html" target="_blank" style="color:#c4b5fd">Configurações</a></span></div>';
+        h += '</div>';
+        // aviso do que espera na outra tela (sem misturar as listas)
+        const outros = noCash ? nT : nC;
+        if (outros) h += '<div class="sg-outro">' + (noCash ? '🏆 ' : '🃏 ') + outros + (outros === 1 ? ' pedido' : ' pedidos') + (noCash ? ' de torneio' : ' de cash') + ' aguardando' +
+            '<button type="button" data-a="' + (noCash ? 'ir-torneio' : 'ir-cash') + '">' + (noCash ? 'Abrir torneio' : 'Ir para Cash Game') + ' →</button></div>';
+        h += '<div class="sg-rod"><span style="flex:1">Lado e modos em <a href="/stacksangeur-painel.html" target="_blank" style="color:#c4b5fd">Configurações</a></span></div>';
         a.innerHTML = h;
         if (recusando) { const inp = a.querySelector('.sg-mot'); if (inp) { if (motAtual) inp.value = motAtual; if (document.activeElement !== inp) inp.focus(); } }
     }
@@ -470,6 +659,7 @@
     function cliquePainel(ev) {
         const a = $('sg-painel');
         if (a.classList.contains('sg-faixa')) {
+            if (contexto() === 'cash') { LSs(EXP_KEY, '1'); render(); return; }
             const tid = torneioAbertoId();
             if (tid && !torneioAtivo(tid)) expOff = tid; else LSs(EXP_KEY, '1');
             render(); return;
@@ -478,6 +668,8 @@
         const ac = b.dataset.a, p = pedidos.find(x => x.id === b.dataset.id);
         if (ac === 'som') { LSs(SOM_KEY, LSg(SOM_KEY, '1') === '0' ? '1' : '0'); render(); return; }
         if (ac === 'lado') { LSs(LADO_KEY, lado() === 'direita' ? 'esquerda' : 'direita'); render(); return; }
+        if (ac === 'ir-cash') { irParaCash(); return; }
+        if (ac === 'ir-torneio') { abrirTorneioDoPrimeiro(); return; }
         if (ac === 'recolher') { const tid = torneioAbertoId(); if (tid && !torneioAtivo(tid)) expOff = null; else LSs(EXP_KEY, '0'); render(); return; }
         if (ac === 'tor-toggle') { definirTorneio(b.dataset.tid, !torneioAtivo(b.dataset.tid)); return; }
         if (ac === 'aba-pedidos' || ac === 'aba-pochete') { aba = ac.slice(4); movAberto = null; recusando = null; if (aba === 'pochete') carregarPochete(); render(); return; }
@@ -489,19 +681,28 @@
         if (ac === 'recusar-ok') { const inp = a.querySelector('.sg-mot'); confirmarRecusa(b.dataset.id, inp ? inp.value : ''); return; }
         if (!p) return;
         if (ac === 'abrir') { const i = idxTorneio(p.torneio_id); if (i >= 0 && typeof abrirDetalhesTorneio === 'function') abrirDetalhesTorneio(i); return; }
-        if (ac === 'aceitar') { aceitar(p, false); return; }
+        if (ac === 'aceitar') { if (ehCash(p)) aceitarCash(p, false); else aceitar(p, false); return; }
         if (ac === 'assumir') {
             showConfirmModal('Assumir pedido parado?',
                 'Outro caixa começou este lançamento e parou há mais de 2 minutos.\n\nConfira na aba Jogadores se a entrada de ' + e(p.jogador_nome) + ' ainda NÃO foi lançada antes de continuar.',
-                () => aceitar(p, true), { icon: '⚠️', confirmLabel: 'Assumir', confirmColor: '#16a34a', borderColor: '#f59e0b' });
+                () => (ehCash(p) ? aceitarCash(p, true) : aceitar(p, true)), { icon: '⚠️', confirmLabel: 'Assumir', confirmColor: '#16a34a', borderColor: '#f59e0b' });
             return;
         }
         if (ac === 'liberar') { liberar(p).then(carregar); return; }
     }
 
+    function irParaCash() {
+        try { if (modalAberto('modal-torneio') && typeof closeModal === 'function') closeModal('modal-torneio'); } catch (_) {}
+        try { if (typeof showPage === 'function') showPage('cash'); } catch (_) {}
+        setTimeout(() => { injetarMesas(); render(); }, 150);
+    }
     function abrirTorneioDoPrimeiro() {
-        if (modalAberto('modal-torneio')) { LSs(EXP_KEY, '1'); render(); return; }   // celular: abre a gaveta
-        const p = pedidos.find(x => x.status === 'pendente' && idxTorneio(x.torneio_id) >= 0);
+        const ctx = contexto();
+        if (ctx && telaPequena() && !expandidoCtx()) { LSs(EXP_KEY, '1'); render(); return; }   // celular: abre a gaveta
+        if (ctx === 'torneio') { LSs(EXP_KEY, '1'); render(); return; }
+        const temT = pedTorneio().some(x => x.status === 'pendente'), temC = pedCash().some(x => x.status === 'pendente');
+        if (!temT && temC) { irParaCash(); return; }
+        const p = pedidos.find(x => x.status === 'pendente' && !ehCash(x) && idxTorneio(x.torneio_id) >= 0);
         if (!p) return toast('⚠️ O torneio do pedido não está carregado neste computador');
         if (typeof abrirDetalhesTorneio === 'function') abrirDetalhesTorneio(idxTorneio(p.torneio_id));
     }
@@ -531,6 +732,26 @@
         if (!ativo && pend > 0) {
             showConfirmModal('Desligar o StackSangeur neste torneio?',
                 'Há ' + pend + (pend === 1 ? ' pedido' : ' pedidos') + ' deste torneio ainda sem resposta. Eles continuam no painel para você aceitar ou recusar; só não entram pedidos novos.',
+                aplicar, { icon: '⚪', confirmLabel: 'Desligar', confirmColor: '#7c3aed', borderColor: '#a855f7' });
+            return;
+        }
+        aplicar();
+    }
+    async function definirMesa(mid, ativo, silencioso) {
+        const pend = pedidos.filter(p => p.mesa_id === mid).length;
+        const m = mesaPorId(mid);
+        const aplicar = async () => {
+            try {
+                const d = await rpc('sangeur_definir_mesa', { p_mesa_id: mid, p_ativo: ativo });
+                if (!d || !d.ok) throw new Error((d && d.erro) || 'erro');
+                ST.mesas = Object.assign({}, ST.mesas, { [mid]: ativo });
+                if (!silencioso || ativo) toast(ativo ? '🟢 StackSangeur ligado na mesa ' + (m ? m.nome : '') : '⚪ StackSangeur desligado na mesa ' + (m ? m.nome : ''));
+                injetarMesas(); render();
+            } catch (err) { toast('⚠️ Não salvou: ' + (err.message || 'sem conexão')); }
+        };
+        if (!ativo && pend > 0 && !silencioso) {
+            showConfirmModal('Desligar o StackSangeur nesta mesa?',
+                'Há ' + pend + (pend === 1 ? ' pedido' : ' pedidos') + ' desta mesa ainda sem resposta. Eles continuam no painel para você aceitar ou recusar; só não entram pedidos novos.',
                 aplicar, { icon: '⚪', confirmLabel: 'Desligar', confirmColor: '#7c3aed', borderColor: '#a855f7' });
             return;
         }
@@ -571,6 +792,7 @@
 
     // ---------- ACEITAR: abre o lançamento de sempre, preenchido ----------
     async function aceitar(p, forcar) {
+        if (ehCash(p)) return aceitarCash(p, forcar);
         if (fluxo) return toast('⏳ Termine o lançamento em andamento primeiro');
         const idx = idxTorneio(p.torneio_id);
         if (idx < 0) return toast('⚠️ Torneio não carregado neste computador');
@@ -663,7 +885,81 @@
         fluxo.pagto = (tg && tg.checked) ? (window._pagoNaHoraMetodo || null) : null;
     }
 
+    // ---------- CASH: ACEITAR abre a "Recompra" de sempre, preenchida ----------
+    // Recompras do jogador nesta mesa feitas depois de "desde" (para não lançar em dobro)
+    function recomprasDepois(p, desdeIso) {
+        const m = mesaPorId(p.mesa_id); if (!m) return [];
+        const desde = new Date(desdeIso).getTime() - 5000, out = [];
+        (m.jogadores || []).filter(j => String(j.jogadorId) === String(p.jogador_id)).forEach(j => {
+            (j.movimentos || []).forEach(mv => { if (mv.tipo === 'recompra' && Number(mv.ts) >= desde) out.push({ mv, combo: 'cash:' + (j.id || '') + ':' + mv.ts }); });
+        });
+        return out;
+    }
+    async function aceitarCash(p, forcar) {
+        if (fluxo) return toast('⏳ Termine o lançamento em andamento primeiro');
+        if (contexto() !== 'cash') { irParaCash(); return; }
+        const m = mesaPorId(p.mesa_id);
+        if (!m) return toast('⚠️ Mesa não carregada neste computador — atualize a página');
+        const j = (m.jogadores || []).find(x => String(x.jogadorId) === String(p.jogador_id) && x.status === 'ativo');
+        if (!j) return toast('⚠️ ' + p.jogador_nome + ' não está sentado nesta mesa agora — recuse o pedido');
+        const jaFeitas = recomprasDepois(p, p.criado_em);
+        if (jaFeitas.length && (p.status === 'pendente' || forcar)) {
+            const hr = new Date(Number(jaFeitas[0].mv.ts)).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            showConfirmModal('Já existe recompra',
+                e(p.jogador_nome) + ' já tem ' + jaFeitas.length + 'x recompra lançada nesta mesa depois do pedido (às ' + hr + ').\n\nMarcar o pedido como aceito SEM lançar de novo?',
+                async () => {
+                    try { const r = await rpc('sangeur_caixa_reservar', { p_id: p.id, p_forcar: false }); if (r && r.ok) await concluir(p, jaFeitas.map(x => x.combo).join(','), null); else toast('⚠️ Pedido indisponível'); }
+                    catch (_) { toast('⚠️ Sem conexão'); }
+                    carregar();
+                }, { icon: '🛡️', confirmLabel: 'Marcar como aceito', confirmColor: '#16a34a', borderColor: '#a855f7', cancelLabel: 'Voltar' });
+            return;
+        }
+        let r;
+        try { r = await rpc('sangeur_caixa_reservar', { p_id: p.id, p_forcar: !!forcar }); }
+        catch (err) { return toast('⚠️ Sem conexão com o servidor. Tente de novo.'); }
+        if (!r || !r.ok) {
+            if (r && r.erro === 'em_uso') toast('🔒 ' + (pNome(r.processando_nome) || 'Outro caixa') + ' já está lançando este pedido');
+            else toast('⚠️ Este pedido já foi resolvido');
+            return carregar();
+        }
+        fluxo = { p, cash: true, mesaId: m.id, inicio: new Date(Date.now() - 1000).toISOString(), abriu: false };
+        render();
+        try { abrirRecompra(m.id, p.jogador_id); } catch (err) { console.warn('[SANGEUR] abrirRecompra:', err); }
+        if (!modalAberto('modal-recompra')) { const f = fluxo; fluxo = null; await liberar(f.p); carregar(); return; }
+        fluxo.abriu = true;
+        setTimeout(() => preencherCash(p, m), 120);
+    }
+    function preencherCash(p, m) {
+        if (!fluxo || fluxo.p.id !== p.id || !modalAberto('modal-recompra')) return;
+        const v = $('rec-valor');
+        if (v) { v.value = Number(p.valor_estimado) || ''; v.dispatchEvent(new Event('input', { bubbles: true })); }
+        const antigo = $('sg-entrada-aviso'); if (antigo) antigo.remove();
+        const col = document.querySelector('#modal-recompra > div > div:nth-child(2)');
+        if (col) {
+            const d = document.createElement('div'); d.id = 'sg-entrada-aviso';
+            d.innerHTML = '<b>Pedido da sangeur ' + e(pNome(p.sangeur_nome)) + '</b>: Recompra · <b>' + e(m.nome) + '</b> · ' + money(p.valor_estimado) +
+                (p.forma_pagto ? ' · obs.: pagou ' + (PAG_NOME[p.forma_pagto] || e(p.forma_pagto)) : '') +
+                '<br>Confira e clique em <b>Confirmar</b>. Fechar sem confirmar devolve o pedido para a fila.';
+            col.insertBefore(d, col.firstChild);
+        }
+    }
+
     async function finalizarFluxo() {
+        if (fluxo && fluxo.cash) {
+            if (modalAberto('modal-recompra')) return;
+            const f = fluxo; fluxo = null;
+            const aviso = $('sg-entrada-aviso'); if (aviso) aviso.remove();
+            const novas = recomprasDepois(f.p, f.inicio);
+            if (novas.length) {
+                await concluir(f.p, novas.map(x => x.combo).join(','), null);
+                toast('✅ Pedido da sangeur aceito — ' + pNome(f.p.sangeur_nome) + ' foi avisada');
+            } else {
+                await liberar(f.p);
+                toast('↩️ Pedido de ' + f.p.jogador_nome + ' voltou para a fila');
+                carregar();
+            }
+            return;
+        }
         if (!fluxo || modalAberto('modal-entrada')) return;
         const f = fluxo; fluxo = null;
         const aviso = $('sg-entrada-aviso'); if (aviso) aviso.remove();
@@ -680,5 +976,5 @@
     }
 
     // exposto só para diagnóstico/testes
-    window._stackSangeurCaixa = { verificar, carregar, atualizarStatus, estado: () => ({ clubeAtivo, pedidos, fluxo, ST }) };
+    window._stackSangeurCaixa = { verificar, carregar, atualizarStatus, injetarMesas, estado: () => ({ clubeAtivo, pedidos, fluxo, ST }) };
 })();

@@ -130,6 +130,15 @@
   </fieldset>
 
   <fieldset>
+    <legend>Mesas de cash novas começam com o StackSangeur</legend>
+    <div class="linha">
+      <label class="rad"><input type="radio" name="padraoCash" value="ligado"> Ligado</label>
+      <label class="rad"><input type="radio" name="padraoCash" value="desligado"> Desligado</label>
+    </div>
+    <div class="hint">Independe dos torneios. O caixa liga ou desliga em cada mesa ao abrir a mesa ou a qualquer momento no cartão da mesa. No cash a sangeur pede recompra; o caixa lança como sempre e o valor vai para a conta do jogador. Salvo na hora.</div>
+  </fieldset>
+
+  <fieldset>
     <legend>O que a sangeur pode solicitar</legend>
     <div class="acoes">
       <label class="chk"><input type="checkbox" data-acao="reentry"> Reentrada</label>
@@ -203,6 +212,8 @@ async function carregarPadraoTorneio() {
     const { data } = await sb.rpc('sangeur_status');
     const v = (data && data.padrao_torneio) || 'ligado';
     document.querySelectorAll('input[name=padraoTorneio]').forEach(r => r.checked = r.value === v);
+    const vc = (data && data.padrao_cash) === 'ligado' ? 'ligado' : 'desligado';
+    document.querySelectorAll('input[name=padraoCash]').forEach(r => r.checked = r.value === vc);
   } catch (_) {}
 }
 async function carregar() {
@@ -250,6 +261,14 @@ document.addEventListener('change', async (ev) => {
       const { data, error } = await sb.rpc('sangeur_salvar_padrao_torneio', { p_padrao: el.value });
       if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
       toast(el.value === 'ligado' ? 'Torneios novos começam com o StackSangeur ligado' : 'Torneios novos começam com o StackSangeur desligado');
+    } catch (e) { toast('⚠️ Não salvou: ' + e.message); carregarPadraoTorneio(); }
+    return;
+  }
+  if (el.name === 'padraoCash') {
+    try {
+      const { data, error } = await sb.rpc('sangeur_salvar_padrao_cash', { p_padrao: el.value });
+      if (error || !data || !data.ok) throw new Error((data && data.erro) || (error && error.message) || 'erro');
+      toast(el.value === 'ligado' ? 'Mesas de cash novas começam com o StackSangeur ligado' : 'Mesas de cash novas começam com o StackSangeur desligado');
     } catch (e) { toast('⚠️ Não salvou: ' + e.message); carregarPadraoTorneio(); }
     return;
   }

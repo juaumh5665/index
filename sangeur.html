@@ -84,6 +84,12 @@
   .tor-select button { flex: 0 0 auto; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line2);
     color: var(--tx2); font-size: 13px; font-weight: 700; }
   .tor-select button.on { background: var(--acbg); border-color: var(--acln); color: var(--ac2); }
+  .modo-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+  .modo-sel button { height: 38px; border-radius: 9px; font-size: 14px; font-weight: 800; color: var(--mut); }
+  .modo-sel button.on { background: var(--acbg); color: var(--ac2); }
+  .vals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .vals button { height: 52px; border-radius: 12px; border: 1.5px solid var(--line2); font-size: 16px; color: var(--tx2); }
+  .vals button.sel { border-color: var(--ac); background: var(--acbg); color: var(--ac2); }
 
   main { flex: 1; padding: 14px 16px calc(96px + var(--safe-b)); display: flex; flex-direction: column; gap: 10px; }
   .sec { font-size: 11.5px; font-weight: 800; color: var(--mut); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
@@ -229,6 +235,7 @@
       <button type="button" class="ic-btn" id="btnTema" aria-label="Aparência"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 9.8C22 5.5 17.5 2 12 2z"/></svg></button>
     </div>
     <div class="offline" id="hOffline" hidden>Sem internet. Os pedidos ficam guardados e são enviados quando a conexão voltar.</div>
+    <div class="modo-sel" id="modoSel" hidden><button type="button" data-modo="torneio">Torneio</button><button type="button" data-modo="cash">Cash</button></div>
     <div class="tor-select" id="torSelect" hidden></div>
     <label class="search" id="boxBusca">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color:var(--mut)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -310,13 +317,17 @@ let TORNEIO_ID = LS.get('stacksangeur_torneio', null);
 let JOGADORES = [];
 let PEDIDOS = [];
 let FILA = LS.get('stacksangeur_fila', []);   // pedidos ainda não confirmados pelo servidor
-let SEL = null;            // { jogador, tipo, qtd, pagto }
+let SEL = null;            // { jogador, tipo, qtd, pagto } · no cash: { cash:true, jogador, valor, pagto }
+let MESAS = [];            // mesas de cash com o StackSangeur ligado (sangeur_listar_mesas_cash)
+let MESA_ID = LS.get('stacksangeur_mesa', null);
+let MODO = LS.get('stacksangeur_modo', 'torneio');   // escolha da sangeur quando há torneio E cash
 let _canal = null, _buscaTimer = null, _audio = null, _enviandoFila = false;
 const _statusVisto = {};   // id → último status mostrado (pra avisar só na mudança)
 
-const TIPO_NOME = { reentry: 'Reentrada', rebuy_simples: 'Rebuy simples', rebuy_duplo: 'Rebuy duplo', addon: 'Add-on', last_chance: 'Last Chance' };
+const TIPO_NOME = { reentry: 'Reentrada', rebuy_simples: 'Rebuy simples', rebuy_duplo: 'Rebuy duplo', addon: 'Add-on', last_chance: 'Last Chance', cash_recompra: 'Recompra cash' };
+const PAGTOS_CASH = [ ['dinheiro','Dinheiro'], ['pix','PIX'], ['debito','Débito'], ['credito','Crédito'], ['conta','Na conta'] ];
 const PAGTOS = [ ['dinheiro','Dinheiro'], ['pix','PIX'], ['debito','Débito'], ['credito','Crédito'], ['cheque','Cheque'] ];
-const PAGTO_NOME = Object.fromEntries(PAGTOS);
+const PAGTO_NOME = Object.assign(Object.fromEntries(PAGTOS), { conta: 'Na conta' });
 const ERROS = {
   nao_logado: 'Sua sessão expirou. Entre de novo.',
   usuario_nao_encontrado: 'Usuário não encontrado no StackOS.',
@@ -332,7 +343,12 @@ const ERROS = {
   acao_nao_permitida: 'Esse tipo de pedido não está liberado para a sangeur.',
   quantidade_invalida: 'Quantidade inválida.',
   forma_pagto_invalida: 'Forma de pagamento não aceita no app.',
-  ja_tem_pendente: 'Esse jogador já tem um pedido aguardando o caixa.'
+  ja_tem_pendente: 'Esse jogador já tem um pedido aguardando o caixa.',
+  mesa_invalida: 'Mesa não encontrada.',
+  mesa_fechada: 'Essa mesa já foi encerrada.',
+  mesa_sem_sangeur: 'O caixa desligou o StackSangeur nesta mesa.',
+  jogador_nao_sentado: 'Esse jogador não está mais sentado nessa mesa.',
+  valor_invalido: 'Valor inválido.'
 };
 
 // ---------- helpers ----------
@@ -501,7 +517,17 @@ async function entrarApp() {
   carregarPochete();
 }
 
+async function carregarMesas() {
+  try {
+    const d = await rpc('sangeur_listar_mesas_cash');
+    if (!d || !d.ok) return;
+    MESAS = d.mesas || [];
+    if (!MESAS.some(m => m.id === MESA_ID)) MESA_ID = MESAS[0]?.id || null;
+    LS.set('stacksangeur_mesa', MESA_ID);
+  } catch (e) { console.warn('[sangeur] mesas', e); }
+}
 async function carregarTorneios() {
+  await carregarMesas();
   try {
     const d = await rpc('sangeur_listar_torneios');
     if (!d || !d.ok) { if (d?.erro === 'sem_permissao') { toast(ERROS.sem_permissao, 'err'); return sair(); } return; }
@@ -513,11 +539,27 @@ async function carregarTorneios() {
 }
 function abaAtual() { const b = document.querySelector('nav.tabs button.on'); return b ? b.dataset.tab : 'jogadores'; }
 function torneioAtual() { return TORNEIOS.find(t => t.id === TORNEIO_ID) || null; }
+function mesaAtual() { return MESAS.find(m => m.id === MESA_ID) || null; }
+// Cash só aparece se o caixa ligou o StackSangeur em alguma mesa aberta
+function modoCash() { if (!MESAS.length) return false; if (!TORNEIOS.length) return true; return MODO === 'cash'; }
+function blindsTxt(m) { return (Number(m.sb) || Number(m.bb)) ? 'NL ' + (Number(m.sb) || 0).toLocaleString('pt-BR') + '/' + (Number(m.bb) || 0).toLocaleString('pt-BR') : 'Cash'; }
 
 function renderTopo() {
   const t = torneioAtual();
   const sel = $('torSelect');
   const naLista = abaAtual() === 'jogadores';
+  const ms = $('modoSel');
+  ms.hidden = !naLista || !(TORNEIOS.length && MESAS.length);
+  ms.querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.modo === 'cash') === modoCash()));
+  if (modoCash()) {
+    const m = mesaAtual();
+    sel.hidden = !naLista || MESAS.length < 2;
+    sel.innerHTML = MESAS.map(x => '<button type="button" data-m="' + x.id + '" class="' + (x.id === MESA_ID ? 'on' : '') + '">' + esc(x.nome) + '</button>').join('');
+    $('boxBusca').hidden = !naLista || !m;
+    $('hTorneio').textContent = m ? 'Cash · ' + m.nome : 'Nenhuma mesa de cash';
+    const ch = $('hNivel'); ch.textContent = m ? blindsTxt(m) : '—'; ch.className = 'chip chip-ac';
+    return;
+  }
   sel.hidden = !naLista || TORNEIOS.length < 2;
   sel.innerHTML = TORNEIOS.map(x => '<button type="button" data-t="' + x.id + '" class="' + (x.id === TORNEIO_ID ? 'on' : '') + '">' + esc(x.nome) + '</button>').join('');
   $('boxBusca').hidden = !naLista || !t;
@@ -529,12 +571,19 @@ function renderTopo() {
   else if (t.is_break) { ch.textContent = emJanelaCompras(t) ? 'Intervalo · compras abertas' : 'Intervalo'; ch.className = 'chip chip-warn'; }
   else { ch.textContent = nivel; ch.className = 'chip chip-ac'; }
 }
+$('modoSel').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-modo]'); if (!b) return;
+  MODO = b.dataset.modo; LS.set('stacksangeur_modo', MODO); $('inpBusca').value = ''; renderTopo(); carregarJogadores();
+});
 $('torSelect').addEventListener('click', (e) => {
+  const bm = e.target.closest('button[data-m]');
+  if (bm) { MESA_ID = bm.dataset.m; LS.set('stacksangeur_mesa', MESA_ID); renderTopo(); renderJogadoresCash(); return; }
   const b = e.target.closest('button[data-t]'); if (!b) return;
   TORNEIO_ID = b.dataset.t; LS.set('stacksangeur_torneio', TORNEIO_ID); renderTopo(); carregarJogadores();
 });
 
 async function carregarJogadores() {
+  if (modoCash()) { await carregarMesas(); renderTopo(); renderJogadoresCash(); return; }
   const t = torneioAtual(), main = $('tabJogadores');
   if (!t) { JOGADORES = []; main.innerHTML = '<div class="vazio">Nenhum torneio em andamento agora.<br>Quando o caixa iniciar um torneio, ele aparece aqui.</div>'; return; }
   try {
@@ -559,8 +608,64 @@ function renderJogadores() {
       '</button>';
     }).join('');
 }
-$('inpBusca').addEventListener('input', () => { clearTimeout(_buscaTimer); _buscaTimer = setTimeout(carregarJogadores, 250); });
+// ---------- CASH: jogadores sentados na mesa ----------
+function pendenteLocalCash(jid) { return FILA.some(f => f.args.p_jogador_id === jid && f.args.p_mesa_id === MESA_ID); }
+function renderJogadoresCash() {
+  const main = $('tabJogadores'), m = mesaAtual(), busca = ($('inpBusca').value || '').trim().toLowerCase();
+  if (!m) { main.innerHTML = '<div class="vazio">Nenhuma mesa de cash com o StackSangeur ligado.<br>O caixa liga no cartão da mesa.</div>'; return; }
+  const lista = (m.jogadores || []).filter(j => !busca || String(j.nome || '').toLowerCase().includes(busca) || String(j.apelido || '').toLowerCase().includes(busca));
+  if (!lista.length) { main.innerHTML = '<div class="vazio">' + (busca ? 'Ninguém na mesa com “' + esc(busca) + '”.' : 'Ninguém sentado nesta mesa ainda.') + '</div>'; return; }
+  main.innerHTML = '<div class="sec">' + (busca ? 'Resultado da busca' : 'Sentados na mesa') + ' · ' + lista.length + '</div>' +
+    lista.map(j => {
+      const pend = j.pendente || pendenteLocalCash(j.jogador_id);
+      return '<button type="button" class="jog" data-cj="' + j.jogador_id + '">' +
+        '<span class="av">' + esc(iniciais(j.nome)) + '</span>' +
+        '<span class="nm"><b>' + esc(j.nome) + (j.apelido ? ' <span style="color:var(--mut);font-weight:600">· ' + esc(j.apelido) + '</span>' : '') + '</b><span>Investido ' + money(j.investido) + '</span></span>' +
+        '<span class="badges">' + (pend ? '<span class="chip chip-warn">pendente</span>' : '') + '</span>' +
+      '</button>';
+    }).join('');
+}
+function valoresCash(m) {
+  const mn = Number(m.bmin) || 0, mx = Number(m.bmax) || 0;
+  let v = mn > 0 ? [mn, mn * 2, mn * 3, mn * 4, mn * 5] : [50, 100, 200, 300, 500];
+  if (mx > 0) { v = v.filter(x => x <= mx); if (!v.includes(mx)) v.push(mx); }
+  return [...new Set(v)].sort((a, b) => a - b).slice(0, 6);
+}
+function abrirJogadorCash(j) {
+  const m = mesaAtual(); if (!m) return;
+  SEL = { cash: true, jogador: j, valor: null, outro: '', pagto: null };
+  $('sNome').textContent = j.nome;
+  $('sInfo').textContent = m.nome + ' · investido ' + money(j.investido);
+  $('sDeve').innerHTML = '<span class="chip chip-ac">' + esc(blindsTxt(m)) + '</span>';
+  $('sheet').hidden = false;
+  history.pushState({ sheet: 1 }, '');
+  renderSheet();
+}
+function renderSheetCash() {
+  const m = mesaAtual(), j = SEL.jogador, corpo = $('sCorpo');
+  const pend = j.pendente || pendenteLocalCash(j.jogador_id);
+  const digitando = document.activeElement && document.activeElement.id === 'inpValorCash';
+  let h = '';
+  if (!m) { corpo.innerHTML = '<div class="vazio">Mesa não está mais disponível.</div>'; $('btnEnviar').disabled = true; return; }
+  if (pend) h += '<div class="aviso" style="border-color:#5c4515;color:var(--warn)">Este jogador já tem um pedido aguardando o caixa. Espere o caixa resolver ou cancele em “Meus pedidos”.</div>';
+  h += '<div class="sec">Recompra · quanto?</div><div class="vals">' +
+    valoresCash(m).map(v => '<button type="button" class="mono' + (SEL.valor === v && !SEL.outro ? ' sel' : '') + '" data-v="' + v + '">' + money(v) + '</button>').join('') + '</div>';
+  h += '<input class="inp mono" id="inpValorCash" inputmode="numeric" autocomplete="off" placeholder="Outro valor (R$)" value="' + esc(SEL.outro) + '">';
+  if (Number(m.bmin) > 0 || Number(m.bmax) > 0) h += '<div style="font-size:12px;color:var(--mut)">Limite da mesa: ' + money(m.bmin) + ' – ' + money(m.bmax) + '</div>';
+  h += '<div class="sec">Como pagou? <span style="text-transform:none;letter-spacing:0;font-weight:600">(opcional, só informação)</span></div><div class="pags">' +
+    PAGTOS_CASH.map(([k, n]) => '<button type="button" data-pc="' + k + '" class="' + (SEL.pagto === k ? 'sel' : '') + '">' + n + '</button>').join('') + '</div>';
+  h += '<div class="aviso"><b>Entregue as fichas só depois que o caixa aceitar.</b> O app avisa com som e vibração.<br>O caixa lança a recompra como sempre: o valor vai para a conta do jogador.</div>';
+  corpo.innerHTML = h;
+  const v = valorCashSel(), btn = $('btnEnviar');
+  btn.disabled = pend || !(v > 0);
+  btn.textContent = v > 0 ? 'Enviar ao caixa · ' + money(v) : 'Escolha o valor';
+  if (digitando) { const i = $('inpValorCash'); if (i) { i.focus(); try { i.setSelectionRange(i.value.length, i.value.length); } catch (_) {} } }
+}
+function valorCashSel() { if (SEL && SEL.outro) return Number(String(SEL.outro).replace(/\D/g, '')) || 0; return (SEL && SEL.valor) || 0; }
+$('inpBusca').addEventListener('input', () => { clearTimeout(_buscaTimer); _buscaTimer = setTimeout(() => { if (modoCash()) renderJogadoresCash(); else carregarJogadores(); }, 250); });
 $('tabJogadores').addEventListener('click', (e) => {
+  const cb = e.target.closest('button[data-cj]');
+  if (cb) { const m = mesaAtual(); const j = m && (m.jogadores || []).find(x => x.jogador_id === cb.dataset.cj); if (j) abrirJogadorCash(j); return; }
   const b = e.target.closest('button[data-j]'); if (!b) return;
   const j = JOGADORES.find(x => x.id === b.dataset.j); if (j) abrirJogador(j);
 });
@@ -581,6 +686,7 @@ $('btnVoltar').addEventListener('click', () => { if (history.state && history.st
 window.addEventListener('popstate', () => { if (!$('sheet').hidden) fecharJogador(); });
 
 function renderSheet() {
+  if (SEL && SEL.cash) return renderSheetCash();
   const t = torneioAtual(), j = SEL.jogador, corpo = $('sCorpo');
   const pend = j.pendente || pendenteLocal(j.id);
   const ops = opcoesJogador(t, j);
@@ -619,7 +725,22 @@ function renderSheet() {
   btn.disabled = !op || !!op.trava || pend || (precisaPag && !SEL.pagto);
   btn.textContent = !op ? 'Escolha o pedido' : (precisaPag && !SEL.pagto ? 'Escolha como pagou' : 'Enviar ao caixa · ' + (op.valor > 0 ? money(op.valor * (op.tipo === 'reentry' ? SEL.qtd : 1)) : 'cortesia'));
 }
+$('sCorpo').addEventListener('input', (e) => {
+  if (e.target.id !== 'inpValorCash' || !SEL || !SEL.cash) return;
+  const n = Number(String(e.target.value).replace(/\D/g, '')) || 0;
+  SEL.outro = n ? String(n) : ''; e.target.value = SEL.outro;
+  const v = valorCashSel(), btn = $('btnEnviar'), pend = SEL.jogador.pendente || pendenteLocalCash(SEL.jogador.jogador_id);
+  btn.disabled = pend || !(v > 0); btn.textContent = v > 0 ? 'Enviar ao caixa · ' + money(v) : 'Escolha o valor';
+  $('sCorpo').querySelectorAll('button[data-v]').forEach(b => b.classList.toggle('sel', !SEL.outro && Number(b.dataset.v) === SEL.valor));
+});
 $('sCorpo').addEventListener('click', (e) => {
+  if (SEL && SEL.cash) {
+    const bv = e.target.closest('button[data-v]'), bp = e.target.closest('button[data-pc]');
+    if (bv) { SEL.valor = Number(bv.dataset.v); SEL.outro = ''; }
+    if (bp) SEL.pagto = SEL.pagto === bp.dataset.pc ? null : bp.dataset.pc;
+    if (bv || bp) renderSheetCash();
+    return;
+  }
   const o = e.target.closest('button[data-o]'), q = e.target.closest('button[data-q]'), p = e.target.closest('button[data-p]');
   const t = torneioAtual(); if (!SEL || !t) return;
   if (o && !o.disabled) { if (SEL.tipo !== o.dataset.o) { SEL.tipo = o.dataset.o; SEL.qtd = 1; } }
@@ -629,6 +750,7 @@ $('sCorpo').addEventListener('click', (e) => {
 });
 
 $('btnEnviar').addEventListener('click', async () => {
+  if (SEL && SEL.cash) return enviarCash();
   const t = torneioAtual(); if (!SEL || !t) return;
   const op = opcoesJogador(t, SEL.jogador).find(x => x.tipo === SEL.tipo); if (!op || op.trava) return;
   const qtd = op.tipo === 'reentry' ? SEL.qtd : 1;
@@ -648,10 +770,26 @@ $('btnEnviar').addEventListener('click', async () => {
   renderJogadores(); renderPedidos(); carregarPedidos(); carregarJogadores(); carregarPochete();
 });
 
+async function enviarCash() {
+  const m = mesaAtual(), v = valorCashSel(); if (!SEL || !m || !(v > 0)) return;
+  const item = {
+    idem: uuid(), criado: new Date().toISOString(), nome: SEL.jogador.nome, rpc: 'sangeur_criar_solicitacao_cash', mesa: m.nome,
+    args: { p_mesa_id: m.id, p_jogador_id: SEL.jogador.jogador_id, p_valor: v, p_forma_pagto: SEL.pagto || null }
+  };
+  item.args.p_idem_key = item.idem;
+  FILA.push(item); LS.set('stacksangeur_fila', FILA);
+  $('btnEnviar').disabled = true;
+  const r = await enviarItem(item);
+  if (r === 'ok') toast('Pedido enviado ao caixa', 'ok');
+  else if (r === 'offline') toast('Sem internet — pedido guardado, envio automático', '');
+  if (history.state && history.state.sheet) history.back(); else fecharJogador();
+  renderPedidos(); carregarPedidos(); carregarJogadores();
+}
+
 // ---------- fila (garante que nenhum pedido se perde se a internet cair) ----------
 async function enviarItem(item) {
   try {
-    const d = await rpc('sangeur_criar_solicitacao', item.args);
+    const d = await rpc(item.rpc || 'sangeur_criar_solicitacao', item.args);
     FILA = FILA.filter(f => f.idem !== item.idem); LS.set('stacksangeur_fila', FILA);
     if (!d || !d.ok) { toast(ERROS[d?.erro] || 'Pedido recusado: ' + (d?.erro || 'erro'), 'err'); return 'recusado'; }
     return 'ok';
@@ -697,14 +835,14 @@ function renderPedidos() {
   let h = '<div class="resumo"><div><small>Aguardando</small><b class="mono">' + ag + '</b></div><div><small>Aceitos hoje</small><b class="mono">' + aceitos.length +
     '</b></div><div><small>Dinheiro comigo</small><b class="mono">' + money(comigo) + '</b></div></div>';
   h += '<div class="sec">Pedidos de hoje</div>';
-  const local = FILA.map(f => ({ _local: true, id: f.idem, jogador_nome: f.nome, tipo: f.args.p_tipo, quantidade: f.args.p_quantidade, valor_estimado: f.args.p_valor_estimado, forma_pagto: f.args.p_forma_pagto, criado_em: f.criado, status: 'enviando' }));
+  const local = FILA.map(f => ({ _local: true, id: f.idem, jogador_nome: f.nome, tipo: f.args.p_tipo || 'cash_recompra', quantidade: f.args.p_quantidade || 1, valor_estimado: f.args.p_valor_estimado != null ? f.args.p_valor_estimado : f.args.p_valor, forma_pagto: f.args.p_forma_pagto, mesa_nome: f.mesa || null, criado_em: f.criado, status: 'enviando' }));
   const lista = local.concat(PEDIDOS);
   if (!lista.length) h += '<div class="vazio">Nenhum pedido hoje.</div>';
   const ST = { enviando: ['chip-warn', 'enviando…'], pendente: ['chip-warn', 'aguardando'], processando: ['chip-warn', 'caixa lançando'], aceita: ['chip-ac', 'aceito'], recusada: ['chip-err', 'recusado'], cancelada: ['chip-mut', 'cancelado'] };
   lista.forEach(p => {
     const st = ST[p.status] || ['chip-mut', p.status];
     const pg = p.forma_pagto_final || p.forma_pagto;
-    h += '<div class="ped"><div class="r1"><div class="l"><b>' + esc(p.jogador_nome) + '</b><span>' + TIPO_NOME[p.tipo] + (p.quantidade > 1 ? ' ' + p.quantidade + 'x' : '') +
+    h += '<div class="ped"><div class="r1"><div class="l"><b>' + esc(p.jogador_nome) + '</b><span>' + (TIPO_NOME[p.tipo] || esc(p.tipo)) + (p.quantidade > 1 ? ' ' + p.quantidade + 'x' : '') + (p.mesa_nome ? ' · ' + esc(p.mesa_nome) : '') +
       ' · ' + (Number(p.valor_estimado) > 0 ? money(p.valor_estimado) : 'cortesia') + (pg ? ' · ' + (PAGTO_NOME[pg] || pg) : '') + ' · ' + hora(p.criado_em) + '</span></div>' +
       '<span class="chip ' + st[0] + '">' + st[1] + '</span></div>';
     if (p.status === 'aceita' && !naHora) h += '<div class="ok">Pode entregar as fichas' + (p.resolvido_nome ? ' · aceito por ' + esc(primeiroNome(p.resolvido_nome)) : '') + '</div>';
@@ -917,7 +1055,7 @@ document.querySelector('nav.tabs').addEventListener('click', (e) => {
   document.querySelectorAll('nav.tabs button').forEach(x => x.classList.toggle('on', x === b));
   const aba = b.dataset.tab;
   $('tabJogadores').hidden = aba !== 'jogadores'; $('tabPedidos').hidden = aba !== 'pedidos'; $('tabPochete').hidden = aba !== 'pochete';
-  $('boxBusca').hidden = aba !== 'jogadores' || !torneioAtual(); $('torSelect').hidden = aba !== 'jogadores' || TORNEIOS.length < 2;
+  renderTopo();
   if (aba === 'pedidos') carregarPedidos();
   if (aba === 'pochete') { renderPochete(); carregarPochete(); }
   window.scrollTo(0, 0);
