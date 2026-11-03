@@ -36196,7 +36196,13 @@ document.addEventListener('visibilitychange', () => {
                             const { data } = await sb.from('transacoes').select('*').eq('clube_id', sbClube.id).gte('ts', desde).limit(1000);
                             (data || []).forEach(r => _rtTransacaoNova({ new: r }));
                         } catch (eTx) { console.warn('[REALTIME] catch-up tx:', eTx); }
-                        try { await _processarMudancaRealtime('torneio', { eventType: 'CATCHUP' }); } catch (_) {}
+                        // Aba esteve escondida: o estado dos torneios (relógio/pausa/nível) vem do banco
+                        try {
+                            const _todos = window._rtTorneiosAlterados || new Set();
+                            (torneios || []).forEach(t => { if (t && t.id) _todos.add(t.id); });
+                            window._rtTorneiosAlterados = _todos;
+                            await _processarMudancaRealtime('torneio', { eventType: 'CATCHUP' });
+                        } catch (_) {}
                         try { await _processarMudancaRealtime('comanda', { eventType: 'CATCHUP' }); } catch (_) {}
                     })();
                 }
