@@ -11875,8 +11875,16 @@ async function _processarMudancaRealtime(tipo, payload) {
                             };
                         });
                         
-                        // 🔒 PRESERVA fechamento local se estiver mais avançado que o banco
+                        // 🔒 PRESERVA item local recente (<2min) que ainda não chegou ao banco
                         const local = localPorId.get(c.id);
+                        try {
+                            if (local && Array.isArray(local.itens)) {
+                                const idsB = new Set(obj.itens.map(i => String(i.id)));
+                                const recLim = Date.now() - 120000;
+                                local.itens.forEach(i => { if (i && i.id && !idsB.has(String(i.id)) && Number(i.ts) >= recLim) obj.itens.push(i); });
+                            }
+                        } catch (_) {}
+                        // 🔒 PRESERVA fechamento local se estiver mais avançado que o banco
                         if (local && local.status === 'fechada' && obj.status === 'aberta') {
                             console.log('[REALTIME] preservando comanda fechada localmente:', c.id);
                             obj.status = 'fechada';
@@ -15269,6 +15277,7 @@ async function carregarUsuarioEClube(authUser) {
     if (!window._modoSuporte) {
         try { await _enviarTransacoesResgatadas(); } catch (_) {}
         try { await _enviarFilhasTorneioResgatadas(); } catch (_) {}
+        try { await _enviarComandasResgatadas(); } catch (_) {}
     }
     try { localStorage.setItem('ps_cache_clube_id', clube.id); } catch (_) {}
 
@@ -23311,10 +23320,67 @@ async function _enviarFilhasTorneioResgatadas() {
     } catch (e) { console.warn('[RESGATE] torneio enviar:', e); }
 }
 
+// Comandas ABERTAS com item lançado nas últimas 12h: no próximo login do mesmo clube
+// cria a comanda (se não existir) e insere só os itens que faltam no banco.
+// Nunca apaga item, nunca mexe em comanda já fechada.
+function _guardarComandasNaoEnviadas() {
+    try {
+        let lista = [];
+        try { lista = Array.isArray(barComandas) && barComandas.length ? barComandas : JSON.parse(localStorage.getItem('ps_bar_comandas') || '[]'); } catch (_) {}
+        const limite = Date.now() - 12 * 3600 * 1000;
+        const itens = (lista || []).filter(c => c && c.id && c.status === 'aberta' && Array.isArray(c.itens)
+            && c.itens.some(it => it && it.id && Number(it.ts) >= limite));
+        if (!itens.length) return;
+        const clubeCache = localStorage.getItem('ps_cache_clube_id') || (sbClube && sbClube.id) || null;
+        if (!clubeCache) return;
+        localStorage.setItem('ps_comanda_resgate', JSON.stringify({ clubeId: clubeCache, comandas: itens }));
+    } catch (e) { console.warn('[RESGATE] comanda guardar:', e); }
+}
+
+async function _enviarComandasResgatadas() {
+    let pac = null;
+    try { pac = JSON.parse(localStorage.getItem('ps_comanda_resgate') || 'null'); } catch (_) {}
+    if (!pac || !Array.isArray(pac.comandas) || !pac.comandas.length || !sbClube) return;
+    if (pac.clubeId !== sbClube.id) return;
+    try {
+        const cid = sbClube.id;
+        const ids = pac.comandas.map(c => c.id);
+        const { data: cRows, error: cErr } = await sb.from('bar_comandas').select('id,status').eq('clube_id', cid).in('id', ids);
+        if (cErr) return;
+        const noBanco = new Map((cRows || []).map(r => [r.id, r.status]));
+        let novasCmd = 0, novosItens = 0;
+        for (const c of pac.comandas) {
+            const st = noBanco.get(c.id);
+            if (st && st !== 'aberta') { console.warn('[RESGATE] comanda ' + c.id + ' já fechada no banco — itens locais não reenviados'); continue; }
+            if (!st) {
+                const { error } = await sb.from('bar_comandas').upsert(_comandaToDb(c), { ignoreDuplicates: true });
+                if (error) { console.warn('[RESGATE] comanda:', error.message); return; }
+                novasCmd++;
+            }
+            const itIds = c.itens.filter(it => it && it.id).map(it => it.id);
+            if (!itIds.length) continue;
+            const { data: ex, error: exErr } = await sb.from('bar_comanda_itens').select('id').eq('comanda_id', c.id).in('id', itIds);
+            if (exErr) return;
+            const existe = new Set((ex || []).map(r => String(r.id)));
+            const faltam = c.itens.filter(it => it && it.id && !existe.has(String(it.id))).map(it => _barItemToRow(c, it));
+            if (!faltam.length) continue;
+            const { error: eIt } = await sb.from('bar_comanda_itens').upsert(faltam, { ignoreDuplicates: true });
+            if (eIt) { console.warn('[RESGATE] itens comanda:', eIt.message); return; }
+            novosItens += faltam.length;
+        }
+        localStorage.removeItem('ps_comanda_resgate');
+        if (novasCmd || novosItens) {
+            console.log('[RESGATE] ✅ comandas: ' + novasCmd + ' nova(s), ' + novosItens + ' item(ns)');
+            try { showToast('✅ ' + novosItens + ' item(ns) de comanda pendente(s) enviados ao banco'); } catch (_) {}
+        }
+    } catch (e) { console.warn('[RESGATE] comanda enviar:', e); }
+}
+
 function _limparEstadoClube() {
     // Antes de apagar: guarda transações que ainda não chegaram ao banco
     _guardarTransacoesNaoEnviadas();
     _guardarFilhasTorneioNaoEnviadas();
+    _guardarComandasNaoEnviadas();
     // Limpa cache local de TUDO que pertence a um clube específico
     const keysClube = [
         'ps_jogadores', 'ps_torneios', 'ps_bar_grupos', 'ps_bar_produtos',
