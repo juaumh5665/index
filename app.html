@@ -15208,7 +15208,10 @@ async function carregarUsuarioEClube(authUser) {
     sbClube = clube;
 
     // Reenvia transações que ficaram sem enviar (app fechado/recarregado antes do sync)
-    if (!window._modoSuporte) { try { await _enviarTransacoesResgatadas(); } catch (_) {} }
+    if (!window._modoSuporte) {
+        try { await _enviarTransacoesResgatadas(); } catch (_) {}
+        try { await _enviarFilhasTorneioResgatadas(); } catch (_) {}
+    }
     try { localStorage.setItem('ps_cache_clube_id', clube.id); } catch (_) {}
 
     // Sempre carrega feature_overrides via RPC (SECURITY DEFINER bypassa RLS e schema cache)
@@ -23195,9 +23198,65 @@ async function _enviarTransacoesResgatadas() {
     } catch (e) { console.warn('[RESGATE] erro ao enviar:', e); }
 }
 
+// Entradas/eliminações de torneio feitas nas últimas 12h em torneio não encerrado.
+// No próximo login do mesmo clube, só as que NÃO existem no banco são inseridas
+// (nunca atualiza nem sobrescreve o torneio — o banco continua mandando).
+function _guardarFilhasTorneioNaoEnviadas() {
+    try {
+        let lista = [];
+        try { lista = Array.isArray(torneios) && torneios.length ? torneios : JSON.parse(localStorage.getItem('ps_torneios') || '[]'); } catch (_) {}
+        const limite = Date.now() - 12 * 3600 * 1000;
+        const removidos = new Set();
+        try { Object.keys(_FILHAS_TORNEIO_DELETE).forEach(k => (_syncQueue.deletes[k] ? [..._syncQueue.deletes[k]] : []).forEach(id => removidos.add(String(id)))); } catch (_) {}
+        const itens = [];
+        (lista || []).forEach(t => {
+            if (!t || !t.id || ['finished', 'encerrado'].includes(String(t.status || ''))) return;
+            (t.entries || []).forEach(e => { if (e && e.id && Number(e.ts) >= limite && !removidos.has(String(e.id))) itens.push({ k: 'e', tid: t.id, r: e }); });
+            (t.eliminados || []).forEach(e => { if (e && e.id && Number(e.ts) >= limite && !removidos.has(String(e.id))) itens.push({ k: 'el', tid: t.id, r: e }); });
+        });
+        if (!itens.length) return;
+        const clubeCache = localStorage.getItem('ps_cache_clube_id') || (sbClube && sbClube.id) || null;
+        if (!clubeCache) return;
+        localStorage.setItem('ps_torneio_resgate', JSON.stringify({ clubeId: clubeCache, ts: Date.now(), itens }));
+    } catch (e) { console.warn('[RESGATE] torneio guardar:', e); }
+}
+
+async function _enviarFilhasTorneioResgatadas() {
+    let pac = null;
+    try { pac = JSON.parse(localStorage.getItem('ps_torneio_resgate') || 'null'); } catch (_) {}
+    if (!pac || !Array.isArray(pac.itens) || !pac.itens.length || !sbClube) return;
+    if (pac.clubeId !== sbClube.id) return;
+    try {
+        const cid = sbClube.id;
+        const tids = [...new Set(pac.itens.map(i => i.tid))];
+        const { data: tRows, error: tErr } = await sb.from('torneios').select('id,status').eq('clube_id', cid).in('id', tids);
+        if (tErr) return;
+        const abertos = new Set((tRows || []).filter(r => !['finished', 'encerrado'].includes(String(r.status || ''))).map(r => r.id));
+        let inseridos = 0;
+        for (const [k, tabela, conv] of [['e', 'torneio_entries', _entryToDbOffline], ['el', 'torneio_eliminados', _eliminadoToDbOffline]]) {
+            const cand = pac.itens.filter(i => i.k === k && abertos.has(i.tid));
+            if (!cand.length) continue;
+            const { data: ex, error: exErr } = await sb.from(tabela).select('id').eq('clube_id', cid).in('id', cand.map(i => i.r.id));
+            if (exErr) return;
+            const existe = new Set((ex || []).map(r => String(r.id)));
+            const novos = cand.filter(i => !existe.has(String(i.r.id))).map(i => conv(i.r, i.tid, cid));
+            if (!novos.length) continue;
+            const { error } = await sb.from(tabela).upsert(novos, { ignoreDuplicates: true });
+            if (error) { console.warn('[RESGATE] ' + tabela + ':', error.message); return; }
+            inseridos += novos.length;
+        }
+        localStorage.removeItem('ps_torneio_resgate');
+        if (inseridos) {
+            console.log('[RESGATE] ✅ ' + inseridos + ' lançamento(s) de torneio recuperados');
+            try { showToast('✅ ' + inseridos + ' lançamento(s) de torneio pendente(s) enviados ao banco'); } catch (_) {}
+        }
+    } catch (e) { console.warn('[RESGATE] torneio enviar:', e); }
+}
+
 function _limparEstadoClube() {
     // Antes de apagar: guarda transações que ainda não chegaram ao banco
     _guardarTransacoesNaoEnviadas();
+    _guardarFilhasTorneioNaoEnviadas();
     // Limpa cache local de TUDO que pertence a um clube específico
     const keysClube = [
         'ps_jogadores', 'ps_torneios', 'ps_bar_grupos', 'ps_bar_produtos',
