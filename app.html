@@ -11829,6 +11829,7 @@ async function _processarMudancaRealtime(tipo, payload) {
                                 valor: valorUnit,           // valor unitário
                                 subtotal: qtd * valorUnit,  // subtotal calculado
                                 ts: new Date(i.ts).getTime(),
+                                origem: i.origem || null,
                             };
                         });
                         
@@ -13242,6 +13243,7 @@ async function carregarEstadoDoSupabase() {
                                 valor: valorUnit,
                                 subtotal: qtd * valorUnit,
                                 ts: new Date(i.ts).getTime(),
+                                origem: i.origem || null,
                             };
                         });
                     });
@@ -15939,7 +15941,8 @@ function _cleanupComandasQuitados() {
         window._cleanupComandasDone = true;
 
         const comandasAbertas = (typeof barComandas !== 'undefined' ? barComandas : [])
-            .filter(c => c.status === 'aberta' && c.jogadorId);
+            .filter(c => c.status === 'aberta' && c.jogadorId
+                && (typeof calcCobrarComanda !== 'function' || calcCobrarComanda(c) <= 0.01));
 
         if (!comandasAbertas.length) return;
 
@@ -38627,6 +38630,25 @@ function calcTotalComanda(c) {
     }, 0);
 }
 
+// Itens lançados pelo StackBar ANTES de _SB_CORTE_COBRANCA_COMANDA já foram cobrados
+// no extrato na hora do lançamento (regra antiga). Desde o corte o StackBar só lança
+// o item na comanda, e a cobrança acontece uma vez só, no fechamento.
+// calcCobrarComanda = o que ainda falta cobrar do jogador por esta comanda.
+const _SB_CORTE_COBRANCA_COMANDA = Date.parse('2026-11-03T12:34:03.266Z');
+function calcJaCobradoComanda(c) {
+    if (!c || !Array.isArray(c.itens)) return 0;
+    return c.itens.reduce((s, it) => {
+        if (it.origem !== 'stackbar') return s;
+        const ts = Number(it.ts) || 0;
+        if (!ts || ts >= _SB_CORTE_COBRANCA_COMANDA) return s;
+        const sub = (it.subtotal != null && !isNaN(it.subtotal)) ? Number(it.subtotal) : Number(it.qtd || 0) * Number(it.valor || 0);
+        return s + sub;
+    }, 0);
+}
+function calcCobrarComanda(c) {
+    return Math.max(0, Math.round((calcTotalComanda(c) - calcJaCobradoComanda(c)) * 100) / 100);
+}
+
 // ============================================================
 // EXTRATO DE COMANDA (aberta ou fechada)
 // ============================================================
@@ -47841,7 +47863,7 @@ function renderSaldoCard(saldo) {
     let _barAberto = 0;
     try {
         _barAberto = (barComandas || []).filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta')
-            .reduce((s, c) => s + calcTotalComanda(c), 0);
+            .reduce((s, c) => s + calcCobrarComanda(c), 0);
         _barAberto = Math.round(_barAberto * 100) / 100;
     } catch (_) { _barAberto = 0; }
     const _saldoConta = saldo;
@@ -47996,7 +48018,7 @@ function renderPagarConta() {
 
     // Verifica se tem comandas abertas do jogador
     const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
-    const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+    const totalComandas = comandasAbertas.reduce((s, c) => s + calcCobrarComanda(c), 0);
     const totalItens = comandasAbertas.reduce((s, c) => s + c.itens.length, 0);
 
     if (saldo > 0 && !comandasAbertas.length) {
@@ -48334,7 +48356,7 @@ function atualizarTotalComComandas() {
     // Respeita o modo de cobrança selecionado (tudo vs torneio)
     const divida = (_pjCobrancaModo === 'torneio') ? _pjDividaTorneio : _pjDividaTotal;
     const comandasAbertas = barComandas.filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta');
-    const totalComandas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+    const totalComandas = comandasAbertas.reduce((s, c) => s + calcCobrarComanda(c), 0);
 
     const incluir = (document.getElementById('pj-incluir-comandas') || {}).checked;
     const total = divida + (incluir ? totalComandas : 0);
@@ -48768,7 +48790,7 @@ async function _confirmarPagamentoContaImpl() {
 
         let comandasFechadas = 0;
         for (const c of comandasAbertas) {
-            const totalC = calcTotalComanda(c);
+            const totalC = calcCobrarComanda(c);
             if (disponivelParaComandas + 0.001 < totalC) {
                 // Não cobre essa comanda — ela e as próximas ficam abertas
                 break;
@@ -48784,7 +48806,7 @@ async function _confirmarPagamentoContaImpl() {
                     fechadaPeloCaixa: c.fechadaPeloCaixa || false,
                 }
             });
-            registrarTransacao({
+            if (totalC > 0) registrarTransacao({
                 jogadorId: pagamentoJogadorId,
                 tipo: 'bar',
                 valor: -totalC,
@@ -48796,7 +48818,7 @@ async function _confirmarPagamentoContaImpl() {
             c.fechadoEm = Date.now();
             c.pagamento = metodo;
             c.formasPagamento = splits.map(p => ({ valor: Number(p.valor), metodo: p.metodo }));
-            c.total = totalC;
+            c.total = calcTotalComanda(c);
             c.fechadaPeloCaixa = true;
             if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
             disponivelParaComandas -= totalC;
@@ -48806,7 +48828,7 @@ async function _confirmarPagamentoContaImpl() {
         // Total das comandas que ficaram abertas (pra mostrar no toast)
         const totalAbertasRestantes = comandasAbertas
             .filter(c => c.status === 'aberta')
-            .reduce((s, c) => s + calcTotalComanda(c), 0);
+            .reduce((s, c) => s + calcCobrarComanda(c), 0);
 
         if (comandasFechadas > 0) {
             if (typeof _suspenderRealtime === 'function') _suspenderRealtime(12000);
@@ -48828,8 +48850,10 @@ async function _confirmarPagamentoContaImpl() {
     {
         const saldoPosPayment = getSaldoJogador(pagamentoJogadorId);
         if (saldoPosPayment >= -0.01) { // margem p/ float
+            // Só fecha sem cobrar a comanda que já foi toda cobrada no extrato
+            // (itens antigos do StackBar). Comanda com valor a cobrar continua aberta.
             const comandasAindaAbertas = barComandas.filter(
-                c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta'
+                c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta' && calcCobrarComanda(c) <= 0.01
             );
             if (comandasAindaAbertas.length > 0) {
                 let autoFechadas = 0;
@@ -49665,7 +49689,7 @@ function confirmarFechamentoDia() {
     // 🆕 Detecta comandas do bar AINDA abertas no fim do dia
     // Elas vão ser auto-fechadas como "devedor" — viram saldo a pagar pro próximo dia
     const comandasAbertas = (barComandas || []).filter(c => c.status === 'aberta');
-    const totalComandasAbertas = comandasAbertas.reduce((s, c) => s + calcTotalComanda(c), 0);
+    const totalComandasAbertas = comandasAbertas.reduce((s, c) => s + calcCobrarComanda(c), 0);
 
     if (!abertas.length && !comandasAbertas.length) {
         return showToast('⚠️ Nenhuma transação ou comanda para fechar hoje');
@@ -49714,11 +49738,11 @@ function confirmarFechamentoDia() {
     let comandasFechadas = 0;
     let totalFechado = 0;
     comandasAbertas.forEach(c => {
-        const totalC = calcTotalComanda(c);
-        if (totalC <= 0) return;
+        const totalC = calcCobrarComanda(c);
+        if (calcTotalComanda(c) <= 0) return;
 
         // Registra débito da comanda (saldo devedor) — mantém rastreabilidade
-        registrarTransacao({
+        if (totalC > 0) registrarTransacao({
             jogadorId: c.jogadorId,
             tipo: 'bar',
             valor: -totalC,
@@ -49735,7 +49759,7 @@ function confirmarFechamentoDia() {
         c.status = 'fechada';
         c.fechadoEm = Date.now();
         c.pagamento = 'pendente';
-        c.total = totalC;
+        c.total = calcTotalComanda(c);
         c.fechadaPorFechamentoDia = fechamento.id;
         c.fechadaPeloCaixa = false;
         if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
@@ -50044,7 +50068,7 @@ function openFecharComanda() {
     if (!c.itens.length) return showToast('⚠️ Comanda vazia');
 
     const j = jogadores.find(j => j.id === c.jogadorId);
-    const totalComanda = calcTotalComanda(c);
+    const totalComanda = calcCobrarComanda(c);
 
     // === GUARD: alerta se jogador já quitou no caixa ===
     const saldoPreCheck = getSaldoJogador(c.jogadorId);
@@ -50115,7 +50139,7 @@ function cobrarSomenteBar() {
     if (!c.itens.length) return showToast('⚠️ Comanda vazia');
 
     const j = jogadores.find(j => j.id === c.jogadorId);
-    const totalComanda = calcTotalComanda(c);
+    const totalComanda = calcCobrarComanda(c);
 
     // === GUARD: alerta se jogador já quitou no caixa ===
     const saldoPreCheck = getSaldoJogador(c.jogadorId);
@@ -50328,8 +50352,8 @@ function fecharComandaConfirm() {
         if (!confirm(`Faltam ${formatMoney(saldoRestante)} pra completar.\n\nDeseja continuar? O valor restante ficará como pendência do jogador.`)) return;
     }
     
-    // 1) Registrar débito da comanda (sempre o total da comanda)
-    registrarTransacao({
+    // 1) Registrar débito da comanda (o que ainda não foi cobrado dela)
+    if (_fcEstadoAcerto.totalComanda > 0) registrarTransacao({
         jogadorId: c.jogadorId,
         tipo: 'bar',
         valor: -_fcEstadoAcerto.totalComanda,
@@ -50389,7 +50413,7 @@ function fecharComandaConfirm() {
     c.fechadoEm  = Date.now();
     c.pagamento  = metodosUsados.length === 1 ? metodosUsados[0] : 'multiplo';
     c.formasPagamento = splits.map(p => ({ valor: Number(p.valor), metodo: p.metodo }));
-    c.total      = _fcEstadoAcerto.totalComanda;
+    c.total      = calcTotalComanda(c);
     c.valorPago  = totalPago;
     c.incluiuPendencias = incluirPend && _fcEstadoAcerto.pendencias > 0;
     c.pendenciasValor = incluirPend ? _fcEstadoAcerto.pendencias : 0;
