@@ -11792,7 +11792,8 @@ async function _processarMudancaRealtime(tipo, payload) {
                             return [...(doBanco || []), ...pend];
                         };
                         // Torneio mudado em outra máquina: relógio/nível/status vêm do banco
-                        const _base = _alteradosFora.has(r.id) ? Object.assign({}, _loc, t) : _loc;
+                        const _localMaisNovo = (Number(_loc.relogioTs) || 0) > (Number(t.relogioTs) || 0);
+                        const _base = (_alteradosFora.has(r.id) && !_localMaisNovo) ? Object.assign({}, _loc, t) : _loc;
                         return Object.assign({}, _base, {
                             entries: _mesclar(t.entries, _loc.entries),
                             eliminados: _mesclar(t.eliminados, _loc.eliminados),
@@ -12296,6 +12297,7 @@ function _torneioToDb(t) {
         tempo_alvo: t.tempoAlvo ? new Date(t.tempoAlvo).toISOString() : null,
         status: t.status || 'aguardando',
         rodando: !!t.rodando,
+        relogio_ts: Number(t.relogioTs) || null,
         is_break: !!t.isBreak,
         iniciado_em: t.iniciadoEm ? new Date(t.iniciadoEm).toISOString() : null,
         tempo_jogo_acumulado_ms: t.tempoJogoAcumuladoMs || 0,
@@ -13547,6 +13549,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         tempoAlvo: r.tempo_alvo ? new Date(r.tempo_alvo).getTime() : null,
         status: r.status,
         rodando: !!r.rodando,
+        relogioTs: r.relogio_ts != null ? Number(r.relogio_ts) : 0,
         isBreak: !!r.is_break,
         iniciadoEm: r.iniciado_em ? new Date(r.iniciado_em).getTime() : null,
         tempoJogoAcumuladoMs: Number(r.tempo_jogo_acumulado_ms) || 0,
@@ -33265,6 +33268,7 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
     if (finalizado) {
         t.status = 'finished';
         t.rodando = false;
+        t.relogioTs = _nowServidor();
         vencedorIdFinal = ativos.find(id => id !== jid);
         t.vencedorId = vencedorIdFinal;  // 🆕 salva pro acerto do 1º
         const venc = jogadores.find(j => j.id === vencedorIdFinal);
@@ -36133,6 +36137,9 @@ function _nowServidor() {
 // Helper: recalcula tempoAlvo baseado em tempoRestante e estado rodando
 // USA RELÓGIO DO SERVIDOR — garante sincronia entre todos dispositivos
 function _recalcTempoAlvo(t) {
+    // Carimbo da última mudança de relógio feita NESTA máquina: o banco não deixa
+    // uma máquina com carimbo mais antigo sobrescrever pausa/nível/tempo mais novos.
+    t.relogioTs = _nowServidor();
     if (t.rodando && t.tempoRestante > 0) {
         t.tempoAlvo = _nowServidor() + (t.tempoRestante * 1000);
     } else {
@@ -37630,6 +37637,7 @@ function encerrarTorneio(idx) {
 
     t.status = 'encerrado';
     t.rodando = false;
+    t.relogioTs = _nowServidor();
     t.encerradoEm = Date.now();
     t.encerradoPor = currentUser ? currentUser.nome : 'Sistema';
 
