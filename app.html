@@ -11705,6 +11705,11 @@ function _onRealtimeEvent(tipo, payload) {
         _stackbarTalvezImprimirItem(payload);
     }
 
+    // Torneio alterado em OUTRA máquina (pausa, nível, encerramento): guarda o id
+    // pra aplicar os dados do torneio do banco nesta máquina (só desse torneio)
+    if (tipo === 'torneio' && payload && payload.new && payload.new.id) {
+        (window._rtTorneiosAlterados ||= new Set()).add(payload.new.id);
+    }
     // Adiciona à fila de pendentes (não substitui!)
     _realtimePendentes.push({ tipo, payload });
 
@@ -11769,6 +11774,8 @@ async function _processarMudancaRealtime(tipo, payload) {
                     const jpRows = _semRemocoesPendentes('torneioJackpot', jpRowsDb);
                     
                     const _locaisPorId = new Map((torneios || []).map(x => [x.id, x]));
+                    const _alteradosFora = window._rtTorneiosAlterados || new Set();
+                    window._rtTorneiosAlterados = new Set();
                     torneios = tRows.map(r => {
                         // Monta com o mesmo conversor do boot (antes chamava sem as listas e quebrava)
                         const t = _torneioFromDb(r, eRows || [], elRows || [], jpRows || [], tmRows || []);
@@ -11784,7 +11791,9 @@ async function _processarMudancaRealtime(tipo, payload) {
                             const pend = (local || []).filter(x => x && !ids.has(String(x.id)) && Number(x.ts) >= _rec);
                             return [...(doBanco || []), ...pend];
                         };
-                        return Object.assign({}, _loc, {
+                        // Torneio mudado em outra máquina: relógio/nível/status vêm do banco
+                        const _base = _alteradosFora.has(r.id) ? Object.assign({}, _loc, t) : _loc;
+                        return Object.assign({}, _base, {
                             entries: _mesclar(t.entries, _loc.entries),
                             eliminados: _mesclar(t.eliminados, _loc.eliminados),
                             jackpotCompras: _mesclar(t.jackpotCompras, _loc.jackpotCompras),
