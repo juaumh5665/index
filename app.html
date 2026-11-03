@@ -11379,6 +11379,12 @@ function iniciarRealtime() {
             filter: `clube_id=eq.${clubeId}` 
         }, (payload) => _onRealtimeEvent('comanda_item', payload))
         
+        // === CASH: sessões (quem está sentado, recompras, saídas) feitas em outra máquina
+        .on('postgres_changes', {
+            event: '*', schema: 'public', table: 'cash_sessoes',
+            filter: `clube_id=eq.${clubeId}`
+        }, (payload) => _onRealtimeEvent('cash_mesa', payload))
+
         // === TRANSAÇÕES: só INSERT (o reenvio/upsert de linhas existentes não gera evento)
         //     Mescla a linha nova na memória — sem recarregar nada do banco.
         .on('postgres_changes', {
@@ -11993,7 +11999,12 @@ async function _processarMudancaRealtime(tipo, payload) {
         }
         
         if (tipo === 'cash_mesa') {
-            if (paginaAtual === 'cash') safeRender(window.renderCash, 'renderCash');
+            if (paginaAtual === 'cash') safeRender(() => typeof renderCashMesas === 'function' && renderCashMesas(), 'renderCashMesas');
+            // Ficha do jogador aberta: saldo pode ter mudado por recompra/saída em outra máquina
+            safeRender(() => {
+                const modal = document.getElementById('modal-pagamento-jogador');
+                if (modal && modal.classList.contains('open') && pagamentoJogadorId) renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+            }, 'fichaJogadorCash');
         }
         
         // Toast discreto
@@ -12480,9 +12491,25 @@ async function _carregarSessoesCash(clubeId) {
             porMesa.set(r.mesa_id, arr);
         });
 
-        // Popula m.jogadores de cada mesa local
+        // Popula m.jogadores de cada mesa local.
+        // Sessão/movimento local de menos de 2 min que ainda não chegou ao banco é mantido
+        // (o envio é direto e pode estar em andamento).
+        const _rec = Date.now() - 120000;
+        const _ultMov = (j) => (j && Array.isArray(j.movimentos) ? j.movimentos.reduce((mx, mv) => Math.max(mx, Number(mv.ts) || 0), 0) : 0);
         cashMesas.forEach(m => {
-            m.jogadores = porMesa.get(m.id) || [];
+            const doBanco = porMesa.get(m.id) || [];
+            const locais = Array.isArray(m.jogadores) ? m.jogadores : [];
+            const locPorId = new Map(locais.map(j => [String(j.id), j]));
+            const idsBanco = new Set(doBanco.map(j => String(j.id)));
+            const final = doBanco.map(j => {
+                const loc = locPorId.get(String(j.id));
+                // Local com movimento mais novo (recente) que o banco ainda não tem: fica o local
+                if (loc && _ultMov(loc) > _ultMov(j) && _ultMov(loc) >= _rec) return loc;
+                if (loc && loc.status === 'saiu' && j.status !== 'saiu' && (Number(loc.saiuEm) || 0) >= _rec) return loc;
+                return j;
+            });
+            locais.forEach(j => { if (j && !idsBanco.has(String(j.id)) && (Number(j.entrouEm) || 0) >= _rec) final.push(j); });
+            m.jogadores = final;
         });
 
         // Salva no localStorage atualizado
@@ -36211,6 +36238,7 @@ document.addEventListener('visibilitychange', () => {
                             await _processarMudancaRealtime('torneio', { eventType: 'CATCHUP' });
                         } catch (_) {}
                         try { await _processarMudancaRealtime('comanda', { eventType: 'CATCHUP' }); } catch (_) {}
+                        try { await _processarMudancaRealtime('cash_mesa', { eventType: 'CATCHUP' }); } catch (_) {}
                     })();
                 }
             } catch(e) { console.warn('[REALTIME] erro ao recarregar dados após volta:', e); }
