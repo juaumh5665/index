@@ -47832,10 +47832,20 @@ function abrirPagamentoJogador(jogadorId) {
 }
 
 function renderSaldoCard(saldo) {
-    const devedor = saldo < 0;
-    const credito = saldo > 0;
     const el = document.getElementById('pj-saldo-card');
     if (!el) return;
+    // Destaque mostra TUDO que o jogador deve: saldo da conta + comandas do bar ainda abertas.
+    // Só exibição: getSaldoJogador e o pagamento continuam iguais (o bar já aparece na Composição).
+    let _barAberto = 0;
+    try {
+        _barAberto = (barComandas || []).filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta')
+            .reduce((s, c) => s + calcTotalComanda(c), 0);
+        _barAberto = Math.round(_barAberto * 100) / 100;
+    } catch (_) { _barAberto = 0; }
+    const _saldoConta = saldo;
+    if (_barAberto > 0) saldo = Math.round((saldo - _barAberto) * 100) / 100;
+    const devedor = saldo < 0;
+    const credito = saldo > 0;
     const cor = devedor ? '#ef4444' : credito ? '#22c55e' : '#71717a';
     const bg  = devedor ? 'rgba(239,68,68,.08)' : credito ? 'rgba(34,197,94,.08)' : '#0f0f12';
     const border = devedor ? 'rgba(239,68,68,.2)' : credito ? 'rgba(34,197,94,.2)' : '#1e1e23';
@@ -47846,7 +47856,8 @@ function renderSaldoCard(saldo) {
         <div style="font-family:var(--font-mono);font-weight:800;font-size:2.2rem;color:${cor};margin-top:.25rem;">
             ${devedor?'-':credito?'+':''}${formatMoney(Math.abs(saldo))}
         </div>
-        ${devedor?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Valor a receber do jogador</div>`
+        ${_barAberto > 0 ? `<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">${_saldoConta < 0 ? 'Conta ' + formatMoney(Math.abs(_saldoConta)) : _saldoConta > 0 ? 'Crédito ' + formatMoney(_saldoConta) : 'Conta R$ 0,00'} ${_saldoConta > 0 ? '−' : '+'} bar ${formatMoney(_barAberto)} (comanda aberta)</div>`
+        : devedor?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Valor a receber do jogador</div>`
                 :credito?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Pode ser usado em buy-ins, bar ou cash</div>`
                 :`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Nenhuma pendência</div>`}
     `;
