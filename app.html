@@ -11942,6 +11942,18 @@ async function _processarMudancaRealtime(tipo, payload) {
             if (paginaAtual === 'caixa') {
                 safeRender(() => typeof renderCaixa === 'function' && renderCaixa(), 'renderCaixa');
             }
+            // Ficha do jogador aberta (Extrato / Pagar Conta): atualiza na hora a comanda
+            // lançada pelo StackBar. Não redesenha o Pagar Conta se o operador estiver digitando.
+            safeRender(() => {
+                const modal = document.getElementById('modal-pagamento-jogador');
+                if (!modal || !modal.classList.contains('open') || !pagamentoJogadorId) return;
+                renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+                const ae = document.activeElement;
+                const pagar = document.getElementById('pj-pagar');
+                if (pagar && pagar.style.display === 'block' && !(ae && pagar.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName))) renderPagarConta();
+                const ext = document.getElementById('pj-extrato');
+                if (ext && ext.style.display === 'block' && typeof renderExtratoJogador === 'function') renderExtratoJogador();
+            }, 'fichaJogador');
         }
         
         if (tipo === 'cash_mesa') {
@@ -47540,7 +47552,7 @@ function renderCaixaAberto() {
     const comandasAbertasMap = new Map();
     (barComandas || []).forEach(c => {
         if (c.status !== 'aberta') return;
-        const total = calcTotalComanda(c);
+        const total = calcCobrarComanda(c);
         const existente = comandasAbertasMap.get(c.jogadorId) || { valor: 0, qtd: 0, itens: 0 };
         existente.valor += total;
         existente.qtd += 1;
@@ -47839,11 +47851,14 @@ function abrirPagamentoJogador(jogadorId) {
     document.getElementById('pj-info').innerText = `${j.apelido?j.apelido+' · ':''}${j.whatsapp || ''}`;
 
     renderSaldoCard(saldo);
+    // Comanda aberta também conta como conta a pagar (ela só entra no saldo quando fecha)
+    let _temComandaAberta = false;
+    try { _temComandaAberta = (barComandas || []).some(c => c.jogadorId === jogadorId && c.status === 'aberta' && calcCobrarComanda(c) > 0); } catch (_) {}
     // reset tabs
     document.querySelectorAll('.pj-tab-content').forEach(t => t.style.display = 'none');
     document.querySelectorAll('#modal-pagamento-jogador .tab-btn').forEach(b => b.classList.remove('active'));
     // Se jogador deve ou tem crédito, abre direto na aba "Pagar Conta"
-    if (saldo !== 0) {
+    if (saldo !== 0 || _temComandaAberta) {
         renderPagarConta();
         document.getElementById('pj-pagar').style.display = 'block';
         document.getElementById('pjtab-btn-pagar').classList.add('active');
