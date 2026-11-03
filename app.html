@@ -36178,6 +36178,18 @@ document.addEventListener('visibilitychange', () => {
             try {
                 if (typeof _carregarDadosClube === 'function' && sbClube && sbClube.id) {
                     _carregarDadosClube(sbClube.id);
+                } else if (sbClube && sbClube.id) {
+                    // Busca só o que entrou enquanto a aba estava escondida
+                    (async () => {
+                        try {
+                            const tsMax = (transacoes || []).reduce((m, t) => Math.max(m, Number(t.ts) || 0), 0);
+                            const desde = new Date((tsMax || Date.now()) - 10 * 60000).toISOString();
+                            const { data } = await sb.from('transacoes').select('*').eq('clube_id', sbClube.id).gte('ts', desde).limit(1000);
+                            (data || []).forEach(r => _rtTransacaoNova({ new: r }));
+                        } catch (eTx) { console.warn('[REALTIME] catch-up tx:', eTx); }
+                        try { await _processarMudancaRealtime('torneio', { eventType: 'CATCHUP' }); } catch (_) {}
+                        try { await _processarMudancaRealtime('comanda', { eventType: 'CATCHUP' }); } catch (_) {}
+                    })();
                 }
             } catch(e) { console.warn('[REALTIME] erro ao recarregar dados após volta:', e); }
         }
@@ -47835,9 +47847,11 @@ function renderCaixaAberto() {
 
     // Filtro por status — agora também aceita jogador com comanda aberta como "devedor"
     let lista = saldos;
-    if (filtro === 'devedor') lista = saldos.filter(s => s.saldo < 0 || s.comanda);
-    else if (filtro === 'credito') lista = saldos.filter(s => s.saldo > 0 && !s.comanda);
-    else if (filtro === 'zerado') lista = saldos.filter(s => s.saldo === 0 && !s.comanda);
+    // Saldo líquido = conta + comanda aberta (crédito que cobre a comanda continua sendo crédito)
+    const _liq = (x) => Math.round((x.saldo - (x.comanda ? x.comanda.valor : 0)) * 100) / 100;
+    if (filtro === 'devedor') lista = saldos.filter(s => _liq(s) < 0);
+    else if (filtro === 'credito') lista = saldos.filter(s => _liq(s) > 0);
+    else if (filtro === 'zerado') lista = saldos.filter(s => _liq(s) === 0);
 
     // Busca inteligente em nome, apelido e sobrenome
     if (q) {
