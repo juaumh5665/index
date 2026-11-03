@@ -1188,8 +1188,24 @@
         body.quality-performance #tv-pausa{animation:tvPausaPisca 1.4s steps(2, jump-none) infinite;}
 
         /* Premiação passando na tela de break (mesmo estilo do ticker global) */
-        #break-screen #bs-prize-ticker{position:absolute;left:0;right:0;bottom:0;margin:0;z-index:3}
+        /* No fluxo da coluna (depois dos patrocinadores), para nunca ficar por cima deles */
+        #break-screen #bs-prize-ticker{position:relative;margin:auto -2vw 0;width:calc(100% + 4vw);z-index:3}
+        #break-screen #bs-patrocinadores-wrap:not([style*="none"]) ~ #bs-prize-ticker{margin-top:.6vh}
         #break-screen #bs-prize-ticker .gt-header{color:#fbbf24}
+        /* Com premiação no rodapé: encosta no fim da tela e compacta um pouco o topo para caber tudo */
+        #break-screen.bs-com-premiacao{padding-bottom:0}
+        #break-screen.bs-com-premiacao .bs-logo{max-height:11vh}
+        #break-screen.bs-com-premiacao .bs-patrocinador-item{height:clamp(64px, 7vw, 110px)}
+        /* Se ainda não couber (zoom alto / TV pequena), compacta em 2 níveis — o JS mede e aplica */
+        #break-screen.bs-fit1{gap:.6vh}
+        #break-screen.bs-fit1 .bs-logo{max-height:7vh}
+        #break-screen.bs-fit1 .bs-break-text{font-size:clamp(2.6rem, 6.5vw, 6rem)}
+        #break-screen.bs-fit1 .bs-timer{font-size:clamp(2.2rem, 4.8vw, 4.8rem)}
+        #break-screen.bs-fit1 .bs-patrocinador-item{height:clamp(50px, 5.2vw, 86px)}
+        #break-screen.bs-fit2 .bs-logo{display:none !important}
+        #break-screen.bs-fit2 .bs-break-text{font-size:clamp(2.2rem, 5vw, 4.6rem)}
+        #break-screen.bs-fit2 .bs-patrocinadores-label{display:none}
+        #break-screen.bs-fit2 .bs-patrocinador-item{height:clamp(42px, 4.2vw, 70px)}
 
         /* BREAK SCREEN - layout vertical organizado (não usa absolute pra elementos do fluxo) */
         #break-screen{
@@ -1834,6 +1850,7 @@
         // Atualizar label
         var lbl = document.getElementById('tv-zoom-val');
         if (lbl) lbl.innerText = _getZoomAtual() + '%';
+        setTimeout(function () { if (typeof ajustarBreakFit === 'function') ajustarBreakFit(); }, 60);
     }
     
     function _aplicarZoomSalvo() {
@@ -2532,6 +2549,21 @@ function montarCarouselPremiacao(d) {
             el.classList.toggle('show', !!(d && d.pausado));
         } catch (e) { console.warn('atualizarPausa:', e); }
     }
+    // Garante que a faixa da premiação caiba inteira na tela (zoom alto, TV pequena): compacta o topo
+    function ajustarBreakFit() {
+        try {
+            var bs = document.getElementById('break-screen'); if (!bs) return;
+            bs.classList.remove('bs-fit1', 'bs-fit2');
+            if (!bs.classList.contains('show') || !bs.classList.contains('bs-com-premiacao')) return;
+            var tk = document.getElementById('bs-prize-ticker');
+            var cabe = function () { return tk.getBoundingClientRect().bottom <= window.innerHeight + 1; };
+            if (cabe()) return;
+            bs.classList.add('bs-fit1'); if (cabe()) return;
+            bs.classList.add('bs-fit2');
+        } catch (e) { console.warn('ajustarBreakFit:', e); }
+    }
+    window.addEventListener('resize', function () { setTimeout(ajustarBreakFit, 100); });
+    document.addEventListener('load', function (ev) { if (ev.target && ev.target.closest && ev.target.closest('#break-screen')) setTimeout(ajustarBreakFit, 30); }, true);
     // Premiação passando na tela de break — mesmos valores que a TV já recebe
     var _bsTicker = { key: null };
     function montarTickerBreak(d) {
@@ -2539,7 +2571,9 @@ function montarCarouselPremiacao(d) {
             var tk = document.getElementById('bs-prize-ticker'), strip = document.getElementById('bs-gt-strip');
             if (!tk || !strip) return;
             var pp = d && d.premiacaoProjetada;
-            if (!d || !d.isBreak || !pp || !pp.valores || !pp.valores.length) { tk.classList.remove('show'); return; }
+            var bsEl = document.getElementById('break-screen');
+            if (!d || !d.isBreak || !pp || !pp.valores || !pp.valores.length) { tk.classList.remove('show'); if (bsEl) bsEl.classList.remove('bs-com-premiacao'); return; }
+            if (bsEl) { bsEl.classList.add('bs-com-premiacao'); setTimeout(ajustarBreakFit, 60); }
             var key = JSON.stringify({ v: pp.valores, g: pp.vagas || [], vel: pp.velocidadePremiacao || 3 });
             if (_bsTicker.key === key && strip.children.length) { tk.classList.add('show'); return; }
             _bsTicker.key = key; strip.innerHTML = '';
@@ -2623,6 +2657,7 @@ function montarCarouselPremiacao(d) {
         // Se d.patrocinadores veio no payload (TV popup, vindo do app), usa direto.
         // Senão, busca do Supabase via wrapper (TV pública).
         _bsAtualizarPatrocinadores(d.clubeId, d.patrocinadores);
+            ajustarBreakFit();   // re-mede a cada atualização (logo/patrocinadores carregam depois)
         } catch (e) { console.error('atualizarBreakScreen erro:', e); }
     }
 
@@ -2744,6 +2779,7 @@ function montarCarouselPremiacao(d) {
         track.style.animationDuration = dur + 's';
 
         wrap.style.display = 'flex';
+        setTimeout(function () { if (typeof ajustarBreakFit === 'function') ajustarBreakFit(); }, 80);
         console.log('[BS-PATR] ✅ Carrossel renderizado:', lista.length, 'itens × ' + minRepeticoes + ' repetições × 2 (loop) = ' + (listaExpandida.length * 2) + ' DOMs. Dur:', dur + 's');
     }
 
