@@ -1195,17 +1195,19 @@
         /* Com premiação no rodapé: encosta no fim da tela e compacta um pouco o topo para caber tudo */
         #break-screen.bs-com-premiacao{padding-bottom:0}
         #break-screen.bs-com-premiacao .bs-logo{max-height:11vh}
-        #break-screen.bs-com-premiacao .bs-patrocinador-item{height:clamp(64px, 7vw, 110px)}
+        #break-screen.bs-com-premiacao .bs-patrocinador-item{width:clamp(160px, 18vw, 300px);height:clamp(96px, 11vw, 180px)}
         /* Se ainda não couber (zoom alto / TV pequena), compacta em 2 níveis — o JS mede e aplica */
         #break-screen.bs-fit1{gap:.6vh}
         #break-screen.bs-fit1 .bs-logo{max-height:7vh}
         #break-screen.bs-fit1 .bs-break-text{font-size:clamp(2.6rem, 6.5vw, 6rem)}
         #break-screen.bs-fit1 .bs-timer{font-size:clamp(2.2rem, 4.8vw, 4.8rem)}
-        #break-screen.bs-fit1 .bs-patrocinador-item{height:clamp(50px, 5.2vw, 86px)}
-        #break-screen.bs-fit2 .bs-logo{display:none !important}
-        #break-screen.bs-fit2 .bs-break-text{font-size:clamp(2.2rem, 5vw, 4.6rem)}
-        #break-screen.bs-fit2 .bs-patrocinadores-label{display:none}
-        #break-screen.bs-fit2 .bs-patrocinador-item{height:clamp(42px, 4.2vw, 70px)}
+        /* nível 2: patrocinadores um pouco menores (o topo já foi compactado no nível 1) */
+        #break-screen.bs-fit2 .bs-patrocinador-item{width:clamp(130px, 14vw, 230px);height:clamp(72px, 8vw, 130px)}
+        /* nível 3: último recurso */
+        #break-screen.bs-fit3 .bs-logo{display:none !important}
+        #break-screen.bs-fit3 .bs-break-text{font-size:clamp(2.2rem, 5vw, 4.6rem)}
+        #break-screen.bs-fit3 .bs-patrocinadores-label{display:none}
+        #break-screen.bs-fit3 .bs-patrocinador-item{width:clamp(110px, 11vw, 180px);height:clamp(54px, 5.6vw, 96px)}
 
         /* BREAK SCREEN - layout vertical organizado (não usa absolute pra elementos do fluxo) */
         #break-screen{
@@ -1343,8 +1345,8 @@
         }
         .bs-patrocinador-item {
             flex-shrink: 0;
-            width: clamp(130px, 14vw, 200px);
-            height: clamp(80px, 9vw, 130px);
+            width: clamp(170px, 20vw, 320px);
+            height: clamp(105px, 12.5vw, 200px);
             background: rgba(0,0,0,.55);
             border: 1px solid rgba(245,213,114,.25);
             border-radius: .75rem;
@@ -2553,13 +2555,15 @@ function montarCarouselPremiacao(d) {
     function ajustarBreakFit() {
         try {
             var bs = document.getElementById('break-screen'); if (!bs) return;
-            bs.classList.remove('bs-fit1', 'bs-fit2');
-            if (!bs.classList.contains('show') || !bs.classList.contains('bs-com-premiacao')) return;
-            var tk = document.getElementById('bs-prize-ticker');
+            bs.classList.remove('bs-fit1', 'bs-fit2', 'bs-fit3');
+            if (!bs.classList.contains('show')) return;
+            var tk = bs.classList.contains('bs-com-premiacao') ? document.getElementById('bs-prize-ticker') : document.getElementById('bs-patrocinadores-wrap');
+            if (!tk || tk.offsetHeight === 0) return;
             var cabe = function () { return tk.getBoundingClientRect().bottom <= window.innerHeight + 1; };
             if (cabe()) return;
             bs.classList.add('bs-fit1'); if (cabe()) return;
-            bs.classList.add('bs-fit2');
+            bs.classList.add('bs-fit2'); if (cabe()) return;
+            bs.classList.add('bs-fit3');
         } catch (e) { console.warn('ajustarBreakFit:', e); }
     }
     window.addEventListener('resize', function () { setTimeout(ajustarBreakFit, 100); });
