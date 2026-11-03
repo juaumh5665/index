@@ -12512,6 +12512,7 @@ async function sincronizarEstado() {
     }
     if (_syncEmAndamento || !sbClube) {
         console.log('[SYNC] Pulando: emAndamento=' + _syncEmAndamento + ', sbClube=' + (sbClube ? 'OK' : 'NULL'));
+        if (_syncEmAndamento) window._syncRepetirAoTerminar = true; // roda de novo quando o atual terminar
         return;
     }
     if (!dbOnline) {
@@ -13032,8 +13033,27 @@ async function sincronizarEstado() {
     } catch (e) {
         console.warn('Sync falhou:', e.message);
     } finally {
+        // Transações não podem ficar presas atrás de erro em outra tabela (ex: torneios)
+        try {
+            if (_syncQueue.transacoes.size && sbClube && dbOnline) {
+                const idsTx = [..._syncQueue.transacoes];
+                const rowsTx = idsTx.map(id => transacoes.find(t => t.id === id || String(t.id) === String(id)))
+                                    .filter(Boolean).map(_transacaoToDb);
+                if (rowsTx.length) {
+                    const { error: eTx } = await sb.from('transacoes').upsert(rowsTx);
+                    if (!eTx) idsTx.forEach(id => _syncQueue.transacoes.delete(id));
+                }
+            }
+        } catch (eTx2) { console.warn('[SYNC] transações (isolado):', eTx2); }
         _syncEmAndamento = false;
         _persistirFilaPendencias(); // OFFLINE-QUEUE: atualiza fila persistida (limpa os que já sincronizaram)
+        if (window._syncRepetirAoTerminar) {
+            window._syncRepetirAoTerminar = false;
+            _agendarSync();
+        } else if (_syncQueue.transacoes.size) {
+            // Sobrou transação sem enviar (erro de rede): tenta de novo em 10s
+            setTimeout(() => { if (_syncQueue.transacoes.size) _agendarSync(); }, 10000);
+        }
     }
 }
 
@@ -15151,6 +15171,10 @@ async function carregarUsuarioEClube(authUser) {
     }
 
     sbClube = clube;
+
+    // Reenvia transações que ficaram sem enviar (app fechado/recarregado antes do sync)
+    if (!window._modoSuporte) { try { await _enviarTransacoesResgatadas(); } catch (_) {} }
+    try { localStorage.setItem('ps_cache_clube_id', clube.id); } catch (_) {}
 
     // Sempre carrega feature_overrides via RPC (SECURITY DEFINER bypassa RLS e schema cache)
     try {
@@ -23043,7 +23067,79 @@ document.addEventListener('keydown', function(e) {
 // SEGURANÇA: Limpar TODO o estado em memória + localStorage
 // Chamado ao fazer logout OU antes de carregar novo clube
 // ============================================================
+// ============================================================
+// RESGATE DE TRANSAÇÕES NÃO ENVIADAS
+// Antes de limpar o estado (abrir o app, logout, sessão expirada) guarda as
+// transações que ainda estão na fila de sync em 'ps_tx_resgate'. No próximo
+// login do MESMO clube elas são enviadas ao banco antes de carregar os dados.
+// Sem isso, um pagamento feito logo antes de fechar/recarregar o app sumia.
+// ============================================================
+function _guardarTransacoesNaoEnviadas() {
+    try {
+        const ids = new Set();
+        try { (_syncQueue && _syncQueue.transacoes ? [..._syncQueue.transacoes] : []).forEach(id => ids.add(String(id))); } catch (_) {}
+        try {
+            const pend = JSON.parse(localStorage.getItem('ps_sync_pending') || '{}');
+            (pend.transacoes || []).forEach(id => ids.add(String(id)));
+        } catch (_) {}
+        if (!ids.size) return;
+        const fontes = [];
+        try { if (Array.isArray(transacoes)) fontes.push(transacoes); } catch (_) {}
+        try { fontes.push(JSON.parse(localStorage.getItem('ps_transacoes') || '[]')); } catch (_) {}
+        const achadas = new Map();
+        fontes.forEach(lista => (lista || []).forEach(t => {
+            if (t && ids.has(String(t.id)) && !achadas.has(String(t.id))) achadas.set(String(t.id), t);
+        }));
+        if (!achadas.size) return;
+        let atual = { clubeId: null, itens: [] };
+        try { atual = JSON.parse(localStorage.getItem('ps_tx_resgate') || 'null') || atual; } catch (_) {}
+        const clubeCache = localStorage.getItem('ps_cache_clube_id') || (sbClube && sbClube.id) || null;
+        // Resgate de outro clube ainda pendente: não mistura (fica o mais antigo até ser enviado)
+        if (atual.itens && atual.itens.length && atual.clubeId && clubeCache && atual.clubeId !== clubeCache) return;
+        const porId = new Map((atual.itens || []).map(t => [String(t.id), t]));
+        achadas.forEach((t, id) => {
+            const c = { ...t };
+            if (!c.operador && currentUser) { c.operador = currentUser.nome; c.operadorId = currentUser.id; }
+            porId.set(id, c);
+        });
+        localStorage.setItem('ps_tx_resgate', JSON.stringify({ clubeId: atual.clubeId || clubeCache, itens: [...porId.values()] }));
+        console.warn('[RESGATE] ' + achadas.size + ' transação(ões) não enviadas guardadas pra reenvio');
+    } catch (e) { console.warn('[RESGATE] erro ao guardar:', e); }
+}
+
+// Envia ao banco as transações guardadas (chamado no login, com sbClube já definido)
+async function _enviarTransacoesResgatadas() {
+    let pacote = null;
+    try { pacote = JSON.parse(localStorage.getItem('ps_tx_resgate') || 'null'); } catch (_) {}
+    if (!pacote || !Array.isArray(pacote.itens) || !pacote.itens.length || !sbClube) return;
+    try {
+        let itens = pacote.itens;
+        if (pacote.clubeId && pacote.clubeId !== sbClube.id) {
+            console.warn('[RESGATE] pendências são de outro clube — mantidas até login nele');
+            return;
+        }
+        if (!pacote.clubeId) {
+            // Sem carimbo de clube: só envia transações de jogadores deste clube
+            const jids = [...new Set(itens.map(t => t.jogadorId).filter(Boolean))];
+            if (!jids.length) return;
+            const { data: jRows, error: jErr } = await sb.from('jogadores').select('id').eq('clube_id', sbClube.id).in('id', jids);
+            if (jErr) return;
+            const ok = new Set((jRows || []).map(r => r.id));
+            itens = itens.filter(t => t.jogadorId && ok.has(t.jogadorId));
+            if (!itens.length) { localStorage.removeItem('ps_tx_resgate'); return; }
+        }
+        const rows = itens.map(_transacaoToDb);
+        const { error } = await sb.from('transacoes').upsert(rows);
+        if (error) { console.warn('[RESGATE] falhou, tenta no próximo login:', error.message); return; }
+        localStorage.removeItem('ps_tx_resgate');
+        console.log('[RESGATE] ✅ ' + rows.length + ' transação(ões) enviadas');
+        try { showToast('✅ ' + rows.length + ' lançamento(s) pendente(s) enviados ao banco'); } catch (_) {}
+    } catch (e) { console.warn('[RESGATE] erro ao enviar:', e); }
+}
+
 function _limparEstadoClube() {
+    // Antes de apagar: guarda transações que ainda não chegaram ao banco
+    _guardarTransacoesNaoEnviadas();
     // Limpa cache local de TUDO que pertence a um clube específico
     const keysClube = [
         'ps_jogadores', 'ps_torneios', 'ps_bar_grupos', 'ps_bar_produtos',
@@ -26411,6 +26507,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function logout() {
     if (!confirm('Deseja sair do sistema?')) return;
+    // Envia o que estiver pendente antes de sair (o que não der fica guardado pro próximo login)
+    try {
+        if (typeof _syncQueue !== 'undefined' && _syncQueue.transacoes && _syncQueue.transacoes.size && dbOnline) {
+            const rowsTx = [..._syncQueue.transacoes].map(id => transacoes.find(t => String(t.id) === String(id)))
+                .filter(Boolean).map(_transacaoToDb);
+            if (rowsTx.length) {
+                const { error } = await sb.from('transacoes').upsert(rowsTx);
+                if (!error) _syncQueue.transacoes.clear();
+            }
+        }
+    } catch (e) { console.warn('[LOGOUT] envio pendências:', e); }
     logAudit('LOGOUT', 'Logout do sistema');
     descartarUndo();  // limpar toast pendente
     try { pararRealtime(); } catch(e) { console.warn('[REALTIME]', e); }
