@@ -50085,16 +50085,8 @@ function openFecharComanda() {
     const j = jogadores.find(j => j.id === c.jogadorId);
     const totalComanda = calcCobrarComanda(c);
 
-    // === GUARD: alerta se jogador já quitou no caixa ===
-    const saldoPreCheck = getSaldoJogador(c.jogadorId);
-    if (saldoPreCheck >= -0.01) {
-        const nomeJ = j ? j.nome : 'Jogador';
-        if (!confirm(
-            `⚠️ ATENÇÃO: ${nomeJ} tem saldo ${saldoPreCheck >= 0 ? 'positivo' : 'zerado'} (${formatMoney(saldoPreCheck)}).\n\n` +
-            `Fechar esta comanda vai CRIAR um débito de ${formatMoney(totalComanda)}.\n\n` +
-            `Isso pode gerar cobrança duplicada se o bar já foi quitado no caixa.\n\nDeseja continuar mesmo assim?`
-        )) return;
-    }
+    // (Aviso de "cobrança duplicada" removido: desde 03/11 a comanda só é cobrada
+    //  no fechamento, então saldo zerado com comanda aberta é o normal.)
 
     // Calcula pendências anteriores (saldo negativo excluindo esta comanda)
     // Importante: a comanda atual ainda não gerou transação; usaremos saldo atual como pendência
@@ -50156,16 +50148,8 @@ function cobrarSomenteBar() {
     const j = jogadores.find(j => j.id === c.jogadorId);
     const totalComanda = calcCobrarComanda(c);
 
-    // === GUARD: alerta se jogador já quitou no caixa ===
-    const saldoPreCheck = getSaldoJogador(c.jogadorId);
-    if (saldoPreCheck >= -0.01) {
-        const nomeJ = j ? j.nome : 'Jogador';
-        if (!confirm(
-            `⚠️ ATENÇÃO: ${nomeJ} tem saldo ${saldoPreCheck >= 0 ? 'positivo' : 'zerado'} (${formatMoney(saldoPreCheck)}).\n\n` +
-            `Cobrar esta comanda vai CRIAR um débito de ${formatMoney(totalComanda)}.\n\n` +
-            `Isso pode gerar cobrança duplicada se o bar já foi quitado no caixa.\n\nDeseja continuar mesmo assim?`
-        )) return;
-    }
+    // (Aviso de "cobrança duplicada" removido: desde 03/11 a comanda só é cobrada
+    //  no fechamento, então saldo zerado com comanda aberta é o normal.)
 
     const saldoAtual = getSaldoJogador(c.jogadorId);
     const pendencias = saldoAtual < 0 ? Math.abs(saldoAtual) : 0;
