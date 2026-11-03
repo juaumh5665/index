@@ -500,6 +500,8 @@
   .hist-badge.estornada { background: rgba(239, 68, 68, .2); color: #fca5a5; }
   .hist-badge.pendente  { background: rgba(245, 158, 11, .2); color: #fcd34d; }
   .hist-badge.negada    { background: rgba(113, 113, 122, .2); color: #a1a1aa; }
+  .hist-badge.cmd-aberta  { background: rgba(245, 158, 11, .15); color: #fbbf24; }
+  .hist-badge.cmd-fechada { background: rgba(16, 185, 129, .18); color: #6ee7b7; }
 
   /* Botão solicitar estorno (compacto, discreto) */
   .btn-estorno {
@@ -1557,6 +1559,14 @@ function setupEventListeners() {
     });
   });
 
+  // Histórico aberto: atualiza a cada 20s pra mostrar comanda fechada no caixa
+  setInterval(() => {
+    try {
+      const t = $('tab-historico');
+      if (t && t.classList.contains('active') && document.visibilityState === 'visible') carregarHistorico();
+    } catch (_) {}
+  }, 20000);
+
   // Busca/grupo de produtos
   $('inpBusca').addEventListener('input', renderProdutos);
   $('selGrupo').addEventListener('change', renderProdutos);
@@ -1832,6 +1842,18 @@ function renderHistorico() {
       }).join('') + '</div>';
     }
 
+    // Situação da comanda (aberta / fechada no caixa). Se o jogador pedir de novo
+    // depois de fechada, o StackBar abre uma comanda NOVA automaticamente.
+    let badgeComanda = '';
+    if (v.tipo === 'comanda' && v.estorno_status !== 'aprovado') {
+      if (v.comanda_status === 'fechada') {
+        const hf = v.comanda_fechado_em ? new Date(v.comanda_fechado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+        badgeComanda = `<span class="hist-badge cmd-fechada">✅ COMANDA FECHADA${hf ? ' · ' + hf : ''}</span>`;
+      } else if (v.comanda_status === 'aberta') {
+        badgeComanda = '<span class="hist-badge cmd-aberta">🟡 COMANDA ABERTA</span>';
+      }
+    }
+
     const chevron = itens.length > 0 ? '<span class="hist-chevron">▼</span>' : '';
 
     return `
@@ -1840,6 +1862,7 @@ function renderHistorico() {
         <div class="hist-info" style="flex:1;min-width:0;">
           <div class="hist-jogador">${esc(v.jogador_nome || '—')} ${badge}</div>
           <div class="hist-meta">${hora} • ${esc(formaTxt)}${itens.length > 0 ? ` • ${itens.length} ${itens.length === 1 ? 'item' : 'itens'}` : ''}</div>
+          ${badgeComanda ? `<div style="margin:4px 0;">${badgeComanda}</div>` : ''}
           ${botaoEstorno}
           ${itensHtml}
         </div>
