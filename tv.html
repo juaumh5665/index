@@ -1171,6 +1171,26 @@
             color: var(--gold);
         }
 
+        /* AVISO "TORNEIO EM PAUSA" — faixa piscando sobre qualquer layout (interna e pública) */
+        #tv-pausa{
+            display:none; position:fixed; left:0; right:0; top:50%; transform:translateY(-50%);
+            z-index:150; pointer-events:none; text-align:center;
+            background:rgba(245,158,11,.93); color:#1a1306;
+            padding:2.2vh 2vw; border-top:3px solid #fde68a; border-bottom:3px solid #fde68a;
+            font-family:'Manrope',system-ui,sans-serif;
+            animation:tvPausaPisca 1.2s ease-in-out infinite;
+        }
+        #tv-pausa.show{display:block;}
+        #tv-pausa .tp-t{font-size:clamp(2rem,6vw,6rem);font-weight:800;letter-spacing:.12em;line-height:1}
+        #tv-pausa .tp-s{font-size:clamp(.8rem,1.4vw,1.4rem);font-weight:700;margin-top:.8vh;letter-spacing:.04em}
+        @keyframes tvPausaPisca{0%,100%{opacity:1}50%{opacity:.28}}
+        /* Reduzido: mesma faixa (sem blur, que ela já não usa). Performance: pisca seco (2 passos), mais leve */
+        body.quality-performance #tv-pausa{animation:tvPausaPisca 1.4s steps(2, jump-none) infinite;}
+
+        /* Premiação passando na tela de break (mesmo estilo do ticker global) */
+        #break-screen #bs-prize-ticker{position:absolute;left:0;right:0;bottom:0;margin:0;z-index:3}
+        #break-screen #bs-prize-ticker .gt-header{color:#fbbf24}
+
         /* BREAK SCREEN - layout vertical organizado (não usa absolute pra elementos do fluxo) */
         #break-screen{
             display:none;
@@ -1553,6 +1573,18 @@
 
             <!-- Frase do rodapé personalizada (reutiliza a do Pro Live) -->
             <div id="bs-frase-rodape" class="bs-frase-rodape" style="display:none;"></div>
+
+            <!-- Premiação passando embaixo (só quando a premiação está anunciada na TV) -->
+            <div id="bs-prize-ticker" class="global-prize-ticker">
+                <div class="gt-header"><i class="fa-solid fa-trophy"></i> Premiação</div>
+                <div class="gt-track"><div class="gt-strip" id="bs-gt-strip"></div></div>
+            </div>
+        </div>
+
+        <!-- AVISO DE PAUSA (todos os layouts e modos de qualidade) -->
+        <div id="tv-pausa" role="status" aria-live="polite">
+            <div class="tp-t"><i class="fa-solid fa-pause"></i> TORNEIO EM PAUSA</div>
+            <div class="tp-s">O relógio volta assim que o torneio for retomado</div>
         </div>
 
         <!-- PRO LIVE LAYOUT (só visível com body.layout-pokerweb) -->
@@ -2493,11 +2525,51 @@ function montarCarouselPremiacao(d) {
         }
     }
 
+    // Aviso "TORNEIO EM PAUSA" (d.pausado vem do app e da TV pública)
+    function atualizarPausa(d) {
+        try {
+            const el = document.getElementById('tv-pausa'); if (!el) return;
+            el.classList.toggle('show', !!(d && d.pausado));
+        } catch (e) { console.warn('atualizarPausa:', e); }
+    }
+    // Premiação passando na tela de break — mesmos valores que a TV já recebe
+    var _bsTicker = { key: null };
+    function montarTickerBreak(d) {
+        try {
+            var tk = document.getElementById('bs-prize-ticker'), strip = document.getElementById('bs-gt-strip');
+            if (!tk || !strip) return;
+            var pp = d && d.premiacaoProjetada;
+            if (!d || !d.isBreak || !pp || !pp.valores || !pp.valores.length) { tk.classList.remove('show'); return; }
+            var key = JSON.stringify({ v: pp.valores, g: pp.vagas || [], vel: pp.velocidadePremiacao || 3 });
+            if (_bsTicker.key === key && strip.children.length) { tk.classList.add('show'); return; }
+            _bsTicker.key = key; strip.innerHTML = '';
+            var conj = pp.valores.length <= 4 ? 8 : (pp.valores.length <= 6 ? 6 : 4);
+            for (var pass = 0; pass < conj; pass++) {
+                for (var i = 0; i < pp.valores.length; i++) {
+                    var it = document.createElement('div'); it.className = 'gt-item';
+                    var pos = document.createElement('span'); pos.className = 'gt-pos ' + (i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''); pos.textContent = (i + 1) + 'º'; it.appendChild(pos);
+                    var lab = document.createElement('span'); lab.className = 'gt-label'; lab.textContent = 'Lugar'; it.appendChild(lab);
+                    var val = document.createElement('span'); val.className = 'gt-value'; val.textContent = 'R$ ' + (pp.valores[i] || 0).toLocaleString('pt-BR'); it.appendChild(val);
+                    var vg = (pp.vagas && pp.vagas[i]) ? String(pp.vagas[i]).trim() : '';
+                    if (vg) { var b = document.createElement('span'); b.className = 'gt-vaga'; b.textContent = '🎫 ' + vg.toUpperCase(); it.appendChild(b); }
+                    strip.appendChild(it);
+                }
+            }
+            strip.style.setProperty('--ticker-end', '-' + (100 / conj) + '%');
+            var mult = (typeof _getMultiplicadorVelocidade === 'function') ? _getMultiplicadorVelocidade(pp) : 1;
+            var seg = Math.max(10, pp.valores.length * conj * 0.8 * mult);
+            strip.style.animationDuration = seg + 's';
+            strip.style.setProperty('--perf-duration', seg + 's');
+            tk.classList.add('show');
+        } catch (e) { console.warn('montarTickerBreak:', e); }
+    }
+
     // Break screen helper - usa data-url de logo armazenada em background via postMessage
     function atualizarBreakScreen(d) {
         try {
         const bs = document.getElementById('break-screen');
         if (!bs) return;
+        montarTickerBreak(d);
         if (!d.isBreak) { bs.classList.remove('show'); return; }
         console.log('[BREAK] ATIVANDO break-screen. d.clubeId:', d.clubeId, 'd.isBreak:', d.isBreak, 'window.pubState?.clubeId:', (window.pubState && window.pubState.clubeId) || 'N/A');
         bs.classList.add('show');
@@ -2890,6 +2962,7 @@ function montarCarouselPremiacao(d) {
 
             // Break overlay still works
             atualizarBreakScreen(d);
+            atualizarPausa(d);
             atualizarPrizeOverlay(d);
             return;
         }
@@ -2935,6 +3008,7 @@ function montarCarouselPremiacao(d) {
         if(d.pct<20){document.getElementById('bar').style.background='#ef4444';}
         else{document.getElementById('bar').style.background='';}
         atualizarBreakScreen(d);
+        atualizarPausa(d);
         atualizarPrizeOverlay(d);
     };
     </script>
@@ -4092,6 +4166,7 @@ function montarCarouselPremiacao(d) {
       nextAnte: prox ? ((prox.ante || 0).toLocaleString()) : '',
       prize: prize.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       isBreak: !!t.is_break,
+      pausado: !!t.iniciado_em && t.rodando === false && !['finished', 'encerrado'].includes(String(t.status || '')),
       next: prox ? ((prox.sb || 0).toLocaleString() + '/' + (prox.bb || 0).toLocaleString()) : 'FINAL',
       pct: pct,
       elapsed: elapsed,
