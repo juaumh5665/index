@@ -11379,6 +11379,13 @@ function iniciarRealtime() {
             filter: `clube_id=eq.${clubeId}` 
         }, (payload) => _onRealtimeEvent('comanda_item', payload))
         
+        // === TRANSAÇÕES: só INSERT (o reenvio/upsert de linhas existentes não gera evento)
+        //     Mescla a linha nova na memória — sem recarregar nada do banco.
+        .on('postgres_changes', {
+            event: 'INSERT', schema: 'public', table: 'transacoes',
+            filter: `clube_id=eq.${clubeId}`
+        }, (payload) => { try { _rtTransacaoNova(payload); } catch (e) { console.warn('[REALTIME] tx:', e); } })
+
         .on('postgres_changes', { 
             event: '*', schema: 'public', table: 'bar_produtos',
             filter: `clube_id=eq.${clubeId}` 
@@ -12001,6 +12008,34 @@ function _atualizarIndicadorRealtime(conectado) {
         ind.style.display = 'flex';
         ind.innerHTML = '<span class="rt-dot off"></span><span style="color:#71717a;font-size:.65rem;font-weight:700;letter-spacing:.1em;">OFFLINE</span>';
     }
+}
+
+// Lançamento feito em OUTRA máquina: entra no saldo/extrato desta na hora
+let _rtTxRenderTimer = null;
+function _rtTransacaoNova(payload) {
+    const r = payload && payload.new;
+    if (!r || !r.id || !sbClube || r.clube_id !== sbClube.id) return;
+    if ((transacoes || []).some(t => String(t.id) === String(r.id))) return; // já existe (lançada aqui)
+    transacoes.push(_transacaoFromDb(r));
+    // Só cache local — NÃO chama saveData (não reenvia nada ao banco)
+    clearTimeout(_rtTxRenderTimer);
+    _rtTxRenderTimer = setTimeout(() => {
+        try { localStorage.setItem('ps_transacoes', JSON.stringify(transacoes)); } catch (_) {}
+        const pg = window._paginaAtual;
+        try { if (pg === 'caixa' && typeof renderCaixa === 'function') renderCaixa(); } catch (_) {}
+        try {
+            const modal = document.getElementById('modal-pagamento-jogador');
+            if (modal && modal.classList.contains('open') && pagamentoJogadorId) {
+                renderSaldoCard(getSaldoJogador(pagamentoJogadorId));
+                const ae = document.activeElement;
+                const pagar = document.getElementById('pj-pagar');
+                if (pagar && pagar.style.display === 'block' && !(ae && pagar.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName))) renderPagarConta();
+                const ext = document.getElementById('pj-extrato');
+                if (ext && ext.style.display === 'block') renderExtratoJogador();
+            }
+        } catch (_) {}
+        try { if (pg === 'dashboard' && typeof renderDashboard === 'function') renderDashboard(); } catch (_) {}
+    }, 800);
 }
 
 function _mostrarToastRealtime(tipo, evento) {
@@ -23128,6 +23163,29 @@ async function _enviarTransacoesResgatadas() {
             itens = itens.filter(t => t.jogadorId && ok.has(t.jogadorId));
             if (!itens.length) { localStorage.removeItem('ps_tx_resgate'); return; }
         }
+        // Não reenvia se outra máquina já lançou igual depois (mesmo jogador, tipo e valor)
+        try {
+            const jids = [...new Set(itens.map(t => t.jogadorId).filter(Boolean))];
+            const tsMin = Math.min(...itens.map(t => Number(t.ts) || Date.now()));
+            if (jids.length) {
+                const { data: ex } = await sb.from('transacoes').select('id,jogador_id,tipo,valor,ts')
+                    .eq('clube_id', sbClube.id).in('jogador_id', jids).gte('ts', new Date(tsMin).toISOString());
+                const idsLocal = new Set(itens.map(t => String(t.id)));
+                const pulados = [];
+                itens = itens.filter(t => {
+                    const dup = (ex || []).some(r => !idsLocal.has(String(r.id)) && r.jogador_id === t.jogadorId
+                        && r.tipo === t.tipo && Math.abs(Number(r.valor) - Number(t.valor)) < 0.01
+                        && new Date(r.ts).getTime() >= (Number(t.ts) || 0));
+                    if (dup) pulados.push(t);
+                    return !dup;
+                });
+                if (pulados.length) {
+                    console.warn('[RESGATE] não reenviados (já lançados em outra máquina):', pulados);
+                    try { showToast('⚠️ ' + pulados.length + ' lançamento(s) pendente(s) já tinham sido refeitos em outra máquina — não reenviados'); } catch (_) {}
+                }
+                if (!itens.length) { localStorage.removeItem('ps_tx_resgate'); return; }
+            }
+        } catch (eDup) { console.warn('[RESGATE] checagem duplicidade:', eDup); return; }
         const rows = itens.map(_transacaoToDb);
         const { error } = await sb.from('transacoes').upsert(rows);
         if (error) { console.warn('[RESGATE] falhou, tenta no próximo login:', error.message); return; }
