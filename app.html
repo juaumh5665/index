@@ -11768,8 +11768,27 @@ async function _processarMudancaRealtime(tipo, payload) {
                     const elRows = _semRemocoesPendentes('torneioEliminados', elRowsDb);
                     const jpRows = _semRemocoesPendentes('torneioJackpot', jpRowsDb);
                     
+                    const _locaisPorId = new Map((torneios || []).map(x => [x.id, x]));
                     torneios = tRows.map(r => {
-                        const t = _torneioFromDb(r);
+                        // Monta com o mesmo conversor do boot (antes chamava sem as listas e quebrava)
+                        const t = _torneioFromDb(r, eRows || [], elRows || [], jpRows || [], tmRows || []);
+                        const _loc = _locaisPorId.get(r.id);
+                        if (!_loc) { t.estornos = t.estornos || []; return t; }
+                        // Torneio já existe aqui: mantém os dados do torneio desta máquina (relógio,
+                        // nível, config) e traz do banco só as listas (entradas, eliminações, jackpot).
+                        // Lançamento local recente (<2min) que ainda não subiu é mantido; o que sumiu
+                        // do banco há mais tempo foi estornado em outra máquina e sai daqui também.
+                        const _rec = Date.now() - 120000;
+                        const _mesclar = (doBanco, local) => {
+                            const ids = new Set((doBanco || []).map(x => String(x.id)));
+                            const pend = (local || []).filter(x => x && !ids.has(String(x.id)) && Number(x.ts) >= _rec);
+                            return [...(doBanco || []), ...pend];
+                        };
+                        return Object.assign({}, _loc, {
+                            entries: _mesclar(t.entries, _loc.entries),
+                            eliminados: _mesclar(t.eliminados, _loc.eliminados),
+                            jackpotCompras: _mesclar(t.jackpotCompras, _loc.jackpotCompras),
+                        });
                         t.entries = (eRows || []).filter(e => e.torneio_id === r.id).map(e => ({
                             id: e.id, jogadorId: e.jogador_id, tipo: e.tipo,
                             valor: parseFloat(e.valor || 0), fichas: parseInt(e.fichas || 0),
