@@ -44197,6 +44197,7 @@ const _waProvider = {
             }
             const e = new Error('Servidor não responde — pode estar dormindo. Aguarde ~30s e tente novamente.'); e._doProxy = true; throw e;
         }
+        if (resp.status === 401 || resp.status === 403) return undefined; // login/permissão da ponte → caminho direto
         if (!resp.ok) {
             // Erro do próprio WhatsApp (vem com "error") → repassa como hoje.
             // Qualquer outra resposta de erro (ex.: gateway recusou o login) → caminho direto.
