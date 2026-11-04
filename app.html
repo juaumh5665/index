@@ -12377,7 +12377,7 @@ function _torneioToDb(t) {
         tempo_alvo: t.tempoAlvo ? new Date(t.tempoAlvo).toISOString() : null,
         status: t.status || 'aguardando',
         rodando: !!t.rodando,
-        relogio_ts: Number(t.relogioTs) || null,
+        relogio_ts: Math.round(Number(t.relogioTs)) || null, // coluna bigint: nunca mandar fração
         is_break: !!t.isBreak,
         iniciado_em: t.iniciadoEm ? new Date(t.iniciadoEm).toISOString() : null,
         tempo_jogo_acumulado_ms: t.tempoJogoAcumuladoMs || 0,
@@ -36332,7 +36332,7 @@ async function _sincronizarRelogioServidor() {
         if (data) {
             const serverNow = new Date(data).getTime();
             const clientMidpoint = (t0 + t1) / 2;
-            _serverClockOffsetMs = serverNow - clientMidpoint;
+            _serverClockOffsetMs = Math.round(serverNow - clientMidpoint);
             _serverClockSynced = true;
             console.log('[CLOCK] Sincronizado com servidor. Offset:', _serverClockOffsetMs + 'ms');
         }
@@ -36347,7 +36347,7 @@ setInterval(_sincronizarRelogioServidor, 2 * 60 * 1000);
 
 // "Now" do servidor calculado localmente (sem chamada de rede)
 function _nowServidor() {
-    return Date.now() + _serverClockOffsetMs;
+    return Math.round(Date.now() + _serverClockOffsetMs);
 }
 
 // Helper: recalcula tempoAlvo baseado em tempoRestante e estado rodando
