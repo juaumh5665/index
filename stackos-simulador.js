@@ -223,8 +223,8 @@
                 try { abrirEditarTorneio(idx); } catch (_) {}
                 // Quando o Editar fechar, volta pra simulação com a config nova
                 const iv = setInterval(() => {
-                    const ed = document.querySelector('[id^="modal-editar-torneio"], #modal-edit-torneio');
-                    if (ed && document.body.contains(ed) && ed.offsetParent !== null) return;
+                    // O Editar é position:fixed (offsetParent sempre null) — basta ver se ainda existe
+                    if (document.getElementById('modal-editar-torneio')) return;
                     clearInterval(iv);
                     if (!sim) return;
                     m.style.display = '';
