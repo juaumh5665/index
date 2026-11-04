@@ -11004,6 +11004,42 @@ async function _syncUpsertDiff(rows, tabela, snapshotKey, opts) {
     const snap = _syncSnapshots[snapshotKey];
     const upsertOpts = opts.upsertOpts;
 
+    // CONFERÊNCIA LEVE (modo full): em vez de regravar TODAS as linhas (cada regravação vira
+    // aviso de realtime em todas as máquinas), confere no banco quais ids existem:
+    //   - linha que NÃO existe no banco → envia (garante que nada se perde)
+    //   - linha que existe e mudou aqui desde o último envio confirmado → envia
+    //   - linha que existe e não mudou → não regrava (só registra no snapshot)
+    // Se a conferência falhar por qualquer motivo, cai no comportamento antigo (regrava tudo).
+    if (isFull && _SYNC_DIFF_MODE && snap && !opts.semConferenciaLeve && rows.length) {
+        try {
+            const ids = rows.map(r => r && r.id).filter(Boolean);
+            const noBanco = new Set();
+            for (let i = 0; i < ids.length; i += 200) {
+                const lote = ids.slice(i, i + 200);
+                const { data: ex, error: exErr } = await sb.from(tabela).select('id').in('id', lote);
+                if (exErr) throw exErr;
+                (ex || []).forEach(r => noBanco.add(String(r.id)));
+            }
+            // Só NÃO reenvia a linha que já foi confirmada no banco por ESTA máquina com
+            // exatamente este conteúdo (snapshot igual) e que continua existindo lá.
+            // Sem snapshot (ex.: logo depois de abrir o app) → envia, como antes.
+            const enviar = rows.filter(r => {
+                if (!r || !r.id) return true;
+                if (!noBanco.has(String(r.id))) return true;           // falta no banco → envia
+                const h = snap.get(r.id);
+                return h === undefined || h !== _syncHash(r);           // sem confirmação ou mudou → envia
+            });
+            if (!enviar.length) {
+                console.log('[SYNC:conf] ' + tabela + ': ' + rows.length + ' conferidas, 0 faltando/alteradas');
+                return { data: null, enviados: 0, total: rows.length, full: true };
+            }
+            console.log('[SYNC:conf] ' + tabela + ': ' + enviar.length + ' de ' + rows.length + ' faltando/alteradas → enviando');
+            return await _syncUpsertDiff(enviar, tabela, snapshotKey, Object.assign({}, opts, { semConferenciaLeve: true }));
+        } catch (eConf) {
+            console.warn('[SYNC:conf] conferência falhou em ' + tabela + ' — usando regravação completa:', eConf && eConf.message);
+        }
+    }
+
     if (isFull || !_SYNC_DIFF_MODE || !snap) {
         const q = upsertOpts ? sb.from(tabela).upsert(rows, upsertOpts) : sb.from(tabela).upsert(rows);
         // FIX CRÍTICO: SEMPRE usa .select() no full-sync pra validar se as rows realmente chegaram no banco.
