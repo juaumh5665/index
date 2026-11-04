@@ -33790,6 +33790,14 @@ function updateTV(idx) {
         isBreak:  t.isBreak,
         // Só para a TV mostrar o aviso "TORNEIO EM PAUSA" (não entra em nenhum cálculo)
         pausado:  !!t.iniciadoEm && t.rodando === false && !['finished', 'encerrado'].includes(String(t.status || '')),
+        // Aviso de eliminação na TV (opção do clube, padrão desligado) — só leitura
+        torneioId: t.id,
+        avisoEliminacao: !!(sbClube && sbClube.config && sbClube.config.tv_aviso_eliminacao),
+        eliminacoesRecentes: (t.eliminados || []).slice().sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0)).slice(0, 8).map(e => {
+            const o = { id: e.id || (e.jogadorId + '-' + e.posicao), nome: getJogadorNome(e.jogadorId), posicao: e.posicao };
+            if (Number(e.posicao) === 2) { try { const v = getVencedorTorneio(t); if (v) o.campeao = getJogadorNome(v); } catch (_) {} }
+            return o;
+        }),
         next:     prox ? ((prox.sb || 0).toLocaleString() + '/' + (prox.bb || 0).toLocaleString()) : 'FINAL',
         pct:      t.tempoTotal > 0 ? (t.tempoRestante / t.tempoTotal) * 100 : 0,
         elapsed:  elapsedFormatted,
@@ -56980,7 +56988,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <!-- StackSangeur (painel do caixa): só liga em clube com feature_sangeur; não altera nada do app -->
 <script src="/stacksangeur-caixa.js?v=6" defer></script>
 <script src="/stackos-abertos.js?v=1" defer></script>
-<script src="/stackos-simulador.js?v=6" defer></script>
+<script src="/stackos-simulador.js?v=7" defer></script>
 <script src="/stackos-relogio-controle.js?v=3" defer></script>
 <script src="/stackos-ranking.js?v=2" defer></script>
 <script src="/tv-som.js"></script>

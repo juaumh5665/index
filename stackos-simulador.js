@@ -356,6 +356,32 @@
         });
     }
 
-    setInterval(() => { try { garantirBotao(); garantirOpcao(); } catch (_) {} }, 1000);
+    // ---------- Opção: aviso de eliminação na TV (padrão desligado) ----------
+    function garantirOpcaoTvElim() {
+        const aba = document.getElementById('cfg-torneios');
+        if (!aba || !ehAdmin() || document.getElementById('cfg-tv-elim-card')) return;
+        const card = document.createElement('div');
+        card.id = 'cfg-tv-elim-card';
+        card.style.cssText = 'margin-bottom:1rem;padding:1rem;background:#14141a;border:1px solid #27272a;border-radius:.6rem;';
+        card.innerHTML = '<label style="display:flex;gap:.6rem;align-items:flex-start;cursor:pointer">' +
+            '<input type="checkbox" id="cfg-tv-elim" style="width:18px;height:18px;margin-top:2px;accent-color:#f5d572">' +
+            '<span><b>📺 Aviso de eliminação na TV</b><br><span style="font-size:.78rem;color:#a1a1aa">Quando um jogador é eliminado, a TV (interna e pública) mostra por 5 segundos "❌ NOME · ELIMINADO EM Xº". No fim, mostra o campeão. Não cobre relógio, blinds nem os dados da tela.</span></span></label>';
+        const ref = document.getElementById('cfg-sim-torneio-card');
+        if (ref && ref.parentNode === aba) ref.insertAdjacentElement('afterend', card); else aba.insertBefore(card, aba.firstChild);
+        const cb = card.querySelector('#cfg-tv-elim');
+        cb.checked = !!(window.sbClube && sbClube.config && sbClube.config.tv_aviso_eliminacao);
+        cb.addEventListener('change', async () => {
+            if (!window.sbClube) return;
+            const novo = Object.assign({}, sbClube.config || {}, { tv_aviso_eliminacao: cb.checked });
+            try {
+                const { error } = await sb.from('clubes').update({ config: novo }).eq('id', sbClube.id);
+                if (error) throw error;
+                sbClube.config = novo;
+                showToast(cb.checked ? '📺 Aviso de eliminação na TV ativado' : 'Aviso de eliminação na TV desativado');
+            } catch (e) { cb.checked = !cb.checked; showToast('⚠️ Não foi possível salvar: ' + (e.message || e)); }
+        });
+    }
+
+    setInterval(() => { try { garantirBotao(); garantirOpcao(); garantirOpcaoTvElim(); } catch (_) {} }, 1000);
     window.stackosSimuladorAbrir = abrir;
 })();

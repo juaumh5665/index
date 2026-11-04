@@ -1187,6 +1187,21 @@
         /* Reduzido: mesma faixa (sem blur, que ela já não usa). Performance: pisca seco (2 passos), mais leve */
         body.quality-performance #tv-pausa{animation:tvPausaPisca 1.4s steps(2, jump-none) infinite;}
 
+        /* AVISO DE ELIMINAÇÃO (opção do clube, padrão desligado) — ~5s, em fila */
+        #tv-elim{display:none;position:fixed;z-index:140;pointer-events:none;text-align:center;
+            left:2vw;right:2vw;bottom:1.6vh;padding:1.6vh 2vw;border-radius:10px;
+            background:linear-gradient(90deg,rgba(60,10,10,.0),rgba(127,29,29,.94) 14%,rgba(127,29,29,.94) 86%,rgba(60,10,10,0));
+            border-top:2px solid #f5d572;border-bottom:2px solid #f5d572;color:#fff;font-family:'Manrope',system-ui,sans-serif}
+        body.layout-pokerweb #tv-elim{left:22%;right:22%;bottom:auto;top:71.5%}
+        #tv-elim.show{display:block;animation:tvElimEntra .45s ease-out}
+        #tv-elim.campeao{background:linear-gradient(90deg,rgba(66,45,5,0),rgba(161,98,7,.96) 14%,rgba(161,98,7,.96) 86%,rgba(66,45,5,0))}
+        #tv-elim .te-n{font-weight:900;font-size:clamp(1.2rem,2.8vw,3rem);letter-spacing:.04em;line-height:1.1;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+        #tv-elim .te-s{font-weight:800;font-size:clamp(.7rem,1.3vw,1.4rem);color:#fde68a;letter-spacing:.12em;margin-top:.4vh}
+        @keyframes tvElimEntra{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+        body.quality-reduzido #tv-elim .te-n{text-shadow:none}
+        body.quality-performance #tv-elim.show{animation:none}
+        body.quality-performance #tv-elim .te-n{text-shadow:none}
+
         /* Premiação passando na tela de break (mesmo estilo do ticker global) */
         /* No fluxo da coluna (depois dos patrocinadores), para nunca ficar por cima deles */
         #break-screen #bs-prize-ticker{position:relative;margin:auto -2vw 0;width:calc(100% + 4vw);z-index:3}
@@ -1604,6 +1619,9 @@
             <div class="tp-t"><i class="fa-solid fa-pause"></i> TORNEIO EM PAUSA</div>
             <div class="tp-s">O relógio volta assim que o torneio for retomado</div>
         </div>
+
+        <!-- AVISO DE ELIMINAÇÃO (opção do clube) -->
+        <div id="tv-elim" role="status" aria-live="polite"><div class="te-n"></div><div class="te-s"></div></div>
 
         <!-- PRO LIVE LAYOUT (só visível com body.layout-pokerweb) -->
         <div id="pw-screen">
@@ -2545,6 +2563,38 @@ function montarCarouselPremiacao(d) {
     }
 
     // Aviso "TORNEIO EM PAUSA" (d.pausado vem do app e da TV pública)
+    // Aviso de eliminação: mostra cada eliminação NOVA por ~5s, uma de cada vez.
+    // Na primeira carga (ou troca de torneio) só memoriza as que já existiam — não mostra nada.
+    var _elim = { tid: null, vistos: null, fila: [], ativo: false };
+    function atualizarAvisoEliminacao(d) {
+        try {
+            if (!d || !d.avisoEliminacao || !Array.isArray(d.eliminacoesRecentes)) return;
+            var tid = d.torneioId || d.tournamentName || '';
+            if (_elim.tid !== tid || !_elim.vistos) {
+                _elim.tid = tid; _elim.vistos = new Set(d.eliminacoesRecentes.map(function (e) { return String(e.id); })); _elim.fila = [];
+                return;
+            }
+            d.eliminacoesRecentes.slice().reverse().forEach(function (e) {
+                var k = String(e.id);
+                if (_elim.vistos.has(k)) return;
+                _elim.vistos.add(k);
+                _elim.fila.push(e);
+            });
+            if (!_elim.ativo) _mostrarProximaEliminacao();
+        } catch (e) { console.warn('atualizarAvisoEliminacao:', e); }
+    }
+    function _mostrarProximaEliminacao() {
+        var el = document.getElementById('tv-elim');
+        var e = _elim.fila.shift();
+        if (!el || !e) { _elim.ativo = false; if (el) el.classList.remove('show'); return; }
+        _elim.ativo = true;
+        var campeao = Number(e.posicao) === 2 && e.campeao;
+        el.classList.toggle('campeao', !!campeao);
+        el.querySelector('.te-n').textContent = campeao ? ('🏆 CAMPEÃO: ' + String(e.campeao).toUpperCase()) : ('❌ ' + String(e.nome || 'Jogador').toUpperCase());
+        el.querySelector('.te-s').textContent = campeao ? ('VICE: ' + String(e.nome || '').toUpperCase()) : ('ELIMINADO' + (e.posicao ? ' EM ' + e.posicao + 'º' : ''));
+        el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+        setTimeout(function () { el.classList.remove('show'); setTimeout(_mostrarProximaEliminacao, 400); }, campeao ? 8000 : 5000);
+    }
     function atualizarPausa(d) {
         try {
             const el = document.getElementById('tv-pausa'); if (!el) return;
@@ -3003,6 +3053,7 @@ function montarCarouselPremiacao(d) {
             // Break overlay still works
             atualizarBreakScreen(d);
             atualizarPausa(d);
+            atualizarAvisoEliminacao(d);
             atualizarPrizeOverlay(d);
             return;
         }
@@ -3049,6 +3100,7 @@ function montarCarouselPremiacao(d) {
         else{document.getElementById('bar').style.background='';}
         atualizarBreakScreen(d);
         atualizarPausa(d);
+        atualizarAvisoEliminacao(d);
         atualizarPrizeOverlay(d);
     };
     </script>
@@ -4207,6 +4259,10 @@ function montarCarouselPremiacao(d) {
       prize: prize.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       isBreak: !!t.is_break,
       pausado: !!t.iniciado_em && t.rodando === false && !['finished', 'encerrado'].includes(String(t.status || '')),
+      torneioId: t.id,
+      avisoEliminacao: !!(pubState.clube && pubState.clube.tv_aviso_eliminacao),
+      eliminacoesRecentes: (t.eliminados || []).slice().sort(function (a, b) { return new Date(b.ts || 0) - new Date(a.ts || 0); }).slice(0, 8)
+        .map(function (e) { return { id: e.id, nome: e.nome, posicao: e.posicao }; }),
       next: prox ? ((prox.sb || 0).toLocaleString() + '/' + (prox.bb || 0).toLocaleString()) : 'FINAL',
       pct: pct,
       elapsed: elapsed,
