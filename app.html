@@ -44197,8 +44197,11 @@ const _waProvider = {
             }
             const e = new Error('Servidor não responde — pode estar dormindo. Aguarde ~30s e tente novamente.'); e._doProxy = true; throw e;
         }
-        if (!resp.ok && data && data.error) {
-            const e = new Error(data.error); e.code = data.code || ''; e._doProxy = true; throw e;
+        if (!resp.ok) {
+            // Erro do próprio WhatsApp (vem com "error") → repassa como hoje.
+            // Qualquer outra resposta de erro (ex.: gateway recusou o login) → caminho direto.
+            if (data && data.error) { const e = new Error(data.error); e.code = data.code || ''; e._doProxy = true; throw e; }
+            return undefined;
         }
         return data;
     },
