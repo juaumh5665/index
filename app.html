@@ -11696,8 +11696,27 @@ function _onRealtimeEvent(tipo, payload) {
     // DIAGNÓSTICO: contabiliza msg recebida (ANTES de qualquer filtro)
     _rtRegistrarMsg(tipo);
 
+    // ANTI-LOOP por id marca TODOS os torneios a cada save (o relógio rodando salva a cada 15s),
+    // o que fazia esta máquina ignorar pausa/entradas vindas de OUTRA máquina.
+    // Aqui o conteúdo decide: relógio mais novo que o local, ou entrada/eliminação que não
+    // existe aqui (ou que sumiu no banco), é de outra máquina → processa.
+    let _rtDeFora = false;
+    try {
+        const n = payload && payload.new, o = payload && payload.old;
+        if (tipo === 'torneio' && n && n.id) {
+            const loc = (torneios || []).find(x => x.id === n.id);
+            if (loc && Number(n.relogio_ts || 0) > Number(loc.relogioTs || 0)) _rtDeFora = true;
+        } else if ((tipo === 'entry' || tipo === 'eliminado') && (n || o)) {
+            const reg = (n && n.id) ? n : o;
+            const loc = (torneios || []).find(x => x.id === reg.torneio_id);
+            const lista = loc ? (tipo === 'entry' ? loc.entries : loc.eliminados) : null;
+            const existe = (lista || []).some(e => String(e.id) === String(reg.id));
+            if (loc && ((payload.eventType === 'INSERT' && !existe) || (payload.eventType === 'DELETE' && existe))) _rtDeFora = true;
+        }
+    } catch (_) {}
+
     // ANTI-LOOP: Ignorar eventos que VOCÊ MESMO causou (acabou de salvar)
-    if (_ehMudancaPropria(payload)) {
+    if (!_rtDeFora && _ehMudancaPropria(payload)) {
         console.log('[REALTIME] ignorando mudança própria:', tipo);
         return;
     }
@@ -56813,7 +56832,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <script src="/stacksangeur-caixa.js?v=6" defer></script>
 <script src="/stackos-abertos.js?v=1" defer></script>
 <script src="/stackos-simulador.js?v=6" defer></script>
-<script src="/stackos-relogio-controle.js?v=2" defer></script>
+<script src="/stackos-relogio-controle.js?v=3" defer></script>
 <script src="/tv-som.js"></script>
 <style>
 #cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }

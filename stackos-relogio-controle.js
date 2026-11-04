@@ -116,7 +116,23 @@
         if (typeof original !== 'function' || original.__relogioCtrl) return;
         const w = function (idx) {
             const args = arguments, self = this;
-            if (!ativo() || !acaoDoOperador()) return original.apply(self, args);
+            if (!ativo()) return original.apply(self, args);
+            if (!acaoDoOperador()) {
+                // Avanço automático (cronômetro): roda sempre, mas numa máquina que NÃO controla
+                // não carimba relógio novo — assim ela nunca sobrescreve no banco uma pausa/ajuste
+                // feito pela controladora (o banco mantém o carimbo mais novo).
+                try {
+                    const tt = (typeof torneios !== 'undefined' && torneios) ? torneios[idx] : null;
+                    const rw = tt ? ctrl.get(tt.id) : null;
+                    if (tt && rw && rw.device_id !== deviceId) {
+                        const antes = tt.relogioTs;
+                        const ret = original.apply(self, args);
+                        tt.relogioTs = antes;
+                        return ret;
+                    }
+                } catch (_) {}
+                return original.apply(self, args);
+            }
             const t = (typeof torneios !== 'undefined' && torneios) ? torneios[idx] : null;
             if (!t || !t.id || !window.sbClube) return original.apply(self, args);
             const row = ctrl.get(t.id);
