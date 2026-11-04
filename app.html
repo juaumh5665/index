@@ -9903,7 +9903,7 @@ function saveData() {
         }
         // Apenas as últimas transações (otimização)
         if (typeof transacoes !== 'undefined') {
-            transacoes.slice(-10).forEach(tx => _markDirty('transacoes', tx.id));
+            transacoes.slice(-10).forEach(tx => { if (!(_txNoBanco && _txNoBanco.has(String(tx.id)))) _markDirty('transacoes', tx.id); });
         }
     }
 }
@@ -13185,7 +13185,7 @@ async function sincronizarEstado() {
                             .map(_transacaoToDb);
             if (rows.length) {
                 const { error } = await sb.from('transacoes').upsert(rows);
-                if (!error) _syncQueue.transacoes.clear();
+                if (!error) { if (_txNoBanco) rows.forEach(r => _txNoBanco.add(String(r.id))); _syncQueue.transacoes.clear(); }
             }
         }
 
@@ -13234,7 +13234,7 @@ async function sincronizarEstado() {
                                     .filter(Boolean).map(_transacaoToDb);
                 if (rowsTx.length) {
                     const { error: eTx } = await sb.from('transacoes').upsert(rowsTx);
-                    if (!eTx) idsTx.forEach(id => _syncQueue.transacoes.delete(id));
+                    if (!eTx) { if (_txNoBanco) rowsTx.forEach(r => _txNoBanco.add(String(r.id))); idsTx.forEach(id => _syncQueue.transacoes.delete(id)); }
                 }
             }
         } catch (eTx2) { console.warn('[SYNC] transações (isolado):', eTx2); }
@@ -13906,7 +13906,13 @@ function _comandaFromDb(r) {
     };
 }
 
+// Transações que já se sabe que estão no banco (vieram de lá ou foram enviadas com sucesso).
+// O "reenvio das últimas 10" a cada saveData é só rede de segurança para as que ainda não subiram;
+// pular as que já estão no banco evita que uma máquina reenvie uma cópia antiga e desfaça a
+// correção (lápis do cash) feita em outra máquina. Correções marcam a transação explicitamente.
+var _txNoBanco = (typeof _txNoBanco !== 'undefined' && _txNoBanco) || new Set();
 function _transacaoFromDb(r) {
+    if (r && r.id && _txNoBanco) _txNoBanco.add(String(r.id));
     return {
         id: r.id, jogadorId: r.jogador_id, tipo: r.tipo,
         valor: parseFloat(r.valor), metodo: r.metodo,
@@ -41456,6 +41462,8 @@ function editarMovimentoCash(mesaId, jogadorId, movIdx) {
                 );
                 if (tx) {
                     tx.valor = -novoValor; // negativo = jogador deve
+                    // Envia a correção ao banco (antes ficava só nesta máquina e voltava ao valor antigo no F5)
+                    if (typeof _markDirty === 'function') _markDirty('transacoes', tx.id);
                 } else {
                     // Registra ajuste se não encontrar transação original
                     registrarTransacao({
