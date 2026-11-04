@@ -36545,8 +36545,8 @@ function _executarTickGlobal() {
                 mudancaImportante = true;
             }
         } else if (t.rodando && !t.tempoAlvo && t.tempoRestante > 0) {
-            // Migração: torneios antigos sem tempoAlvo — gera o alvo agora
-            _recalcTempoAlvo(t);
+            // Migração: torneios antigos sem tempoAlvo — gera o alvo agora (automático: não carimba relógio novo)
+            { const _rtsAntes = t.relogioTs; _recalcTempoAlvo(t); if (_rtsAntes != null) t.relogioTs = _rtsAntes; }
             changed = true;
             mudancaImportante = true;  // força sync imediato pra TV pública pegar
         } else if (t.rodando && t.tempoRestante <= 0) {
