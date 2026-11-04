@@ -1200,6 +1200,11 @@
         @keyframes tvElimEntra{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
         body.quality-reduzido #tv-elim .te-n{text-shadow:none}
         body.quality-performance #tv-elim.show{animation:none}
+        body.tv-elim-ativo #tv-zoom-controls{opacity:0!important;pointer-events:none!important}
+        body.tv-elim-ativo, body.tv-elim-ativo *{cursor:none!important}
+        #tv-elim.compacto{padding:.45vh 1.5vw}
+        #tv-elim.compacto .te-n{font-size:clamp(1rem,2vw,2rem)}
+        #tv-elim.compacto .te-s{font-size:clamp(.6rem,1vw,1rem);margin-top:0}
         body.quality-performance #tv-elim .te-n{text-shadow:none}
 
         /* Premiação passando na tela de break (mesmo estilo do ticker global) */
@@ -2586,14 +2591,38 @@ function montarCarouselPremiacao(d) {
     function _mostrarProximaEliminacao() {
         var el = document.getElementById('tv-elim');
         var e = _elim.fila.shift();
-        if (!el || !e) { _elim.ativo = false; if (el) el.classList.remove('show'); return; }
+        if (!el || !e) { _elim.ativo = false; document.body.classList.remove('tv-elim-ativo'); if (el) el.classList.remove('show'); return; }
         _elim.ativo = true;
+        document.body.classList.add('tv-elim-ativo'); // esconde barra de zoom/som/qualidade e cursor durante o aviso
         var campeao = Number(e.posicao) === 2 && e.campeao;
         el.classList.toggle('campeao', !!campeao);
         el.querySelector('.te-n').textContent = campeao ? ('🏆 CAMPEÃO: ' + String(e.campeao).toUpperCase()) : ('❌ ' + String(e.nome || 'Jogador').toUpperCase());
         el.querySelector('.te-s').textContent = campeao ? ('VICE: ' + String(e.nome || '').toUpperCase()) : ('ELIMINADO' + (e.posicao ? ' EM ' + e.posicao + 'º' : ''));
         el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+        _posicionarAvisoEliminacao(el);
         setTimeout(function () { el.classList.remove('show'); setTimeout(_mostrarProximaEliminacao, 400); }, campeao ? 8000 : 5000);
+    }
+    // Pro Live: encaixa a faixa no espaço livre REAL entre os blinds e a premiação
+    // (com zoom alto esse espaço diminui). Se não couber nem compacta, fica sobre a premiação.
+    function _posicionarAvisoEliminacao(el) {
+        try {
+            el.classList.remove('compacto'); el.style.top = ''; el.style.bottom = '';
+            if (!document.body.classList.contains('layout-pokerweb')) return;
+            var vis = function (x) { return x && x.offsetParent !== null && x.getBoundingClientRect().height > 0; };
+            var cima = document.getElementById('pw-blinds-next-wrap');
+            if (!vis(cima)) cima = document.getElementById('pw-ante');
+            var baixoEls = ['prize-carousel', 'prize-carousel-equipes', 'global-prize-ticker', 'pw-bottom-strip'].map(function (id) { return document.getElementById(id); }).filter(vis);
+            if (!vis(cima) || !baixoEls.length) return;
+            var topoLivre = cima.getBoundingClientRect().bottom + 6;
+            var baseLivre = Math.min.apply(null, baixoEls.map(function (x) { return x.getBoundingClientRect().top; })) - 6;
+            var h = el.getBoundingClientRect().height;
+            if (h > baseLivre - topoLivre) { el.classList.add('compacto'); h = el.getBoundingClientRect().height; }
+            if (h <= baseLivre - topoLivre) {
+                el.style.top = Math.round(topoLivre + (baseLivre - topoLivre - h) / 2) + 'px';
+            } else {
+                el.style.top = Math.round(Math.max(topoLivre, baseLivre - h + 6 + 8)) + 'px'; // sem espaço: cobre o começo da premiação
+            }
+        } catch (e) { /* mantém a posição padrão */ }
     }
     function atualizarPausa(d) {
         try {
