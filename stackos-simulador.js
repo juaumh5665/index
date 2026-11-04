@@ -54,6 +54,19 @@
         return { entry: e, total };
     }
 
+    // Nível do relógio na simulação: 'pre' = antes de iniciar; número = índice em t.blinds
+    function aplicarNivel(t, sel) {
+        if (sel === 'pre' || sel == null) { t.iniciadoEm = null; t.nivelAtual = 0; return; }
+        t.iniciadoEm = Date.now() - 1000;
+        t.nivelAtual = Number(sel) || 0;
+    }
+    function rotuloNivel(t, sel) {
+        if (sel === 'pre' || sel == null) return 'Antes de iniciar';
+        const idx = Number(sel) || 0;
+        const b = (t.blinds || [])[idx];
+        let n = 0; for (let i = 0; i <= idx; i++) { if ((t.blinds || [])[i] && !t.blinds[i].isBreak) n++; }
+        return (b && b.isBreak) ? ('Intervalo após nível ' + Math.max(1, n)) : ('Nível ' + n + (b && (b.sb || b.bb) ? ' (' + (b.sb || 0) + '/' + (b.bb || 0) + ')' : ''));
+    }
     function fichasDaEntry(t, e) {
         if (Number(e.fichasOverride) > 0) return Number(e.fichasOverride);
         return (typeof _fichasStackPorTipo === 'function') ? _fichasStackPorTipo(t, e.tipo) : (Number(t.stack) || 0);
@@ -66,7 +79,8 @@
         const t = JSON.parse(JSON.stringify(t0));
         t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
         t.premiacaoProjetada = t0.premiacaoProjetada ? JSON.parse(JSON.stringify(t0.premiacaoProjetada)) : t.premiacaoProjetada;
-        sim = { tid: t0.id, t, lanc: [], n: 0 };
+        sim = { tid: t0.id, t, lanc: [], n: 0, nivel: 'pre' };
+        aplicarNivel(t, 'pre');
         render();
     }
     function recarregarConfig() {
@@ -74,17 +88,20 @@
         if (!sim) return;
         const t0 = (torneios || []).find(x => x.id === sim.tid);
         if (!t0) return;
-        const antigos = sim.lanc.map(l => ({ jid: l.entry.jogadorId, tipo: l.entry.tipo, nome: l.nome, combo: l.combo || null }));
+        const antigos = sim.lanc.map(l => ({ jid: l.entry.jogadorId, tipo: l.entry.tipo, nome: l.nome, combo: l.combo || null, nivel: l.nivel }));
         const t = JSON.parse(JSON.stringify(t0));
         t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
         sim.t = t; sim.lanc = [];
         const feitos = new Set();
+        const nivelAtualSel = sim.nivel;
         antigos.forEach(a => {
+            sim.nivel = a.nivel; aplicarNivel(sim.t, a.nivel);
             if (!a.combo) return lancar(a.tipo, a.jid, a.nome, true);
             if (feitos.has(a.combo)) return;
             feitos.add(a.combo);
             lancarComboPara(antigos.filter(x => x.combo === a.combo).map(x => x.tipo), a.jid, a.nome);
         });
+        sim.nivel = nivelAtualSel; aplicarNivel(sim.t, nivelAtualSel);
         render();
     }
     function fechar() {
@@ -103,7 +120,7 @@
         }
         const r = montarEntry(sim.t, jid, tipo);
         sim.t.entries.push(r.entry);
-        sim.lanc.push({ entry: r.entry, nome, total: r.total });
+        sim.lanc.push({ entry: r.entry, nome, total: r.total, nivel: sim.nivel });
         if (!silencioso) render();
     }
     // COMBO: várias ações do mesmo jogador num lançamento só (igual ao combo real:
@@ -116,7 +133,7 @@
             r.entry.comboId = key;
             r.entry.ts = Date.now() + i;
             sim.t.entries.push(r.entry);
-            sim.lanc.push({ entry: r.entry, nome, total: r.total, combo: key });
+            sim.lanc.push({ entry: r.entry, nome, total: r.total, combo: key, nivel: sim.nivel });
         });
     }
     function lancarCombo() {
@@ -205,7 +222,7 @@
         const linhas = sim.lanc.map((l, i) => {
             const lbl = (typeof _labelTipoEntry === 'function') ? _labelTipoEntry(l.entry.tipo) : l.entry.tipo;
             return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #222;font-size:13px">' +
-                '<span>' + esc(l.nome) + ' · ' + esc(lbl) + (l.entry.isPromo ? ' PROMO' : '') + (l.combo ? ' <span style="font-size:10px;background:#3b2a05;color:#fcd34d;border-radius:999px;padding:1px 6px">COMBO</span>' : '') + '</span>' +
+                '<span>' + esc(l.nome) + ' · ' + esc(lbl) + (l.entry.isPromo ? ' PROMO' : '') + (l.combo ? ' <span style="font-size:10px;background:#3b2a05;color:#fcd34d;border-radius:999px;padding:1px 6px">COMBO</span>' : '') + '<br><span style="font-size:11px;color:#71717a">' + esc(rotuloNivel(t, l.nivel)) + '</span></span>' +
                 '<span style="font-variant-numeric:tabular-nums;color:#d4d4d8">' + fm(l.total) + ' · ' + fmtN(fichasDaEntry(t, l.entry)) + ' fichas</span>' +
                 '<button data-sim-comp="' + i + '" style="background:#27272a;border:1px solid #3f3f46;color:#e4e4e7;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🧾</button>' +
                 '<button data-sim-rm="' + i + '" style="background:none;border:0;color:#fca5a5;cursor:pointer;font-size:14px" title="Remover">✕</button></div>';
@@ -222,6 +239,13 @@
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">' +
                 '<div style="background:#14141a;border:1px solid #27272a;border-radius:12px;padding:16px;min-width:0">' +
                     '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin-bottom:10px">Lançar jogadores fictícios</div>' +
+                    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:#0f0f14;border:1px solid #3f3f46;border-radius:8px">' +
+                        '<span style="font-size:12px;color:#a1a1aa">⏱️ Lançar como se o relógio estivesse em:</span>' +
+                        '<select id="sim-nivel" style="flex:1;min-width:180px;background:#18181b;border:1px solid #52525b;color:#e4e4e7;border-radius:6px;padding:6px">' +
+                            ['pre'].concat((t.blinds || []).map((_, i) => String(i))).map(v => '<option value="' + v + '"' + (String(sim.nivel) === v ? ' selected' : '') + '>' + esc(rotuloNivel(t, v)) + '</option>').join('') +
+                        '</select>' +
+                        '<span style="font-size:11px;color:#71717a;width:100%">Mostra como fica o buy-in free, promo, taxa e bônus de fichas em cada nível. Os lançamentos já feitos mantêm o nível em que foram lançados.</span>' +
+                    '</div>' +
                     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' + btnTipo + '</div>' +
                     '<div style="font-size:11px;color:#71717a;margin-top:6px">Buy-in cria jogador novo; rebuy, add-on e last chance vão para o último jogador lançado. Re-entry é a volta de um jogador eliminado (no torneio real só aparece depois de eliminar) — usa o valor de re-entry configurado, ou o do buy-in se não houver.</div>' +
                     '<div style="margin-top:10px;padding:10px;border:1px solid #3f3f46;border-radius:8px;background:#0f0f14">' +
@@ -253,6 +277,8 @@
             '</div>';
 
         try { if (typeof renderPayout === 'function') renderPayout(t, 'sim-payout', true); } catch (_) {}
+        const selNv = document.getElementById('sim-nivel');
+        if (selNv) selNv.onchange = () => { sim.nivel = selNv.value; aplicarNivel(sim.t, sim.nivel); render(); };
 
         m.onclick = (ev) => {
             const b = ev.target.closest('button');
