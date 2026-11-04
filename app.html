@@ -12723,6 +12723,7 @@ async function sincronizarEstado() {
 
                 // 1. Sync torneios principais
                 let dataT;
+                let _torneiosLinhaFalhou = []; // linha principal recusada pelo banco: continua na fila (sobrevive a F5)
                 try {
                     // Conferência completa (5 min) só pros torneios NÃO encerrados. Encerrados
                     // seguem no modo diff: qualquer alteração neles continua sendo enviada.
@@ -12742,6 +12743,7 @@ async function sincronizarEstado() {
                 } catch (errT) {
                     console.error('[SYNC] ❌ Erro torneios:', errT);
                     showToast('⚠️ Erro sync torneio: ' + (errT.message || errT));
+                    _torneiosLinhaFalhou = payload.map(p => p.id);
                 }
                 {
                     console.log('[SYNC] ✅ Torneios sincronizados:', dataT ? dataT.length : 0);
@@ -12932,6 +12934,7 @@ async function sincronizarEstado() {
                         }
                     }
                     _syncQueue.torneios.clear();
+                    _torneiosLinhaFalhou.forEach(id => { if (!_syncRetryIds.includes(id)) _syncRetryIds.push(id); });
                     // FIX SYNC-TV: re-marca torneios que falharam DEPOIS do clear
                     if (_syncRetryIds.length) {
                         console.log('[SYNC] Re-marcando ' + _syncRetryIds.length + ' torneio(s) com falha para retry');
