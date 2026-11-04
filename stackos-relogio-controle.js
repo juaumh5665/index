@@ -17,11 +17,13 @@
     const FLAG = 'relogio_controle';
     const FUNCS = ['toggleTimer', 'adjTime', 'nextLevel', 'prevLevel', 'toggleBreak', 'encerrarTorneio', 'reabrirTorneio', 'abrirEditarTorneio'];
 
+    // Identidade POR ABA (sessionStorage): duas abas no mesmo computador contam como
+    // duas "máquinas". Recarregar a aba mantém a mesma identidade.
     let deviceId = null;
-    try { deviceId = localStorage.getItem('ps_device_id'); } catch (_) {}
+    try { deviceId = sessionStorage.getItem('ps_relogio_device_id'); } catch (_) {}
     if (!deviceId) {
         deviceId = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-        try { localStorage.setItem('ps_device_id', deviceId); } catch (_) {}
+        try { sessionStorage.setItem('ps_relogio_device_id', deviceId); } catch (_) {}
     }
 
     const ctrl = new Map();        // torneio_id -> { device_id, operador_nome, assumido_em }
