@@ -7506,11 +7506,17 @@ document.addEventListener('DOMContentLoaded', function(){
             <div>
                 <label class="inp-label">Fórmula de Pontuação *</label>
                 <select id="rk-formula" class="inp" onchange="onRankingFormulaChange()">
+                    <option value="escalonada">Pontos por jogador (ex.: 34 jogadores → 1º = 340, 2º = 330 … último = 10)</option>
                     <option value="posicao_fixa">Pontos fixos por posição (1º=100, 2º=80, 3º=60, 4º=50, 5º=40, 6º=30, 7º=20, 8º=10)</option>
                     <option value="log">Fórmula logarítmica (10 × √N / √pos × log(1+buyin))</option>
                     <option value="percent">Percentual (pontos = % do prize pool ganho × 100)</option>
                     <option value="custom">Customizada (tabela personalizada de posições)</option>
                 </select>
+            </div>
+            <div id="rk-esc-wrap" style="display:none;">
+                <label class="inp-label">Pontos por jogador</label>
+                <input id="rk-base" class="inp" type="number" min="1" step="1" value="10">
+                <div style="font-size:.7rem;color:#71717a;margin-top:.35rem;">Cada jogador do torneio vale esse valor. Último colocado = 1×, penúltimo = 2× … 1º = nº de jogadores ×. Re-entry conta 1 vez.</div>
             </div>
             <div id="rk-custom-wrap" style="display:none;">
                 <label class="inp-label">Pontos por posição (um valor por linha)</label>
@@ -13775,6 +13781,13 @@ function _rankingToDb(r) {
         formula:     r.formula || null,
         custom_pontos: Array.isArray(r.customPontos) ? r.customPontos : null,
         premios_pct:   Array.isArray(r.premiosPct) ? r.premiosPct : null,
+        // Pontos por jogador (fórmula escalonada) + saldo inicial importado + ajustes manuais
+        pontos_config: {
+            base: Number(r.base) || 10,
+            saldoInicial: Array.isArray(r.saldoInicial) ? r.saldoInicial : [],
+            ajustes: Array.isArray(r.ajustes) ? r.ajustes : [],
+            importacoes: Array.isArray(r.importacoes) ? r.importacoes : [],
+        },
         criado_em: r.criadoEm ? new Date(r.criadoEm).toISOString() : new Date().toISOString(),
     };
 }
@@ -13790,6 +13803,10 @@ function _rankingFromDb(row) {
         formula: row.formula || '',
         customPontos: Array.isArray(row.custom_pontos) ? row.custom_pontos : [],
         premiosPct:   Array.isArray(row.premios_pct) ? row.premios_pct : [],
+        base: (row.pontos_config && Number(row.pontos_config.base)) || 10,
+        saldoInicial: (row.pontos_config && Array.isArray(row.pontos_config.saldoInicial)) ? row.pontos_config.saldoInicial : [],
+        ajustes: (row.pontos_config && Array.isArray(row.pontos_config.ajustes)) ? row.pontos_config.ajustes : [],
+        importacoes: (row.pontos_config && Array.isArray(row.pontos_config.importacoes)) ? row.pontos_config.importacoes : [],
         criadoEm: row.criado_em ? new Date(row.criado_em).getTime() : Date.now(),
     };
 }
@@ -51101,6 +51118,8 @@ function onRankingFormulaChange() {
     const formula = document.getElementById('rk-formula').value;
     const wrap = document.getElementById('rk-custom-wrap');
     wrap.style.display = formula === 'custom' ? 'block' : 'none';
+    const esc = document.getElementById('rk-esc-wrap');
+    if (esc) esc.style.display = formula === 'escalonada' ? 'block' : 'none';
 }
 
 function openModalRanking() {
@@ -51113,6 +51132,7 @@ function openModalRanking() {
     document.getElementById('rk-formula').value = 'posicao_fixa';
     document.getElementById('rk-custom-pontos').value = '100\n80\n60\n50\n40\n30\n20\n10';
     document.getElementById('rk-premios-pct').value = '50\n30\n20';
+    if (document.getElementById('rk-base')) document.getElementById('rk-base').value = 10;
     onRankingFormulaChange();
     openModal('modal-ranking');
 }
@@ -51233,6 +51253,7 @@ async function salvarRanking() {
         formula:   document.getElementById('rk-formula').value,
         customPontos: document.getElementById('rk-custom-pontos').value.split('\n').map(s => parseInt(s.trim())).filter(n => !isNaN(n)),
         premiosPct: document.getElementById('rk-premios-pct').value.split('\n').map(s => parseFloat(s.trim())).filter(n => !isNaN(n)),
+        base: Math.max(1, parseInt((document.getElementById('rk-base') || {}).value, 10) || 10),
     };
 
     if (editId) {
@@ -51287,6 +51308,7 @@ function editarRanking(id) {
     document.getElementById('rk-formula').value = r.formula;
     document.getElementById('rk-custom-pontos').value = (r.customPontos || []).join('\n');
     document.getElementById('rk-premios-pct').value = (r.premiosPct || []).join('\n');
+    if (document.getElementById('rk-base')) document.getElementById('rk-base').value = Number(r.base) || 10;
     onRankingFormulaChange();
     openModal('modal-ranking');
 }
@@ -51386,8 +51408,10 @@ function calcularPontuacoesRanking(r) {
         if (vencedorId) resultados.push({ jogadorId: vencedorId, posicao: 1 });
         eliminadosOrdenados.forEach(e => resultados.push({ jogadorId: e.jogadorId, posicao: e.posicao }));
 
+        // Fórmula por jogador usa jogadores ÚNICOS (re-entry conta 1x)
+        const nJog = new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => String(e.jogadorId))).size;
         resultados.forEach(res => {
-            const p = calcularPontosParaPosicao(r, res.posicao, total, t.buyin);
+            const p = calcularPontosParaPosicao(r, res.posicao, r.formula === 'escalonada' ? nJog : total, t.buyin);
             if (p <= 0) return;
             if (!pontos[res.jogadorId]) pontos[res.jogadorId] = { pontos: 0, torneios: 0 };
             pontos[res.jogadorId].pontos += p;
@@ -51395,12 +51419,24 @@ function calcularPontuacoesRanking(r) {
         });
     });
 
-    return Object.entries(pontos).map(([jid, v]) => ({
-        jogadorId: jid,
-        nome: getJogadorNome(jid),
-        pontos: v.pontos,
-        torneios: v.torneios,
-    })).sort((a, b) => b.pontos - a.pontos);
+    // Saldo inicial (importado) + ajustes manuais
+    const ext = {}; // jogadorId -> { inicial, ajuste }
+    (r.saldoInicial || []).forEach(s => { if (!s || !s.jogadorId) return; (ext[s.jogadorId] ||= { inicial: 0, ajuste: 0 }).inicial += Number(s.pontos) || 0; });
+    (r.ajustes || []).forEach(a => { if (!a || !a.jogadorId) return; (ext[a.jogadorId] ||= { inicial: 0, ajuste: 0 }).ajuste += Number(a.pontos) || 0; });
+    const todos = new Set([...Object.keys(pontos), ...Object.keys(ext)]);
+    return [...todos].map(jid => {
+        const v = pontos[jid] || { pontos: 0, torneios: 0 };
+        const x = ext[jid] || { inicial: 0, ajuste: 0 };
+        return {
+            jogadorId: jid,
+            nome: getJogadorNome(jid),
+            pontos: v.pontos + x.inicial + x.ajuste,
+            pontosTorneios: v.pontos,
+            inicial: x.inicial,
+            ajuste: x.ajuste,
+            torneios: v.torneios,
+        };
+    }).filter(p => p.pontos !== 0 || p.torneios > 0).sort((a, b) => b.pontos - a.pontos);
 }
 
 function getVencedorTorneio(t) {
@@ -51411,6 +51447,12 @@ function getVencedorTorneio(t) {
 }
 
 function calcularPontosParaPosicao(r, pos, total, buyin) {
+    if (r.formula === 'escalonada') {
+        // base × (jogadores − colocação + 1): último = base, 1º = base × jogadores
+        const base = Number(r.base) || 10;
+        if (!pos || pos < 1 || !total || pos > total) return 0;
+        return base * (total - pos + 1);
+    }
     if (r.formula === 'posicao_fixa') {
         const defaults = [100, 80, 60, 50, 40, 30, 20, 10];
         return defaults[pos - 1] || 0;
@@ -56869,6 +56911,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <script src="/stackos-abertos.js?v=1" defer></script>
 <script src="/stackos-simulador.js?v=6" defer></script>
 <script src="/stackos-relogio-controle.js?v=3" defer></script>
+<script src="/stackos-ranking.js?v=1" defer></script>
 <script src="/tv-som.js"></script>
 <style>
 #cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }

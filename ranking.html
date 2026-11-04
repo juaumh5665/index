@@ -444,12 +444,22 @@ async function carregarRanking() {
     }
 
     // Calcula ranking real
-    const { jogadoresOrdenados, qtdTorneios, premioAcumulado } = await calcularRanking(
-        rk.id,
-        rk.clube_id,
-        rk.formula,
-        rk.custom_pontos,
-    );
+    let jogadoresOrdenados, qtdTorneios, premioAcumulado;
+    if (rk.formula === 'escalonada') {
+        // Pontos por jogador + saldo inicial + ajustes: calculado no banco (mesma regra do app)
+        const { data: rr, error: rErr } = await sb.rpc('ranking_publico_calcular', { p_slug: slug });
+        if (rErr || !rr || !rr.ok) console.warn('[RANKING] rpc:', rErr);
+        jogadoresOrdenados = (rr && rr.jogadores) || [];
+        qtdTorneios = (rr && rr.torneios) || 0;
+        premioAcumulado = 0;
+    } else {
+        ({ jogadoresOrdenados, qtdTorneios, premioAcumulado } = await calcularRanking(
+            rk.id,
+            rk.clube_id,
+            rk.formula,
+            rk.custom_pontos,
+        ));
+    }
 
     // Formato de data
     const fmtData = (s) => {
