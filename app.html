@@ -19593,6 +19593,56 @@ function imprimirComprovanteCompraCash(dados) {
 }
 
 // =====================================================================
+// COMPRAS ESTORNADAS DA SESSÃO DO CASH (só para COMPROVANTE/EXTRATO)
+// =====================================================================
+// Quando uma compra do cash é estornada no Caixa (transação "Estorno: Recompra cash · ...")
+// ou pelo estorno do próprio cash (cash_estorno), a sessão continua com o movimento.
+// Aqui só identificamos quais movimentos foram estornados, para o comprovante não somá-los.
+// NÃO altera sessão, transação, saldo, rake nem financeiro — é somente leitura.
+function _cashMovsEstornados(m, j) {
+    const fora = new Set();
+    try {
+        if (!m || !j || typeof transacoes === 'undefined') return fora;
+        const movs = (j.movimentos || []).filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
+        if (!movs.length) return fora;
+        const txs = transacoes.filter(t => t && t.jogadorId === j.jogadorId);
+        const origUsadas = new Set();
+        const marcar = (tipoMov, valor, tsRef, modo) => {
+            const cand = movs.filter(mv => !fora.has(mv) && mv.tipo === tipoMov && Math.abs((Number(mv.valor) || 0) - valor) < 0.01);
+            let melhor = null;
+            if (modo === 'perto') {
+                cand.forEach(mv => { const d = Math.abs((Number(mv.ts) || 0) - tsRef); if (d <= 120000 && (!melhor || d < melhor.d)) melhor = { mv, d }; });
+            } else { // 'antes': a compra mais recente feita antes do estorno
+                cand.forEach(mv => { const ts = Number(mv.ts) || 0; if (ts <= tsRef + 1000 && (!melhor || ts > melhor.ts)) melhor = { mv, ts }; });
+            }
+            if (melhor) fora.add(melhor.mv);
+        };
+        // 1) Estorno feito no Caixa
+        txs.filter(t => t.tipo === 'estorno' && /^Estorno: (Buy-in|Recompra) cash · /.test(String(t.descricao || '')))
+            .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+            .forEach(e => {
+                const descOrig = String(e.descricao).slice('Estorno: '.length);
+                const valor = Math.abs(Number(e.valor) || 0);
+                const orig = txs.filter(t => (t.tipo === 'cash_in' || t.tipo === 'cash_rec') && !origUsadas.has(t.id) &&
+                        String(t.descricao || '') === descOrig && Math.abs(Math.abs(Number(t.valor) || 0) - valor) < 0.01 &&
+                        String(t.refId || '') === String(m.id) && (t.ts || 0) <= (e.ts || 0))
+                    .sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
+                if (!orig) return;
+                origUsadas.add(orig.id);
+                marcar(descOrig.indexOf('Buy-in') === 0 ? 'buyin' : 'recompra', valor, Number(orig.ts) || 0, 'perto');
+            });
+        // 2) Estorno feito na tela do cash (o movimento pode voltar pela junção entre máquinas)
+        txs.filter(t => t.tipo === 'cash_estorno' && String(t.refId || '') === String(m.id))
+            .sort((a, b) => (a.ts || 0) - (b.ts || 0))
+            .forEach(e => {
+                const tipoMov = /^Estorno buy-in/i.test(String(e.descricao || '')) ? 'buyin' : 'recompra';
+                marcar(tipoMov, Math.abs(Number(e.valor) || 0), Number(e.ts) || 0, 'antes');
+            });
+    } catch (err) { console.warn('[CASH] _cashMovsEstornados:', err); }
+    return fora;
+}
+
+// =====================================================================
 // EXTRATO DO JOGADOR — CASH GAME (térmico, reimpressão)
 // =====================================================================
 // Mostra TODAS as compras (buy-in + recompras) e retiradas da sessão,
@@ -19621,7 +19671,8 @@ function gerarExtratoCashJogador(mesa, sessao) {
 
     // Lista de movimentos (compras + retiradas + retornos)
     const movimentos = Array.isArray(sessao.movimentos) ? sessao.movimentos.slice().sort((a,b) => (a.ts||0) - (b.ts||0)) : [];
-    const compras   = movimentos.filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
+    const _estornadas = _cashMovsEstornados(mesa, sessao); // compras estornadas não entram no total do comprovante
+    const compras   = movimentos.filter(mv => (mv.tipo === 'buyin' || mv.tipo === 'recompra') && !_estornadas.has(mv));
     const retiradas = movimentos.filter(mv => mv.tipo === 'retirar' || mv.tipo === 'saida' || mv.tipo === 'cashout');
     const saidasAnt = Number(sessao.saidasAnteriores) || 0;
 
@@ -19650,6 +19701,11 @@ function gerarExtratoCashJogador(mesa, sessao) {
             const dt = new Date(mv.ts || Date.now());
             const dtFmt = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             const label = (mv.tipo === 'buyin' ? 'Buy-in' : 'Recompra') + ' #' + compraNum;
+            if (_estornadas.has(mv)) {
+                txt += _printPad(label + ' ESTORNADA', '(' + formatMoney(Number(mv.valor) || 0) + ')', col) + '\n';
+                txt += '   ' + dtFmt + ' - nao somada' + '\n';
+                return;
+            }
             txt += _printPad(label, formatMoney(Number(mv.valor) || 0), col) + '\n';
             txt += '   ' + dtFmt + '\n';
         });
@@ -40641,11 +40697,13 @@ function confirmRecompra() {
     try {
         if (!config.cash || config.cash.imprimirComprovante !== false) {
             // Soma todas as compras da sessão atual (buy-in + recompras)
+            // Compras estornadas (no Caixa ou no cash) não entram no comprovante — só impressão
+            const _estornadas = _cashMovsEstornados(m, j);
             const totalAcumulado = (j.movimentos || [])
-                .filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra')
+                .filter(mv => (mv.tipo === 'buyin' || mv.tipo === 'recompra') && !_estornadas.has(mv))
                 .reduce((s, mv) => s + (Number(mv.valor) || 0), 0);
             const qtdCompras = (j.movimentos || [])
-                .filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra').length;
+                .filter(mv => (mv.tipo === 'buyin' || mv.tipo === 'recompra') && !_estornadas.has(mv)).length;
             imprimirComprovanteCompraCash({
                 mesa: m,
                 jogadorNome: jog ? jog.nome : '—',
