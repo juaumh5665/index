@@ -19673,6 +19673,8 @@ function _cashMovsEstornados(m, j) {
                     .sort((a, b) => (b.ts || 0) - (a.ts || 0))[0];
                 if (!orig) return;
                 origUsadas.add(orig.id);
+                // Já tirada da sessão quando estornou (lista de estornadas): nada a fazer aqui
+                if (descOrig.indexOf('Recompra') === 0 && (j.recomprasEstornadas || []).some(x => Math.abs((Number(x) || 0) - (Number(orig.ts) || 0)) <= 120000)) return;
                 marcar(descOrig.indexOf('Buy-in') === 0 ? 'buyin' : 'recompra', valor, Number(orig.ts) || 0, 'perto');
             });
         // 2) Estorno feito na tela do cash: o movimento já sai da sessão e o banco não o traz de volta
@@ -41538,6 +41540,46 @@ function editarMovimentoCash(mesaId, jogadorId, movIdx) {
     );
 }
 
+// --- ESTORNO FEITO NO CAIXA DE UMA COMPRA DO CASH ---
+// Reflete na sessão da mesa (aberta) o mesmo que o estorno pela tela do cash faz com a compra:
+// tira o movimento, registra a recompra como estornada (não volta por outra máquina) e atualiza
+// o total investido. NÃO cria transação (o Caixa já criou o estorno) nem mexe em rake.
+function _cashRefletirEstornoCaixa(t) {
+    try {
+        if (!t || (t.tipo !== 'cash_in' && t.tipo !== 'cash_rec') || !t.refId || typeof cashMesas === 'undefined') return false;
+        const m = cashMesas.find(x => String(x.id) === String(t.refId));
+        if (!m || m.status === 'encerrada') return false;
+        const tipoMov = t.tipo === 'cash_in' ? 'buyin' : 'recompra';
+        const valor = Math.abs(Number(t.valor) || 0);
+        let alvo = null;
+        (m.jogadores || []).filter(jj => jj.jogadorId === t.jogadorId).forEach(jj => {
+            (jj.movimentos || []).forEach(mv => {
+                if (mv.tipo !== tipoMov || Math.abs((Number(mv.valor) || 0) - valor) > 0.01) return;
+                const d = Math.abs((Number(mv.ts) || 0) - (Number(t.ts) || 0));
+                if (d <= 120000 && (!alvo || d < alvo.d)) alvo = { j: jj, mv, d };
+            });
+        });
+        if (!alvo) return false;
+        const j = alvo.j, mv = alvo.mv;
+        const idx = j.movimentos.indexOf(mv);
+        if (idx >= 0) j.movimentos.splice(idx, 1);
+        if (mv.tipo === 'recompra') {
+            if (!Array.isArray(j.recomprasEstornadas)) j.recomprasEstornadas = [];
+            if (mv.ts && !j.recomprasEstornadas.includes(mv.ts)) j.recomprasEstornadas.push(mv.ts);
+        } else {
+            j.buyinEditadoEm = Date.now();
+        }
+        j.totalInvestido = (j.movimentos || []).filter(x => x.tipo === 'buyin' || x.tipo === 'recompra').reduce((sm, x) => sm + (Number(x.valor) || 0), 0);
+        if (sbClube && typeof sb !== 'undefined' && j.id) {
+            sb.from('cash_sessoes').update(_cashSessaoToDb(j, m.id)).eq('id', j.id).then(({ error }) => {
+                if (error) console.warn('[CASH] Falha ao atualizar sessão (estorno no caixa):', error.message);
+            }).catch(e => console.warn('[CASH] update estorno caixa falhou:', e));
+        }
+        try { if (typeof renderCashMesas === 'function') renderCashMesas(); } catch (_) {}
+        return true;
+    } catch (e) { console.warn('[CASH] refletir estorno do caixa:', e); return false; }
+}
+
 // --- ESTORNAR MOVIMENTO (COMPRA) DO CASH ---
 function estornarMovimentoCash(mesaId, jogadorId, movIdx) {
     const m = cashMesas.find(x => x.id === mesaId);
@@ -50163,6 +50205,9 @@ function removerTransacao(id) {
             estornoPor: currentUser ? currentUser.nome : 'Sistema',
         };
         transacoes.push(estornoTx);
+
+        // Compra do cash estornada no Caixa: a mesa (aberta) também deixa de contar essa compra
+        try { if (typeof _cashRefletirEstornoCaixa === 'function') _cashRefletirEstornoCaixa(t); } catch (_) {}
 
         // LOTE 6: Restaura ticket/voucher ao estado anterior quando estorno de uso
         let tvRestaurado = '';
