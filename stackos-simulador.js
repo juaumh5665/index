@@ -1,0 +1,288 @@
+// ============================================================
+// SIMULADOR DE TORNEIO (modo teste) — StackOS
+// ------------------------------------------------------------
+// Faz uma CÓPIA do torneio só na memória e lança jogadores fictícios.
+// Usa as MESMAS funções de cálculo do app (getRake, getPrize, getStaffCascata,
+// getStaffFixo, renderPayout, gerarComprovanteCompra) sem alterar nenhuma delas.
+// NÃO grava nada: sem saveData, sem transações, sem sync, sem TV, sem auditoria.
+// Opção do clube (padrão DESLIGADO): Configurações → Torneios.
+// ============================================================
+(function () {
+    'use strict';
+
+    const FLAG = 'simulador_torneio';
+    const TIPOS = [
+        ['buyin', 'Buy-in'], ['buyin_duplo', 'Buy-in duplo'], ['reentry', 'Re-entry'],
+        ['rebuy_simples', 'Rebuy simples'], ['rebuy_duplo', 'Rebuy duplo'], ['addon', 'Add-on'],
+    ];
+    const ALERTA = '⚠️ Depois da primeira entrada real, buy-in, rake, taxa administrativa, add-on e fichas ficam travados. Confira tudo aqui antes de lançar jogadores.';
+
+    let sim = null; // { tid, t (cópia), lanc: [{entry, nome, total}], n }
+
+    const ativo = () => { try { return !!(window.sbClube && sbClube.config && sbClube.config[FLAG]); } catch (_) { return false; } };
+    const ehAdmin = () => { try { return currentUser && (currentUser.role === 'admin' || currentUser.papel === 'admin' || window._isSuperAdmin); } catch (_) { return false; } };
+    const fm = (v) => (typeof formatMoney === 'function') ? formatMoney(v) : ('R$ ' + Number(v || 0).toFixed(2));
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const nomeFake = (i) => 'Jogador Teste ' + String(i).padStart(2, '0');
+
+    // ---------- Monta a entry com a MESMA regra do lançamento real (sem passaporte) ----------
+    function montarEntry(t, jid, tipo) {
+        let valorBase = (typeof _getBuyinEfetivo === 'function') ? _getBuyinEfetivo(t) : (Number(t.buyin) || 0);
+        if (tipo === 'reentry')       valorBase = (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.reentryValor || t.buyin) || 0);
+        if (tipo === 'rebuy_simples') valorBase = Number(t.rebuyValor || t.rebuySimples) || 0;
+        if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
+        if (tipo === 'buyin_duplo')   valorBase = Number(t.buyinDuploValor) || 0;
+        if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
+        const valorPromo = (tipo !== 'buyin_duplo' && typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
+        if (valorPromo !== null) valorBase = valorPromo;
+        if (tipo === 'buyin' && valorBase === 0 && _staffFixoAtivo(t) && (t.staffFixoModo || 'embutido') === 'embutido' && t.staffFixoCobrarFree) valorBase = Number(t.staffFixoValor) || 0;
+        if (tipo === 'buyin' && valorBase === 0 && _isStaffFixoAdicionalV2(t) && t.staffFixoCobrarFree) valorBase = Number(t.staffFixoValor) || 0;
+        const taxaAdm = _taxaAdmAplica(t, tipo) ? Number(t.taxaAdm) : 0;
+        const isV2 = _isStaffFixoAdicionalV2(t);
+        const isLeg = _staffFixoAtivo(t) && (t.staffFixoModo || 'embutido') === 'adicional' && !isV2;
+        let staff = 0;
+        if ((isLeg || isV2) && _isTipoStaffFixoElegivel(t, tipo, valorBase)) staff = Number(t.staffFixoValor) || 0;
+        let valorEntry = valorBase;
+        if (isV2 && staff > 0) valorEntry = Math.max(0, valorBase - staff);
+        const total = isV2 ? (valorBase + taxaAdm) : (valorBase + staff + taxaAdm);
+        const e = { id: 'sim-' + Math.random().toString(36).slice(2), jogadorId: jid, tipo, ts: Date.now(), valor: valorEntry, staff, taxaAdm, comboId: 'sim' };
+        const bonus = (typeof _calcBonusFichasParaEntry === 'function') ? _calcBonusFichasParaEntry(t, tipo) : 0;
+        if (bonus > 0) e.bonusFichas = bonus;
+        const fp = (typeof _calcFichasBuyinPromo === 'function') ? _calcFichasBuyinPromo(t, tipo) : null;
+        if (fp !== null) { e.fichasOverride = fp; e.isPromo = true; }
+        return { entry: e, total };
+    }
+
+    function fichasDaEntry(t, e) {
+        if (Number(e.fichasOverride) > 0) return Number(e.fichasOverride);
+        return (typeof _fichasStackPorTipo === 'function') ? _fichasStackPorTipo(t, e.tipo) : (Number(t.stack) || 0);
+    }
+
+    // ---------- Abrir / fechar ----------
+    function abrir() {
+        const t0 = (typeof activeTorneioIdx !== 'undefined' && activeTorneioIdx !== null) ? torneios[activeTorneioIdx] : null;
+        if (!t0) return showToast('⚠️ Abra um torneio primeiro');
+        const t = JSON.parse(JSON.stringify(t0));
+        t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
+        t.premiacaoProjetada = t0.premiacaoProjetada ? JSON.parse(JSON.stringify(t0.premiacaoProjetada)) : t.premiacaoProjetada;
+        sim = { tid: t0.id, t, lanc: [], n: 0 };
+        render();
+    }
+    function recarregarConfig() {
+        // Depois de "Ajustar configuração": pega a config nova do torneio real e refaz os lançamentos
+        if (!sim) return;
+        const t0 = (torneios || []).find(x => x.id === sim.tid);
+        if (!t0) return;
+        const antigos = sim.lanc.map(l => ({ jid: l.entry.jogadorId, tipo: l.entry.tipo, nome: l.nome }));
+        const t = JSON.parse(JSON.stringify(t0));
+        t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
+        sim.t = t; sim.lanc = [];
+        antigos.forEach(a => lancar(a.tipo, a.jid, a.nome, true));
+        render();
+    }
+    function fechar() {
+        sim = null;
+        const m = document.getElementById('sim-torneio-modal');
+        if (m) m.remove();
+    }
+
+    function lancar(tipo, jid, nome, silencioso) {
+        if (!sim) return;
+        if (!jid) {
+            // Buy-in / duplo = jogador novo; demais = último jogador lançado (ou novo se não houver)
+            const ultimo = sim.lanc.length ? sim.lanc[sim.lanc.length - 1] : null;
+            if (tipo === 'buyin' || tipo === 'buyin_duplo' || !ultimo) { sim.n++; jid = 'sim-j' + sim.n; nome = nomeFake(sim.n); }
+            else { jid = ultimo.entry.jogadorId; nome = ultimo.nome; }
+        }
+        const r = montarEntry(sim.t, jid, tipo);
+        sim.t.entries.push(r.entry);
+        sim.lanc.push({ entry: r.entry, nome, total: r.total });
+        if (!silencioso) render();
+    }
+    function gerarVarios() {
+        const q = Math.max(1, Math.min(300, parseInt((document.getElementById('sim-qtd') || {}).value, 10) || 0));
+        const tipo = (document.getElementById('sim-qtd-tipo') || {}).value || 'buyin';
+        for (let i = 0; i < q; i++) lancar(tipo, null, null, true);
+        render();
+    }
+    function remover(i) {
+        if (!sim) return;
+        const l = sim.lanc[i];
+        if (!l) return;
+        sim.lanc.splice(i, 1);
+        sim.t.entries = sim.t.entries.filter(e => e.id !== l.entry.id);
+        render();
+    }
+    function limpar() { if (!sim) return; sim.lanc = []; sim.t.entries = []; sim.n = 0; render(); }
+
+    function verComprovante(i) {
+        if (!sim) return;
+        const l = sim.lanc[i];
+        if (!l || typeof gerarComprovanteCompra !== 'function') return;
+        let txt = '';
+        try { txt = gerarComprovanteCompra(sim.t, { entry: l.entry, jogadorNome: l.nome }); } catch (e) { txt = '(não foi possível gerar o comprovante: ' + e.message + ')'; }
+        const marca = '*** SIMULAÇÃO — SEM VALOR ***';
+        mostrarTexto('Comprovante (simulação)', marca + '\n\n' + txt + '\n\n' + marca);
+    }
+    function mostrarTexto(titulo, txt) {
+        let ov = document.getElementById('sim-comp-ov');
+        if (ov) ov.remove();
+        ov = document.createElement('div');
+        ov.id = 'sim-comp-ov';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100001;display:flex;align-items:center;justify-content:center;padding:16px;';
+        ov.innerHTML = '<div style="background:#18181b;border:1px solid #3f3f46;border-radius:12px;max-width:420px;width:100%;max-height:90vh;display:flex;flex-direction:column;">' +
+            '<div style="padding:12px 16px;border-bottom:1px solid #27272a;display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#fcd34d;">' + esc(titulo) +
+            '<button id="sim-comp-x" style="background:none;border:0;color:#a1a1aa;font-size:18px;cursor:pointer">✕</button></div>' +
+            '<pre style="margin:0;padding:16px;overflow:auto;background:#fff;color:#111;font:12px/1.35 \'Courier New\',monospace;white-space:pre-wrap;">' + esc(txt) + '</pre>' +
+            '<div style="padding:10px 16px;font-size:12px;color:#a1a1aa;border-top:1px solid #27272a">🖨️ Impressão desativada na simulação — só visualização.</div></div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('click', (e) => { if (e.target === ov || e.target.id === 'sim-comp-x') ov.remove(); });
+    }
+
+    // ---------- Tela ----------
+    function render() {
+        if (!sim) return;
+        const t = sim.t;
+        let m = document.getElementById('sim-torneio-modal');
+        if (!m) {
+            m = document.createElement('div');
+            m.id = 'sim-torneio-modal';
+            m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;overflow:auto;padding:16px;';
+            document.body.appendChild(m);
+        }
+        let rake = 0, prize = 0, cascata = 0, fixo = 0;
+        try { rake = getRake(t); } catch (_) {}
+        try { prize = getPrize(t); } catch (_) {}
+        try { cascata = getStaffCascata(t); } catch (_) {}
+        try { fixo = getStaffFixo(t); } catch (_) {}
+        const taxaAdm = t.entries.reduce((s, e) => s + (Number(e.taxaAdm) || 0), 0);
+        const arrecadado = sim.lanc.reduce((s, l) => s + (Number(l.total) || 0), 0);
+        const jogadoresUnicos = new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => e.jogadorId)).size;
+        let chip = t.entries.reduce((s, e) => s + fichasDaEntry(t, e), 0);
+        try { chip += (typeof _getFichasExtrasBonus === 'function') ? _getFichasExtrasBonus(t) : 0; } catch (_) {}
+        const media = jogadoresUnicos ? Math.round(chip / jogadoresUnicos) : 0;
+        const fmtN = (n) => Number(n || 0).toLocaleString('pt-BR');
+
+        const linhas = sim.lanc.map((l, i) => {
+            const lbl = (typeof _labelTipoEntry === 'function') ? _labelTipoEntry(l.entry.tipo) : l.entry.tipo;
+            return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #222;font-size:13px">' +
+                '<span>' + esc(l.nome) + ' · ' + esc(lbl) + (l.entry.isPromo ? ' PROMO' : '') + '</span>' +
+                '<span style="font-variant-numeric:tabular-nums;color:#d4d4d8">' + fm(l.total) + ' · ' + fmtN(fichasDaEntry(t, l.entry)) + ' fichas</span>' +
+                '<button data-sim-comp="' + i + '" style="background:#27272a;border:1px solid #3f3f46;color:#e4e4e7;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🧾</button>' +
+                '<button data-sim-rm="' + i + '" style="background:none;border:0;color:#fca5a5;cursor:pointer;font-size:14px" title="Remover">✕</button></div>';
+        }).join('') || '<div style="color:#71717a;font-size:13px;padding:10px 0">Nenhum lançamento ainda. Use os botões acima.</div>';
+
+        const btnTipo = TIPOS.map(([k, l]) => '<button data-sim-lanc="' + k + '" style="padding:10px;border-radius:8px;border:0;background:#a16207;color:#fff;font-weight:700;cursor:pointer;font-size:13px">+ ' + l + '</button>').join('');
+        const row = (k, v, cor) => '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #222;font-size:13px;font-variant-numeric:tabular-nums"><span style="color:#a1a1aa">' + k + '</span><b style="color:' + (cor || '#e4e4e7') + '">' + v + '</b></div>';
+        const stat = (k, v) => '<div style="background:#0f0f14;border:1px solid #27272a;border-radius:8px;padding:10px"><div style="font-size:11px;color:#a1a1aa;text-transform:uppercase">' + k + '</div><b style="font-size:20px">' + v + '</b></div>';
+
+        m.innerHTML = '<div style="max-width:1100px;margin:0 auto;display:grid;gap:14px;font-family:inherit;color:#e4e4e7">' +
+            '<div style="background:repeating-linear-gradient(45deg,#3b2a05,#3b2a05 12px,#2a1e04 12px,#2a1e04 24px);border:1px solid #b45309;color:#fde68a;border-radius:10px;padding:12px 14px;font-weight:800;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">' +
+                '<span>🧪 SIMULAÇÃO — nada aqui é salvo, não entra no caixa, extrato, ranking nem na TV</span><span style="font-size:12px;background:#78350f;padding:3px 10px;border-radius:999px">' + esc(t.nome || '') + '</span></div>' +
+            '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600">' + ALERTA + '</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">' +
+                '<div style="background:#14141a;border:1px solid #27272a;border-radius:12px;padding:16px;min-width:0">' +
+                    '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin-bottom:10px">Lançar jogadores fictícios</div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' + btnTipo + '</div>' +
+                    '<div style="font-size:11px;color:#71717a;margin-top:6px">Buy-in cria jogador novo; re-entry, rebuy e add-on vão para o último jogador lançado.</div>' +
+                    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><input id="sim-qtd" type="number" min="1" max="300" value="20" style="width:80px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' +
+                    '<select id="sim-qtd-tipo" style="background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + TIPOS.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>' +
+                    '<button id="sim-gerar" style="flex:1;padding:8px;border-radius:8px;border:1px solid #3f3f46;background:#18181b;color:#e4e4e7;cursor:pointer">⚡ Gerar em lote</button></div>' +
+                    '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin:16px 0 6px">Lançamentos simulados (' + sim.lanc.length + ')</div>' +
+                    '<div style="max-height:340px;overflow:auto">' + linhas + '</div></div>' +
+                '<div style="background:#14141a;border:1px solid #27272a;border-radius:12px;padding:16px;min-width:0">' +
+                    '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin-bottom:10px">Resultado (mesmos cálculos do sistema)</div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">' + stat('Entradas', t.entries.filter(e => e.tipo !== 'addon').length) + stat('Jogadores', jogadoresUnicos) + stat('Chipcount', fmtN(chip)) + stat('Média', fmtN(media)) + '</div>' +
+                    row('Arrecadado (cobrado dos jogadores)', fm(arrecadado)) +
+                    row('Rake (' + (Number(t.rake) || 0) + '%)', fm(rake)) +
+                    row('Staff cascata', fm(cascata)) + row('Staff fixo', fm(fixo)) +
+                    row('Taxa adm.', fm(taxaAdm)) +
+                    row('Prize pool', fm(prize), '#86efac') +
+                    '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin:14px 0 6px">Premiação</div><div id="sim-payout"></div>' +
+                '</div></div>' +
+            '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:#14141a;border:1px solid #27272a;border-radius:12px;padding:12px">' +
+                '<button id="sim-limpar" style="padding:10px 14px;border-radius:8px;border:1px solid #7f1d1d;background:#18181b;color:#fca5a5;cursor:pointer">🗑️ Limpar simulação</button>' +
+                '<button id="sim-ajustar" style="padding:10px 14px;border-radius:8px;border:1px solid #3f3f46;background:#18181b;color:#e4e4e7;cursor:pointer">✏️ Ajustar configuração</button>' +
+                '<button id="sim-fechar" style="padding:10px 14px;border-radius:8px;border:0;background:#15803d;color:#fff;font-weight:700;cursor:pointer">Fechar simulação</button></div>' +
+            '</div>';
+
+        try { if (typeof renderPayout === 'function') renderPayout(t, 'sim-payout', true); } catch (_) {}
+
+        m.onclick = (ev) => {
+            const b = ev.target.closest('button');
+            if (!b) return;
+            if (b.dataset.simLanc) return lancar(b.dataset.simLanc);
+            if (b.dataset.simComp != null) return verComprovante(Number(b.dataset.simComp));
+            if (b.dataset.simRm != null) return remover(Number(b.dataset.simRm));
+            if (b.id === 'sim-gerar') return gerarVarios();
+            if (b.id === 'sim-limpar') return limpar();
+            if (b.id === 'sim-fechar') return fechar();
+            if (b.id === 'sim-ajustar') {
+                const idx = (torneios || []).findIndex(x => x.id === sim.tid);
+                m.style.display = 'none';
+                try { abrirEditarTorneio(idx); } catch (_) {}
+                // Quando o Editar fechar, volta pra simulação com a config nova
+                const iv = setInterval(() => {
+                    const ed = document.querySelector('[id^="modal-editar-torneio"], #modal-edit-torneio');
+                    if (ed && document.body.contains(ed) && ed.offsetParent !== null) return;
+                    clearInterval(iv);
+                    if (!sim) return;
+                    m.style.display = '';
+                    recarregarConfig();
+                }, 600);
+            }
+        };
+    }
+
+    // ---------- Botão no modal do torneio ----------
+    function garantirBotao() {
+        const t = (typeof activeTorneioIdx !== 'undefined' && activeTorneioIdx !== null && Array.isArray(window.torneios || torneios)) ? torneios[activeTorneioIdx] : null;
+        const btnEdit = document.querySelector('button[onclick="abrirEditarTorneio(activeTorneioIdx)"]');
+        let b = document.getElementById('btn-simular-torneio');
+        const mostrar = !!(ativo() && t && btnEdit && !t.iniciadoEm && !['finished', 'encerrado'].includes(String(t.status || '')));
+        if (!mostrar) { if (b) b.style.display = 'none'; return; }
+        if (!b) {
+            b = document.createElement('button');
+            b.id = 'btn-simular-torneio';
+            b.className = 'btn-ghost';
+            b.type = 'button';
+            b.title = 'Testar a configuração com jogadores fictícios (nada é salvo)';
+            b.style.cssText = 'font-size:.8rem;color:#fcd34d;border-color:rgba(245,158,11,.45);margin-left:.4rem;';
+            b.innerHTML = '🧪 Simular torneio';
+            b.addEventListener('click', abrir);
+            btnEdit.insertAdjacentElement('afterend', b);
+        }
+        b.style.display = '';
+    }
+
+    // ---------- Opção nas Configurações → Torneios (só admin) ----------
+    function garantirOpcao() {
+        const aba = document.getElementById('cfg-torneios');
+        if (!aba || !ehAdmin() || document.getElementById('cfg-sim-torneio-card')) return;
+        const card = document.createElement('div');
+        card.id = 'cfg-sim-torneio-card';
+        card.style.cssText = 'margin-bottom:1rem;padding:1rem;background:#14141a;border:1px solid #27272a;border-radius:.6rem;';
+        card.innerHTML = '<label style="display:flex;gap:.6rem;align-items:flex-start;cursor:pointer">' +
+            '<input type="checkbox" id="cfg-sim-torneio" style="width:18px;height:18px;margin-top:2px;accent-color:#f5d572">' +
+            '<span><b>🧪 Simulador de torneio</b><br><span style="font-size:.78rem;color:#a1a1aa">Mostra o botão "Simular torneio" antes de iniciar. Testa a configuração com jogadores fictícios (rake, staff, prize, fichas, premiação e comprovantes) sem salvar nada.</span></span></label>';
+        aba.insertBefore(card, aba.firstChild);
+        const cb = card.querySelector('#cfg-sim-torneio');
+        cb.checked = ativo();
+        cb.addEventListener('change', async () => {
+            if (!window.sbClube) return;
+            const novo = Object.assign({}, sbClube.config || {}, { [FLAG]: cb.checked });
+            try {
+                const { error } = await sb.from('clubes').update({ config: novo }).eq('id', sbClube.id);
+                if (error) throw error;
+                sbClube.config = novo;
+                showToast(cb.checked ? '🧪 Simulador de torneio ativado' : 'Simulador de torneio desativado');
+            } catch (e) {
+                cb.checked = !cb.checked;
+                showToast('⚠️ Não foi possível salvar: ' + (e.message || e));
+            }
+        });
+    }
+
+    setInterval(() => { try { garantirBotao(); garantirOpcao(); } catch (_) {} }, 1000);
+    window.stackosSimuladorAbrir = abrir;
+})();
