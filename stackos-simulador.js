@@ -12,8 +12,8 @@
 
     const FLAG = 'simulador_torneio';
     const TIPOS = [
-        ['buyin', 'Buy-in'], ['buyin_duplo', 'Buy-in duplo'], ['reentry', 'Re-entry'],
-        ['rebuy_simples', 'Rebuy simples'], ['rebuy_duplo', 'Rebuy duplo'], ['addon', 'Add-on'],
+        ['buyin', 'Buy-in'], ['buyin_duplo', 'Buy-in duplo'], ['reentry', 'Re-entry (eliminado)'],
+        ['rebuy_simples', 'Rebuy simples'], ['rebuy_duplo', 'Rebuy duplo'], ['addon', 'Add-on'], ['last_chance', 'Last Chance'],
     ];
     const ALERTA = '⚠️ Depois da primeira entrada real, buy-in, rake, taxa administrativa, add-on e fichas ficam travados. Confira tudo aqui antes de lançar jogadores.';
 
@@ -33,6 +33,7 @@
         if (tipo === 'rebuy_duplo')   valorBase = Number(t.rebuyDuploValor || t.rebuyDuplo) || 0;
         if (tipo === 'buyin_duplo')   valorBase = Number(t.buyinDuploValor) || 0;
         if (tipo === 'addon')         valorBase = Number(t.addonValor) || 0;
+        if (tipo === 'last_chance')   valorBase = Number(t.lastChanceValor || t.last_chance_valor) || 0;
         const valorPromo = (tipo !== 'buyin_duplo' && typeof _calcValorBuyinPromo === 'function') ? _calcValorBuyinPromo(t, tipo) : null;
         if (valorPromo !== null) valorBase = valorPromo;
         if (tipo === 'buyin' && valorBase === 0 && _staffFixoAtivo(t) && (t.staffFixoModo || 'embutido') === 'embutido' && t.staffFixoCobrarFree) valorBase = Number(t.staffFixoValor) || 0;
@@ -107,7 +108,7 @@
     }
     // COMBO: várias ações do mesmo jogador num lançamento só (igual ao combo real:
     // mesma ordem buy-in → duplo → rebuys → add-on, mesmo comboId, comprovante consolidado)
-    const ORDEM_COMBO = ['buyin', 'buyin_duplo', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+    const ORDEM_COMBO = ['buyin', 'buyin_duplo', 'rebuy_simples', 'rebuy_duplo', 'addon', 'last_chance'];
     function lancarComboPara(tipos, jid, nome) {
         const key = 'combo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
         ORDEM_COMBO.filter(tp => tipos.includes(tp)).forEach((tp, i) => {
@@ -222,7 +223,7 @@
                 '<div style="background:#14141a;border:1px solid #27272a;border-radius:12px;padding:16px;min-width:0">' +
                     '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin-bottom:10px">Lançar jogadores fictícios</div>' +
                     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' + btnTipo + '</div>' +
-                    '<div style="font-size:11px;color:#71717a;margin-top:6px">Buy-in cria jogador novo; re-entry, rebuy e add-on vão para o último jogador lançado.</div>' +
+                    '<div style="font-size:11px;color:#71717a;margin-top:6px">Buy-in cria jogador novo; rebuy, add-on e last chance vão para o último jogador lançado. Re-entry é a volta de um jogador eliminado (no torneio real só aparece depois de eliminar) — usa o valor de re-entry configurado, ou o do buy-in se não houver.</div>' +
                     '<div style="margin-top:10px;padding:10px;border:1px solid #3f3f46;border-radius:8px;background:#0f0f14">' +
                         '<div style="font-size:11px;color:#fcd34d;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Combo (mesmo jogador, um comprovante só)</div>' +
                         '<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:13px">' +
