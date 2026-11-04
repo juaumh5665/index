@@ -45,18 +45,23 @@
         const lista = (typeof jogadores !== 'undefined' ? jogadores : []);
         const exatos = lista.filter(j => norm(j.nome) === alvo || (j.apelido && norm(j.apelido) === alvo));
         if (exatos.length === 1) return { status: 'ok', jogadorId: exatos[0].id };
-        // Sugestão: todas as palavras do nome da planilha aparecem no nome/apelido do cadastro
-        const palavras = alvo.split(' ').filter(w => w.length >= 3);
-        let melhor = null, melhorScore = 0;
+        // Sugestão SÓ com casamento forte: precisa bater pelo menos 2 palavras "de nome"
+        // (ignora junior, filho, da, de...) OU todas as palavras quando o nome tem 1 só.
+        // Evita sugerir "Andy Silva Júnior" para "Almir Junior" só pelo "junior".
+        const COMUNS = new Set(['junior', 'jr', 'filho', 'neto', 'sobrinho', 'da', 'de', 'do', 'das', 'dos', 'e']);
+        const palavras = alvo.split(' ').filter(w => w.length >= 3 && !COMUNS.has(w));
+        let melhor = null, melhorScore = 0, empate = false;
         lista.forEach(j => {
-            const base = norm(j.nome + ' ' + (j.apelido || ''));
-            const toks = base.split(' ');
+            const toks = norm(j.nome + ' ' + (j.apelido || '')).split(' ').filter(t => !COMUNS.has(t));
             let sc = 0;
-            palavras.forEach(w => { if (toks.includes(w)) sc += 2; else if (toks.some(t => t.startsWith(w) || w.startsWith(t) && t.length >= 3)) sc += 1; });
-            if (sc > melhorScore) { melhorScore = sc; melhor = j; }
+            palavras.forEach(w => { if (toks.includes(w)) sc++; });
+            const forte = palavras.length >= 2 ? sc >= 2 : (palavras.length === 1 && sc === 1 && toks.length <= 2);
+            if (!forte) return;
+            if (sc > melhorScore) { melhorScore = sc; melhor = j; empate = false; }
+            else if (sc === melhorScore) empate = true;
         });
         if (exatos.length > 1) return { status: 'sg', jogadorId: exatos[0].id };
-        if (melhor && melhorScore >= 2) return { status: 'sg', jogadorId: melhor.id };
+        if (melhor && !empate) return { status: 'sg', jogadorId: melhor.id };
         return { status: 'no', jogadorId: '' };
     }
 
