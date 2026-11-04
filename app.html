@@ -12628,6 +12628,17 @@ async function _carregarSessoesCash(clubeId) {
             const idsBanco = new Set(doBanco.map(j => String(j.id)));
             const final = doBanco.map(j => {
                 const loc = locPorId.get(String(j.id));
+                // Recompra estornada em outra máquina (lista do banco): sai também da cópia local,
+                // senão a cópia local parece "mais nova" e o estorno não aparece aqui.
+                if (loc && Array.isArray(j.recomprasEstornadas) && j.recomprasEstornadas.length && Array.isArray(loc.movimentos)) {
+                    const lap = new Set(j.recomprasEstornadas.map(x => String(x)));
+                    const antes = loc.movimentos.length;
+                    loc.movimentos = loc.movimentos.filter(mv => !(mv.tipo === 'recompra' && lap.has(String(mv.ts))));
+                    if (loc.movimentos.length !== antes) {
+                        loc.totalInvestido = loc.movimentos.filter(x => x.tipo === 'buyin' || x.tipo === 'recompra').reduce((sm, x) => sm + (Number(x.valor) || 0), 0);
+                    }
+                    loc.recomprasEstornadas = [...new Set([...(loc.recomprasEstornadas || []), ...j.recomprasEstornadas])];
+                }
                 // Local com movimento mais novo (recente) que o banco ainda não tem: fica o local
                 if (loc && _ultMov(loc) > _ultMov(j) && _ultMov(loc) >= _rec) return loc;
                 if (loc && loc.status === 'saiu' && j.status !== 'saiu' && (Number(loc.saiuEm) || 0) >= _rec) return loc;
