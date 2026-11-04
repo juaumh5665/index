@@ -11456,12 +11456,17 @@ function iniciarRealtime() {
             filter: `clube_id=eq.${clubeId}`
         }, (payload) => _onRealtimeEvent('cash_mesa', payload))
 
-        // === TRANSAÇÕES: só INSERT (o reenvio/upsert de linhas existentes não gera evento)
-        //     Mescla a linha nova na memória — sem recarregar nada do banco.
+        // === TRANSAÇÕES: INSERT (nova) e UPDATE (correção, ex.: lápis do cash em outra máquina)
+        //     Mescla na memória — sem recarregar nada do banco. Reenvio idêntico não gera evento
+        //     (o banco ignora update sem mudança).
         .on('postgres_changes', {
             event: 'INSERT', schema: 'public', table: 'transacoes',
             filter: `clube_id=eq.${clubeId}`
         }, (payload) => { try { _rtTransacaoNova(payload); } catch (e) { console.warn('[REALTIME] tx:', e); } })
+        .on('postgres_changes', {
+            event: 'UPDATE', schema: 'public', table: 'transacoes',
+            filter: `clube_id=eq.${clubeId}`
+        }, (payload) => { try { _rtTransacaoNova(payload, true); } catch (e) { console.warn('[REALTIME] tx upd:', e); } })
 
         .on('postgres_changes', { 
             event: '*', schema: 'public', table: 'bar_produtos',
@@ -12150,11 +12155,24 @@ function _atualizarIndicadorRealtime(conectado) {
 
 // Lançamento feito em OUTRA máquina: entra no saldo/extrato desta na hora
 let _rtTxRenderTimer = null;
-function _rtTransacaoNova(payload) {
+function _rtTransacaoNova(payload, ehUpdate) {
     const r = payload && payload.new;
     if (!r || !r.id || !sbClube || r.clube_id !== sbClube.id) return;
-    if ((transacoes || []).some(t => String(t.id) === String(r.id))) return; // já existe (lançada aqui)
-    transacoes.push(_transacaoFromDb(r));
+    const local = (transacoes || []).find(t => String(t.id) === String(r.id));
+    if (local) {
+        if (!ehUpdate) return; // já existe (lançada aqui)
+        if (_syncQueue && _syncQueue.transacoes && _syncQueue.transacoes.has(local.id)) return; // tem alteração local ainda não enviada: ela vale
+        // Correção feita em outra máquina: atualiza só os campos que vêm do banco
+        // (mantém marcações locais como estornada/fechamento). Não reenvia nada.
+        const n = _transacaoFromDb(r);
+        let mudou = false;
+        ['valor', 'descricao', 'metodo', 'tipo', 'origem', 'refId', 'jogadorId'].forEach(k => {
+            if (n[k] !== undefined && local[k] !== n[k]) { local[k] = n[k]; mudou = true; }
+        });
+        if (!mudou) return;
+    } else {
+        transacoes.push(_transacaoFromDb(r));
+    }
     // Só cache local — NÃO chama saveData (não reenvia nada ao banco)
     clearTimeout(_rtTxRenderTimer);
     _rtTxRenderTimer = setTimeout(() => {
