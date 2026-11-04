@@ -185,7 +185,7 @@
         if (!m) {
             m = document.createElement('div');
             m.id = 'sim-torneio-modal';
-            m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100000;overflow:auto;padding:16px;';
+            m.style.cssText = 'position:fixed;inset:0;background:rgba(9,9,11,.96);z-index:100000;overflow:auto;padding:16px;';
             document.body.appendChild(m);
         }
         let rake = 0, prize = 0, cascata = 0, fixo = 0;
@@ -217,7 +217,7 @@
         m.innerHTML = '<div style="max-width:1100px;margin:0 auto;display:grid;gap:14px;font-family:inherit;color:#e4e4e7">' +
             '<div style="background:repeating-linear-gradient(45deg,#3b2a05,#3b2a05 12px,#2a1e04 12px,#2a1e04 24px);border:1px solid #b45309;color:#fde68a;border-radius:10px;padding:12px 14px;font-weight:800;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">' +
                 '<span>🧪 SIMULAÇÃO — nada aqui é salvo, não entra no caixa, extrato, ranking nem na TV</span><span style="font-size:12px;background:#78350f;padding:3px 10px;border-radius:999px">' + esc(t.nome || '') + '</span></div>' +
-            '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600">' + ALERTA + '</div>' +
+            '<div style="background:#2a1215;border:1px solid #b91c1c;color:#fecaca;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:700;line-height:1.45">' + ALERTA + '</div>' +
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">' +
                 '<div style="background:#14141a;border:1px solid #27272a;border-radius:12px;padding:16px;min-width:0">' +
                     '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin-bottom:10px">Lançar jogadores fictícios</div>' +
