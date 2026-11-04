@@ -44120,6 +44120,23 @@ const _waProvider = {
     // Fetch seguro que trata respostas HTML (servidor dormindo/erro)
     // retry=true tenta acordar o servidor e repetir 1x
     async _safeFetch(url, opts, retry = true) {
+        // PONTE SEGURA (servidor gerenciado do StackOS): a chamada passa pela função
+        // wa-proxy do Supabase, que guarda o token no servidor. Se a ponte ainda não
+        // estiver configurada ou não responder, segue pelo caminho antigo (direto),
+        // então os envios continuam funcionando exatamente como hoje.
+        try {
+            const cfgP = this.getConfig();
+            const baseGer = (typeof _WA_MANAGED_SERVER !== 'undefined' && _WA_MANAGED_SERVER.url) || '';
+            if (cfgP.provider === 'baileys' && baseGer && String(url).startsWith(baseGer + '/api/') && !window._waProxyIndisponivel) {
+                const acao = String(url).split('?')[0].split('/').pop();
+                const payload = opts && opts.body ? JSON.parse(opts.body) : undefined;
+                const r = await this._viaProxy(acao, payload, retry);
+                if (r !== undefined) return r;
+            }
+        } catch (eP) {
+            if (eP && eP._doProxy) throw eP; // erro real do WhatsApp (ex.: sessão desconectada)
+            console.warn('[WA] ponte indisponível, usando caminho direto:', eP && eP.message);
+        }
         let resp;
         try {
             resp = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
@@ -44148,6 +44165,40 @@ const _waProvider = {
             const err = new Error(data.error);
             err.code = data.code || '';
             throw err;
+        }
+        return data;
+    },
+
+    // Chama a função wa-proxy. Retorna undefined quando a ponte não está disponível
+    // (sem chave configurada / função ausente / rede) → quem chamou usa o caminho direto.
+    async _viaProxy(acao, payload, retry) {
+        let sess = null;
+        try { sess = (await sb.auth.getSession()).data.session; } catch (_) {}
+        if (!sess || !sess.access_token) return undefined;
+        let resp;
+        try {
+            resp = await fetch(SUPABASE_URL + '/functions/v1/wa-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sess.access_token, 'apikey': SUPABASE_KEY },
+                body: JSON.stringify({ action: acao, payload }),
+                signal: AbortSignal.timeout(30000),
+            });
+        } catch (_) { return undefined; }
+        let data = null;
+        try { data = await resp.json(); } catch (_) { return undefined; }
+        if (resp.status === 404 || resp.status === 501 || (data && (data.code === 'PROXY_SEM_CHAVE' || data.code === 'PROXY_ERRO'))) {
+            if (resp.status === 501 || (data && data.code === 'PROXY_SEM_CHAVE')) window._waProxyIndisponivel = true; // não tenta de novo nesta sessão
+            return undefined;
+        }
+        if (data && data.code === 'WA_DORMINDO') {
+            if (retry) {
+                const acordou = await this._wakeUp();
+                if (acordou) return this._viaProxy(acao, payload, false);
+            }
+            const e = new Error('Servidor não responde — pode estar dormindo. Aguarde ~30s e tente novamente.'); e._doProxy = true; throw e;
+        }
+        if (!resp.ok && data && data.error) {
+            const e = new Error(data.error); e.code = data.code || ''; e._doProxy = true; throw e;
         }
         return data;
     },
