@@ -19774,10 +19774,10 @@ function gerarExtratoCashJogador(mesa, sessao) {
     return txt;
 }
 
-function reimprimirExtratoCashJogador(mesaId, jogadorId) {
+function reimprimirExtratoCashJogador(mesaId, jogadorId, sessaoId) {
     const m = cashMesas.find(x => x.id === mesaId);
     if (!m) return showToast('⚠️ Mesa não encontrada');
-    const sessao = (m.jogadores || []).find(j => j.jogadorId === jogadorId);
+    const sessao = _cashSessaoDoJogador(m, jogadorId, sessaoId);
     if (!sessao) return showToast('⚠️ Sessão do jogador não encontrada');
 
     const jog = jogadores.find(x => x.id === jogadorId);
@@ -40447,7 +40447,7 @@ function renderJogadoresCashMesa(m) {
                 </div>
                 <div style="display:flex;gap:.35rem;">
                     <button onclick="abrirRecompra('${m.id}', '${j.jogadorId}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--gold);border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Recompra"><i class="fa-solid fa-plus"></i> Rec.</button>
-                    <button onclick="reimprimirExtratoCashJogador('${m.id}', '${j.jogadorId}')" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);color:#38bdf8;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Reimprimir extrato"><i class="fa-solid fa-print"></i></button>
+                    <button onclick="reimprimirExtratoCashJogador('${m.id}', '${j.jogadorId}', '${j.id || ''}')" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);color:#38bdf8;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Reimprimir extrato"><i class="fa-solid fa-print"></i></button>
                     <button onclick="abrirRetirar('${m.id}', '${j.jogadorId}')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:.4rem;padding:.4rem .65rem;cursor:pointer;font-size:.75rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Retirar"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
                 </div>
                 <div></div>
@@ -41360,11 +41360,19 @@ function confirmRetirar() {
     }, 300);
 }
 
+// Sessão do jogador na mesa. Quando ele saiu e voltou com uma sessão NOVA, existem duas;
+// a tela da mesa age sobre a que está ATIVA (antes pegava a primeira = a antiga, já encerrada).
+function _cashSessaoDoJogador(m, jogadorId, sessaoId) {
+    const lista = (m && m.jogadores) || [];
+    if (sessaoId) { const s = lista.find(jj => String(jj.id) === String(sessaoId)); if (s) return s; }
+    return lista.find(jj => jj.jogadorId === jogadorId && jj.status === 'ativo') || lista.find(jj => jj.jogadorId === jogadorId);
+}
+
 // --- EDITAR MOVIMENTOS (BUY-IN / RECOMPRA) ---
 function abrirEditarMovimentos(mesaId, jogadorId) {
     const m = cashMesas.find(x => x.id === mesaId);
     if (!m) return;
-    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId);
+    const j = _cashSessaoDoJogador(m, jogadorId);
     if (!j) return;
     const jog = jogadores.find(x => x.id === jogadorId);
     const nomeJog = jog ? jog.nome : 'Jogador';
@@ -41414,7 +41422,7 @@ function abrirEditarMovimentos(mesaId, jogadorId) {
 function editarMovimentoCash(mesaId, jogadorId, movIdx) {
     const m = cashMesas.find(x => x.id === mesaId);
     if (!m) return;
-    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId);
+    const j = _cashSessaoDoJogador(m, jogadorId);
     if (!j) return;
     const movs = (j.movimentos || []).filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
     const mv = movs[movIdx];
@@ -41454,12 +41462,14 @@ function editarMovimentoCash(mesaId, jogadorId, movIdx) {
             const diff = novoValor - valorAnterior;
             if (diff !== 0 && typeof transacoes !== 'undefined' && Array.isArray(transacoes)) {
                 const tipoTx = mv.tipo === 'buyin' ? 'cash_in' : 'cash_rec';
-                const tx = transacoes.find(t =>
+                // Se houver mais de uma com o mesmo valor (ex.: sessão antiga do mesmo jogador),
+                // corrige a lançada no momento deste movimento.
+                const tx = transacoes.filter(t =>
                     String(t.jogadorId) === String(jogadorId) &&
                     t.tipo === tipoTx &&
                     String(t.refId) === String(m.id) &&
                     Math.abs(Math.abs(t.valor) - valorAnterior) < 0.01
-                );
+                ).sort((a, b) => Math.abs((a.ts || 0) - (mv.ts || 0)) - Math.abs((b.ts || 0) - (mv.ts || 0)))[0];
                 if (tx) {
                     tx.valor = -novoValor; // negativo = jogador deve
                     // Envia a correção ao banco (antes ficava só nesta máquina e voltava ao valor antigo no F5)
@@ -41497,7 +41507,7 @@ function editarMovimentoCash(mesaId, jogadorId, movIdx) {
 function estornarMovimentoCash(mesaId, jogadorId, movIdx) {
     const m = cashMesas.find(x => x.id === mesaId);
     if (!m) return;
-    const j = m.jogadores.find(jj => jj.jogadorId === jogadorId);
+    const j = _cashSessaoDoJogador(m, jogadorId);
     if (!j) return;
     const movsFiltrados = (j.movimentos || []).filter(mv => mv.tipo === 'buyin' || mv.tipo === 'recompra');
     const mv = movsFiltrados[movIdx];
@@ -41662,7 +41672,7 @@ function renderCashHistorico() {
                         <span style="font-family:var(--font-mono);color:#71717a;">Inv: ${formatMoney(j.totalInvestido)}</span>
                         <span style="font-family:var(--font-mono);color:#71717a;">Saiu: ${formatMoney(j.saiuCom)}</span>
                         <span style="font-family:var(--font-mono);font-weight:800;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(resultado)}</span>
-                        <button onclick="reimprimirExtratoCashJogador('${m.id}','${j.jogadorId}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--gold);border-radius:.35rem;padding:.25rem .55rem;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Reimprimir extrato do jogador"><i class="fa-solid fa-print"></i></button>
+                        <button onclick="reimprimirExtratoCashJogador('${m.id}','${j.jogadorId}','${j.id || ''}')" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--gold);border-radius:.35rem;padding:.25rem .55rem;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Reimprimir extrato do jogador"><i class="fa-solid fa-print"></i></button>
                     </div>`;
                 }).join('')}
             </div>
