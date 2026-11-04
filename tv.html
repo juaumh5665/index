@@ -2576,11 +2576,11 @@ function montarCarouselPremiacao(d) {
             if (!d || !d.avisoEliminacao || !Array.isArray(d.eliminacoesRecentes)) return;
             var tid = d.torneioId || d.tournamentName || '';
             if (_elim.tid !== tid || !_elim.vistos) {
-                _elim.tid = tid; _elim.vistos = new Set(d.eliminacoesRecentes.map(function (e) { return String(e.id); })); _elim.fila = [];
+                _elim.tid = tid; _elim.vistos = new Set(d.eliminacoesRecentes.map(_chaveElim)); _elim.fila = [];
                 return;
             }
             d.eliminacoesRecentes.slice().reverse().forEach(function (e) {
-                var k = String(e.id);
+                var k = _chaveElim(e);
                 if (_elim.vistos.has(k)) return;
                 _elim.vistos.add(k);
                 _elim.fila.push(e);
@@ -2588,6 +2588,7 @@ function montarCarouselPremiacao(d) {
             if (!_elim.ativo) _mostrarProximaEliminacao();
         } catch (e) { console.warn('atualizarAvisoEliminacao:', e); }
     }
+    function _chaveElim(e) { return String(e.nome || e.id || '').trim().toUpperCase() + '|' + String(e.posicao || ''); }
     function _mostrarProximaEliminacao() {
         var el = document.getElementById('tv-elim');
         var e = _elim.fila.shift();
@@ -2600,6 +2601,8 @@ function montarCarouselPremiacao(d) {
         el.querySelector('.te-s').textContent = campeao ? ('VICE: ' + String(e.nome || '').toUpperCase()) : ('ELIMINADO' + (e.posicao ? ' EM ' + e.posicao + 'º' : ''));
         el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
         _posicionarAvisoEliminacao(el);
+        // Mostra, dá uma piscadinha e mostra de novo (mesmo comportamento na TV interna e no link externo)
+        if (!e._repetido) { var rep = {}; for (var kk in e) rep[kk] = e[kk]; rep._repetido = true; _elim.fila.unshift(rep); }
         setTimeout(function () { el.classList.remove('show'); setTimeout(_mostrarProximaEliminacao, 400); }, campeao ? 8000 : 5000);
     }
     // Pro Live: encaixa a faixa no espaço livre REAL entre os blinds e a premiação
