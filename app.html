@@ -36507,6 +36507,17 @@ async function _revalidarClubeAtual() {
 // Revalida automaticamente a cada 5 minutos
 setInterval(_revalidarClubeAtual, 5 * 60 * 1000);
 
+// Avanço de nível pelo cronômetro: NÃO carimba relógio novo (relogioTs). Assim o carimbo
+// continua sendo o da última ação do operador, e uma aba/máquina com estado antigo
+// (que avança sozinha a partir de dados velhos) nunca vence no banco uma mudança mais nova.
+// Máquinas com o estado certo calculam o mesmo avanço a partir do mesmo tempoAlvo.
+function _avancoAutomaticoNivel(i) {
+    const t = torneios[i];
+    const antes = t ? t.relogioTs : undefined;
+    nextLevel(i);
+    if (t && antes != null) t.relogioTs = antes;
+}
+
 function _executarTickGlobal() {
     let changed = false;
     let mudancaImportante = false;
@@ -36529,7 +36540,7 @@ function _executarTickGlobal() {
             }
             
             if (t.tempoRestante <= 0) {
-                nextLevel(i);
+                _avancoAutomaticoNivel(i);
                 changed = true;
                 mudancaImportante = true;
             }
@@ -36539,7 +36550,7 @@ function _executarTickGlobal() {
             changed = true;
             mudancaImportante = true;  // força sync imediato pra TV pública pegar
         } else if (t.rodando && t.tempoRestante <= 0) {
-            nextLevel(i);
+            _avancoAutomaticoNivel(i);
             changed = true;
             mudancaImportante = true;
         } else if (t.iniciadoEm && t.status !== 'finished') {
