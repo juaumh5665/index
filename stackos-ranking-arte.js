@@ -461,7 +461,7 @@
 
     // ---------------- Opção (Configurações › Torneios) ----------------
     function garantirOpcao() {
-        const aba = document.getElementById('cfg-torneios');
+        const aba = document.getElementById('cfg-trn-recursos') || document.getElementById('cfg-torneios');
         if (!aba || !ehAdmin() || document.getElementById('cfg-rk-arte-card')) return;
         const card = document.createElement('div');
         card.id = 'cfg-rk-arte-card';

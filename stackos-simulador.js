@@ -330,7 +330,7 @@
 
     // ---------- Opção nas Configurações → Torneios (só admin) ----------
     function garantirOpcao() {
-        const aba = document.getElementById('cfg-torneios');
+        const aba = document.getElementById('cfg-trn-recursos') || document.getElementById('cfg-torneios');
         if (!aba || !ehAdmin() || document.getElementById('cfg-sim-torneio-card')) return;
         const card = document.createElement('div');
         card.id = 'cfg-sim-torneio-card';
@@ -358,7 +358,7 @@
 
     // ---------- Opção: aviso de eliminação na TV (padrão desligado) ----------
     function garantirOpcaoTvElim() {
-        const aba = document.getElementById('cfg-torneios');
+        const aba = document.getElementById('cfg-trn-recursos') || document.getElementById('cfg-torneios');
         if (!aba || !ehAdmin() || document.getElementById('cfg-tv-elim-card')) return;
         const card = document.createElement('div');
         card.id = 'cfg-tv-elim-card';

@@ -4490,119 +4490,147 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <!-- ABA: TORNEIOS (padrões) -->
                 <div id="cfg-torneios" class="configtab-content" style="display:none;">
-                    <div class="stat-card" style="padding:1.5rem;">
-                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;">Valores Padrão para Novos Torneios</div>
-                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1.25rem;">Estes valores aparecem como padrão ao criar um novo torneio. Podem ser alterados individualmente em cada torneio.</div>
-                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
-                            <div><label class="inp-label">Buy-in Padrão R$</label><input id="cfg-torn-buyin" type="number" class="inp" value="100"></div>
-                            <div><label class="inp-label">Rake Padrão %</label><input id="cfg-torn-rake" type="number" class="inp" value="20"></div>
-                            <div><label class="inp-label">Stack Inicial</label><input id="cfg-torn-stack" type="number" class="inp" value="20000"></div>
-                            <div><label class="inp-label">Duração do Nível (min)</label><input id="cfg-torn-tempo" type="number" class="inp" value="15"></div>
-                            <div><label class="inp-label">Re-entry até o nível</label><input id="cfg-torn-reentry" type="number" class="inp" value="6"></div>
-                            <div><label class="inp-label">Add-on (fichas)</label><input id="cfg-torn-addon" type="number" class="inp" value="0"></div>
-                        </div>
-                        <button onclick="salvarConfigTorneios()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1.25rem;width:100%;">Salvar Padrões de Torneio</button>
+                    <!-- Repaginado (só visual): mesmos campos, ids e botões de salvar -->
+                    <style>
+                        #cfg-torneios .ct-nav{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1.1rem}
+                        #cfg-torneios .ct-nav button{font-family:inherit;font-size:.75rem;padding:.4rem .85rem;border:1px solid #27272a;border-radius:999px;background:transparent;color:#d4d4d8;cursor:pointer}
+                        #cfg-torneios .ct-nav button:hover{border-color:#a855f7;color:#e9d5ff;background:rgba(168,85,247,.1)}
+                        #cfg-torneios .ct-sec{margin-bottom:1.5rem;scroll-margin-top:1rem}
+                        #cfg-torneios .ct-sh{margin-bottom:.7rem}
+                        #cfg-torneios .ct-sh h3{margin:0;font-size:.9rem;font-weight:800;color:#fafafa}
+                        #cfg-torneios .ct-sh p{margin:.15rem 0 0;font-size:.75rem;color:#71717a}
+                        #cfg-torneios .ct-card{background:#111114;border:1px solid #1e1e23;border-radius:.75rem;padding:1rem}
+                        #cfg-torneios .ct-card > .ct-tit{font-size:.85rem;font-weight:800;color:#fafafa;margin-bottom:.6rem}
+                        #cfg-torneios .ct-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:.65rem}
+                        #cfg-torneios .ct-f6{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem}
+                        #cfg-torneios .ct-ft{display:flex;justify-content:flex-end;margin-top:.85rem}
+                        #cfg-torneios .ct-ft .btn-gold{padding:.55rem 1.2rem;border-radius:.5rem;font-size:.8rem;width:auto}
+                        #cfg-torneios .ct-hint{font-size:.7rem;color:#52525b;margin-top:.3rem}
+                        #cfg-torneios .ct-info{margin-top:.75rem;font-size:.75rem;line-height:1.5;color:#93c5fd;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.18);border-radius:.5rem;padding:.55rem .75rem}
+                        #cfg-torneios .ct-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem 0;border-bottom:1px solid #1a1a1f;cursor:pointer}
+                        #cfg-torneios .ct-row:last-child{border-bottom:0}
+                        #cfg-torneios .ct-row small{display:block;font-size:.72rem;color:#8b8b93;margin-top:.15rem}
+                        #cfg-torneios .ct-seg{display:flex;gap:.5rem;flex-wrap:wrap}
+                        #cfg-torneios .ct-seg label{display:flex;align-items:center;gap:.45rem;cursor:pointer;font-size:.8rem;padding:.45rem .8rem;border:1px solid #27272a;border-radius:.45rem;background:rgba(255,255,255,.02)}
+                        #cfg-torneios .ct-seg label:has(input:checked){border-color:#06b6d4;background:rgba(6,182,212,.1);color:#a5f3fc}
+                        #cfg-torneios .ct-ck{display:flex;gap:1.1rem;flex-wrap:wrap}
+                        #cfg-torneios .ct-ck label{display:flex;align-items:center;gap:.45rem;cursor:pointer;font-size:.82rem}
+                        /* Recursos (cards criados pelos módulos): viram chaves liga/desliga com selo */
+                        #cfg-trn-recursos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:.65rem}
+                        #cfg-trn-recursos > div{margin:0 !important;padding:.85rem 1rem !important;background:#0d0d10 !important;border:1px solid #1e1e23 !important;border-radius:.65rem !important}
+                        #cfg-trn-recursos > div:has(input:checked){border-color:rgba(34,197,94,.35) !important;background:rgba(34,197,94,.04) !important}
+                        #cfg-trn-recursos > div > label{flex-direction:row-reverse;justify-content:space-between;gap:.9rem !important}
+                        #cfg-trn-recursos > div > label > span{font-size:.85rem;line-height:1.35}
+                        #cfg-trn-recursos > div > label > span > span{display:block;margin-top:.25rem;font-size:.72rem !important;line-height:1.45;color:#8b8b93 !important}
+                        #cfg-trn-recursos > div > label > span > br{display:none}
+                        #cfg-trn-recursos > div > label > span > b::after{content:"DESLIGADO";font-size:.6rem;font-weight:800;letter-spacing:.04em;padding:.12rem .4rem;border-radius:.25rem;margin-left:.45rem;vertical-align:.1rem;background:#27272a;color:#a1a1aa}
+                        #cfg-trn-recursos > div:has(input:checked) > label > span > b::after{content:"LIGADO";background:rgba(34,197,94,.15);color:#86efac}
+                        #cfg-trn-recursos input[type=checkbox]{appearance:none;-webkit-appearance:none;width:40px !important;height:22px !important;min-width:40px !important;max-width:40px !important;min-height:22px !important;max-height:22px !important;padding:0 !important;border:0 !important;box-sizing:border-box;flex:0 0 40px !important;margin:.15rem 0 0 !important;border-radius:999px;background:#3f3f46;position:relative;cursor:pointer;flex:none;transition:background .15s}
+                        #cfg-trn-recursos input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+                        #cfg-trn-recursos input[type=checkbox]:checked{background:#22c55e}
+                        #cfg-trn-recursos input[type=checkbox]:checked::after{left:21px}
+                        #ct-sec-recursos:has(#cfg-trn-recursos:empty){display:none}
+                    </style>
+
+                    <div class="ct-nav">
+                        <button type="button" onclick="document.getElementById('ct-sec-recursos').scrollIntoView({behavior:'smooth'})">⚡ Recursos</button>
+                        <button type="button" onclick="document.getElementById('ct-sec-padroes').scrollIntoView({behavior:'smooth'})">🏆 Padrões de novos torneios</button>
+                        <button type="button" onclick="document.getElementById('ct-sec-travas').scrollIntoView({behavior:'smooth'})">🔒 Travas e rake</button>
+                        <button type="button" onclick="document.getElementById('ct-sec-impressao').scrollIntoView({behavior:'smooth'})">🖨️ Impressão</button>
                     </div>
 
-                    <!-- LOTE 1+2: Travas de Compras / Add-on -->
-                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
-                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-lock"></i> Travas de Compras (Padrão do Clube)</div>
-                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
-                            Define o nível máximo em que <strong>buy-in, re-entry e rebuy</strong> podem ser realizados nos torneios deste clube. 
-                            Após esse nível, esses tipos de compra ficam bloqueados automaticamente.
-                            <br>Cada torneio pode <strong>sobrescrever</strong> esse padrão ao criar/editar.
-                        </div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-                            <div>
-                                <label class="inp-label">🛒 Compras (buy-in / re-entry / rebuy) até o nível</label>
-                                <input id="cfg-trn-max-compras" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (vazio = sem trava)" inputmode="numeric">
-                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Vazio = sem trava (comportamento atual)</div>
+                    <!-- RECURSOS: os módulos (simulador, relógio, aviso TV, arte do ranking) colocam suas chaves aqui -->
+                    <div class="ct-sec" id="ct-sec-recursos">
+                        <div class="ct-sh"><h3>⚡ Recursos dos torneios</h3><p>Liga e desliga na hora — não precisa salvar.</p></div>
+                        <div id="cfg-trn-recursos"></div>
+                    </div>
+
+                    <!-- PADRÕES -->
+                    <div class="ct-sec" id="ct-sec-padroes">
+                        <div class="ct-sh"><h3>🏆 Padrões para novos torneios</h3><p>Aparecem preenchidos ao criar um torneio. Cada torneio pode mudar.</p></div>
+                        <div class="ct-card">
+                            <div class="ct-f6">
+                                <div><label class="inp-label">Buy-in Padrão R$</label><input id="cfg-torn-buyin" type="number" class="inp" value="100"></div>
+                                <div><label class="inp-label">Rake Padrão %</label><input id="cfg-torn-rake" type="number" class="inp" value="20"></div>
+                                <div><label class="inp-label">Stack Inicial</label><input id="cfg-torn-stack" type="number" class="inp" value="20000"></div>
+                                <div><label class="inp-label">Duração do Nível (min)</label><input id="cfg-torn-tempo" type="number" class="inp" value="15"></div>
+                                <div><label class="inp-label">Re-entry até o nível</label><input id="cfg-torn-reentry" type="number" class="inp" value="6"></div>
+                                <div><label class="inp-label">Add-on (fichas)</label><input id="cfg-torn-addon" type="number" class="inp" value="0"></div>
                             </div>
-                            <div>
-                                <label class="inp-label">🎯 Add-on até o nível</label>
-                                <input id="cfg-trn-max-addon" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (vazio = sem trava)" inputmode="numeric">
-                                <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Após esse nível, add-on é bloqueado</div>
+                            <div class="ct-ft"><button onclick="salvarConfigTorneios()" class="btn-gold">Salvar Padrões de Torneio</button></div>
+                        </div>
+                    </div>
+
+                    <!-- TRAVAS + RAKE -->
+                    <div class="ct-sec" id="ct-sec-travas">
+                        <div class="ct-sh"><h3>🔒 Travas e rake (padrão do clube)</h3><p>Cada torneio pode <strong>sobrescrever</strong> esses padrões ao criar/editar.</p></div>
+                        <div class="ct-grid2">
+                            <!-- LOTE 1+2: Travas de Compras / Add-on -->
+                            <div class="ct-card">
+                                <div class="ct-tit"><i class="fa-solid fa-lock" style="color:var(--gold);"></i> Travas de compras</div>
+                                <div class="ct-f6">
+                                    <div>
+                                        <label class="inp-label">🛒 Compras até o nível</label>
+                                        <input id="cfg-trn-max-compras" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (vazio = sem trava)" inputmode="numeric">
+                                        <div class="ct-hint">Buy-in, re-entry e rebuy. Vazio = sem trava</div>
+                                    </div>
+                                    <div>
+                                        <label class="inp-label">🎯 Add-on até o nível</label>
+                                        <input id="cfg-trn-max-addon" class="inp" type="number" min="1" max="30" placeholder="Ex: 10 (vazio = sem trava)" inputmode="numeric">
+                                        <div class="ct-hint">Após esse nível, add-on é bloqueado</div>
+                                    </div>
+                                </div>
+                                <div class="ct-info"><i class="fa-solid fa-info-circle"></i> Ex.: compras e add-on até o nível 10 → do nível 11 em diante ficam bloqueados buy-in, re-entry e add-on (rebuys de jogadores ativos continuam permitidos). Se o torneio tiver <strong>Last Chance</strong> ativo, ele libera após o add-on.</div>
+                                <div class="ct-ft"><button onclick="salvarTravasPadrao()" class="btn-gold">Salvar Travas</button></div>
+                            </div>
+                            <!-- LOTE 4: Padrão de rake sobre Jackpot/Last Chance -->
+                            <div class="ct-card">
+                                <div class="ct-tit"><i class="fa-solid fa-percent" style="color:var(--gold);"></i> Rake sobre compras extras</div>
+                                <label class="ct-row">
+                                    <div>
+                                        <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-gem" style="color:var(--gold);"></i> Jackpot paga rake</div>
+                                        <small>Marcado: o valor do Jackpot entra no cálculo do rake. Desmarcado: vai 100% pro prize pool.</small>
+                                    </div>
+                                    <label class="switch"><input type="checkbox" id="cfg-jackpot-paga-rake"><span class="slider"></span></label>
+                                </label>
+                                <label class="ct-row">
+                                    <div>
+                                        <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-star" style="color:#a78bfa;"></i> Last Chance paga rake</div>
+                                        <small>Marcado: o valor do Last Chance entra no cálculo do rake. Desmarcado: vai 100% pro prize pool.</small>
+                                    </div>
+                                    <label class="switch"><input type="checkbox" id="cfg-last-chance-paga-rake"><span class="slider"></span></label>
+                                </label>
+                                <div class="ct-ft"><button onclick="salvarRakeExtras()" class="btn-gold">Salvar Padrões de Rake</button></div>
                             </div>
                         </div>
-                        <button onclick="salvarTravasPadrao()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Travas</button>
                     </div>
 
-                    <!-- LOTE 4: Padrão de rake sobre Jackpot/Last Chance -->
-                    <div class="stat-card" style="padding:1.5rem;margin-top:1rem;">
-                        <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-percent"></i> Rake sobre Compras Extras (Padrão do Clube)</div>
-                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1rem;line-height:1.5;">
-                            Define se <strong>Jackpot</strong> e <strong>Last Chance</strong> pagam rake do clube por padrão.
-                            <br>Cada torneio pode <strong>sobrescrever</strong> esse padrão ao criar/editar.
-                        </div>
-                        <div style="display:flex;flex-direction:column;gap:.75rem;">
-                            <label style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:.5rem;cursor:pointer;">
-                                <div>
-                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-gem" style="color:var(--gold);"></i> Jackpot paga rake</div>
-                                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Se marcado: o valor do Jackpot entra no cálculo do rake. Se desmarcado: vai 100% pro prize pool.</div>
-                                </div>
-                                <label class="switch"><input type="checkbox" id="cfg-jackpot-paga-rake"><span class="slider"></span></label>
-                            </label>
-                            <label style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;cursor:pointer;">
-                                <div>
-                                    <div style="font-size:.85rem;font-weight:700;"><i class="fa-solid fa-star" style="color:#a78bfa;"></i> Last Chance paga rake</div>
-                                    <div style="font-size:.7rem;color:#71717a;margin-top:.2rem;">Se marcado: o valor do Last Chance entra no cálculo do rake. Se desmarcado: vai 100% pro prize pool.</div>
-                                </div>
-                                <label class="switch"><input type="checkbox" id="cfg-last-chance-paga-rake"><span class="slider"></span></label>
-                            </label>
-                        </div>
-                        <button onclick="salvarRakeExtras()" class="btn-gold" style="padding:.8rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Padrões de Rake</button>
-                    </div>
-                    
-                    <div class="stat-card" style="padding:1rem;margin-top:.75rem;background:rgba(59,130,246,.05);border-color:rgba(59,130,246,.2);">
-                        <div style="font-size:.78rem;color:#93c5fd;line-height:1.6;">
-                            <i class="fa-solid fa-info-circle"></i> <strong>Exemplo prático:</strong> Configurando "Compras até nível 10" e "Add-on até nível 10":
-                            <ul style="margin:.5rem 0 0 1.2rem;padding:0;color:#cbd5e1;">
-                                <li>Níveis 1 a 10: tudo permitido</li>
-                                <li>A partir do nível 11: buy-in, re-entry e add-on bloqueados (rebuys de jogadores ativos continuam permitidos)</li>
-                                <li>Se o torneio tiver <strong>Last Chance</strong> ativo, ele libera após o add-on</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Impressão Térmica do Clube -->
-                    <div class="stat-card" id="impressao-termica-section" style="padding:1.5rem;margin-top:1rem;">
-                        <div style="font-size:.65rem;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;"><i class="fa-solid fa-print"></i> Impressão Térmica</div>
-                        <div style="font-size:.75rem;color:#71717a;margin-bottom:1.25rem;">Configura como os comprovantes de compra/jackpot são impressos. Estas configs valem pra todos os torneios do clube.</div>
-
-                        <div style="margin-bottom:1rem;">
+                    <!-- IMPRESSÃO -->
+                    <div class="ct-sec" id="ct-sec-impressao">
+                        <div class="ct-sh"><h3>🖨️ Impressão térmica</h3><p>Como os comprovantes de compra/jackpot são impressos. Vale pra todos os torneios do clube.</p></div>
+                        <!-- Impressão Térmica do Clube -->
+                        <div class="ct-card" id="impressao-termica-section">
                             <label class="inp-label">Largura do papel</label>
-                            <div style="display:flex;gap:.65rem;margin-top:.35rem;">
-                                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;padding:.5rem .8rem;border:1px solid #27272a;border-radius:.4rem;flex:1;background:rgba(255,255,255,.02);">
+                            <div class="ct-seg">
+                                <label>
                                     <input type="radio" name="cfg-impressao-largura" value="80mm" id="cfg-impressao-largura-80" checked style="accent-color:#06b6d4;">
                                     <span><strong>80mm</strong> <span style="font-size:.7rem;color:#71717a;">(32 colunas — padrão)</span></span>
                                 </label>
-                                <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;padding:.5rem .8rem;border:1px solid #27272a;border-radius:.4rem;flex:1;background:rgba(255,255,255,.02);">
+                                <label>
                                     <input type="radio" name="cfg-impressao-largura" value="58mm" id="cfg-impressao-largura-58" style="accent-color:#06b6d4;">
                                     <span><strong>58mm</strong> <span style="font-size:.7rem;color:#71717a;">(24 colunas)</span></span>
                                 </label>
                             </div>
+                            <label class="inp-label" style="margin-top:.9rem;">Dados do cabeçalho</label>
+                            <div class="ct-ck">
+                                <label><input type="checkbox" id="cfg-impressao-cnpj" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;"><span>Imprimir <strong>CNPJ</strong></span></label>
+                                <label><input type="checkbox" id="cfg-impressao-endereco" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;"><span>Imprimir <strong>endereço</strong></span></label>
+                                <label><input type="checkbox" id="cfg-impressao-telefone" style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;"><span>Imprimir <strong>telefone</strong></span></label>
+                            </div>
+                            <div class="ct-ft"><button onclick="salvarConfigImpressao()" class="btn-gold">Salvar Configurações de Impressão</button></div>
                         </div>
-
-                        <div style="font-size:.7rem;color:#71717a;margin-bottom:.5rem;margin-top:1rem;">Dados do cabeçalho:</div>
-                        <div style="display:flex;flex-direction:column;gap:.4rem;">
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
-                                <input type="checkbox" id="cfg-impressao-cnpj" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
-                                <span>Imprimir <strong>CNPJ</strong></span>
-                            </label>
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
-                                <input type="checkbox" id="cfg-impressao-endereco" checked style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
-                                <span>Imprimir <strong>endereço</strong></span>
-                            </label>
-                            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;">
-                                <input type="checkbox" id="cfg-impressao-telefone" style="width:16px;height:16px;cursor:pointer;accent-color:#06b6d4;">
-                                <span>Imprimir <strong>telefone</strong></span>
-                            </label>
-                        </div>
-
-                        <button onclick="salvarConfigImpressao()" class="btn-gold" style="padding:.7rem;border-radius:.6rem;margin-top:1rem;width:100%;">Salvar Configurações de Impressão</button>
-                    </div>
                     <!-- Placeholder pra quando feature_impressao_termica estiver OFF (preenchido por JS) -->
-                    <div id="impressao-termica-locked" style="display:none;padding:1.5rem;margin-top:1rem;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);border-radius:.6rem;">
+                    <div id="impressao-termica-locked" style="display:none;padding:1.5rem;margin-top:0;background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.25);border-radius:.6rem;">
                         <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem;">
                             <i class="fa-solid fa-print" style="color:#06b6d4;font-size:1.1rem;"></i>
                             <div style="font-size:.85rem;font-weight:800;color:#fff;">Impressão Térmica <span style="background:linear-gradient(135deg,#f5d572 0%,#d4a82e 100%);color:#0a0a0b;font-size:.62rem;padding:.12em .5em;border-radius:.35em;font-weight:800;letter-spacing:.08em;margin-left:.4rem;vertical-align:middle;">PRO</span></div>
@@ -4614,6 +4642,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         <button onclick="if(typeof mostrarModalUpgrade==='function')mostrarModalUpgrade('Impressão Térmica de comprovantes e fechamentos')" class="btn-gold" style="padding:.55rem 1rem;border-radius:.5rem;font-size:.78rem;">
                             <i class="fa-solid fa-arrow-up"></i> Fazer Upgrade
                         </button>
+                    </div>
                     </div>
                 </div>
 
@@ -57002,10 +57031,10 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <!-- StackSangeur (painel do caixa): só liga em clube com feature_sangeur; não altera nada do app -->
 <script src="/stacksangeur-caixa.js?v=6" defer></script>
 <script src="/stackos-abertos.js?v=1" defer></script>
-<script src="/stackos-simulador.js?v=7" defer></script>
-<script src="/stackos-relogio-controle.js?v=3" defer></script>
+<script src="/stackos-simulador.js?v=8" defer></script>
+<script src="/stackos-relogio-controle.js?v=4" defer></script>
 <script src="/stackos-ranking.js?v=2" defer></script>
-<script src="/stackos-ranking-arte.js?v=1" defer></script>
+<script src="/stackos-ranking-arte.js?v=2" defer></script>
 <script src="/tv-som.js"></script>
 <style>
 #cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }

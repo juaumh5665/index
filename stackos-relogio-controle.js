@@ -183,7 +183,7 @@
 
     // ---------- Opção nas Configurações → Torneios (só admin) ----------
     function opcao() {
-        const aba = document.getElementById('cfg-torneios');
+        const aba = document.getElementById('cfg-trn-recursos') || document.getElementById('cfg-torneios');
         if (!aba || !ehAdmin() || document.getElementById('cfg-relogio-ctrl-card')) return;
         const card = document.createElement('div');
         card.id = 'cfg-relogio-ctrl-card';
