@@ -73,11 +73,17 @@
         if (!sim) return;
         const t0 = (torneios || []).find(x => x.id === sim.tid);
         if (!t0) return;
-        const antigos = sim.lanc.map(l => ({ jid: l.entry.jogadorId, tipo: l.entry.tipo, nome: l.nome }));
+        const antigos = sim.lanc.map(l => ({ jid: l.entry.jogadorId, tipo: l.entry.tipo, nome: l.nome, combo: l.combo || null }));
         const t = JSON.parse(JSON.stringify(t0));
         t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
         sim.t = t; sim.lanc = [];
-        antigos.forEach(a => lancar(a.tipo, a.jid, a.nome, true));
+        const feitos = new Set();
+        antigos.forEach(a => {
+            if (!a.combo) return lancar(a.tipo, a.jid, a.nome, true);
+            if (feitos.has(a.combo)) return;
+            feitos.add(a.combo);
+            lancarComboPara(antigos.filter(x => x.combo === a.combo).map(x => x.tipo), a.jid, a.nome);
+        });
         render();
     }
     function fechar() {
@@ -99,6 +105,28 @@
         sim.lanc.push({ entry: r.entry, nome, total: r.total });
         if (!silencioso) render();
     }
+    // COMBO: várias ações do mesmo jogador num lançamento só (igual ao combo real:
+    // mesma ordem buy-in → duplo → rebuys → add-on, mesmo comboId, comprovante consolidado)
+    const ORDEM_COMBO = ['buyin', 'buyin_duplo', 'rebuy_simples', 'rebuy_duplo', 'addon'];
+    function lancarComboPara(tipos, jid, nome) {
+        const key = 'combo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        ORDEM_COMBO.filter(tp => tipos.includes(tp)).forEach((tp, i) => {
+            const r = montarEntry(sim.t, jid, tp);
+            r.entry.comboId = key;
+            r.entry.ts = Date.now() + i;
+            sim.t.entries.push(r.entry);
+            sim.lanc.push({ entry: r.entry, nome, total: r.total, combo: key });
+        });
+    }
+    function lancarCombo() {
+        if (!sim) return;
+        const tipos = [...document.querySelectorAll('[data-sim-combo]:checked')].map(c => c.dataset.simCombo);
+        if (tipos.length < 2) return showToast('⚠️ Marque pelo menos 2 ações para o combo');
+        sim.n++;
+        lancarComboPara(tipos, 'sim-j' + sim.n, nomeFake(sim.n));
+        sim.comboSel = tipos;
+        render();
+    }
     function gerarVarios() {
         const q = Math.max(1, Math.min(300, parseInt((document.getElementById('sim-qtd') || {}).value, 10) || 0));
         const tipo = (document.getElementById('sim-qtd-tipo') || {}).value || 'buyin';
@@ -109,8 +137,10 @@
         if (!sim) return;
         const l = sim.lanc[i];
         if (!l) return;
-        sim.lanc.splice(i, 1);
-        sim.t.entries = sim.t.entries.filter(e => e.id !== l.entry.id);
+        // Combo sai inteiro
+        const ids = new Set(l.combo ? sim.lanc.filter(x => x.combo === l.combo).map(x => x.entry.id) : [l.entry.id]);
+        sim.lanc = sim.lanc.filter(x => !ids.has(x.entry.id));
+        sim.t.entries = sim.t.entries.filter(e => !ids.has(e.id));
         render();
     }
     function limpar() { if (!sim) return; sim.lanc = []; sim.t.entries = []; sim.n = 0; render(); }
@@ -120,7 +150,15 @@
         const l = sim.lanc[i];
         if (!l || typeof gerarComprovanteCompra !== 'function') return;
         let txt = '';
-        try { txt = gerarComprovanteCompra(sim.t, { entry: l.entry, jogadorNome: l.nome }); } catch (e) { txt = '(não foi possível gerar o comprovante: ' + e.message + ')'; }
+        try {
+            if (l.combo && typeof gerarComprovanteCombo === 'function') {
+                const ents = sim.lanc.filter(x => x.combo === l.combo).map(x => x.entry);
+                txt = ents.length > 1 ? gerarComprovanteCombo(sim.t, { entries: ents, jogadorNome: l.nome })
+                                      : gerarComprovanteCompra(sim.t, { entry: l.entry, jogadorNome: l.nome });
+            } else {
+                txt = gerarComprovanteCompra(sim.t, { entry: l.entry, jogadorNome: l.nome });
+            }
+        } catch (e) { txt = '(não foi possível gerar o comprovante: ' + e.message + ')'; }
         const marca = '*** SIMULAÇÃO — SEM VALOR ***';
         mostrarTexto('Comprovante (simulação)', marca + '\n\n' + txt + '\n\n' + marca);
     }
@@ -166,7 +204,7 @@
         const linhas = sim.lanc.map((l, i) => {
             const lbl = (typeof _labelTipoEntry === 'function') ? _labelTipoEntry(l.entry.tipo) : l.entry.tipo;
             return '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid #222;font-size:13px">' +
-                '<span>' + esc(l.nome) + ' · ' + esc(lbl) + (l.entry.isPromo ? ' PROMO' : '') + '</span>' +
+                '<span>' + esc(l.nome) + ' · ' + esc(lbl) + (l.entry.isPromo ? ' PROMO' : '') + (l.combo ? ' <span style="font-size:10px;background:#3b2a05;color:#fcd34d;border-radius:999px;padding:1px 6px">COMBO</span>' : '') + '</span>' +
                 '<span style="font-variant-numeric:tabular-nums;color:#d4d4d8">' + fm(l.total) + ' · ' + fmtN(fichasDaEntry(t, l.entry)) + ' fichas</span>' +
                 '<button data-sim-comp="' + i + '" style="background:#27272a;border:1px solid #3f3f46;color:#e4e4e7;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">🧾</button>' +
                 '<button data-sim-rm="' + i + '" style="background:none;border:0;color:#fca5a5;cursor:pointer;font-size:14px" title="Remover">✕</button></div>';
@@ -185,6 +223,13 @@
                     '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin-bottom:10px">Lançar jogadores fictícios</div>' +
                     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' + btnTipo + '</div>' +
                     '<div style="font-size:11px;color:#71717a;margin-top:6px">Buy-in cria jogador novo; re-entry, rebuy e add-on vão para o último jogador lançado.</div>' +
+                    '<div style="margin-top:10px;padding:10px;border:1px solid #3f3f46;border-radius:8px;background:#0f0f14">' +
+                        '<div style="font-size:11px;color:#fcd34d;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Combo (mesmo jogador, um comprovante só)</div>' +
+                        '<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:13px">' +
+                            ORDEM_COMBO.map(k => '<label style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" data-sim-combo="' + k + '"' + ((sim.comboSel || ['buyin', 'rebuy_duplo']).includes(k) ? ' checked' : '') + ' style="accent-color:#f5d572">' + ((TIPOS.find(x => x[0] === k) || [k, k])[1]) + '</label>').join('') +
+                        '</div>' +
+                        '<button id="sim-combo" style="margin-top:8px;width:100%;padding:9px;border-radius:8px;border:0;background:#a16207;color:#fff;font-weight:700;cursor:pointer">+ Lançar combo</button>' +
+                    '</div>' +
                     '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><input id="sim-qtd" type="number" min="1" max="300" value="20" style="width:80px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' +
                     '<select id="sim-qtd-tipo" style="background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + TIPOS.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>' +
                     '<button id="sim-gerar" style="flex:1;padding:8px;border-radius:8px;border:1px solid #3f3f46;background:#18181b;color:#e4e4e7;cursor:pointer">⚡ Gerar em lote</button></div>' +
@@ -215,6 +260,7 @@
             if (b.dataset.simComp != null) return verComprovante(Number(b.dataset.simComp));
             if (b.dataset.simRm != null) return remover(Number(b.dataset.simRm));
             if (b.id === 'sim-gerar') return gerarVarios();
+            if (b.id === 'sim-combo') return lancarCombo();
             if (b.id === 'sim-limpar') return limpar();
             if (b.id === 'sim-fechar') return fechar();
             if (b.id === 'sim-ajustar') {
