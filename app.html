@@ -12511,7 +12511,10 @@ function _cashSessaoToDb(j, mesaId) {
         fichas: mv.fichas || null,                      // ✨ fichas entregues nessa recompra
         rakeCobrado: Number(mv.rakeCobrado) || 0,
         ts: mv.ts || Date.now(),
+        editadoEm: mv.editadoEm || null,               // edição pelo lápis: a mais nova vence entre máquinas
     }));
+    // Edição/estorno do buy-in (o banco não deixa máquina desatualizada voltar o valor antigo)
+    const buyinEditadoEm = Math.max(Number(buyinMov && buyinMov.editadoEm) || 0, Number(j.buyinEditadoEm) || 0) || null;
     // rake total = soma de rakeCobrado de todos os movimentos
     const rakeTotal = (j.movimentos || []).reduce((s, mv) => s + (Number(mv.rakeCobrado) || 0), 0);
 
@@ -12531,6 +12534,8 @@ function _cashSessaoToDb(j, mesaId) {
         operador: j.operador || (currentUser && currentUser.nome) || null,
         saidas_anteriores: Number(j.saidasAnteriores) || 0,
         retornou_ts: j.retornouEm ? new Date(j.retornouEm).toISOString() : null,
+        recompras_estornadas: Array.isArray(j.recomprasEstornadas) ? j.recomprasEstornadas : [],
+        buyin_editado_em: buyinEditadoEm,
     };
 }
 
@@ -12544,6 +12549,7 @@ function _cashSessaoFromDb(r) {
             fichas: r.entrada_fichas || null,   // ✨ fichas do buy-in inicial
             rakeCobrado: 0,
             ts: r.entrou_ts ? new Date(r.entrou_ts).getTime() : Date.now(),
+            editadoEm: r.buyin_editado_em ? Number(r.buyin_editado_em) : undefined,
         });
     }
     if (Array.isArray(r.recompras)) {
@@ -12554,6 +12560,7 @@ function _cashSessaoFromDb(r) {
                 fichas: mv.fichas || null,          // ✨ fichas da recompra
                 rakeCobrado: Number(mv.rakeCobrado) || 0,
                 ts: mv.ts || Date.now(),
+                editadoEm: mv.editadoEm || undefined,
             });
         });
     }
@@ -12584,6 +12591,8 @@ function _cashSessaoFromDb(r) {
         operador: r.operador || null,
         saidasAnteriores: Number(r.saidas_anteriores) || 0,
         retornouEm: r.retornou_ts ? new Date(r.retornou_ts).getTime() : null,
+        recomprasEstornadas: Array.isArray(r.recompras_estornadas) ? r.recompras_estornadas : [],
+        buyinEditadoEm: r.buyin_editado_em ? Number(r.buyin_editado_em) : null,
     };
 }
 
@@ -19620,7 +19629,7 @@ function imprimirComprovanteCompraCash(dados) {
 // COMPRAS ESTORNADAS DA SESSÃO DO CASH (só para COMPROVANTE/EXTRATO)
 // =====================================================================
 // Quando uma compra do cash é estornada no Caixa (transação "Estorno: Recompra cash · ...")
-// ou pelo estorno do próprio cash (cash_estorno), a sessão continua com o movimento.
+// a sessão continua com o movimento (o estorno pela tela do cash já tira o movimento da sessão).
 // Aqui só identificamos quais movimentos foram estornados, para o comprovante não somá-los.
 // NÃO altera sessão, transação, saldo, rake nem financeiro — é somente leitura.
 function _cashMovsEstornados(m, j) {
@@ -19655,13 +19664,10 @@ function _cashMovsEstornados(m, j) {
                 origUsadas.add(orig.id);
                 marcar(descOrig.indexOf('Buy-in') === 0 ? 'buyin' : 'recompra', valor, Number(orig.ts) || 0, 'perto');
             });
-        // 2) Estorno feito na tela do cash (o movimento pode voltar pela junção entre máquinas)
-        txs.filter(t => t.tipo === 'cash_estorno' && String(t.refId || '') === String(m.id))
-            .sort((a, b) => (a.ts || 0) - (b.ts || 0))
-            .forEach(e => {
-                const tipoMov = /^Estorno buy-in/i.test(String(e.descricao || '')) ? 'buyin' : 'recompra';
-                marcar(tipoMov, Math.abs(Number(e.valor) || 0), Number(e.ts) || 0, 'antes');
-            });
+        // 2) Estorno feito na tela do cash: o movimento já sai da sessão e o banco não o traz de volta
+        //    (lista recomprasEstornadas). Se por algum motivo ainda estiver aqui, não soma.
+        const lap = new Set((j.recomprasEstornadas || []).map(x => String(x)));
+        if (lap.size) movs.forEach(mv => { if (mv.tipo === 'recompra' && lap.has(String(mv.ts))) fora.add(mv); });
     } catch (err) { console.warn('[CASH] _cashMovsEstornados:', err); }
     return fora;
 }
@@ -41549,6 +41555,13 @@ function estornarMovimentoCash(mesaId, jogadorId, movIdx) {
             const realIdx = j.movimentos.indexOf(mv);
             if (realIdx >= 0) {
                 j.movimentos.splice(realIdx, 1);
+            }
+            // Avisa o banco que essa compra foi estornada (outra máquina desatualizada não a traz de volta)
+            if (mv.tipo === 'recompra') {
+                if (!Array.isArray(j.recomprasEstornadas)) j.recomprasEstornadas = [];
+                if (mv.ts && !j.recomprasEstornadas.includes(mv.ts)) j.recomprasEstornadas.push(mv.ts);
+            } else {
+                j.buyinEditadoEm = Date.now();
             }
 
             // 2) Recalcular totalInvestido
