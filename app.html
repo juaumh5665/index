@@ -29512,6 +29512,15 @@ function abrirEditarTorneio(idx) {
                 '<div class="edit-coll-body">' +
                     '<label class="inp-label">Nome do torneio</label>' +
                     '<input id="edit-nome" class="inp" value="' + esc(t.nome || '') + '">' +
+                    // Ranking vinculado (só define em qual ranking o torneio pontua — não mexe em valores)
+                    '<label class="inp-label" style="margin-top:.75rem;">Ranking</label>' +
+                    '<select id="edit-ranking-id" class="inp">' +
+                        '<option value="">— Não pontua em ranking —</option>' +
+                        ((typeof rankings !== 'undefined' && Array.isArray(rankings)) ? rankings : []).map(r =>
+                            '<option value="' + esc(r.id) + '"' + (String(t.rankingId || '') === String(r.id) ? ' selected' : '') + '>' + esc(r.nome || 'Ranking') + '</option>'
+                        ).join('') +
+                    '</select>' +
+                    '<div style="font-size:.7rem;color:#71717a;margin-top:.3rem;">Os pontos entram no ranking quando o torneio for finalizado.</div>' +
                 '</div>' +
             '</div>' +
 
@@ -29851,6 +29860,13 @@ async function _salvarEditarTorneio() {
 
     // === Coleta dos valores editados ===
     const novoNome = (document.getElementById('edit-nome').value || '').trim() || t.nome;
+    // Ranking vinculado
+    const _elRk = document.getElementById('edit-ranking-id');
+    if (_elRk && String(t.rankingId || '') !== String(_elRk.value || '')) {
+        const _rkAntes = t.rankingId || null;
+        t.rankingId = _elRk.value || null;
+        try { logAudit && logAudit('TORNEIO_EDITA', 'Ranking do torneio "' + t.nome + '": ' + (_rkAntes || 'nenhum') + ' → ' + (t.rankingId || 'nenhum'), { id: t.id }); } catch (_) {}
+    }
     const novoReentry = parseInt(document.getElementById('edit-reentry-ate').value);
     const novoAddonAte = parseInt(document.getElementById('edit-addon-ate').value);
     const impCompra = document.getElementById('edit-imp-compra').checked;
