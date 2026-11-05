@@ -56007,7 +56007,11 @@ function calcularResumoCaixaTorneio(t) {
     const taxaAdmQtd = taxaAdmUnit > 0 ? buyinsQtd : 0;
 
     // bounties pagos (saem do caixa do torneio)
-    const bountiesPagos = (t.eliminados || []).reduce((s,e) => s + (e.bountyPago || 0), 0);
+    // KO: soma dos créditos de bounty lançados (menos estornos). Não depende da lista de eliminados,
+    // que perde o KO quando o eliminado faz re-entry. Torneio normal = 0.
+    const bountiesPagos = ['bounty','pko','knockout'].includes(t.tipo)
+        ? Math.max(0, (typeof _bountyTotalCreditado === 'function') ? _bountyTotalCreditado(t) : 0)
+        : (t.eliminados || []).reduce((s,e) => s + (e.bountyPago || 0), 0);
 
     // FASE F.1: Staff fixo total (se modo='fixo') — informativo, NÃO entra no rake mas vai pra equipe
     const staffFixoTotal = (typeof _getStaffFixoTotal === 'function') ? _getStaffFixoTotal(t) : 0;
