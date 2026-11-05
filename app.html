@@ -48652,7 +48652,12 @@ function renderSaldoCard(saldo) {
     if (!el) return;
     // Destaque mostra TUDO que o jogador deve: saldo da conta + comandas do bar ainda abertas.
     // Só exibição: getSaldoJogador e o pagamento continuam iguais (o bar já aparece na Composição).
-    let _barAberto = 0;
+    let _barAberto = 0, _barQtdComandas = 0, _barQtdItens = 0;
+    try {
+        const _abertas = (barComandas || []).filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta' && calcCobrarComanda(c) > 0);
+        _barQtdComandas = _abertas.length;
+        _barQtdItens = _abertas.reduce((s, c) => s + (c.itens || []).length, 0); // mesma contagem da Composição
+    } catch (_) {}
     try {
         _barAberto = (barComandas || []).filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta')
             .reduce((s, c) => s + calcCobrarComanda(c), 0);
@@ -48672,7 +48677,15 @@ function renderSaldoCard(saldo) {
         <div style="font-family:var(--font-mono);font-weight:800;font-size:2.2rem;color:${cor};margin-top:.25rem;">
             ${devedor?'-':credito?'+':''}${formatMoney(Math.abs(saldo))}
         </div>
-        ${_barAberto > 0 ? `<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">${_saldoConta < 0 ? 'Conta ' + formatMoney(Math.abs(_saldoConta)) : _saldoConta > 0 ? 'Crédito ' + formatMoney(_saldoConta) : 'Conta R$ 0,00'} ${_saldoConta > 0 ? '−' : '+'} bar ${formatMoney(_barAberto)} (comanda aberta)</div>`
+        ${_barAberto > 0 ? `<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">${_saldoConta < 0 ? 'Conta ' + formatMoney(Math.abs(_saldoConta)) : _saldoConta > 0 ? 'Crédito ' + formatMoney(_saldoConta) : 'Conta R$ 0,00'} ${_saldoConta > 0 ? '−' : '+'} bar ${formatMoney(_barAberto)} (comanda aberta)</div>
+            <div style="margin-top:.75rem;text-align:left;display:flex;gap:.75rem;align-items:center;padding:.75rem .9rem;border-radius:.6rem;background:rgba(249,115,22,.12);border:2px solid #f97316;">
+                <div style="font-size:1.6rem;line-height:1;">🍺</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:.66rem;letter-spacing:.08em;font-weight:800;color:#fdba74;text-transform:uppercase;">Comanda aberta no bar</div>
+                    <div style="font-family:var(--font-mono);font-weight:800;font-size:1.5rem;color:#fb923c;line-height:1.15;">${formatMoney(_barAberto)}</div>
+                    <div style="font-size:.75rem;color:#fed7aa;">${_barQtdComandas} comanda${_barQtdComandas > 1 ? 's' : ''} · ${_barQtdItens} ${_barQtdItens === 1 ? 'item' : 'itens'} · <a href="#" onclick="event.preventDefault();event.stopPropagation();_imprimirExtratoComandasAbertas('${pagamentoJogadorId}')" style="color:#fdba74;text-decoration:underline;">ver itens</a>${_saldoConta > 0 ? '<br>O jogador já tem crédito para cobrir. Confira antes de receber de novo.' : ''}</div>
+                </div>
+            </div>`
         : devedor?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Valor a receber do jogador</div>`
                 :credito?`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Pode ser usado em buy-ins, bar ou cash</div>`
                 :`<div style="font-size:.75rem;color:#71717a;margin-top:.35rem;">Nenhuma pendência</div>`}
@@ -48902,7 +48915,7 @@ function renderPagarConta() {
     const toggleComandas = comandasAbertas.length > 0 ? `
         <label class="pj-toggle-comandas" id="pj-toggle-comandas-wrap">
             <input type="checkbox" id="pj-incluir-comandas" checked onchange="atualizarTotalComComandas()">
-            <span>Incluir comandas no acerto</span>
+            <span>Fechar a comanda do bar com este pagamento<small>Desligado: a comanda continua aberta no extrato do jogador</small></span>
         </label>` : '';
 
     // Toggle de cobrança: "Saldo Total" vs "Só Torneio" (aparece só quando há diferença)
@@ -49037,8 +49050,18 @@ function renderPagarConta() {
             .pj-comp-total-label{font-size:.85rem;font-weight:700;color:#fafafa;}
             .pj-comp-total-val{font-size:1.15rem;font-weight:900;font-family:var(--font-mono);color:#ef4444;}
 
-            .pj-toggle-comandas{display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:.4rem;padding:.4rem .65rem;margin-top:.6rem;font-size:.72rem;color:#f97316;font-weight:700;}
-            .pj-toggle-comandas input{accent-color:#f97316;margin:0;cursor:pointer;}
+            /* Comanda aberta em destaque (só visual) */
+            #pj-linha-comandas{background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.45);border-radius:.5rem;padding:.6rem .7rem;margin:.35rem 0;}
+            #pj-linha-comandas .pj-comp-label{font-size:.95rem;font-weight:800;color:#fdba74;}
+            #pj-linha-comandas .pj-comp-sub{color:#fdba74;opacity:.8;font-size:.75rem;}
+            #pj-linha-comandas .pj-comp-val{font-size:1.15rem;color:#fb923c;}
+            .pj-toggle-comandas{display:flex;align-items:center;gap:.7rem;cursor:pointer;border-radius:.6rem;padding:.7rem .85rem;margin-top:.7rem;font-size:.9rem;font-weight:800;background:#141418;border:2px solid #3f3f46;color:#a1a1aa;transition:all .15s;}
+            .pj-toggle-comandas:has(input:checked){background:rgba(34,197,94,.1);border-color:#22c55e;color:#86efac;}
+            .pj-toggle-comandas input{appearance:none;-webkit-appearance:none;width:42px;height:24px;min-width:42px;border-radius:999px;background:#52525b;position:relative;margin:0;cursor:pointer;flex:none;transition:background .15s;}
+            .pj-toggle-comandas input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;}
+            .pj-toggle-comandas input:checked{background:#22c55e;}
+            .pj-toggle-comandas input:checked::after{left:21px;}
+            .pj-toggle-comandas small{display:block;font-weight:600;font-size:.72rem;opacity:.85;margin-top:.1rem;}
 
             .pj-valor-wrap{margin-bottom:1rem;}
             .pj-valor-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;}
