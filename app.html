@@ -18803,7 +18803,7 @@ function _resetAdminRenderEtapa2(body) {
                 </div>
                 ${c.data_validade ? `<div>
                     <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Validade</div>
-                    <div style="color:#fafafa;">${new Date(c.data_validade).toLocaleDateString('pt-BR')}</div>
+                    <div style="color:#fafafa;">${_dataLocal(c.data_validade).toLocaleDateString('pt-BR')}</div>
                 </div>` : ''}
                 ${c.criado_em ? `<div>
                     <div style="color:#71717a;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.2rem;">Cliente desde</div>
@@ -24680,6 +24680,14 @@ function _mostrarModalLimiteUsuarios(info) {
 }
 
 
+// Datas "AAAA-MM-DD" do banco: interpreta no fuso local, senão o navegador
+// lê como UTC e mostra/compara um dia antes no Brasil.
+function _dataLocal(v) {
+    if (v == null || v === '') return new Date(NaN);
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d); } // meia-noite local
+    return new Date(v);
+}
+
 async function carregarAssinaturaAtual() {
     // Carrega assinatura do clube atual + planos disponíveis
     try {
@@ -24710,7 +24718,7 @@ async function carregarAssinaturaAtual() {
         // Verificar bloqueio
         const clube = clubeRes.data;
         const hoje = new Date(); hoje.setHours(0,0,0,0);
-        const validade = clube?.data_validade ? new Date(clube.data_validade) : null;
+        const validade = clube?.data_validade ? _dataLocal(clube.data_validade) : null;
         const expirada = validade && validade < hoje;
         const bloqueadoCampo = clube?.bloqueado === true;
         const statusInativo = _assinaturaAtual && ['suspensa','expirada','cancelada'].includes(_assinaturaAtual.status);
@@ -24748,7 +24756,7 @@ function atualizarBadgeAssinatura() {
     }
     
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const validade = _assinaturaAtual.data_validade ? new Date(_assinaturaAtual.data_validade) : null;
+    const validade = _assinaturaAtual.data_validade ? _dataLocal(_assinaturaAtual.data_validade) : null;
     if (!validade) { badge.style.display = 'none'; return; }
     
     const dias = Math.ceil((validade - hoje) / (1000*60*60*24));
@@ -24794,7 +24802,7 @@ function _renderBannerTrial() {
     
     const status = _assinaturaAtual.status;
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const validade = _assinaturaAtual.data_validade ? new Date(_assinaturaAtual.data_validade) : null;
+    const validade = _assinaturaAtual.data_validade ? _dataLocal(_assinaturaAtual.data_validade) : null;
     
     // Só mostra banner se trial ou expirada
     if (status !== 'trial' && status !== 'expirada') {
@@ -24885,7 +24893,7 @@ function _renderModalTrialExpirado() {
     const statusAssin = _assinaturaAtual?.status;
     const statusClube = sbClube?.status;
     const dias = _assinaturaAtual?.data_validade 
-        ? Math.ceil((new Date(_assinaturaAtual.data_validade) - new Date().setHours(0,0,0,0)) / (1000*60*60*24))
+        ? Math.ceil((_dataLocal(_assinaturaAtual.data_validade) - new Date().setHours(0,0,0,0)) / (1000*60*60*24))
         : null;
     
     // Critério pra mostrar modal:
@@ -25028,7 +25036,7 @@ async function renderAssinatura() {
     // === Banner de status ===
     const a = _assinaturaAtual;
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const validade = a.data_validade ? new Date(a.data_validade) : null;
+    const validade = a.data_validade ? _dataLocal(a.data_validade) : null;
     const dias = validade ? Math.ceil((validade - hoje) / (1000*60*60*24)) : null;
     
     let banner = '';
@@ -25570,7 +25578,7 @@ function _renderBannerGlobalAssinatura_OLD_DESATIVADO() {
     
     const a = _assinaturaAtual;
     const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const validade = a.data_validade ? new Date(a.data_validade) : null;
+    const validade = a.data_validade ? _dataLocal(a.data_validade) : null;
     const dias = validade ? Math.ceil((validade - hoje) / (1000*60*60*24)) : null;
     
     let bg, cor, icone, msg;
@@ -25950,7 +25958,7 @@ function adminRenderClubes(clubes) {
         const dias = c.dias_restantes != null ? c.dias_restantes : '—';
         const corDias = (c.dias_restantes != null && c.dias_restantes < 0) ? '#dc2626' : 
                         (c.dias_restantes != null && c.dias_restantes < 7) ? '#f59e0b' : '#fafafa';
-        const validade = c.data_validade ? new Date(c.data_validade).toLocaleDateString('pt-BR') : '—';
+        const validade = c.data_validade ? _dataLocal(c.data_validade).toLocaleDateString('pt-BR') : '—';
         const valor = c.valor_mensal ? 'R$ ' + Number(c.valor_mensal).toFixed(2).replace('.', ',') : '—';
         const cor = corStatus[c.status] || '#71717a';
         const planoBadge = c.plano_nome ? c.plano_nome.replace('StackOS ', '') : '—';
@@ -26034,7 +26042,7 @@ async function adminEstenderTrialRapido(clubeId, nome, dias) {
         const clube = _adminClubesCache.find(c => c.id === clubeId);
         if (!clube) { alert('Clube não encontrado em cache'); return; }
 
-        const base = clube.data_validade ? new Date(clube.data_validade) : new Date();
+        const base = clube.data_validade ? _dataLocal(clube.data_validade) : new Date();
         // Para adição: se já venceu, parte de hoje. Para subtração: sempre parte da data atual
         if (dias > 0 && base < new Date()) base.setTime(Date.now());
         base.setDate(base.getDate() + dias);
@@ -26054,7 +26062,7 @@ async function adminEstenderTrialRapido(clubeId, nome, dias) {
         // Aqui forçamos o UPDATE do status pra refletir a nova validade.
         // (Quando a RPC for corrigida no Supabase, este bloco pode ser removido.)
         // =====================================================================
-        const novoStatus = new Date(novaData) >= new Date(new Date().toISOString().split('T')[0]) ? 'ativo' : 'expirado';
+        const novoStatus = _dataLocal(novaData) >= new Date(new Date().toISOString().split('T')[0]) ? 'ativo' : 'expirado';
         const { error: errStatus } = await sb.from('clubes')
             .update({ status: novoStatus })
             .eq('id', clubeId);
@@ -26076,7 +26084,7 @@ async function adminEstenderTrialRapido(clubeId, nome, dias) {
         }
         
         // Feedback visual
-        const dataFmt = new Date(novaData).toLocaleDateString('pt-BR');
+        const dataFmt = _dataLocal(novaData).toLocaleDateString('pt-BR');
         const msgDias = dias > 0 ? `+${dias}d` : `${dias}d`;
         if (typeof showToast === 'function') {
             showToast(`✓ "${nome}" ${dias > 0 ? 'estendido' : 'reduzido'} ${msgDias} → ${dataFmt}`);
@@ -26117,19 +26125,19 @@ async function adminAcoesClube(clubeId, nome) {
             if (isNaN(diasNum) || diasNum === 0) { alert('Número inválido'); return; }
             // Calcular nova data
             const clube = _adminClubesCache.find(c => c.id === clubeId);
-            const base = clube?.data_validade ? new Date(clube.data_validade) : new Date();
+            const base = clube?.data_validade ? _dataLocal(clube.data_validade) : new Date();
             if (diasNum > 0 && base < new Date()) base.setTime(Date.now());
             base.setDate(base.getDate() + diasNum);
             const novaData = base.toISOString().split('T')[0];
             const { error } = await sb.rpc('estender_validade', { p_clube_id: clubeId, p_nova_data: novaData });
             if (error) throw error;
             // Sincroniza clubes.status + assinaturas (mesma correção dos botões rápidos)
-            const _novoStatus = new Date(novaData) >= new Date(new Date().toISOString().split('T')[0]) ? 'ativo' : 'expirado';
+            const _novoStatus = _dataLocal(novaData) >= new Date(new Date().toISOString().split('T')[0]) ? 'ativo' : 'expirado';
             await sb.from('clubes').update({ status: _novoStatus }).eq('id', clubeId);
             const _statusAss = _novoStatus === 'ativo' ? 'ativa' : 'expirada';
             await sb.from('assinaturas').update({ status: _statusAss, data_validade: novaData }).eq('clube_id', clubeId);
             const _acaoLabel = diasNum > 0 ? 'estendida' : 'reduzida';
-            alert(`✓ Validade ${_acaoLabel} (${diasNum > 0 ? '+' : ''}${diasNum}d) até ${new Date(novaData).toLocaleDateString('pt-BR')}`);
+            alert(`✓ Validade ${_acaoLabel} (${diasNum > 0 ? '+' : ''}${diasNum}d) até ${_dataLocal(novaData).toLocaleDateString('pt-BR')}`);
             await adminCarregarClubes();
             await adminCarregarDashboard();
         }
