@@ -28796,6 +28796,62 @@ function _bountyTotalCreditado(t) {
     }, 0);
 }
 
+// Lista "pra quem foi pago" (só leitura): agrupa os créditos de bounty por jogador
+function _bountyAbrirPagos() {
+    const t = torneios[activeTorneioIdx];
+    if (!t) return;
+    const pref = ['🎯 Bounty de', '🎯 Bounty parcial de', '⚡ KO de', '🏆 Bounty do campeão', '↩️ Estorno do bounty'];
+    const txs = (transacoes || []).filter(tx => tx && tx.refId === t.id && tx.tipo === 'buyin' && typeof tx.descricao === 'string'
+        && pref.some(p => tx.descricao.indexOf(p) === 0)).sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+    const por = {};
+    txs.forEach(tx => {
+        const g = por[tx.jogadorId] || (por[tx.jogadorId] = { total: 0, kos: 0, linhas: [] });
+        const v = Number(tx.valor) || 0;
+        g.total += v;
+        const ehEstorno = tx.descricao.indexOf('↩️') === 0;
+        const ehCamp = tx.descricao.indexOf('🏆') === 0;
+        if (!ehCamp) g.kos += ehEstorno ? -1 : 1;
+        g.camp = g.camp || (ehCamp ? v : 0);
+        const txt = tx.descricao.split(' · ')[0];
+        const hora = tx.ts ? new Date(tx.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+        g.linhas.push(`<div style="display:flex;justify-content:space-between;gap:.75rem;font-size:.85rem;padding:.3rem 0;color:${v < 0 ? '#fca5a5' : '#d4d4d8'};"><span>${esc(txt)} <span style="color:#71717a;">${hora}</span></span><b style="font-family:var(--font-mono);white-space:nowrap;">${v < 0 ? '−' : '+'}${formatMoney(Math.abs(v))}</b></div>`);
+    });
+    const ids = Object.keys(por).sort((a, b) => por[b].total - por[a].total);
+    const total = ids.reduce((s, id) => s + por[id].total, 0);
+    const corpo = ids.length ? ids.map(id => {
+        const g = por[id];
+        const fichas = Math.max(0, g.kos) + (g.camp ? 1 : 0);
+        return `<div style="background:#0f0f12;border:1px solid #1e1e23;border-radius:.6rem;padding:.75rem .9rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;">
+                <div><div style="font-weight:800;font-size:1.02rem;">${esc(getJogadorNome(id))}</div>
+                <div style="font-size:.78rem;color:#a1a1aa;margin-top:.1rem;">${Math.max(0, g.kos)} KO${g.camp ? ' + bounty de campeão' : ''} · <b style="color:var(--gold);">${fichas} ficha${fichas === 1 ? '' : 's'} de KO</b></div></div>
+                <div style="font-family:var(--font-mono);font-weight:800;font-size:1.15rem;color:#22c55e;">${formatMoney(g.total)}</div>
+            </div>
+            <div style="margin-top:.45rem;border-top:1px solid #1e1e23;padding-top:.35rem;">${g.linhas.join('')}</div>
+        </div>`;
+    }).join('') : '<div style="color:#71717a;font-size:.9rem;padding:1rem;text-align:center;">Nenhum bounty pago ainda.</div>';
+    let ov = document.getElementById('modal-bounties-pagos');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'modal-bounties-pagos';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:99990;display:flex;align-items:center;justify-content:center;padding:1rem;font-family:Manrope,sans-serif;';
+    ov.innerHTML = `<div style="background:#111113;border:1px solid #2a2a30;border-radius:1rem;width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;">
+        <div style="padding:1.1rem 1.4rem;border-bottom:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;">
+            <div><div style="font-weight:800;font-size:1.2rem;color:#22c55e;"><i class="fa-solid fa-crosshairs"></i> Bounties pagos</div>
+            <div style="font-size:.8rem;color:#71717a;margin-top:.15rem;">${esc(t.nome || '')} · já creditados na conta de cada jogador</div></div>
+            <button type="button" data-fechar="1" style="background:none;border:0;color:#a1a1aa;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:1rem 1.4rem;overflow:auto;display:flex;flex-direction:column;gap:.6rem;">${corpo}</div>
+        <div style="padding:.85rem 1.4rem;border-top:1px solid #1e1e23;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.78rem;color:#a1a1aa;line-height:1.4;">No caixa: recolher as fichas de KO e fazer o acerto normal<br>(o valor já está no saldo — não pagar à parte).</span>
+            <b style="font-family:var(--font-mono);font-size:1.15rem;color:#22c55e;white-space:nowrap;">${formatMoney(total)}</b>
+        </div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-fechar]')) ov.remove(); });
+}
+window._bountyAbrirPagos = _bountyAbrirPagos;
+
 function renderBountyPanel(t) {
     const wrap = document.getElementById('mt-bounties-wrap');
     if (!wrap) return;
@@ -28820,7 +28876,7 @@ function renderBountyPanel(t) {
 
     document.getElementById('mt-bounties-totals').innerHTML = `
         <span style="padding:.35rem .7rem;background:rgba(245,158,11,.1);border-radius:.4rem;color:var(--gold);font-weight:700;"><i class="fa-solid fa-coins"></i> Na mesa: ${formatMoney(totalBountiesNaMesa)}</span>
-        <span style="padding:.35rem .7rem;background:rgba(34,197,94,.1);border-radius:.4rem;color:#22c55e;font-weight:700;"><i class="fa-solid fa-check"></i> Pagos: ${formatMoney(totalBountiesPagos)}</span>
+        <button type="button" onclick="_bountyAbrirPagos()" title="Ver pra quem foi pago" style="padding:.35rem .7rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);border-radius:.4rem;color:#22c55e;font-weight:700;cursor:pointer;font-family:inherit;font-size:inherit;"><i class="fa-solid fa-check"></i> Pagos: ${formatMoney(totalBountiesPagos)} <i class="fa-solid fa-list" style="margin-left:.25rem;opacity:.8;"></i></button>
     `;
 
     // Ordena por valor do bounty decrescente
