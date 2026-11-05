@@ -91,6 +91,13 @@
                 '<button id="sim-ko-btn" style="padding:9px;border-radius:8px;border:0;background:#b91c1c;color:#fff;font-weight:700;cursor:pointer"' + (ativos.length < 2 ? ' disabled' : '') + '>💀 Eliminar</button>' +
             '</div>' +
             '<div style="font-size:11px;color:#71717a;margin:6px 0 10px">Depois de eliminar, "+ Re-entry" volta o último eliminado com bounty novo.</div>' +
+            (function () { try {
+                const pb = montarEntry(t, '__preco__', 'buyin'), pr = montarEntry(t, '__preco__', 'reentry'), pa = montarEntry(t, '__preco__', 'addon');
+                const tx = Number(pb.entry.taxaAdm) || 0;
+                return row('Buy-in cobrado', fm(pb.total) + (tx ? ' <span style="color:#71717a;font-weight:500">(' + fm(pb.total - tx) + ' + taxa ' + fm(tx) + ')</span>' : '')) +
+                       row('Reentrada cobrada' + (t.reentryValor != null ? '' : ' (igual ao buy-in)'), fm(pr.total)) +
+                       (Number(t.addonValor) > 0 ? row('Add-on cobrado', fm(pa.total)) : '');
+            } catch (_) { return ''; } })() +
             row('Bounty por KO', t.tipo === 'bounty' ? fm(v) : (t.tipo === 'pko' ? splitPko(t) + '% vai pro bolso' : '100% do líquido')) +
             (t.tipo === 'bounty' ? row('Separado da premiação (' + qtdComBounty + ' entradas × ' + fm(v) + ')', fm(reservado)) : '') +
             row('Já pago aos eliminadores', fm(pagos), '#fcd34d') +
@@ -311,7 +318,9 @@
                 '<button data-sim-rm="' + i + '" style="background:none;border:0;color:#fca5a5;cursor:pointer;font-size:14px" title="Remover">✕</button></div>';
         }).join('') || '<div style="color:#71717a;font-size:13px;padding:10px 0">Nenhum lançamento ainda. Use os botões acima.</div>';
 
-        const btnTipo = TIPOS.map(([k, l]) => '<button data-sim-lanc="' + k + '" style="padding:10px;border-radius:8px;border:0;background:#a16207;color:#fff;font-weight:700;cursor:pointer;font-size:13px">+ ' + l + '</button>').join('');
+        // Preço de cada ação (mesma regra do lançamento real) — aparece no botão
+        const precoDe = (k) => { try { const r = montarEntry(t, '__preco__', k); return (r.total - (Number(r.entry.taxaAdm) || 0)) > 0 ? r.total : null; } catch (_) { return null; } };
+        const btnTipo = TIPOS.map(([k, l]) => { const pv = precoDe(k); return '<button data-sim-lanc="' + k + '" style="padding:10px;border-radius:8px;border:0;background:#a16207;color:#fff;font-weight:700;cursor:pointer;font-size:13px">+ ' + l + (pv ? '<br><span style="font-size:11px;font-weight:600;opacity:.9">' + fm(pv) + '</span>' : '') + '</button>'; }).join('');
         const row = (k, v, cor) => '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #222;font-size:13px;font-variant-numeric:tabular-nums"><span style="color:#a1a1aa">' + k + '</span><b style="color:' + (cor || '#e4e4e7') + '">' + v + '</b></div>';
         const stat = (k, v) => '<div style="background:#0f0f14;border:1px solid #27272a;border-radius:8px;padding:10px"><div style="font-size:11px;color:#a1a1aa;text-transform:uppercase">' + k + '</div><b style="font-size:20px">' + v + '</b></div>';
 
