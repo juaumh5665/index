@@ -8260,7 +8260,9 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
                             <div><label class="inp-label">Valor Bounty R$</label><input id="t-bounty-valor" type="number" value="20" class="inp"></div>
                             <div id="t-pko-split-wrap" style="display:none;"><label class="inp-label">% p/ cabeça</label><input id="t-pko-split" type="number" value="50" min="0" max="100" class="inp"></div>
+                            <div><label class="inp-label">Valor da reentrada R$</label><input id="t-ko-reentry-valor" type="number" step="0.01" min="0" placeholder="igual ao buy-in" class="inp"></div>
                         </div>
+                        <div style="font-size:.66rem;color:#71717a;margin-top:.3rem;">Reentrada: valor total cobrado (com staff). Vazio = mesmo valor do buy-in. Taxa adm. continua só no buy-in.</div>
                         <div id="t-bounty-hint" style="font-size:.68rem;color:#71717a;margin-top:.4rem;"></div>
                     </div>
 
@@ -28199,7 +28201,15 @@ function saveTournament() {
         buyinDuploFichas:   parseInt(document.getElementById('t-buyin-duplo-fichas')?.value)    || 0,
         // Reentrada múltipla — desligada por padrão (0 = desligado, reentryValor null = segue o buy-in)
         reentryMultiploMax: _rmLerForm().max,
-        reentryValor:       _rmLerForm().valor,
+        reentryValor:       (function(){
+            // KO: campo próprio "Valor da reentrada" (a reentrada múltipla fica desligada em KO)
+            const tp = document.getElementById('t-tipo')?.value;
+            if (typeof _rmTipoKO === 'function' && _rmTipoKO(tp)) {
+                const v = parseFloat(document.getElementById('t-ko-reentry-valor')?.value);
+                return (!isNaN(v) && v > 0) ? v : null;
+            }
+            return _rmLerForm().valor;
+        })(),
         // Last Chance (3ª compra após add-on)
         last_chance_ativo:  document.getElementById('t-last-chance-ativo')?.checked || false,
         last_chance_valor:  parseFloat(document.getElementById('t-last-chance-valor')?.value) || 0,
@@ -29792,11 +29802,16 @@ function abrirEditarTorneio(idx) {
                         '<div><label class="inp-label">Add-on fichas</label><input id="edit-fin-addon-fichas" class="inp" type="number" min="0" value="' + (Number(t.addonFichas)||0) + '"></div>' +
                         '<div><label class="inp-label">Buy-in duplo R$</label><input id="edit-fin-buyin-duplo" class="inp" type="number" min="0" step="0.01" value="' + (Number(t.buyinDuploValor)||0) + '"></div>' +
                         '<div><label class="inp-label">Buy-in duplo fichas</label><input id="edit-fin-buyin-duplo-fichas" class="inp" type="number" min="0" value="' + (Number(t.buyinDuploFichas)||0) + '"></div>' +
+                        // KO: só o valor da reentrada (reentrada múltipla não existe em KO)
+                        ((typeof _rmTipoKO === 'function' && _rmTipoKO(t.tipo)) ? (
+                        '<div><label class="inp-label">Valor da reentrada R$ (KO)</label><input id="edit-fin-ko-reentry" class="inp" type="number" min="0" step="0.01" placeholder="igual ao buy-in" value="' + ((t.reentryValor != null) ? Number(t.reentryValor) : '') + '"></div>'
+                        ) : (
                         // Reentrada múltipla (NOVO)
                         '<div><label class="inp-label">Reentrada múltipla</label><select id="edit-fin-rm-max" class="inp">' +
                             [0,2,3,4,5,6,8,10].map(function(n){ var cur = (Number(t.reentryMultiploMax) > 1) ? Number(t.reentryMultiploMax) : 0; return '<option value="' + n + '"' + (n === cur ? ' selected' : '') + '>' + (n ? ('Até ' + n + 'x') : 'Desligada') + '</option>'; }).join('') +
                         '</select></div>' +
-                        '<div><label class="inp-label">Valor por reentrada R$</label><input id="edit-fin-rm-valor" class="inp" type="number" min="0" step="0.01" value="' + ((t.reentryValor != null) ? Number(t.reentryValor) : 20) + '"></div>' +
+                        '<div><label class="inp-label">Valor por reentrada R$</label><input id="edit-fin-rm-valor" class="inp" type="number" min="0" step="0.01" value="' + ((t.reentryValor != null) ? Number(t.reentryValor) : 20) + '"></div>'
+                        )) +
                     '</div>' +
                 '</div>' +
             '</div>'
@@ -30207,6 +30222,14 @@ async function _salvarEditarTorneio() {
     {
         const elRmMax = document.getElementById('edit-fin-rm-max');
         const elRmVal = document.getElementById('edit-fin-rm-valor');
+        const elKoRe = document.getElementById('edit-fin-ko-reentry');
+        if (!_editTemEntries && elKoRe) {
+            // KO: valor próprio da reentrada (vazio = igual ao buy-in)
+            const v = parseFloat(elKoRe.value);
+            const novo = (!isNaN(v) && v > 0) ? v : null;
+            const antes = (t.reentryValor != null) ? Number(t.reentryValor) : null;
+            if (novo !== antes) { t.reentryValor = novo; _rmEditAlterado = true; }
+        }
         if (!_editTemEntries && elRmMax && elRmVal) {
             const novoMax = parseInt(elRmMax.value) || 0;
             const novoVal = parseFloat(elRmVal.value);
@@ -57325,7 +57348,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <!-- StackSangeur (painel do caixa): só liga em clube com feature_sangeur; não altera nada do app -->
 <script src="/stacksangeur-caixa.js?v=6" defer></script>
 <script src="/stackos-abertos.js?v=1" defer></script>
-<script src="/stackos-simulador.js?v=9" defer></script>
+<script src="/stackos-simulador.js?v=10" defer></script>
 <script src="/stackos-relogio-controle.js?v=4" defer></script>
 <script src="/stackos-ranking.js?v=2" defer></script>
 <script src="/stackos-ranking-arte.js?v=2" defer></script>

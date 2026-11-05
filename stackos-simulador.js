@@ -24,6 +24,80 @@
     const fm = (v) => (typeof formatMoney === 'function') ? formatMoney(v) : ('R$ ' + Number(v || 0).toFixed(2));
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const nomeFake = (i) => 'Jogador Teste ' + String(i).padStart(2, '0');
+    const nomeDe = (jid) => { const l = sim && sim.lanc.find(x => x.entry.jogadorId === jid); return l ? l.nome : jid; };
+    const ehKO = (t) => !!t && ['bounty', 'pko', 'knockout'].includes(t.tipo);
+    const splitPko = (t) => Number(t.pkoSplit != null ? t.pkoSplit : t.bountyKoSplit) || 0;
+    const cabeca = (t, jid) => (typeof _bountyNaCabeca === 'function') ? _bountyNaCabeca(t, jid) : 0;
+    function ativosSim(t) {
+        const saiu = new Set((t.eliminados || []).map(e => e.jogadorId));
+        return [...new Set(t.entries.filter(e => e.tipo !== 'addon').map(e => e.jogadorId))].filter(id => !saiu.has(id));
+    }
+    // ---------- KO: eliminação simulada (mesma regra do real: o eliminador recebe o bounty da cabeça) ----------
+    function eliminarSim() {
+        if (!sim) return;
+        const t = sim.t;
+        const jid = (document.getElementById('sim-ko-elim') || {}).value;
+        const por = (document.getElementById('sim-ko-por') || {}).value || null;
+        if (!jid) return showToast('⚠️ Escolha quem foi eliminado');
+        if (por && por === jid) return showToast('⚠️ O jogador não pode eliminar ele mesmo');
+        const ativos = ativosSim(t);
+        if (ativos.length < 2) return showToast('⚠️ Torneio já terminou');
+        const pago = por ? cabeca(t, jid) : 0;
+        const ts = Date.now() + (sim.kos || []).length;
+        t.eliminados.push({ jogadorId: jid, eliminadorId: por, bountyPago: pago, posicao: ativos.length, ts });
+        // Histórico de KOs à parte: a re-entry tira o jogador dos eliminados, mas o KO já foi pago
+        (sim.kos = sim.kos || []).push({ jogadorId: jid, eliminadorId: por, bountyPago: pago, posicao: ativos.length, ts });
+        render();
+    }
+    function desfazerElimSim(i) {
+        if (!sim) return;
+        const k = (sim.kos || [])[i];
+        if (!k) return;
+        sim.kos.splice(i, 1);
+        sim.t.eliminados = sim.t.eliminados.filter(e => e.ts !== k.ts);
+        render();
+    }
+    function blocoKO(t) {
+        if (!ehKO(t)) return '';
+        const v = Number(t.bountyValor) || 0;
+        const ativos = ativosSim(t);
+        const fim = ativos.length === 1 && t.eliminados.length > 0;
+        const noBolso = (e) => t.tipo === 'pko' ? (Number(e.bountyPago) || 0) * splitPko(t) / 100 : (Number(e.bountyPago) || 0);
+        const kos = sim.kos || [];
+        const pagos = kos.reduce((s, e) => s + (e.eliminadorId ? noBolso(e) : 0), 0);
+        const naMesa = ativos.reduce((s, id) => s + cabeca(t, id), 0);
+        const perdidos = kos.filter(e => !e.eliminadorId).length;
+        const qtdComBounty = t.entries.filter(e => e.tipo !== 'addon' && e.tipo !== 'last_chance').length;
+        const reservado = t.tipo === 'bounty' ? qtdComBounty * v : 0;
+        const ganhos = {};
+        kos.forEach(e => { if (e.eliminadorId) { const g = ganhos[e.eliminadorId] || (ganhos[e.eliminadorId] = { n: 0, v: 0 }); g.n++; g.v += noBolso(e); } });
+        const row = (k, val, cor) => '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #222;font-size:13px;font-variant-numeric:tabular-nums"><span style="color:#a1a1aa">' + k + '</span><b style="color:' + (cor || '#e4e4e7') + '">' + val + '</b></div>';
+        const opt = (ids, vazio) => (vazio ? '<option value="">' + vazio + '</option>' : '<option value="">— escolha —</option>') + ids.map(id => '<option value="' + esc(id) + '">' + esc(nomeDe(id)) + ' · ' + fm(cabeca(t, id)) + '</option>').join('');
+        const avisos = [];
+        if (t.tipo === 'knockout') avisos.push('⚡ "Somente KO": a premiação final é ZERO — todo o dinheiro vira bounty. Para KO fixo (ex.: R$ 25 por KO) use "💰 Bounty Fixo".');
+        if (t.tipo === 'bounty' && t.entries.some(e => e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo')) avisos.push('Rebuy em Bounty Fixo tira mais ' + fm(v) + ' da premiação por rebuy sem aumentar o bounty da cabeça.');
+        if (perdidos) avisos.push(perdidos + ' eliminação(ões) sem eliminador: esse bounty não foi pago a ninguém.');
+        if (fim) avisos.push('🏆 Fim: o campeão ' + esc(nomeDe(ativos[0])) + ' termina com ' + fm(cabeca(t, ativos[0])) + ' na cabeça — hoje o sistema não paga esse valor a ele.');
+        const voltou = (e) => !t.eliminados.some(x => x.ts === e.ts);
+        const elimLista = kos.map((e, i) => '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:5px 0;border-bottom:1px solid #1f1f25"><span>' + e.posicao + 'º · ' + esc(nomeDe(e.jogadorId)) + ' <span style="color:#71717a">por ' + (e.eliminadorId ? esc(nomeDe(e.eliminadorId)) : 'ninguém') + (voltou(e) ? ' <span style="font-size:10px;background:#1e3a2a;color:#86efac;border-radius:999px;padding:1px 6px">VOLTOU (re-entry)</span>' : '') + '</span></span><span style="display:flex;gap:8px;align-items:center"><b style="color:#fcd34d">' + (e.eliminadorId ? '+' + fm(noBolso(e)) : '—') + '</b><button data-sim-unelim="' + i + '" style="background:none;border:0;color:#fca5a5;cursor:pointer" title="Desfazer">✕</button></span></div>').join('');
+        const ganhosLista = Object.keys(ganhos).sort((a, b) => ganhos[b].v - ganhos[a].v).map(id => row(esc(nomeDe(id)) + ' · ' + ganhos[id].n + ' KO', fm(ganhos[id].v), '#fcd34d')).join('');
+        return '<div style="background:#14141a;border:1px solid #b45309;border-radius:12px;padding:16px;min-width:0">' +
+            '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#fcd34d;margin-bottom:10px">🎯 KO — eliminações e bounties</div>' +
+            avisos.map(a => '<div style="background:#2a1e04;border:1px solid #92400e;color:#fde68a;border-radius:8px;padding:8px 10px;font-size:12.5px;margin-bottom:8px;line-height:1.4">' + a + '</div>').join('') +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">' +
+                '<label style="font-size:11px;color:#a1a1aa">Eliminado<select id="sim-ko-elim" style="width:100%;margin-top:4px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + opt(ativos) + '</select></label>' +
+                '<label style="font-size:11px;color:#a1a1aa">Quem eliminou<select id="sim-ko-por" style="width:100%;margin-top:4px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + opt(ativos, '— sem eliminador —') + '</select></label>' +
+                '<button id="sim-ko-btn" style="padding:9px;border-radius:8px;border:0;background:#b91c1c;color:#fff;font-weight:700;cursor:pointer"' + (ativos.length < 2 ? ' disabled' : '') + '>💀 Eliminar</button>' +
+            '</div>' +
+            '<div style="font-size:11px;color:#71717a;margin:6px 0 10px">Depois de eliminar, "+ Re-entry" volta o último eliminado com bounty novo.</div>' +
+            row('Bounty por KO', t.tipo === 'bounty' ? fm(v) : (t.tipo === 'pko' ? splitPko(t) + '% vai pro bolso' : '100% do líquido')) +
+            (t.tipo === 'bounty' ? row('Separado da premiação (' + qtdComBounty + ' entradas × ' + fm(v) + ')', fm(reservado)) : '') +
+            row('Já pago aos eliminadores', fm(pagos), '#fcd34d') +
+            row('Ainda na cabeça dos ativos (' + ativos.length + ')', fm(naMesa)) +
+            (ganhosLista ? '<div style="font-size:11px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px">Quem ganhou KO (= fichas de KO a trocar no caixa)</div>' + ganhosLista : '') +
+            (elimLista ? '<div style="font-size:11px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px">Eliminações</div><div style="max-height:220px;overflow:auto">' + elimLista + '</div>' : '') +
+        '</div>';
+    }
 
     // ---------- Monta a entry com a MESMA regra do lançamento real (sem passaporte) ----------
     function montarEntry(t, jid, tipo) {
@@ -77,7 +151,7 @@
         const t0 = (typeof activeTorneioIdx !== 'undefined' && activeTorneioIdx !== null) ? torneios[activeTorneioIdx] : null;
         if (!t0) return showToast('⚠️ Abra um torneio primeiro');
         const t = JSON.parse(JSON.stringify(t0));
-        t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
+        t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = []; t.bounties = {};
         t.premiacaoProjetada = t0.premiacaoProjetada ? JSON.parse(JSON.stringify(t0.premiacaoProjetada)) : t.premiacaoProjetada;
         sim = { tid: t0.id, t, lanc: [], n: 0, nivel: 'pre' };
         aplicarNivel(t, 'pre');
@@ -90,8 +164,8 @@
         if (!t0) return;
         const antigos = sim.lanc.map(l => ({ jid: l.entry.jogadorId, tipo: l.entry.tipo, nome: l.nome, combo: l.combo || null, nivel: l.nivel }));
         const t = JSON.parse(JSON.stringify(t0));
-        t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = [];
-        sim.t = t; sim.lanc = [];
+        t.entries = []; t.eliminados = []; t.jackpotCompras = []; t.estornos = []; t.mesas = []; t.bounties = {};
+        sim.t = t; sim.lanc = []; sim.kos = [];
         const feitos = new Set();
         const nivelAtualSel = sim.nivel;
         antigos.forEach(a => {
@@ -115,9 +189,13 @@
         if (!jid) {
             // Buy-in / duplo = jogador novo; demais = último jogador lançado (ou novo se não houver)
             const ultimo = sim.lanc.length ? sim.lanc[sim.lanc.length - 1] : null;
-            if (tipo === 'buyin' || tipo === 'buyin_duplo' || !ultimo) { sim.n++; jid = 'sim-j' + sim.n; nome = nomeFake(sim.n); }
+            const elimRecente = (tipo === 'reentry' && (sim.t.eliminados || []).length) ? sim.t.eliminados[sim.t.eliminados.length - 1] : null;
+            if (elimRecente) { jid = elimRecente.jogadorId; nome = nomeDe(jid); }
+            else if (tipo === 'buyin' || tipo === 'buyin_duplo' || !ultimo) { sim.n++; jid = 'sim-j' + sim.n; nome = nomeFake(sim.n); }
             else { jid = ultimo.entry.jogadorId; nome = ultimo.nome; }
         }
+        // Re-entry reativa o jogador eliminado (igual ao real): sai da lista de eliminados
+        if (tipo === 'reentry') sim.t.eliminados = (sim.t.eliminados || []).filter(e => e.jogadorId !== jid);
         const r = montarEntry(sim.t, jid, tipo);
         sim.t.entries.push(r.entry);
         sim.lanc.push({ entry: r.entry, nome, total: r.total, nivel: sim.nivel });
@@ -159,9 +237,13 @@
         const ids = new Set(l.combo ? sim.lanc.filter(x => x.combo === l.combo).map(x => x.entry.id) : [l.entry.id]);
         sim.lanc = sim.lanc.filter(x => !ids.has(x.entry.id));
         sim.t.entries = sim.t.entries.filter(e => !ids.has(e.id));
+        const comEntry = new Set(sim.t.entries.filter(e => e.tipo !== 'addon').map(e => e.jogadorId));
+        const okK = (e) => comEntry.has(e.jogadorId) && (!e.eliminadorId || comEntry.has(e.eliminadorId));
+        sim.t.eliminados = (sim.t.eliminados || []).filter(okK);
+        sim.kos = (sim.kos || []).filter(okK);
         render();
     }
-    function limpar() { if (!sim) return; sim.lanc = []; sim.t.entries = []; sim.n = 0; render(); }
+    function limpar() { if (!sim) return; sim.lanc = []; sim.t.entries = []; sim.t.eliminados = []; sim.t.bounties = {}; sim.kos = []; sim.n = 0; render(); }
 
     function verComprovante(i) {
         if (!sim) return;
@@ -270,6 +352,7 @@
                     row('Prize pool', fm(prize), '#86efac') +
                     '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a1a1aa;margin:14px 0 6px">Premiação</div><div id="sim-payout"></div>' +
                 '</div></div>' +
+            blocoKO(t) +
             '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:#14141a;border:1px solid #27272a;border-radius:12px;padding:12px">' +
                 '<button id="sim-limpar" style="padding:10px 14px;border-radius:8px;border:1px solid #7f1d1d;background:#18181b;color:#fca5a5;cursor:pointer">🗑️ Limpar simulação</button>' +
                 '<button id="sim-ajustar" style="padding:10px 14px;border-radius:8px;border:1px solid #3f3f46;background:#18181b;color:#e4e4e7;cursor:pointer">✏️ Ajustar configuração</button>' +
@@ -288,6 +371,8 @@
             if (b.dataset.simRm != null) return remover(Number(b.dataset.simRm));
             if (b.id === 'sim-gerar') return gerarVarios();
             if (b.id === 'sim-combo') return lancarCombo();
+            if (b.id === 'sim-ko-btn') return eliminarSim();
+            if (b.dataset.simUnelim != null) return desfazerElimSim(Number(b.dataset.simUnelim));
             if (b.id === 'sim-limpar') return limpar();
             if (b.id === 'sim-fechar') return fechar();
             if (b.id === 'sim-ajustar') {
