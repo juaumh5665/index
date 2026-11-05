@@ -28700,6 +28700,67 @@ function updateModalTorneio() {
     }
 }
 
+// =====================================================================
+// KO — valor do bounty na cabeça de um jogador.
+// t.bounties não vai pro banco: depois de F5, ou noutra máquina, ele vem vazio
+// e a eliminação pagava R$ 0. Aqui o valor sai do histórico gravado
+// (entries + eliminações), igual em qualquer máquina.
+//  - Bounty fixo: jogador ativo vale t.bountyValor.
+//  - PKO / Somente KO: usa a memória quando tem; senão reconstrói pela ordem dos eventos.
+// =====================================================================
+function _bountyReconstruirKO(t) {
+    const st = {};
+    if (!t) return st;
+    const split = Number(t.pkoSplit != null ? t.pkoSplit : t.bountyKoSplit) || 0;
+    const ev = [];
+    (t.entries || []).forEach(e => { if (e.tipo !== 'addon') ev.push({ k: 'e', ts: Number(e.ts) || 0, j: String(e.jogadorId) }); });
+    (t.eliminados || []).forEach(e => ev.push({ k: 'x', ts: Number(e.ts) || 0, j: String(e.jogadorId), y: e.eliminadorId ? String(e.eliminadorId) : null, pago: Number(e.bountyPago) || 0 }));
+    ev.sort((a, b) => a.ts - b.ts || (a.k === 'e' ? -1 : 1));
+    const free = (typeof _isBuyinFree === 'function') ? _isBuyinFree(t) : false;
+    const ini = free ? 0 : (t.tipo === 'knockout' ? (Number(t.buyin) || 0) * (1 - (Number(t.rake) || 0) / 100) : (Number(t.buyin) || 0) * (split / 100));
+    ev.forEach(v => {
+        if (v.k === 'e') { st[v.j] = (st[v.j] || 0) + ini; return; }
+        const pago = v.pago || st[v.j] || 0;
+        if (t.tipo === 'pko' && v.y && v.y !== v.j) st[v.y] = (st[v.y] || 0) + (pago - pago * (split / 100));
+        st[v.j] = 0;
+    });
+    return st;
+}
+function _bountyNaCabeca(t, jid) {
+    if (!t || !jid) return 0;
+    const id = String(jid);
+    if (t.tipo === 'bounty') {
+        const entrou = (t.entries || []).some(e => String(e.jogadorId) === id && e.tipo !== 'addon');
+        const saiu = (t.eliminados || []).some(e => String(e.jogadorId) === id);
+        return (entrou && !saiu) ? (Number(t.bountyValor) || 0) : 0;
+    }
+    if (t.tipo === 'pko' || t.tipo === 'knockout') {
+        if (t.bounties && t.bounties[jid] != null && !isNaN(Number(t.bounties[jid]))) return Number(t.bounties[jid]) || 0;
+        return _bountyReconstruirKO(t)[id] || 0;
+    }
+    return 0;
+}
+// Estorna o que foi creditado ao eliminador quando uma eliminação KO é cancelada.
+// Não apaga nada: lança uma transação contrária (o caixa e o extrato mostram as duas).
+function _bountyEstornarEliminacao(t, elim) {
+    try {
+        if (!t || !elim || !elim.eliminadorId) return;
+        if (!['bounty','pko','knockout'].includes(t.tipo)) return;
+        const pago = Number(elim.bountyPago) || 0;
+        if (pago <= 0) return;
+        const noBolso = t.tipo === 'pko' ? pago * ((Number(t.pkoSplit != null ? t.pkoSplit : t.bountyKoSplit) || 0) / 100) : pago;
+        if (noBolso <= 0) return;
+        registrarTransacao({
+            jogadorId: elim.eliminadorId,
+            tipo: 'buyin',
+            valor: -noBolso,
+            descricao: `↩️ Estorno do bounty de ${getJogadorNome(elim.jogadorId)} (eliminação cancelada) · ${t.nome}`,
+            origem: 'torneio',
+            refId: t.id,
+        });
+    } catch (e) { console.warn('[BOUNTY] estorno:', e); }
+}
+
 function renderBountyPanel(t) {
     const wrap = document.getElementById('mt-bounties-wrap');
     if (!wrap) return;
@@ -28717,7 +28778,7 @@ function renderBountyPanel(t) {
     if (!t.bounties) t.bounties = {};
 
     // Totalizadores
-    const totalBountiesNaMesa = ativos.reduce((s,id) => s + (t.bounties[id]||0), 0);
+    const totalBountiesNaMesa = ativos.reduce((s,id) => s + _bountyNaCabeca(t, id), 0);
     const totalBountiesPagos = t.eliminados.filter(e=>e.bountyPago).reduce((s,e)=>s+e.bountyPago, 0);
 
     document.getElementById('mt-bounties-totals').innerHTML = `
@@ -28729,7 +28790,7 @@ function renderBountyPanel(t) {
     const ranked = ativos.map(id => ({
         id,
         nome: getJogadorNome(id),
-        valor: t.bounties[id] || 0,
+        valor: _bountyNaCabeca(t, id),
     })).sort((a,b) => b.valor - a.valor);
 
     document.getElementById('mt-bounties-list').innerHTML = ranked.length ? ranked.map((r, i) => `
@@ -33591,7 +33652,7 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
     // Lógica de bounty
     if (['bounty','pko','knockout'].includes(t.tipo) && eliminadorId && eliminadorId !== jid) {
         if (!t.bounties) t.bounties = {}; // FIX: garante que bounties existe
-        const bountyEliminado = t.bounties[jid] || 0;
+        const bountyEliminado = _bountyNaCabeca(t, jid);
         elim.eliminadorId = eliminadorId;
         elim.bountyPago   = bountyEliminado;
 
@@ -33609,7 +33670,7 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
             // Progressive KO: metade vai pro bolso do eliminador, metade cresce na cabeça dele
             const paraBolso  = bountyEliminado * (t.pkoSplit/100);
             const paraCabeca = bountyEliminado - paraBolso;
-            t.bounties[eliminadorId] = (t.bounties[eliminadorId] || 0) + paraCabeca;
+            t.bounties[eliminadorId] = _bountyNaCabeca(t, eliminadorId) + paraCabeca;
             if (paraBolso > 0) {
                 registrarTransacao({
                     jogadorId: eliminadorId,
@@ -33694,7 +33755,10 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
         torneios[tornIdx] = JSON.parse(snapshot);
         // Remove transações recentes de bounty (últimos 5s)
         const agora = Date.now();
-        transacoes = transacoes.filter(tx => !(tx.refId === _undoTorneioId && tx.descricao && (tx.descricao.includes('Bounty') || tx.descricao.includes('KO')) && (agora - tx.ts) < 10000));
+        // (removido) filtro que apagava transações com 'Bounty'/'KO' na descrição: pegava também
+        // buy-ins de torneios com KO no nome e deixava o bounty sem crédito. O snapshot deste
+        // undo é tirado DEPOIS da eliminação, então o crédito do bounty continua coerente.
+        void agora;
         // Deletar eliminação do banco (sync só faz upsert, não delete)
         if (typeof sb !== 'undefined') {
             sb.from('torneio_eliminados').delete().eq('torneio_id', _undoTorneioId).eq('jogador_id', _undoJogadorId).then(({ error }) => {
@@ -55650,6 +55714,12 @@ function _acertoSaida_cancelarEliminacao() {
     }
     try {
         const torneioId = torneios[snap.tornIdx] && torneios[snap.tornIdx].id;
+        // KO: se a eliminação pagou bounty, lança o estorno pro eliminador
+        try {
+            const _tAtual = torneios[snap.tornIdx];
+            const _elimKO = _tAtual && (_tAtual.eliminados || []).find(e => String(e.jogadorId) === String(snap.jogadorId));
+            if (_elimKO) _bountyEstornarEliminacao(_tAtual, _elimKO);
+        } catch (_eKO) { console.warn('[CANCEL_ELIM] bounty:', _eKO); }
         torneios[snap.tornIdx] = JSON.parse(snap.snapshot);
         _ultimoSnapshotEliminacao = null;
 
