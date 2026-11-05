@@ -9883,9 +9883,30 @@ function _saveDataInner() {
 }
 
 // Wrapper público — chama original + dispara sync com debounce
+// Posições dos eliminados pela ORDEM em que saíram: o primeiro a sair fica com a última posição
+// (nº de jogadores únicos) e assim por diante. Corrige os casos em que a posição foi calculada
+// pelo nº de ativos do momento e depois entrou jogador novo (inscrição tardia) ou alguém voltou
+// por re-entry — antes isso gerava posição repetida e faltava a última. Só torneios em andamento;
+// resultado determinístico (mesmo em várias máquinas). Não mexe em entradas, prêmio nem caixa.
+function _normalizarPosicoesEliminados(t) {
+    if (!t || !Array.isArray(t.eliminados) || !t.eliminados.length || !Array.isArray(t.entries)) return false;
+    const n = new Set(t.entries.filter(e => e && e.tipo !== 'addon').map(e => String(e.jogadorId))).size;
+    const lista = t.eliminados.filter(Boolean);
+    if (!n || lista.length > n) return false; // dados fora do padrão: não mexe
+    const ord = lista.slice().sort((a, b) => ((Number(a.ts) || 0) - (Number(b.ts) || 0)) || ((Number(b.posicao) || 0) - (Number(a.posicao) || 0)) || String(a.id || '').localeCompare(String(b.id || '')));
+    let mudou = false;
+    ord.forEach((e, i) => { const pos = n - i; if (Number(e.posicao) !== pos) { e.posicao = pos; mudou = true; } });
+    return mudou;
+}
+
 function saveData() {
     // 🔒 MODO SUPORTE: não salva nada (nem local, nem remote)
     if (window._modoSuporte) return;
+    try {
+        (torneios || []).forEach(t => {
+            if (t && t.iniciadoEm && !['finished', 'encerrado', 'cancelado'].includes(String(t.status || ''))) _normalizarPosicoesEliminados(t);
+        });
+    } catch (e) { console.warn('[POSICOES] normalizar:', e); }
     _saveDataInner();
     // Marca tudo como dirty pra próximo sync (estratégia simples mas eficaz)
     // FIX CRÍTICO: marca dirty MESMO offline — o _persistirFilaPendencias() dentro
@@ -33925,7 +33946,7 @@ function updateTV(idx) {
         torneioId: t.id,
         avisoEliminacao: !!(sbClube && sbClube.config && sbClube.config.tv_aviso_eliminacao),
         eliminacoesRecentes: (t.eliminados || []).slice().sort((a, b) => (Number(b.ts) || 0) - (Number(a.ts) || 0)).slice(0, 8).map(e => {
-            const o = { id: e.id || (e.jogadorId + '-' + e.posicao), nome: getJogadorNome(e.jogadorId), posicao: e.posicao };
+            const o = { id: e.id || (e.jogadorId + '-' + e.posicao), nome: getJogadorNome(e.jogadorId), posicao: e.posicao, ts: Number(e.ts) || 0 };
             if (Number(e.posicao) === 2) { try { const v = getVencedorTorneio(t); if (v) o.campeao = getJogadorNome(v); } catch (_) {} }
             return o;
         }),

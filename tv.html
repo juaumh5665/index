@@ -2588,7 +2588,8 @@ function montarCarouselPremiacao(d) {
             if (!_elim.ativo) _mostrarProximaEliminacao();
         } catch (e) { console.warn('atualizarAvisoEliminacao:', e); }
     }
-    function _chaveElim(e) { return String(e.nome || e.id || '').trim().toUpperCase() + '|' + String(e.posicao || ''); }
+    // Chave estável: nome + horário da eliminação (a posição pode ser corrigida depois, o id muda ao sincronizar)
+    function _chaveElim(e) { return String(e.nome || e.id || '').trim().toUpperCase() + '|' + (e.ts ? String(Math.round(Number(e.ts) / 1000)) : String(e.posicao || '')); }
     function _mostrarProximaEliminacao() {
         var el = document.getElementById('tv-elim');
         var e = _elim.fila.shift();
@@ -4294,7 +4295,7 @@ function montarCarouselPremiacao(d) {
       torneioId: t.id,
       avisoEliminacao: !!(pubState.clube && pubState.clube.tv_aviso_eliminacao),
       eliminacoesRecentes: (t.eliminados || []).slice().sort(function (a, b) { return new Date(b.ts || 0) - new Date(a.ts || 0); }).slice(0, 8)
-        .map(function (e) { return { id: e.id, nome: e.nome, posicao: e.posicao }; }),
+        .map(function (e) { return { id: e.id, nome: e.nome, posicao: e.posicao, ts: e.ts ? new Date(e.ts).getTime() : 0 }; }),
       next: prox ? ((prox.sb || 0).toLocaleString() + '/' + (prox.bb || 0).toLocaleString()) : 'FINAL',
       pct: pct,
       elapsed: elapsed,
