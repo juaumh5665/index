@@ -33597,13 +33597,14 @@ function openModalEliminar(idx) {
         html += `<div style="margin-top:.85rem;padding-top:.75rem;border-top:1px solid #27272a;">
             <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;"><i class="fa-solid fa-crosshairs"></i> Quem eliminou?</div>
             <select id="eliminador-jogador" class="inp" style="font-size:.85rem;padding:.5rem .75rem;" data-player-search="1">
-                <option value="">— Sem eliminador (blindada) —</option>
+                <option value="">— escolha quem eliminou —</option>
                 ${ativos.map(id => {
                     const j = jogadores.find(j => j.id === id);
                     return `<option value="${id}">${j ? j.nome : '?'}</option>`;
                 }).join('')}
+                <option value="__sem__">🚫 Ninguém (desistiu/saiu) — bounty não é pago</option>
             </select>
-            <div style="font-size:.7rem;color:#52525b;margin-top:.35rem;">Bounty será pago ao eliminador selecionado.</div>
+            <div style="font-size:.7rem;color:#a1a1aa;margin-top:.35rem;">Obrigatório: o bounty de <b style="color:var(--gold);">${formatMoney(_bountyNaCabeca(t, document.getElementById('eliminar-jogador')?.value) || Number(t.bountyValor) || 0)}</b> vai pra quem eliminou.</div>
         </div>`;
     }
 
@@ -33611,7 +33612,7 @@ function openModalEliminar(idx) {
 
     // Monta PlayerSearch no eliminador-jogador (foi criado via innerHTML, então não passou pelo mountAll inicial)
     if (isKO) {
-        try { PlayerSearch.mount('eliminador-jogador', { placeholder: 'Quem eliminou? (opcional)' }); } catch(e){}
+        try { PlayerSearch.mount('eliminador-jogador', { placeholder: 'Quem eliminou? (obrigatório)' }); } catch(e){}
     }
 
     // Atualiza apenas o select de "quem eliminou" sem recriar o modal inteiro
@@ -33621,11 +33622,12 @@ function openModalEliminar(idx) {
         const jidEliminado = sel.value;
         // Reconstroi opções do eliminador, excluindo o jogador eliminado
         const valorAtual = eliminadorSel.value;
-        eliminadorSel.innerHTML = '<option value="">— Sem eliminador (blindada) —</option>' +
+        eliminadorSel.innerHTML = '<option value="">— escolha quem eliminou —</option>' +
             ativos.filter(id => id !== jidEliminado).map(id => {
                 const j = jogadores.find(j => j.id === id);
                 return `<option value="${id}">${j ? j.nome : '?'}</option>`;
-            }).join('');
+            }).join('') +
+            '<option value="__sem__">🚫 Ninguém (desistiu/saiu) — bounty não é pago</option>';
         // Mantém valor selecionado se ainda for válido
         if (valorAtual && valorAtual !== jidEliminado) eliminadorSel.value = valorAtual;
         // Re-sincroniza o combobox PlayerSearch após mudança de opções
@@ -33663,7 +33665,12 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
 
     // Para KO: pegar eliminador se selecionado
     const eliminadorSel = document.getElementById('eliminador-jogador');
-    const eliminadorId = eliminadorSel && eliminadorSel.value ? eliminadorSel.value : null;
+    // KO: "Quem eliminou?" é obrigatório (ou "Ninguém" escolhido de propósito)
+    if (eliminadorSel && ['bounty','pko','knockout'].includes(t.tipo) && !eliminadorSel.value) {
+        showToast('🎯 Torneio KO: escolha quem eliminou (ou "Ninguém" se o jogador desistiu)');
+        return;
+    }
+    const eliminadorId = eliminadorSel && eliminadorSel.value && eliminadorSel.value !== '__sem__' ? eliminadorSel.value : null;
 
     const eliminadosIds = new Set(t.eliminados.map(e => e.jogadorId));
     const entriesIds    = [...new Set(t.entries.filter(e=>e.tipo!=='addon').map(e=>e.jogadorId))];
@@ -33735,6 +33742,28 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
         showToast(`🏆 Torneio finalizado! Campeão: ${venc ? venc.nome : 'Desconhecido'}`);
     }
 
+    // KO: o campeão fica com o PRÓPRIO bounty (a ficha de KO dele). Crédito automático, uma vez só.
+    let _bountyCampeao = null;
+    if (finalizado && vencedorIdFinal && ['bounty','pko','knockout'].includes(t.tipo)) {
+        try {
+            const jaPago = (transacoes || []).some(tx => tx.refId === t.id && String(tx.jogadorId) === String(vencedorIdFinal)
+                && tx.descricao && tx.descricao.indexOf('Bounty do campeão') >= 0 && Number(tx.valor) > 0
+                && !(transacoes || []).some(tx2 => tx2.refId === t.id && tx2.descricao && tx2.descricao.indexOf('Estorno do bounty do campeão') >= 0 && Number(tx2.ts) > Number(tx.ts)));
+            const vCamp = _bountyNaCabeca(t, vencedorIdFinal);
+            if (!jaPago && vCamp > 0) {
+                registrarTransacao({
+                    jogadorId: vencedorIdFinal,
+                    tipo: 'buyin',
+                    valor: vCamp,
+                    descricao: `🏆 Bounty do campeão (próprio) · ${t.nome}`,
+                    origem: 'torneio',
+                    refId: t.id,
+                });
+                _bountyCampeao = { jogadorId: vencedorIdFinal, valor: vCamp };
+            }
+        } catch (eBC) { console.warn('[BOUNTY] campeão:', eBC); }
+    }
+
     logAudit('ELIMINACAO', `Eliminado: ${getJogadorNome(jid)} em ${posicao}º · ${t.nome}`, { jogadorId: jid, posicao, torneioId: t.id });
     saveData();
     closeModal('modal-eliminar');
@@ -33754,7 +33783,8 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
             jogadorId: jid,
             nomeJog: getJogadorNome(jid),
             posicao: posicao,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            bountyCampeao: _bountyCampeao
         };
         sugerirAcertoNoCaixa(jid);
     } else {
@@ -55742,6 +55772,16 @@ function _acertoSaida_cancelarEliminacao() {
             const _tAtual = torneios[snap.tornIdx];
             const _elimKO = _tAtual && (_tAtual.eliminados || []).find(e => String(e.jogadorId) === String(snap.jogadorId));
             if (_elimKO) _bountyEstornarEliminacao(_tAtual, _elimKO);
+            if (snap.bountyCampeao && snap.bountyCampeao.valor > 0) {
+                registrarTransacao({
+                    jogadorId: snap.bountyCampeao.jogadorId,
+                    tipo: 'buyin',
+                    valor: -snap.bountyCampeao.valor,
+                    descricao: `↩️ Estorno do bounty do campeão (eliminação cancelada) · ${_tAtual.nome}`,
+                    origem: 'torneio',
+                    refId: _tAtual.id,
+                });
+            }
         } catch (_eKO) { console.warn('[CANCEL_ELIM] bounty:', _eKO); }
         torneios[snap.tornIdx] = JSON.parse(snap.snapshot);
         _ultimoSnapshotEliminacao = null;
@@ -57348,7 +57388,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <!-- StackSangeur (painel do caixa): só liga em clube com feature_sangeur; não altera nada do app -->
 <script src="/stacksangeur-caixa.js?v=6" defer></script>
 <script src="/stackos-abertos.js?v=1" defer></script>
-<script src="/stackos-simulador.js?v=10" defer></script>
+<script src="/stackos-simulador.js?v=11" defer></script>
 <script src="/stackos-relogio-controle.js?v=4" defer></script>
 <script src="/stackos-ranking.js?v=2" defer></script>
 <script src="/stackos-ranking-arte.js?v=2" defer></script>

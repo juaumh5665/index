@@ -77,23 +77,24 @@
         if (t.tipo === 'knockout') avisos.push('⚡ "Somente KO": a premiação final é ZERO — todo o dinheiro vira bounty. Para KO fixo (ex.: R$ 25 por KO) use "💰 Bounty Fixo".');
         if (t.tipo === 'bounty' && t.entries.some(e => e.tipo === 'rebuy_simples' || e.tipo === 'rebuy_duplo')) avisos.push('Rebuy em Bounty Fixo tira mais ' + fm(v) + ' da premiação por rebuy sem aumentar o bounty da cabeça.');
         if (perdidos) avisos.push(perdidos + ' eliminação(ões) sem eliminador: esse bounty não foi pago a ninguém.');
-        if (fim) avisos.push('🏆 Fim: o campeão ' + esc(nomeDe(ativos[0])) + ' termina com ' + fm(cabeca(t, ativos[0])) + ' na cabeça — hoje o sistema não paga esse valor a ele.');
+        if (fim) avisos.push('🏆 Fim: o campeão ' + esc(nomeDe(ativos[0])) + ' recebe o próprio bounty (' + fm(cabeca(t, ativos[0])) + ') — no torneio real o crédito é lançado sozinho na conta dele.');
         const voltou = (e) => !t.eliminados.some(x => x.ts === e.ts);
         const elimLista = kos.map((e, i) => '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:5px 0;border-bottom:1px solid #1f1f25"><span>' + e.posicao + 'º · ' + esc(nomeDe(e.jogadorId)) + ' <span style="color:#71717a">por ' + (e.eliminadorId ? esc(nomeDe(e.eliminadorId)) : 'ninguém') + (voltou(e) ? ' <span style="font-size:10px;background:#1e3a2a;color:#86efac;border-radius:999px;padding:1px 6px">VOLTOU (re-entry)</span>' : '') + '</span></span><span style="display:flex;gap:8px;align-items:center"><b style="color:#fcd34d">' + (e.eliminadorId ? '+' + fm(noBolso(e)) : '—') + '</b><button data-sim-unelim="' + i + '" style="background:none;border:0;color:#fca5a5;cursor:pointer" title="Desfazer">✕</button></span></div>').join('');
-        const ganhosLista = Object.keys(ganhos).sort((a, b) => ganhos[b].v - ganhos[a].v).map(id => row(esc(nomeDe(id)) + ' · ' + ganhos[id].n + ' KO', fm(ganhos[id].v), '#fcd34d')).join('');
+        if (fim && cabeca(t, ativos[0]) > 0) { const g = ganhos[ativos[0]] || (ganhos[ativos[0]] = { n: 0, v: 0 }); g.camp = cabeca(t, ativos[0]); g.v += g.camp; }
+        const ganhosLista = Object.keys(ganhos).sort((a, b) => ganhos[b].v - ganhos[a].v).map(id => row(esc(nomeDe(id)) + ' · ' + ganhos[id].n + ' KO' + (ganhos[id].camp ? ' + próprio (campeão)' : ''), fm(ganhos[id].v), '#fcd34d')).join('');
         return '<div style="background:#14141a;border:1px solid #b45309;border-radius:12px;padding:16px;min-width:0">' +
             '<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#fcd34d;margin-bottom:10px">🎯 KO — eliminações e bounties</div>' +
             avisos.map(a => '<div style="background:#2a1e04;border:1px solid #92400e;color:#fde68a;border-radius:8px;padding:8px 10px;font-size:12.5px;margin-bottom:8px;line-height:1.4">' + a + '</div>').join('') +
             '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">' +
                 '<label style="font-size:11px;color:#a1a1aa">Eliminado<select id="sim-ko-elim" style="width:100%;margin-top:4px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + opt(ativos) + '</select></label>' +
-                '<label style="font-size:11px;color:#a1a1aa">Quem eliminou<select id="sim-ko-por" style="width:100%;margin-top:4px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + opt(ativos, '— sem eliminador —') + '</select></label>' +
+                '<label style="font-size:11px;color:#a1a1aa">Quem eliminou<select id="sim-ko-por" style="width:100%;margin-top:4px;background:#0f0f14;border:1px solid #3f3f46;color:#e4e4e7;border-radius:8px;padding:8px">' + opt(ativos, '— ninguém (desistiu) —') + '</select></label>' +
                 '<button id="sim-ko-btn" style="padding:9px;border-radius:8px;border:0;background:#b91c1c;color:#fff;font-weight:700;cursor:pointer"' + (ativos.length < 2 ? ' disabled' : '') + '>💀 Eliminar</button>' +
             '</div>' +
             '<div style="font-size:11px;color:#71717a;margin:6px 0 10px">Depois de eliminar, "+ Re-entry" volta o último eliminado com bounty novo.</div>' +
             row('Bounty por KO', t.tipo === 'bounty' ? fm(v) : (t.tipo === 'pko' ? splitPko(t) + '% vai pro bolso' : '100% do líquido')) +
             (t.tipo === 'bounty' ? row('Separado da premiação (' + qtdComBounty + ' entradas × ' + fm(v) + ')', fm(reservado)) : '') +
             row('Já pago aos eliminadores', fm(pagos), '#fcd34d') +
-            row('Ainda na cabeça dos ativos (' + ativos.length + ')', fm(naMesa)) +
+            row(fim ? 'Bounty do campeão (crédito automático)' : 'Ainda na cabeça dos ativos (' + ativos.length + ')', fm(naMesa)) +
             (ganhosLista ? '<div style="font-size:11px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px">Quem ganhou KO (= fichas de KO a trocar no caixa)</div>' + ganhosLista : '') +
             (elimLista ? '<div style="font-size:11px;color:#a1a1aa;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 4px">Eliminações</div><div style="max-height:220px;overflow:auto">' + elimLista + '</div>' : '') +
         '</div>';
