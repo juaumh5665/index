@@ -28787,6 +28787,15 @@ function _bountyEstornarEliminacao(t, elim) {
     } catch (e) { console.warn('[BOUNTY] estorno:', e); }
 }
 
+function _bountyTotalCreditado(t) {
+    if (!t) return 0;
+    const pref = ['🎯 Bounty de', '🎯 Bounty parcial de', '⚡ KO de', '🏆 Bounty do campeão', '↩️ Estorno do bounty'];
+    return (transacoes || []).reduce((s, tx) => {
+        if (!tx || tx.refId !== t.id || tx.tipo !== 'buyin' || typeof tx.descricao !== 'string') return s;
+        return pref.some(p => tx.descricao.indexOf(p) === 0) ? s + (Number(tx.valor) || 0) : s;
+    }, 0);
+}
+
 function renderBountyPanel(t) {
     const wrap = document.getElementById('mt-bounties-wrap');
     if (!wrap) return;
@@ -28805,7 +28814,9 @@ function renderBountyPanel(t) {
 
     // Totalizadores
     const totalBountiesNaMesa = ativos.reduce((s,id) => s + _bountyNaCabeca(t, id), 0);
-    const totalBountiesPagos = t.eliminados.filter(e=>e.bountyPago).reduce((s,e)=>s+e.bountyPago, 0);
+    // Pagos = créditos de bounty lançados nas contas (menos estornos). Vem das transações porque a
+    // re-entry tira o jogador da lista de eliminados e o KO já pago sumiria da conta.
+    const totalBountiesPagos = _bountyTotalCreditado(t);
 
     document.getElementById('mt-bounties-totals').innerHTML = `
         <span style="padding:.35rem .7rem;background:rgba(245,158,11,.1);border-radius:.4rem;color:var(--gold);font-weight:700;"><i class="fa-solid fa-coins"></i> Na mesa: ${formatMoney(totalBountiesNaMesa)}</span>
