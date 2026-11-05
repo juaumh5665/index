@@ -30703,7 +30703,8 @@ function renderTabFinanceiro() {
     let _subBruto = '<span style="color:#52525b;">(entra no rake)</span>';
     try {
         const _sfTot = (_staffFixoAtivo(t) && typeof _getStaffFixoTotal === 'function') ? (_getStaffFixoTotal(t) || 0) : 0;
-        const _baseRake = (typeof _getBrutoParaRake === 'function') ? _getBrutoParaRake(t) : null;
+        const _pct = Number(t.rake) || 0;
+        const _baseRake = _pct > 0 ? Math.round((rakeVal / (_pct / 100)) * 100) / 100 : null;
         if (_sfTot > 0 && _baseRake != null && Math.abs(_baseRake - bruto) > 0.009) {
             _subBruto = `<span style="color:#71717a;">inclui staff fixo · o rake entra sobre ${formatMoney(_baseRake)}</span>`;
         }
