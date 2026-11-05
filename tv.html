@@ -2631,7 +2631,8 @@ function montarCarouselPremiacao(d) {
     function atualizarPausa(d) {
         try {
             const el = document.getElementById('tv-pausa'); if (!el) return;
-            el.classList.toggle('show', !!(d && d.pausado));
+            // Faixa "EM PAUSA": o clube pode desligar (ex.: pausa para descontar minutos por mão na mesa final)
+            el.classList.toggle('show', !!(d && d.pausado && !d.ocultarPausa));
         } catch (e) { console.warn('atualizarPausa:', e); }
     }
     // Garante que a faixa da premiação caiba inteira na tela (zoom alto, TV pequena): compacta o topo
@@ -4292,6 +4293,7 @@ function montarCarouselPremiacao(d) {
       prize: prize.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       isBreak: !!t.is_break,
       pausado: !!t.iniciado_em && t.rodando === false && !['finished', 'encerrado'].includes(String(t.status || '')),
+      ocultarPausa: !!(pubState.clube && pubState.clube.tv_ocultar_pausa),
       torneioId: t.id,
       avisoEliminacao: !!(pubState.clube && pubState.clube.tv_aviso_eliminacao),
       eliminacoesRecentes: (t.eliminados || []).slice().sort(function (a, b) { return new Date(b.ts || 0) - new Date(a.ts || 0); }).slice(0, 8)
