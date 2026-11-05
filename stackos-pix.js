@@ -38,6 +38,22 @@
         return ('STACKOS' + nome.replace(/CLUB(E)?$/, '').slice(0, 12) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getFullYear()).slice(2)).slice(0, 25);
     }
 
+    // Biblioteca do QR: servida pelo próprio StackOS (/qrcode-lib.js), sem depender de CDN
+    let _libQR = null;
+    function carregarLibQR() {
+        if (window.QRCode && typeof window.QRCode.toCanvas === 'function') return Promise.resolve(true);
+        if (_libQR) return _libQR;
+        _libQR = new Promise(res => {
+            const s = document.createElement('script');
+            s.src = '/qrcode-lib.js?v=1';
+            s.onload = () => res(!!(window.QRCode && window.QRCode.toCanvas));
+            s.onerror = () => res(false);
+            document.head.appendChild(s);
+            setTimeout(() => res(!!(window.QRCode && window.QRCode.toCanvas)), 6000);
+        });
+        return _libQR;
+    }
+
     // ---------- Tela do clube ----------
     let st = null;
     async function abrirPix() {
@@ -103,7 +119,10 @@
         ov.querySelector('#pix-x').onclick = fechar;
         ov.querySelectorAll('[data-ciclo]').forEach(b => b.onclick = () => { st.ciclo = b.dataset.ciclo; atualizarValor(); });
         const cv = ov.querySelector('#pix-qr');
-        if (cv && window.QRCode) { try { QRCode.toCanvas(cv, brCode(st.valor, st.txid), { width: 214, margin: 1 }); } catch (e) { console.warn('[PIX] QR:', e); } }
+        if (cv) carregarLibQR().then(ok => {
+            if (!ok) { cv.replaceWith(Object.assign(document.createElement('div'), { textContent: 'Use o Pix copia e cola abaixo', style: 'color:#71717a;font-size:.8rem;text-align:center' })); return; }
+            try { QRCode.toCanvas(cv, brCode(st.valor, st.txid), { width: 214, margin: 1 }, (err) => { if (err) console.warn('[PIX] QR:', err); }); } catch (e) { console.warn('[PIX] QR:', e); }
+        });
         const cp = ov.querySelector('#pix-copiar');
         if (cp) cp.onclick = async () => {
             const code = brCode(st.valor, st.txid);
