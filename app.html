@@ -30699,7 +30699,16 @@ function renderTabFinanceiro() {
     }
     
     // === TOTAIS ===
-    linhas.push({ label: 'Total Bruto', sub: '<span style="color:#52525b;">(entra no rake)</span>', val: formatMoney(bruto), tipo: 'total-bruto' });
+    // Legenda do Total Bruto: quando o staff fixo está dentro do valor, mostra a base real do rake
+    let _subBruto = '<span style="color:#52525b;">(entra no rake)</span>';
+    try {
+        const _sfTot = (_staffFixoAtivo(t) && typeof _getStaffFixoTotal === 'function') ? (_getStaffFixoTotal(t) || 0) : 0;
+        const _baseRake = (typeof _getBrutoParaRake === 'function') ? _getBrutoParaRake(t) : null;
+        if (_sfTot > 0 && _baseRake != null && Math.abs(_baseRake - bruto) > 0.009) {
+            _subBruto = `<span style="color:#71717a;">inclui staff fixo · o rake entra sobre ${formatMoney(_baseRake)}</span>`;
+        }
+    } catch (_) {}
+    linhas.push({ label: 'Total Bruto', sub: _subBruto, val: formatMoney(bruto), tipo: 'total-bruto' });
     linhas.push({ label: `Rake (${t.rake || 0}%)`, sub: '', val: formatMoney(rakeVal), tipo: 'rake' });
     
     if (staffPct > 0 && _staffCascataAtivo(t)) {
@@ -30719,6 +30728,17 @@ function renderTabFinanceiro() {
         }
     }
     
+    // KO: bounties saem do prize (mesma conta do getPrize: 1 por entrada, sem add-on e last chance)
+    if (t.tipo === 'bounty') {
+        const _qKO = (t.entries || []).filter(e => e.tipo !== 'addon' && e.tipo !== 'last_chance').length;
+        const _vKO = Number(t.bountyValor) || 0;
+        if (_qKO > 0 && _vKO > 0) {
+            linhas.push({ label: 'Bounties (KO)', sub: `${_qKO} entradas × ${formatMoney(_vKO)} · separado do prize`, val: '−' + formatMoney(_qKO * _vKO), tipo: 'bounty' });
+        }
+    } else if (t.tipo === 'pko' || t.tipo === 'knockout') {
+        linhas.push({ label: 'Bounties (KO)', sub: t.tipo === 'knockout' ? '100% do líquido vira bounty' : `${Number(t.pkoSplit != null ? t.pkoSplit : t.bountyKoSplit) || 0}% do líquido vai pros bounties`, val: '—', tipo: 'bounty' });
+    }
+
     linhas.push({ label: 'Prize Pool', sub: '', val: formatMoney(prize), tipo: 'prize' });
     
     // LOTE 5: Taxa Administrativa — soma à parte (não entra no rake nem no prize)
@@ -30739,6 +30759,7 @@ function renderTabFinanceiro() {
         if (l.tipo === 'total-bruto') { cor = 'color:#fafafa;font-weight:800;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
         if (l.tipo === 'rake')        { cor = 'color:var(--gold);'; }
         if (l.tipo === 'staff')       { cor = 'color:#38bdf8;'; }
+        if (l.tipo === 'bounty')      { cor = 'color:#f59e0b;'; }
         if (l.tipo === 'prize')       { cor = 'color:#22c55e;font-weight:800;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
         if (l.tipo === 'taxa-adm')    { cor = 'color:#fb923c;font-weight:700;'; borda = 'border-top:1px solid #3f3f46;padding-top:.6rem;margin-top:.3rem;'; }
         
