@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, prepareWAMessageMedia, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const pino = require('pino');
 
@@ -346,6 +346,129 @@ app.post('/api/:session/send-image', auth, async (req, res) => {
         res.json({ status: 'sent', phone: cleanPhone, jid: targetJid, messageId: result?.key?.id });
     } catch (e) {
         console.error(`[${sessionId}] Send image error:`, e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// ÁUDIO COMO MENSAGEM DE VOZ (PTT) — rota nova, não mexe nas de texto/imagem
+// Baixa o áudio (URL pública), converte pra OGG/Opus mono (formato que o
+// WhatsApp exige pra mensagem de voz), calcula duração e forma de onda,
+// mostra "gravando áudio…" e envia com ptt:true (não aparece "Encaminhada").
+// ─────────────────────────────────────────────────────────────────────
+let _ffmpegPath = null;
+try { _ffmpegPath = require('ffmpeg-static'); } catch (e) { console.warn('[Audio] ffmpeg-static indisponível:', e.message); }
+const { spawn } = require('child_process');
+
+function _baixarBuffer(url, max = 8 * 1024 * 1024, redirs = 3) {
+    return new Promise((resolve, reject) => {
+        const lib = url.startsWith('https') ? require('https') : require('http');
+        lib.get(url, (r) => {
+            if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && redirs > 0) {
+                r.resume();
+                return resolve(_baixarBuffer(new URL(r.headers.location, url).toString(), max, redirs - 1));
+            }
+            if (r.statusCode !== 200) { r.resume(); return reject(new Error('download status ' + r.statusCode)); }
+            const chunks = []; let tam = 0;
+            r.on('data', (c) => { tam += c.length; if (tam > max) { r.destroy(); reject(new Error('áudio muito grande')); } else chunks.push(c); });
+            r.on('end', () => resolve(Buffer.concat(chunks)));
+            r.on('error', reject);
+        }).on('error', reject);
+    });
+}
+
+function _ffmpeg(args, input) {
+    return new Promise((resolve, reject) => {
+        if (!_ffmpegPath) return reject(new Error('ffmpeg indisponível no servidor'));
+        const p = spawn(_ffmpegPath, args);
+        const out = []; let err = '';
+        p.stdout.on('data', (c) => out.push(c));
+        p.stderr.on('data', (c) => { err += c.toString(); if (err.length > 20000) err = err.slice(-20000); });
+        p.on('error', reject);
+        p.on('close', (code) => code === 0 ? resolve(Buffer.concat(out)) : reject(new Error('ffmpeg falhou: ' + err.slice(-300))));
+        p.stdin.on('error', () => {});
+        p.stdin.end(input);
+    });
+}
+
+async function _prepararVoz(buf) {
+    const ogg = await _ffmpeg(['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-vn', '-ac', '1', '-ar', '48000',
+        '-c:a', 'libopus', '-b:a', '32k', '-application', 'voip', '-f', 'ogg', 'pipe:1'], buf);
+    // PCM 8 kHz pra duração e forma de onda (64 barras, 0–100)
+    let seconds, waveform;
+    try {
+        const pcm = await _ffmpeg(['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-ac', '1', '-ar', '8000', '-f', 's16le', 'pipe:1'], ogg);
+        const n = Math.floor(pcm.length / 2);
+        seconds = Math.max(1, Math.round(n / 8000));
+        const barras = 64, passo = Math.max(1, Math.floor(n / barras)), vals = [];
+        for (let b = 0; b < barras; b++) {
+            let soma = 0, cont = 0;
+            for (let i = b * passo; i < Math.min(n, (b + 1) * passo); i += 4) { soma += Math.abs(pcm.readInt16LE(i * 2)); cont++; }
+            vals.push(cont ? soma / cont : 0);
+        }
+        const mx = Math.max(...vals, 1);
+        waveform = new Uint8Array(vals.map(v => Math.round((v / mx) * 100)));
+    } catch (e) { console.warn('[Audio] waveform:', e.message); }
+    return { ogg, seconds, waveform };
+}
+
+app.post('/api/:session/send-audio', auth, async (req, res) => {
+    const sessionId = req.params.session;
+    const session = sessions[sessionId];
+    const { phone, audioUrl } = req.body;
+    const gravandoMs = Math.max(0, Math.min(Number(req.body.gravandoMs) || 0, 8000));
+
+    if (!session?.sock || !session.connected) {
+        return res.status(400).json({ error: 'Session not connected', code: 'NOT_CONNECTED' });
+    }
+    if (!phone || !audioUrl) {
+        return res.status(400).json({ error: 'phone and audioUrl are required' });
+    }
+
+    try {
+        const cleanPhone = phone.replace(/\D/g, '');
+        let targetJid = cleanPhone + '@s.whatsapp.net';
+        try {
+            const [exists] = await session.sock.onWhatsApp(targetJid);
+            if (!exists || !exists.exists) {
+                return res.status(400).json({ error: `Número ${cleanPhone} não encontrado no WhatsApp`, code: 'NOT_ON_WHATSAPP', phone: cleanPhone });
+            }
+            targetJid = exists.jid;
+        } catch (checkErr) {
+            console.warn(`[${sessionId}] onWhatsApp falhou (${checkErr.message}), enviando direto...`);
+        }
+
+        const original = await _baixarBuffer(audioUrl);
+        const { ogg, seconds, waveform } = await _prepararVoz(original);
+
+        if (gravandoMs > 0) {
+            try {
+                await session.sock.presenceSubscribe(targetJid);
+                await session.sock.sendPresenceUpdate('recording', targetJid);
+                await new Promise(r => setTimeout(r, gravandoMs));
+                await session.sock.sendPresenceUpdate('paused', targetJid);
+            } catch (pe) { console.warn(`[${sessionId}] presença gravando falhou:`, pe.message); }
+        }
+
+        const msg = { audio: ogg, mimetype: 'audio/ogg; codecs=opus', ptt: true };
+        if (seconds) msg.seconds = seconds;
+        let result;
+        try {
+            // Caminho com forma de onda: o Baileys sobrescreve a waveform ao montar a mídia,
+            // então monta a mensagem, coloca a nossa waveform e envia (relay).
+            const media = await prepareWAMessageMedia(msg, { upload: session.sock.waUploadToServer, logger: pino({ level: 'silent' }) });
+            if (waveform && media.audioMessage) media.audioMessage.waveform = waveform;
+            const full = generateWAMessageFromContent(targetJid, media, { userJid: session.sock.user && session.sock.user.id });
+            await session.sock.relayMessage(targetJid, full.message, { messageId: full.key.id });
+            result = full;
+        } catch (relayErr) {
+            console.warn(`[${sessionId}] áudio com waveform falhou (${relayErr.message}), enviando pelo caminho padrão`);
+            result = await session.sock.sendMessage(targetJid, msg);
+        }
+        console.log(`[${sessionId}] Áudio (voz) enviado OK: ${cleanPhone} ${seconds || '?'}s key=${result?.key?.id}`);
+        res.json({ status: 'sent', phone: cleanPhone, jid: targetJid, messageId: result?.key?.id, seconds });
+    } catch (e) {
+        console.error(`[${sessionId}] Send audio error:`, e.message);
         res.status(500).json({ error: e.message });
     }
 });
