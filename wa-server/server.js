@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, prepareWAMessageMedia, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const pino = require('pino');
 
@@ -392,8 +392,9 @@ function _ffmpeg(args, input) {
 }
 
 async function _prepararVoz(buf) {
-    const ogg = await _ffmpeg(['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-vn', '-ac', '1', '-ar', '48000',
-        '-c:a', 'libopus', '-b:a', '32k', '-application', 'voip', '-f', 'ogg', 'pipe:1'], buf);
+    const ogg = await _ffmpeg(['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-vn', '-map_metadata', '-1', '-ac', '1', '-ar', '48000',
+        '-c:a', 'libopus', '-b:a', '48k', '-vbr', 'on', '-application', 'voip', '-frame_duration', '20',
+        '-avoid_negative_ts', 'make_zero', '-f', 'ogg', 'pipe:1'], buf);
     // PCM 8 kHz pra duração e forma de onda (64 barras, 0–100)
     let seconds, waveform;
     try {
@@ -450,22 +451,11 @@ app.post('/api/:session/send-audio', auth, async (req, res) => {
             } catch (pe) { console.warn(`[${sessionId}] presença gravando falhou:`, pe.message); }
         }
 
+        // Caminho padrão do Baileys (o mesmo da imagem): ele calcula duração e forma de onda
+        // sozinho (music-metadata + audio-decode). O caminho manual (relay) chegava sem baixar no WhatsApp Web.
         const msg = { audio: ogg, mimetype: 'audio/ogg; codecs=opus', ptt: true };
-        if (seconds) msg.seconds = seconds;
-        let result;
-        try {
-            // Caminho com forma de onda: o Baileys sobrescreve a waveform ao montar a mídia,
-            // então monta a mensagem, coloca a nossa waveform e envia (relay).
-            const media = await prepareWAMessageMedia(msg, { upload: session.sock.waUploadToServer, logger: pino({ level: 'silent' }) });
-            if (waveform && media.audioMessage) media.audioMessage.waveform = waveform;
-            const full = generateWAMessageFromContent(targetJid, media, { userJid: session.sock.user && session.sock.user.id });
-            await session.sock.relayMessage(targetJid, full.message, { messageId: full.key.id });
-            result = full;
-        } catch (relayErr) {
-            console.warn(`[${sessionId}] áudio com waveform falhou (${relayErr.message}), enviando pelo caminho padrão`);
-            result = await session.sock.sendMessage(targetJid, msg);
-        }
-        console.log(`[${sessionId}] Áudio (voz) enviado OK: ${cleanPhone} ${seconds || '?'}s key=${result?.key?.id}`);
+        const result = await session.sock.sendMessage(targetJid, msg);
+        console.log(`[${sessionId}] Áudio (voz) enviado OK: ${cleanPhone} ~${seconds || '?'}s key=${result?.key?.id}`);
         res.json({ status: 'sent', phone: cleanPhone, jid: targetJid, messageId: result?.key?.id, seconds });
     } catch (e) {
         console.error(`[${sessionId}] Send audio error:`, e.message);
