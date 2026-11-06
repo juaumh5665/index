@@ -38388,6 +38388,16 @@ function openModal(id) {
             document.getElementById('t-reentry').value = config.torneios.reentryAte;
             document.getElementById('t-addon').value   = config.torneios.addonFichas;
         }
+        // Travas do clube (Config → Torneios → Travas de compras) preenchem o Novo torneio.
+        // Antes o "Add-on até nível" ficava sempre no valor fixo do HTML (6).
+        try {
+            const _cMax = sbClube && Number(sbClube.cfg_nivel_max_compras);
+            const _aMax = sbClube && Number(sbClube.cfg_nivel_max_addon);
+            if (_cMax > 0) document.getElementById('t-reentry').value = _cMax;
+            const _elAddN = document.getElementById('t-addon-nivel');
+            if (_elAddN) _elAddN.value = _aMax > 0 ? _aMax : (Number(document.getElementById('t-reentry').value) || 0);
+            if (typeof t2AtualizarStatusTravas === 'function') t2AtualizarStatusTravas();
+        } catch (_eTr) { console.warn('[NovoTorneio] travas padrão:', _eTr); }
         // Populate rankings dropdown
         popularSelectRankings();
         // Reset formato/dia fields
