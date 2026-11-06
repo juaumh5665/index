@@ -3067,6 +3067,21 @@ document.addEventListener('DOMContentLoaded', function(){
                                     <input type="file" id="conv-enviar-img-input" accept="image/*" style="display:none;" onchange="convEnviarHandleFile(this.files[0])">
                                 </div>
 
+                                <!-- Áudio (opcional) — só aparece com "Áudio nos convites" ligado na Config -->
+                                <div id="conv-enviar-audio-card" style="display:none;background:linear-gradient(180deg,rgba(168,85,247,.07),rgba(168,85,247,.02));border:1px solid rgba(168,85,247,.45);border-radius:1rem;padding:1.25rem;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem;">
+                                        <div style="font-size:.65rem;color:#d8b4fe;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">🎙️ Áudio (opcional) · até 3, enviados alternados</div>
+                                        <div style="font-size:.65rem;color:#a1a1aa;">chega como mensagem de voz — sem "encaminhada"</div>
+                                    </div>
+                                    <div id="conv-audio-slots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.6rem;"></div>
+                                    <label style="display:flex;gap:.6rem;align-items:center;margin-top:.75rem;padding:.6rem .75rem;border-radius:.55rem;background:#0b0b0e;border:1px solid #27272a;cursor:pointer;font-size:.75rem;color:#d4d4d8;">
+                                        <input type="checkbox" id="conv-audio-gravando" checked style="accent-color:#22c55e;">
+                                        <span><b>Mostrar "gravando áudio…" antes de enviar</b> <span style="color:#71717a;">— o jogador vê o status por alguns segundos</span></span>
+                                    </label>
+                                    <div style="margin-top:.6rem;font-size:.68rem;color:#fcd34d;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:.45rem;padding:.5rem .65rem;line-height:1.45;">⚠️ Áudio para muitos números chama atenção do WhatsApp. Prefira listas menores (Ativos, quem jogou o torneio) e use em ocasiões especiais.</div>
+                                    <input type="file" id="conv-audio-file" accept="audio/*,.ogg,.opus,.m4a,.mp3,.wav,.webm" style="display:none;" onchange="convAudioArquivoEscolhido(this)">
+                                </div>
+
                                 <!-- Torneio (opcional) -->
                                 <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1rem;">
                                     <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.45rem;">Torneio (preenche {torneio}, {data}, {hora}, {buyin})</div>
@@ -3329,6 +3344,18 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <input type="number" id="conv-cfg-hora-fim" class="inp" min="0" max="23" value="22" style="width:100%;">
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Áudio nos convites (NOVO · desligado por padrão) -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;">
+                                    <div style="font-size:1.2rem;">🎙️</div>
+                                    <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Áudio nos convites</h3>
+                                </div>
+                                <label style="display:flex;gap:.6rem;align-items:flex-start;cursor:pointer;font-size:.8rem;color:#d4d4d8;">
+                                    <input type="checkbox" id="conv-cfg-audio-ativo" style="margin-top:.15rem;accent-color:#a855f7;">
+                                    <span>Mostrar o bloco <b>Áudio (opcional)</b> na tela Enviar. Até 3 áudios, enviados alternados como <b>mensagem de voz</b> (não aparece "encaminhada"). Só funciona com o WhatsApp conectado pelo servidor do StackOS.</span>
+                                </label>
                             </div>
 
                             <!-- Assinatura padrão -->
@@ -43030,6 +43057,8 @@ async function convConfigCarregar() {
         setVal('conv-cfg-hora-fim', conviteConfig.horario_fim || conviteConfig.hora_fim);
         setVal('conv-cfg-assinatura', conviteConfig.assinatura || '');
         setVal('conv-cfg-link-rodape', conviteConfig.link_rodape || '');
+        { const ck = document.getElementById('conv-cfg-audio-ativo'); if (ck) ck.checked = !!conviteConfig.audio_ativo; }
+        try { convAudioAtualizarVisibilidade(); } catch (_) {}
 
         // Popular dropdown de opt-out + lista atual
         convConfigPopularDropdownOptout();
@@ -43061,7 +43090,8 @@ async function convConfigSalvar() {
         wa_api_url: ((document.getElementById('conv-wa-url') || {}).value || '').trim(),
         wa_api_token: ((document.getElementById('conv-wa-token') || {}).value || '').trim(),
         wa_session_name: ((document.getElementById('conv-wa-session') || {}).value || 'default').trim(),
-        wa_connected: !!(conviteConfig && conviteConfig.wa_connected)
+        wa_connected: !!(conviteConfig && conviteConfig.wa_connected),
+        audio_ativo: !!((document.getElementById('conv-cfg-audio-ativo') || {}).checked)
     };
     if (payload.horario_fim <= payload.horario_inicio) {
         showToast('⚠️ Horário fim precisa ser maior que início');
@@ -43074,6 +43104,7 @@ async function convConfigSalvar() {
             .upsert(payload, { onConflict: 'clube_id' });
         if (error) throw error;
         conviteConfig = payload;
+        try { convAudioAtualizarVisibilidade(); } catch (_) {}
         showToast('✅ Configurações salvas');
     } catch (e) {
         console.error('[Convites] erro salvar config:', e);
@@ -43390,6 +43421,7 @@ function convCarregarListaCampanha() {
 
     _convCampanha.torneioId = torneioId || null;
     _convCampanha.templateId = templateId;
+    _convCampanha.audios = []; // fluxo de templates não leva áudio
 
     const filtrados = _convFiltrarJogadores(_convCampanha.filtro);
 
@@ -43451,6 +43483,7 @@ function convRenderListaCampanha() {
             statusHtml = `
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;">
                     <div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ Enviado ${horaStr}</div>
+                    ${p.audioIdx ? (p.erroAudio ? `<div style="font-size:.62rem;color:#f87171;font-weight:700;max-width:200px;text-align:right;" title="${esc(p.erroAudio)}">🎙️ Áudio ${p.audioIdx} não foi</div>` : `<div style="font-size:.62rem;color:#c4b5fd;font-weight:700;">🎙️ Áudio ${p.audioIdx}</div>`) : ''}
                     <button onclick="convMarcarSemWhatsapp(${idx})" title="Marcar como número sem WhatsApp (reverte envio)" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.15rem .45rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">❌ Sem WA</button>
                 </div>`;
         } else if (p.erroApi) {
@@ -43570,6 +43603,22 @@ async function _convEnviarUm(idx) {
             }
             envioOk = true;
             _waKeepAlive.touch(); // reseta timer de inatividade
+            // Áudio como mensagem de voz (opcional). Falha no áudio NÃO desfaz o envio da mensagem.
+            if (_convCampanha.audios && _convCampanha.audios.length) {
+                const aIdx = idx % _convCampanha.audios.length;
+                p.audioIdx = _convCampanha.audios[aIdx].slot + 1;
+                p.erroAudio = null;
+                try {
+                    const aUrl = await _convUploadAudio(aIdx);
+                    await new Promise(r => setTimeout(r, 1200 + Math.random() * 1500));
+                    const grav = _convCampanha.audioGravando ? (3000 + Math.random() * 3000) : 0;
+                    await _waProvider.sendAudio(p.numero, aUrl, grav);
+                    _waKeepAlive.touch();
+                } catch (aErr) {
+                    console.error('[Convites] erro envio áudio:', aErr);
+                    p.erroAudio = aErr.message || 'falhou';
+                }
+            }
         } catch (e) {
             console.error('[Convites] erro envio API:', e);
             // Verifica se é erro de conexão
@@ -43610,6 +43659,7 @@ async function _convEnviarUm(idx) {
             variante: variante,
             metodo: metodo
         };
+        if (p.audioIdx) { row.audio_idx = p.audioIdx; if (p.erroAudio) row.obs = 'Áudio ' + p.audioIdx + ' falhou: ' + String(p.erroAudio).slice(0, 180); }
         let { error: insErr } = await sb.from('convite_envios').insert(row);
         if (insErr) {
             // 2ª tentativa só com o essencial (quem, quando, status) — o histórico não pode ficar sem o envio
@@ -44440,6 +44490,140 @@ function convEnviarSalvarTemplate() {
 }
 
 // --- Iniciar envio (botão principal) ---
+// =====================================================================
+// CONVITES — ÁUDIO (até 3 mensagens de voz, alternadas por jogador)
+// =====================================================================
+let _convAudios = [null, null, null];   // { blob, tipo, url(objectURL), dur, nome, slot }
+let _convAudioRec = null;               // { slot, rec, stream, t0, timer, chunks }
+let _convAudioSlotArquivo = 0;
+const _CONV_AUDIO_MAX_S = 120;
+
+function convAudioAtualizarVisibilidade() {
+    const card = document.getElementById('conv-enviar-audio-card');
+    if (!card) return;
+    const on = !!(conviteConfig && conviteConfig.audio_ativo);
+    card.style.display = on ? '' : 'none';
+    if (on) convAudioRender();
+}
+function _convFmtDur(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function convAudioRender() {
+    const box = document.getElementById('conv-audio-slots');
+    if (!box) return;
+    box.innerHTML = [0, 1, 2].map(i => {
+        const a = _convAudios[i];
+        const rec = _convAudioRec && _convAudioRec.slot === i;
+        const titulo = `<div style="font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${rec ? '#fca5a5' : (a ? '#d8b4fe' : '#71717a')};margin-bottom:.45rem;">Áudio ${i + 1}${rec ? ' · gravando' : (a ? ' · pronto' : '')}</div>`;
+        const base = 'background:#0b0b0e;border-radius:.6rem;padding:.7rem;min-width:0;';
+        if (rec) {
+            const seg = Math.floor((Date.now() - _convAudioRec.t0) / 1000);
+            return `<div style="${base}border:1px solid #7f1d1d;">${titulo}
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <button type="button" onclick="convAudioParar()" title="Parar" style="width:42px;height:42px;border-radius:50%;border:0;background:#dc2626;color:#fff;font-size:1rem;cursor:pointer;box-shadow:0 0 0 5px rgba(220,38,38,.18);flex:none;">⏹</button>
+                    <div><div id="conv-audio-timer" style="font-family:var(--font-mono,monospace);font-weight:800;font-size:1.1rem;color:#fca5a5;">${_convFmtDur(seg)}</div>
+                    <div style="font-size:.65rem;color:#a1a1aa;">clique ⏹ para parar · máx. 2 min</div></div>
+                </div></div>`;
+        }
+        if (a) {
+            return `<div style="${base}border:1px solid #6b21a8;">${titulo}
+                <audio src="${a.url}" controls preload="metadata" style="width:100%;height:34px;"></audio>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;margin-top:.45rem;flex-wrap:wrap;">
+                    <span style="font-size:.65rem;color:#a1a1aa;">${a.dur ? _convFmtDur(a.dur) + ' · ' : ''}${esc(a.nome || 'gravado agora')}</span>
+                    <span style="display:flex;gap:.35rem;">
+                        <button type="button" onclick="convAudioGravar(${i})" style="background:transparent;border:1px solid #3f3f46;color:#d4d4d8;border-radius:.4rem;padding:.25rem .5rem;font-size:.65rem;font-weight:800;cursor:pointer;font-family:inherit;">🔁 Regravar</button>
+                        <button type="button" onclick="convAudioRemover(${i})" style="background:transparent;border:1px solid #7f1d1d;color:#fca5a5;border-radius:.4rem;padding:.25rem .5rem;font-size:.65rem;font-weight:800;cursor:pointer;font-family:inherit;">🗑</button>
+                    </span>
+                </div></div>`;
+        }
+        return `<div style="${base}border:1px dashed #3f3f46;">${titulo}
+            <div style="display:flex;align-items:center;gap:.6rem;">
+                <button type="button" onclick="convAudioGravar(${i})" title="Gravar pelo microfone" ${_convAudioRec ? 'disabled' : ''} style="width:42px;height:42px;border-radius:50%;border:0;background:#a855f7;color:#fff;font-size:1.1rem;cursor:pointer;box-shadow:0 0 0 5px rgba(168,85,247,.15);flex:none;opacity:${_convAudioRec ? '.4' : '1'};">🎙️</button>
+                <div style="font-size:.7rem;color:#a1a1aa;line-height:1.35;"><b style="color:#e4e4e7;">Gravar</b> no microfone<br>ou <a href="javascript:void(0)" onclick="convAudioEscolherArquivo(${i})" style="color:#c4b5fd;">enviar arquivo</a></div>
+            </div></div>`;
+    }).join('');
+}
+function _convAudioSet(i, blob, nome) {
+    if (_convAudios[i] && _convAudios[i].url) { try { URL.revokeObjectURL(_convAudios[i].url); } catch (_) {} }
+    const url = URL.createObjectURL(blob);
+    const tipo = (blob.type || 'audio/webm').split(';')[0];
+    _convAudios[i] = { blob, tipo, url, dur: 0, nome: nome || '', slot: i };
+    try {
+        const au = new Audio(); au.preload = 'metadata'; au.src = url;
+        au.onloadedmetadata = () => { if (isFinite(au.duration)) { _convAudios[i] && (_convAudios[i].dur = au.duration); convAudioRender(); } };
+    } catch (_) {}
+    convAudioRender();
+}
+async function convAudioGravar(i) {
+    if (_convAudioRec) return;
+    if (!navigator.mediaDevices || !window.MediaRecorder) { showToast('⚠️ Este navegador não grava áudio — use "enviar arquivo"'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+    catch (e) { showToast('⚠️ Sem acesso ao microfone — libere a permissão no navegador'); return; }
+    const tipos = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+    const mime = tipos.find(t => { try { return MediaRecorder.isTypeSupported(t); } catch (_) { return false; } }) || '';
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined);
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+        try { stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+        const st = _convAudioRec; _convAudioRec = null;
+        if (st && st.timer) clearInterval(st.timer);
+        const blob = new Blob(chunks, { type: (rec.mimeType || mime || 'audio/webm') });
+        if (blob.size < 1500) { showToast('⚠️ Áudio muito curto'); convAudioRender(); return; }
+        _convAudioSet(i, blob, '');
+        if (st && _convAudios[i]) _convAudios[i].dur = (Date.now() - st.t0) / 1000; // webm do Chrome não traz duração
+        convAudioRender();
+    };
+    _convAudioRec = { slot: i, rec, stream, t0: Date.now(), timer: null };
+    _convAudioRec.timer = setInterval(() => {
+        if (!_convAudioRec) return;
+        const seg = Math.floor((Date.now() - _convAudioRec.t0) / 1000);
+        const el = document.getElementById('conv-audio-timer'); if (el) el.textContent = _convFmtDur(seg);
+        if (seg >= _CONV_AUDIO_MAX_S) convAudioParar();
+    }, 250);
+    rec.start(250);
+    convAudioRender();
+}
+function convAudioParar() {
+    if (_convAudioRec && _convAudioRec.rec && _convAudioRec.rec.state !== 'inactive') { try { _convAudioRec.rec.stop(); } catch (_) {} }
+}
+function convAudioRemover(i) {
+    if (_convAudios[i] && _convAudios[i].url) { try { URL.revokeObjectURL(_convAudios[i].url); } catch (_) {} }
+    _convAudios[i] = null;
+    convAudioRender();
+}
+function convAudioEscolherArquivo(i) {
+    _convAudioSlotArquivo = i;
+    const inp = document.getElementById('conv-audio-file');
+    if (inp) { inp.value = ''; inp.click(); }
+}
+function convAudioArquivoEscolhido(inp) {
+    const f = inp && inp.files && inp.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { showToast('⚠️ Arquivo acima de 5 MB'); return; }
+    if (f.type && !/^(audio|video)\//.test(f.type)) { showToast('⚠️ Escolha um arquivo de áudio'); return; }
+    _convAudioSet(_convAudioSlotArquivo, f, f.name);
+}
+// Sobe o áudio (1 vez por campanha) e devolve a URL pública que o servidor baixa
+async function _convUploadAudio(aIdx) {
+    const a = _convCampanha.audios[aIdx];
+    if (!a) throw new Error('áudio não encontrado');
+    if (a.url) return a.url;
+    if (a._subindo) return a._subindo;
+    a._subindo = (async () => {
+        const extMap = { 'audio/ogg': 'ogg', 'audio/webm': 'webm', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/opus': 'opus', 'video/mp4': 'mp4' };
+        let tipo = a.tipo || 'audio/webm';
+        if (!extMap[tipo]) tipo = 'audio/mpeg';
+        const path = `${sbClube.id}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.${extMap[tipo]}`;
+        const { error } = await sb.storage.from('convite-audios').upload(path, a.blob, { cacheControl: '3600', upsert: false, contentType: tipo });
+        if (error) throw new Error('upload do áudio: ' + (error.message || error));
+        a.url = sb.storage.from('convite-audios').getPublicUrl(path).data.publicUrl;
+        return a.url;
+    })();
+    try { return await a._subindo; } finally { a._subindo = null; }
+}
+window.convAudioGravar = convAudioGravar; window.convAudioParar = convAudioParar; window.convAudioRemover = convAudioRemover;
+window.convAudioEscolherArquivo = convAudioEscolherArquivo; window.convAudioArquivoEscolhido = convAudioArquivoEscolhido;
+
 async function convEnviarIniciar() {
     const texto = document.getElementById('conv-enviar-texto')?.value?.trim();
     if (!texto) { showToast('⚠️ Escreva uma mensagem primeiro'); return; }
@@ -44492,6 +44676,14 @@ async function convEnviarIniciar() {
         _convCampanha.flyerFile = null;
         _convCampanha.flyerUrl = null;
         _convCampanha.flyerUrlPublica = null;
+    }
+
+    // Áudios (até 3, alternados por jogador) — só com a opção ligada na Config
+    _convCampanha.audios = (conviteConfig && conviteConfig.audio_ativo) ? _convAudios.filter(Boolean).map(a => ({ blob: a.blob, tipo: a.tipo, url: null, slot: a.slot })) : [];
+    _convCampanha.audioGravando = !!(document.getElementById('conv-audio-gravando') || {}).checked;
+    if (_convCampanha.audios.length && !(_waProvider.isApi() && (_waProvider.getConfig().provider === 'baileys' || _waProvider.isTeste()))) {
+        showToast('⚠️ Áudio só vai no envio automático pelo WhatsApp do StackOS — neste modo só a mensagem será enviada');
+        _convCampanha.audios = [];
     }
 
     // Carregar lista de jogadores — usa seleção manual se houver
@@ -45026,6 +45218,25 @@ const _waProvider = {
         }
 
         throw new Error('Provider inválido');
+    },
+
+    // ─── SEND AUDIO (mensagem de voz) — só no servidor Baileys do StackOS ───
+    async sendAudio(numero, audioUrl, gravandoMs) {
+        const cfg = this.getConfig();
+        const phone = this._normalizePhone(numero);
+        if (cfg.provider === 'teste') {
+            await new Promise(r => setTimeout(r, 400 + Math.random() * 600));
+            console.log(`[WA-TESTE] sendAudio → ${phone}: ${audioUrl}`);
+            return { success: true, raw: { teste: true, phone, audioUrl } };
+        }
+        if (cfg.provider !== 'baileys') throw new Error('Áudio só funciona com o WhatsApp do servidor StackOS');
+        const data = await this._safeFetch(`${cfg.url}/api/${encodeURIComponent(cfg.session)}/send-audio`, {
+            method: 'POST',
+            headers: this._headers(cfg),
+            body: JSON.stringify({ phone, audioUrl, gravandoMs: Math.max(0, Math.round(gravandoMs || 0)) })
+        });
+        if (data.error) throw new Error(data.error);
+        return { success: true, raw: data };
     },
 
     // ─── DISCONNECT / LOGOUT ───
