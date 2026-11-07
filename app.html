@@ -33445,6 +33445,19 @@ async function _registrarEntradaImpl() {
         // Apaga a eliminação no banco (o sync só faz upsert) — senão ele volta a "eliminado" ao recarregar.
         // Se o lançamento der erro e for revertido, a eliminação volta pra memória e NÃO é apagada.
         _elimRemovidas.forEach(e => _marcarRemocaoFilhaTorneio('torneioEliminados', e && e.id));
+        // Eliminação antiga sem id válido (criada antes desta correção): apaga pela chave torneio+jogador+ts
+        try {
+            const _semId = _elimRemovidas.filter(e => e && !(typeof _isUuid === 'function' && _isUuid(String(e.id || ''))) && e.ts);
+            if (_semId.length && typeof sb !== 'undefined' && sb && sbClube && _isUuid(String(t.id))) {
+                setTimeout(() => {
+                    _semId.forEach(e => {
+                        sb.from('torneio_eliminados').delete().eq('torneio_id', t.id).eq('clube_id', sbClube.id)
+                          .eq('jogador_id', jid).eq('ts', new Date(e.ts).toISOString())
+                          .then(r => { if (r && r.error) console.warn('[REENTRY] delete elim sem id:', r.error.message); });
+                    });
+                }, 4000); // dá tempo do upsert da eliminação terminar
+            }
+        } catch (_eSemId) { console.warn('[REENTRY] elim sem id:', _eSemId); }
     }
 
     // Determina valor BASE em R$ com base no tipo
@@ -33809,7 +33822,9 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
     const ativos        = entriesIds.filter(id => !eliminadosIds.has(id));
     const posicao       = ativos.length;
 
-    const elim = { jogadorId: jid, posicao, ts: Date.now() };
+    // id já na criação: se o jogador fizer re-entry segundos depois (antes do sync), a remoção
+    // da eliminação no banco precisa do id — sem ele a eliminação ficava no banco e a TV mostrava eliminado.
+    const elim = { id: (typeof _genUuid === 'function' ? _genUuid() : undefined), jogadorId: jid, posicao, ts: Date.now() };
 
     // Lógica de bounty
     if (['bounty','pko','knockout'].includes(t.tipo) && eliminadorId && eliminadorId !== jid) {
