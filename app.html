@@ -13125,14 +13125,23 @@ async function sincronizarEstado() {
                                 }
 
                                 const idsLocais = t.mesas.map(m => m.id);
-                                if (idsLocais.length) {
-                                    await sb.from('torneio_mesas')
+                                // Limpeza só quando a lista de mesas mudou desde a última limpeza
+                                // confirmada (antes repetia o mesmo DELETE a cada sync, ~2/s por máquina)
+                                const _chaveMesas = idsLocais.slice().sort().join(',');
+                                const _snapMesas = (window._mesasDelSnap ||= new Map());
+                                if (idsLocais.length && _snapMesas.get(t.id) !== _chaveMesas) {
+                                    const { error: errDelM } = await sb.from('torneio_mesas')
                                         .delete()
                                         .eq('torneio_id', t.id)
                                         .not('id', 'in', `(${idsLocais.map(id => `"${id}"`).join(',')})`);
+                                    if (!errDelM) _snapMesas.set(t.id, _chaveMesas);
                                 }
                             } else {
-                                await sb.from('torneio_mesas').delete().eq('torneio_id', t.id);
+                                const _snapMesas = (window._mesasDelSnap ||= new Map());
+                                if (_snapMesas.get(t.id) !== '') {
+                                    const { error: errDelM0 } = await sb.from('torneio_mesas').delete().eq('torneio_id', t.id);
+                                    if (!errDelM0) _snapMesas.set(t.id, '');
+                                }
                             }
                             // Conferência completa deste torneio concluída sem erro
                             // (linhas não confirmadas pelo banco seguem sendo reenviadas pelo diff)
@@ -13315,7 +13324,9 @@ async function sincronizarEstado() {
                                 // ⚠️ NUNCA deleta itens com origem='stackbar' — eles foram inseridos
                                 // pelo StackBar mobile via DB function e o estado local pode não tê-los ainda.
                                 const idsLocais = c.itens.map(it => it.id);
-                                if (idsLocais.length) {
+                                // Lista de itens igual à última limpeza confirmada: nada sumiu aqui → não repete o DELETE
+                                const _itensIguais = _barSnapIds.get(c.id) === idsLocais.slice().sort().join(',');
+                                if (idsLocais.length && !_itensIguais) {
                                     const { error: errDelIt } = await sb.from('bar_comanda_itens')
                                         .delete()
                                         .eq('comanda_id', c.id)
@@ -13325,10 +13336,14 @@ async function sincronizarEstado() {
                                 }
                             } else {
                                 // Estado local vazio — apaga itens locais, mas PRESERVA itens do StackBar
-                                const { error: errDelIt0 } = await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id)
-                                    .or('origem.is.null,origem.neq.stackbar');
-                                if (errDelIt0) _delItensFalhou = true;
+                                // (só se ainda não foi confirmado vazio — antes repetia a cada sync)
+                                if (_barSnapIds.get(c.id) !== '') {
+                                    const { error: errDelIt0 } = await sb.from('bar_comanda_itens').delete().eq('comanda_id', c.id)
+                                        .or('origem.is.null,origem.neq.stackbar');
+                                    if (errDelIt0) _delItensFalhou = true;
+                                }
                             }
+                            const _listaItensMudou = _barSnapIds.get(c.id) !== (c.itens || []).map(it => it.id).sort().join(',');
                             // Lista de itens desta comanda confirmada no banco (usada pra pular
                             // comanda fechada sem mudança nos próximos ciclos)
                             // (se o DELETE falhou, não marca: a comanda é reprocessada no próximo ciclo, como antes)
@@ -13336,7 +13351,11 @@ async function sincronizarEstado() {
 
                             // ⚡ Recalcula total da comanda a partir do banco real
                             // (garante que itens do StackBar sejam contabilizados no total)
-                            try {
+                            // (sem mudança na lista: confere no máximo 1x por minuto — itens do StackBar
+                            //  chegam também pelo realtime)
+                            const _totConf = (window._barTotalConf ||= new Map());
+                            if (_listaItensMudou || !_totConf.has(c.id) || Date.now() - _totConf.get(c.id) > 60000) try {
+                                _totConf.set(c.id, Date.now());
                                 const { data: somaItens } = await sb.from('bar_comanda_itens')
                                     .select('subtotal')
                                     .eq('comanda_id', c.id);
