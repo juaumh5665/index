@@ -12881,6 +12881,12 @@ async function sincronizarEstado() {
         console.log('[SYNC] Bloqueado — modo suporte ativo (somente leitura)');
         return;
     }
+    // 💤 MODO ESPERA (stackos-dispositivos.js): computador parado não grava no banco.
+    // A fila de pendências fica guardada e sai quando a pessoa volta a usar.
+    if (window._stackEspera) {
+        console.log('[SYNC] Em espera — envio adiado até o computador voltar a ser usado');
+        return;
+    }
     if (_syncEmAndamento || !sbClube) {
         console.log('[SYNC] Pulando: emAndamento=' + _syncEmAndamento + ', sbClube=' + (sbClube ? 'OK' : 'NULL'));
         if (_syncEmAndamento) window._syncRepetirAoTerminar = true; // roda de novo quando o atual terminar
@@ -57814,6 +57820,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <script src="/stackos-abertos.js?v=1" defer></script>
 <script src="/stackos-simulador.js?v=12" defer></script>
 <script src="/stackos-relogio-controle.js?v=4" defer></script>
+<script src="/stackos-dispositivos.js?v=1" defer></script>
 <script src="/stackos-ranking.js?v=2" defer></script>
 <script src="/stackos-ranking-arte.js?v=2" defer></script>
 <script src="/stackos-pix.js?v=3" defer></script>
