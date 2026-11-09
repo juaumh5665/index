@@ -11849,6 +11849,8 @@ function _onRealtimeEvent(tipo, payload) {
         if (tipo === 'torneio' && n && n.id) {
             const loc = (torneios || []).find(x => x.id === n.id);
             if (loc && Number(n.relogio_ts || 0) > Number(loc.relogioTs || 0)) _rtDeFora = true;
+            // Configuração com carimbo mais novo que o desta máquina = veio de outra máquina
+            if (loc && n.cfg_ts && _cfgComparar(loc.cfgTs, n.cfg_ts).bancoMaisNovo) _rtDeFora = true;
         } else if ((tipo === 'entry' || tipo === 'eliminado') && (n || o)) {
             const reg = (n && n.id) ? n : o;
             const loc = (torneios || []).find(x => x.id === reg.torneio_id);
@@ -11961,7 +11963,24 @@ async function _processarMudancaRealtime(tipo, payload) {
                         };
                         // Torneio mudado em outra máquina: relógio/nível/status vêm do banco
                         const _localMaisNovo = (Number(_loc.relogioTs) || 0) > (Number(t.relogioTs) || 0);
-                        const _base = (_alteradosFora.has(r.id) && !_localMaisNovo) ? Object.assign({}, _loc, t) : _loc;
+                        let _base = (_alteradosFora.has(r.id) && !_localMaisNovo) ? Object.assign({}, _loc, t) : _loc;
+                        // Configuração (blinds, premiação, TV, valores) mudada em OUTRA máquina e esta
+                        // não tem alteração própria mais nova: adota a configuração do banco, mantendo
+                        // relógio, listas e caixa desta máquina. (Antes a config local velha ficava aqui.)
+                        try {
+                            if (_base === _loc) {
+                                const _cmp = _cfgComparar(_loc.cfgTs, t.cfgTs);
+                                if (_cmp.bancoMaisNovo && !_cmp.localMaisNovo) {
+                                    const _cfgDoBanco = {};
+                                    Object.keys(t).forEach(k => { if (!_CFG_PROPS_NAO_ADOTAR.has(k)) _cfgDoBanco[k] = t[k]; });
+                                    _base = Object.assign({}, _loc, _cfgDoBanco, { cfgTs: Object.assign({}, t.cfgTs), _cfgBase: undefined });
+                                    console.log('[CFG_TS] configuração mais nova do banco adotada:', r.id);
+                                }
+                            } else {
+                                _base.cfgTs = Object.assign({}, t.cfgTs);
+                                _base._cfgBase = undefined;
+                            }
+                        } catch (eCfg) { console.warn('[CFG_TS] adotar config:', eCfg); }
                         return Object.assign({}, _base, {
                             entries: _mesclar(t.entries, _loc.entries),
                             eliminados: _mesclar(t.eliminados, _loc.eliminados),
@@ -12413,8 +12432,63 @@ async function _sincronizarRemocoesFilhasTorneio() {
 // ============================================================
 // CONVERSORES UI ↔ BANCO (snake_case ↔ camelCase)
 // ============================================================
+// ============================================================
+// VERSÃO POR CAMPO DA CONFIGURAÇÃO DO TORNEIO (cfg_ts)
+// Cada campo de configuração ganha um carimbo de tempo SÓ quando muda nesta máquina.
+// O banco (trigger _torneio_cfg_guard) recusa o campo vindo com carimbo mais antigo que o
+// dele — computador esquecido aberto com dados velhos não regrava mais blinds/premiação/TV.
+// Relógio continua com a regra própria (relogio_ts). Não mexe em nenhum cálculo.
+// ============================================================
+const _CFG_CAMPOS_TORNEIO = ['nome','tipo','formato','dia_label','series_id','series_nome','buyin','rake','taxa_administrativa','taxa_adm_so_free',
+    'stack','tempo_nivel','reentry_ate','compras_encerradas','janela_compras_aberta_manual','addon_valor','addon_fichas',
+    'staff_valor','staff_pct','staff_modo','staff_cascata_ativo','staff_fixo_ativo','staff_fixo_valor','staff_fixo_acoes',
+    'staff_fixo_modo','staff_fixo_cobrar_free','passaporte_ativo','passaporte_valor','passaporte_fichas','buyin_free_ate_nivel',
+    'buyin_pos_free_valor','bonus_registro_ativo','bonus_registro_fichas','bonus_registro_ate_nivel','buyin_promo_ativo',
+    'buyin_promo_valor','buyin_promo_fichas','buyin_promo_ate_nivel','imprimir_comprovante_compra','imprimir_comprovante_jackpot',
+    'comprovante_vias','comprovante_assinatura','rebuy_valor','rebuy_fichas','rebuy_duplo_valor','rebuy_duplo_fichas',
+    'buyin_duplo_valor','buyin_duplo_fichas','reentry_valor','reentry_multiplo_max','jackpot_valor','jackpot_fichas',
+    'jackpot_paga_rake','last_chance_ativo','last_chance_valor','last_chance_fichas','last_chance_ate','last_chance_paga_rake',
+    'bounty_valor','bounty_ko_split','capile_modo','ranking_id','ranking_rake_pct','blinds','tv_layout','tv_prolive_bg',
+    'tv_prolive_text','tv_prolive_custom','tv_show_prize','pw_stats_visiveis','premiacao_proj','prize_pool'];
+// Campos locais que NÃO são configuração (relógio, listas, caixa, estado local)
+const _CFG_PROPS_NAO_ADOTAR = new Set(['id','nivelAtual','tempoTotal','tempoRestante','tempoAlvo','status','rodando','relogioTs',
+    'isBreak','iniciadoEm','tempoJogoAcumuladoMs','tempoJogoResumedAt','encerradoEm','encerradoPor','vencedorId','caixaTorneio',
+    'entries','eliminados','jackpotCompras','mesas','bounties','estornos','cfgTs','_cfgBase']);
+function _cfgHashCampo(v) {
+    try { return JSON.stringify(v === undefined ? null : v); } catch (_) { return ''; }
+}
+function _cfgCarimbar(t, row) {
+    try {
+        if (!t._cfgBase || typeof t._cfgBase !== 'object') t._cfgBase = {};
+        if (!t.cfgTs || typeof t.cfgTs !== 'object') t.cfgTs = {};
+        const agora = Date.now();
+        _CFG_CAMPOS_TORNEIO.forEach(c => {
+            if (!(c in row)) return;
+            const h = _cfgHashCampo(row[c]);
+            if (t._cfgBase[c] === undefined) { t._cfgBase[c] = h; return; } // referência inicial: não conta como alteração
+            if (t._cfgBase[c] !== h) {
+                t._cfgBase[c] = h;
+                t.cfgTs[c] = Math.max(agora, (Number(t.cfgTs[c]) || 0) + 1);
+            }
+        });
+        row.cfg_ts = Object.assign({}, t.cfgTs);
+    } catch (e) { console.warn('[CFG_TS] carimbo:', e); }
+}
+// Compara carimbos local × banco: o banco tem campo mais novo? esta máquina tem alteração mais nova?
+function _cfgComparar(locTs, dbTs) {
+    const a = (locTs && typeof locTs === 'object') ? locTs : {};
+    const b = (dbTs && typeof dbTs === 'object') ? dbTs : {};
+    let bancoMaisNovo = false, localMaisNovo = false;
+    new Set([...Object.keys(a), ...Object.keys(b)]).forEach(k => {
+        const x = Number(a[k]) || 0, y = Number(b[k]) || 0;
+        if (y > x) bancoMaisNovo = true;
+        if (x > y) localMaisNovo = true;
+    });
+    return { bancoMaisNovo, localMaisNovo };
+}
+
 function _torneioToDb(t) {
-    return {
+    const _row = {
         id: t.id,
         clube_id: sbClube ? sbClube.id : null,
         nome: t.nome || 'Torneio',
@@ -12527,6 +12601,8 @@ function _torneioToDb(t) {
         // Só exibição: TV pública (link externo) mostra o MESMO prize do app
         prize_pool: _prizePoolParaTv(t),
     };
+    _cfgCarimbar(t, _row);
+    return _row;
 }
 
 // Prize pool exatamente como o app mostra (getPrize) — gravado só pra TV pública ler.
@@ -13839,6 +13915,9 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         })),
         mesas: tMesas.map(m => ({ id: m.id, numero: m.numero, jogadores: m.jogadores || [] })),
         bounties: {},  // FIX: inicializa bounties pra torneios KO não explodirem no renderBountyPanel
+        // Versão por campo da configuração (referência recalculada no próximo envio, sem contar como alteração)
+        cfgTs: (r.cfg_ts && typeof r.cfg_ts === 'object') ? Object.assign({}, r.cfg_ts) : {},
+        _cfgBase: undefined,
     };
 }
 
