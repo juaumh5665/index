@@ -31435,6 +31435,17 @@ function prevLevel(idx) {
     if (t.nivelAtual > 0) {
         t.nivelAtual--;
         aplicarTempoNivel(t);
+        // Mesma regra do nextLevel: voltar PARA um intervalo liga o intervalo (abre a janela
+        // de compras/add-on se for intervalo de compras); voltar para nível normal desliga.
+        const b = t.blinds && t.blinds[t.nivelAtual];
+        if (b && b.isBreak) {
+            t.isBreak = true;
+            t.status = t.rodando ? 'break' : 'paused';
+            showToast(`⏸️ INTERVALO: ${b.tempo || 10} min`);
+        } else if (t.isBreak) {
+            t.isBreak = false;
+            t.status = t.rodando ? 'running' : 'paused';
+        }
         _recalcTempoAlvo(t);
         saveData();
         updateModalTorneio();
@@ -31552,13 +31563,15 @@ function _emJanelaBreakEspecial(t) {
     }
     
     // Caminho automático: precisa estar em break + break marcado como "de compras"
-    const emBreak = !!(t.is_break || t.isBreak);
-    if (!emBreak) return false;
-    
     const blinds = Array.isArray(t.blinds) ? t.blinds : [];
     const nivelAtual = Number(t.nivelAtual || 0);
     const blindAtual = blinds[nivelAtual];
     if (!blindAtual) return false;
+
+    // Trava de segurança: o nível atual SER um intervalo também conta como break
+    // (antes, voltar o nível para o intervalo deixava is_break desligado e o add-on travava)
+    const emBreak = !!(t.is_break || t.isBreak || blindAtual.isBreak);
+    if (!emBreak) return false;
     
     // Aceita ambos os formatos (camelCase no JS, snake_case se vier do banco)
     return blindAtual.breakDeCompras === true || blindAtual.break_de_compras === true;
@@ -31604,6 +31617,14 @@ function _nivelHumano(t) {
 function _torneioTemBreakDeCompras(t) {
     if (!t || !Array.isArray(t.blinds)) return false;
     return t.blinds.some(b => b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true));
+}
+
+// KO com intervalo de compras: o nível atual já está DEPOIS desse intervalo?
+function _koPassouDoAddon(t) {
+    if (!t || !['bounty', 'pko', 'knockout'].includes(t.tipo) || !Array.isArray(t.blinds)) return false;
+    const idxBreak = t.blinds.findIndex(b => b && b.isBreak && (b.breakDeCompras === true || b.break_de_compras === true));
+    if (idxBreak < 0) return false;
+    return Number(t.nivelAtual || 0) > idxBreak;
 }
 
 function _tipoBloqueadoPorTrava(t, tipo) {
@@ -31661,7 +31682,13 @@ function _tipoBloqueadoPorTrava(t, tipo) {
     // BUG FIX: trava deve valer SEMPRE que o torneio já começou (rodando OU pausado).
     // Só não vale antes de iniciar (iniciadoEm null = nem começou ainda)
     if (!t.iniciadoEm) return { bloqueado: false, motivo: '' };
-    
+
+    // KO: passou do intervalo do add-on → acabaram reentradas e inscrições, mesmo com a
+    // janela manual aberta (depois do add-on ela serve só pra lançar add-on esquecido).
+    if (_TIPOS_NOVA_ENTRADA.includes(tipo) && _koPassouDoAddon(t)) {
+        return { bloqueado: true, motivo: 'KO: reentrada e inscrição só até o intervalo do add-on' };
+    }
+
     // 🔥 JANELA DE BREAK ESPECIAL — libera TUDO no intervalo final
     // (regra do poker: jogador eliminado/novo pode entrar no break com qualquer tipo de compra)
     // Inclui Buy-in pra novos jogadores que chegam só no intervalo do add-on
@@ -33868,6 +33895,58 @@ function openModalEliminar(idx) {
     openModal('modal-eliminar');
 }
 
+// =====================================================================
+// KO: depois de eliminar, aparece um atalho "Reentrar agora?" para o jogador
+// (só se a reentrada estiver liberada pelas travas). Clicar abre o Nova Entrada
+// já com o jogador e a Re-entry escolhidos — o operador confere e confirma como sempre.
+// =====================================================================
+function _koSugerirReentrada(t, jid, finalizado) {
+    if (!t || finalizado || !['bounty', 'pko', 'knockout'].includes(t.tipo)) return;
+    if (!(Number(t.reentryAte) > 0)) return;
+    if (_tipoBloqueadoPorTrava(t, 'reentry').bloqueado) return;
+    const tid = t.id;
+    const nome = getJogadorNome(jid);
+    const valor = (typeof _getReentryValor === 'function') ? _getReentryValor(t) : (Number(t.reentryValor || t.buyin) || 0);
+    setTimeout(() => {
+        let bar = document.getElementById('ko-sug-reentrada');
+        if (bar) bar.remove();
+        bar = document.createElement('div');
+        bar.id = 'ko-sug-reentrada';
+        bar.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10070;width:min(560px, calc(100vw - 32px));box-sizing:border-box;background:#18181b;border:1px solid rgba(245,213,114,.45);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.55);padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;color:#e4e4e7;font-family:inherit;';
+        bar.innerHTML = '<div style="min-width:0;flex:1"><div style="font-weight:800;font-size:15px">🔁 Reentrada para ' + esc(nome) + '?</div>' +
+            '<div style="font-size:12px;color:#a1a1aa;margin-top:2px">Acabou de ser eliminado · Re-entry ' + (valor > 0 ? formatMoney(valor) : 'GRÁTIS') + '</div></div>' +
+            '<button id="ko-sug-sim" style="padding:9px 14px;border-radius:8px;border:0;background:#f5d572;color:#111;font-weight:800;cursor:pointer">Reentrar agora</button>' +
+            '<button id="ko-sug-nao" style="padding:9px 12px;border-radius:8px;border:1px solid #3f3f46;background:transparent;color:#a1a1aa;cursor:pointer">Agora não</button>';
+        document.body.appendChild(bar);
+        const fechar = () => { try { bar.remove(); } catch (_) {} };
+        const timer = setTimeout(fechar, 30000);
+        bar.querySelector('#ko-sug-nao').onclick = () => { clearTimeout(timer); fechar(); };
+        bar.querySelector('#ko-sug-sim').onclick = () => {
+            clearTimeout(timer); fechar();
+            const idx = torneios.findIndex(x => x && x.id === tid);
+            const tt = torneios[idx];
+            if (!tt) return;
+            if (!(tt.eliminados || []).some(e => String(e.jogadorId) === String(jid))) { showToast('ℹ️ ' + nome + ' não está mais eliminado'); return; }
+            if (_tipoBloqueadoPorTrava(tt, 'reentry').bloqueado) { showToast('🔒 Reentrada não está mais liberada'); return; }
+            openModalEntrada(idx);
+            const sel = document.getElementById('entrada-jogador');
+            if (!sel) return;
+            sel.value = jid;
+            if (typeof sel.onchange === 'function') sel.onchange();
+            const tipoSel = document.getElementById('entrada-tipo');
+            const opt = tipoSel && Array.from(tipoSel.options).find(o => o.value === 'reentry' && !o.disabled);
+            if (opt) { tipoSel.value = 'reentry'; try { tipoSel.dispatchEvent(new Event('change')); } catch (_) {} }
+            try { atualizarResumoEntrada(); } catch (_) {}
+            // Se o acerto do caixa estiver aberto, o Nova Entrada fica por cima enquanto estiver aberto
+            const me = document.getElementById('modal-entrada');
+            if (me) {
+                me.style.zIndex = '10060';
+                const iv = setInterval(() => { if (!me.classList.contains('open')) { me.style.zIndex = ''; clearInterval(iv); } }, 500);
+            }
+        };
+    }, 700);
+}
+
 function confirmarEliminacao(pulaAcerto) {
     return comLock('confirmarEliminacao', function() {
         return _confirmarEliminacaoImpl(pulaAcerto);
@@ -34001,6 +34080,9 @@ function _confirmarEliminacaoImpl(pulaAcerto) {
     closeModal('modal-eliminar');
     updateModalTorneio();
     renderTorneiosList();
+
+    // KO: oferece a reentrada do jogador recém-eliminado (atalho, não lança nada sozinho)
+    try { _koSugerirReentrada(t, jid, finalizado); } catch (eSug) { console.warn('[KO] sugerir reentrada:', eSug); }
 
     // Sugerir acerto no caixa (depende da preferência do operador)
     // Se pulaAcerto=true (botão "Eliminar — acertar depois"), pula essa etapa.
