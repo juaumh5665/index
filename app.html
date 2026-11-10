@@ -32865,7 +32865,8 @@ function atualizarResumoEntrada() {
     let taxaAdm = 0;
     if (t.taxaAdmSoFree) {
         // Opção "só no buy-in FREE": prévia igual ao que será cobrado
-        if (acoes.includes('buyin') && _taxaAdmAplica(t, 'buyin')) taxaAdm = Number(t.taxaAdm);
+        if ((acoes.includes('buyin') && _taxaAdmAplica(t, 'buyin'))
+            || (acoes.includes('buyin_duplo') && _taxaAdmAplica(t, 'buyin_duplo'))) taxaAdm = Number(t.taxaAdm);
     } else if (acoes.includes('buyin') && Number(t.taxaAdm) > 0) {
         taxaAdm = Number(t.taxaAdm);
     }
@@ -37534,7 +37535,15 @@ function _finSubPorValores(entries, valorPadrao) {
 function _taxaAdmAplica(t, tipo) {
     if (!t || !(Number(t.taxaAdm) > 0)) return false;
     if (t.taxaAdmSoFree) {
-        return tipo === 'buyin' && _isBuyinFree(t) && (Number(_getBuyinEfetivo(t)) || 0) === 0;
+        if (tipo === 'buyin' && _isBuyinFree(t) && (Number(_getBuyinEfetivo(t)) || 0) === 0) return true;
+        // Quem chega DEPOIS da janela FREE também paga a taxa no buy-in dele
+        // (buy-in/buy-in duplo lançado depois do último nível free)
+        if ((tipo === 'buyin' || tipo === 'buyin_duplo') && _isBuyinFree(t) && t.iniciadoEm) {
+            const maxFree = (typeof _resolverNivelMaxBuyinFree === 'function') ? _resolverNivelMaxBuyinFree(t) : (t.buyinFreeAteNivel || null);
+            const nivelH = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
+            if (maxFree != null && nivelH > maxFree) return true;
+        }
+        return false;
     }
     return tipo === 'buyin' || tipo === 'buyin_duplo';
 }
