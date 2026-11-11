@@ -49483,6 +49483,7 @@ function getTipoIcon(tipo) {
 let _pjCobrancaModo = 'tudo'; // 'tudo' (saldo total) ou 'torneio' (só torneio ativo)
 let _pjDividaTotal = 0;
 let _pjDividaTorneio = 0;
+let _pjCredito = 0; // crédito do jogador (saldo positivo) que ajuda a pagar a comanda
 let _pjTotalComandas = 0;
 
 function renderPagarConta() {
@@ -49561,8 +49562,10 @@ function renderPagarConta() {
     _pjDividaTotal = divida;
     _pjDividaTorneio = dividaTorneio;
     _pjTotalComandas = totalComandas;
+    // Crédito do jogador desconta da comanda (só existe quando não há dívida)
+    _pjCredito = (saldo > 0 && totalComandas > 0) ? Math.round(saldo * 100) / 100 : 0;
 
-    const totalSugerido = divida + totalComandas;
+    const totalSugerido = Math.max(0, Math.round((divida + totalComandas - _pjCredito) * 100) / 100);
 
     // Dados do jogador (pra cabeçalho)
     const jogador = jogadores.find(j => j.id === pagamentoJogadorId);
@@ -49621,21 +49624,41 @@ function renderPagarConta() {
         <!-- Composição -->
         <div class="pj-composicao">
             <div class="pj-comp-lab">Composição</div>
+            ${_pjCredito > 0 ? `
+            <div id="pj-linha-saldo" class="pj-comp-linha">
+                <div class="pj-comp-left">
+                    <i class="fa-solid fa-wallet" style="color:#22c55e;font-size:.85rem;"></i>
+                    <span class="pj-comp-label">Crédito do jogador</span>
+                </div>
+                <div class="pj-comp-val" style="color:#22c55e;">+ ${formatMoney(_pjCredito)}</div>
+            </div>` : `
             <div id="pj-linha-saldo" class="pj-comp-linha">
                 <div class="pj-comp-left">
                     <i class="fa-solid fa-receipt" style="color:#ef4444;font-size:.85rem;"></i>
                     <span class="pj-comp-label">Saldo devedor${comandasAbertas.length > 0 ? ' <span class="pj-comp-sub">(buy-in/rebuy)</span>' : ''}</span>
                 </div>
                 <div id="pj-divida-display" class="pj-comp-val pj-comp-val-red">- ${formatMoney(divida)}</div>
-            </div>
+            </div>`}
             ${linhaComandas}
             <div class="pj-comp-total">
                 <span class="pj-comp-total-label">Total a pagar</span>
-                <div id="pj-total-display" class="pj-comp-total-val">${formatMoney(totalSugerido)}</div>
+                <div id="pj-total-display" class="pj-comp-total-val"${_pjCredito >= totalComandas && totalComandas > 0 ? ' style="color:#22c55e;"' : ''}>${formatMoney(totalSugerido)}</div>
             </div>
+            ${_pjCredito > 0 ? `<div style="font-size:.68rem;color:${_pjCredito >= totalComandas ? '#86efac' : '#a1a1aa'};text-align:right;margin-top:.3rem;">${_pjCredito >= totalComandas
+                ? `o crédito cobre a comanda · sobra ${formatMoney(Math.round((_pjCredito - totalComandas) * 100) / 100)}`
+                : `${formatMoney(totalComandas)} da comanda − ${formatMoney(_pjCredito)} de crédito`}</div>` : ''}
             ${toggleComandas}
             ${toggleCobranca}
         </div>
+
+        ${(_pjCredito > 0 && _pjCredito + 0.001 >= totalComandas && totalComandas > 0) ? `
+        <div id="pj-usar-credito-wrap" style="margin-bottom:1rem;">
+            <button type="button" onclick="pjUsarCreditoComanda()" style="width:100%;padding:.85rem;border:0;border-radius:.6rem;background:#16a34a;color:#fff;font-weight:800;font-size:.9rem;cursor:pointer;font-family:inherit;">
+                <i class="fa-solid fa-circle-check"></i> Usar crédito para fechar a comanda (${formatMoney(totalComandas)})
+            </button>
+            <div style="font-size:.68rem;color:#a1a1aa;text-align:center;margin-top:.35rem;">Fecha a comanda descontando do crédito · não entra dinheiro no caixa · fica ${formatMoney(Math.round((_pjCredito - totalComandas) * 100) / 100)} de crédito</div>
+            <div style="display:flex;align-items:center;gap:.5rem;color:#52525b;font-size:.68rem;margin-top:.75rem;"><span style="flex:1;height:1px;background:#27272a"></span>ou receber em dinheiro / pix<span style="flex:1;height:1px;background:#27272a"></span></div>
+        </div>` : ''}
 
         <!-- LOTE 6: Voucher disponível (pra devedores) -->
         <div id="pj-voucher-wrap" style="display:none;margin-bottom:1rem;padding:.75rem 1rem;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.2);border-radius:.5rem;">
@@ -49814,7 +49837,7 @@ function _pjVoucherChanged() {
     const divida = (_pjCobrancaModo === 'torneio') ? _pjDividaTorneio : _pjDividaTotal;
     const incluirComandas = (document.getElementById('pj-incluir-comandas') || {}).checked !== false;
     const totalComandas = incluirComandas ? _pjTotalComandas : 0;
-    const totalBase = divida + totalComandas;
+    const totalBase = Math.max(0, Math.round((divida + totalComandas - (incluirComandas ? _pjCredito : 0)) * 100) / 100);
 
     if (voucherId) {
         const v = (vouchers || []).find(v => v.id === voucherId);
@@ -49843,9 +49866,11 @@ function atualizarTotalComComandas() {
     const totalComandas = comandasAbertas.reduce((s, c) => s + calcCobrarComanda(c), 0);
 
     const incluir = (document.getElementById('pj-incluir-comandas') || {}).checked;
-    const total = divida + (incluir ? totalComandas : 0);
+    const total = Math.max(0, Math.round((divida + (incluir ? totalComandas - _pjCredito : 0)) * 100) / 100);
     
     _pjTotalSugerido = total;
+    const btnCred = document.getElementById('pj-usar-credito-wrap');
+    if (btnCred) btnCred.style.display = incluir ? '' : 'none';
     
     const disp = document.getElementById('pj-total-display');
     if (disp) disp.innerText = formatMoney(total);
@@ -49891,7 +49916,7 @@ function _pjTrocarCobranca(modo) {
     // Atualiza total considerando comandas
     const incluir = (document.getElementById('pj-incluir-comandas') || {}).checked;
     const totalComandas = incluir ? _pjTotalComandas : 0;
-    const total = divida + totalComandas;
+    const total = Math.max(0, Math.round((divida + totalComandas - (incluir ? _pjCredito : 0)) * 100) / 100);
 
     _pjTotalSugerido = total;
 
@@ -50132,6 +50157,66 @@ function _validarValorPagamentoOLD() {
     } else {
         aviso.innerText = '';
     }
+}
+
+// =====================================================================
+// USAR CRÉDITO DO JOGADOR PARA FECHAR A COMANDA DO BAR
+// Lança só o débito do bar (o crédito do jogador já cobre) e fecha a comanda.
+// Nenhum dinheiro entra no caixa. O saldo de crédito cai automaticamente
+// (saldo = soma das transações).
+// =====================================================================
+function pjUsarCreditoComanda() {
+    return comLock('pjUsarCreditoComanda', function () {
+        const jid = pagamentoJogadorId;
+        const j = jogadores.find(x => x.id === jid);
+        if (!j) return showToast('⚠️ Jogador não encontrado');
+        let credito = Math.round(getSaldoJogador(jid) * 100) / 100;
+        const abertas = barComandas
+            .filter(c => c.jogadorId === jid && c.status === 'aberta')
+            .sort((a, b) => (a.abertoEm || a.createdAt || 0) - (b.abertoEm || b.createdAt || 0));
+        const total = abertas.reduce((s, c) => s + calcCobrarComanda(c), 0);
+        if (!(credito > 0) || !abertas.length) return showToast('⚠️ Sem crédito ou sem comanda aberta');
+        if (credito + 0.001 < total) return showToast('⚠️ O crédito não cobre a comanda — receba a diferença pelo pagamento normal');
+
+        let fechadas = 0, usado = 0;
+        for (const c of abertas) {
+            const totalC = calcCobrarComanda(c);
+            if (credito + 0.001 < totalC) break;
+            if (totalC > 0) registrarTransacao({
+                jogadorId: jid,
+                tipo: 'bar',
+                valor: -totalC,
+                descricao: `Comanda bar (${c.itens.length} iten${c.itens.length > 1 ? 's' : ''}) · paga com crédito do jogador`,
+                origem: 'bar',
+                refId: c.id,
+            });
+            c.status = 'fechada';
+            c.fechadoEm = Date.now();
+            c.pagamento = 'credito_sistema';
+            c.formasPagamento = [{ valor: totalC, metodo: 'credito_sistema' }];
+            c.total = calcTotalComanda(c);
+            c.fechadaPeloCaixa = true;
+            c.descricaoFechamento = 'Paga com crédito do jogador';
+            if (typeof _marcarIdRecente === 'function') _marcarIdRecente(c.id);
+            credito = Math.round((credito - totalC) * 100) / 100;
+            usado += totalC;
+            fechadas++;
+        }
+        if (!fechadas) return showToast('⚠️ Nenhuma comanda fechada');
+        if (typeof _suspenderRealtime === 'function') _suspenderRealtime(12000);
+        usado = Math.round(usado * 100) / 100;
+        logAudit('PAGAMENTO', `Comanda paga com crédito · ${j.nome} · ${formatMoney(usado)} (sobra ${formatMoney(credito)} de crédito)`,
+            { jogadorId: jid, valor: usado, metodo: 'credito_sistema', comandas: fechadas });
+        saveData();
+        if (typeof sincronizarEstado === 'function') sincronizarEstado().catch(err => console.warn('[CAIXA] sync falhou:', err));
+        showToast(`✅ Comanda fechada com o crédito · ${j.nome} fica com ${formatMoney(credito)} de crédito`);
+        try { renderSaldoCard(getSaldoJogador(jid)); } catch (_) {}
+        try { renderPagarConta(); } catch (_) {}
+        try { renderExtratoJogador(); } catch (_) {}
+        try { renderCaixaAberto(); } catch (_) {}
+        try { renderComandas && renderComandas(); } catch (_) {}
+        try { renderDashboard(); } catch (_) {}
+    }, '⏳ Fechando comanda...');
 }
 
 function confirmarPagamentoConta() {
