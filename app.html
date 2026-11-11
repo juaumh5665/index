@@ -9913,19 +9913,38 @@ let blindStructure = [
 ];
 
 // Wrapper que dispara sync automaticamente após cada save
+// Grava no navegador SEM NUNCA interromper o fluxo: se o espaço do navegador (≈5 MB) acabar,
+// tenta uma versão enxuta dos torneios e, se ainda não couber, segue (o banco é a fonte da verdade).
+// FIX 11/11 (Royal): "QuotaExceededError" no ps_torneios travava saveData → entrada travada.
+let _lsAvisoCheio = 0;
+function _lsSet(chave, valor) {
+    try { localStorage.setItem(chave, valor); return true; }
+    catch (e) {
+        if (Date.now() - _lsAvisoCheio > 60000) { _lsAvisoCheio = Date.now(); console.warn('[STORAGE] sem espaço para', chave, '— seguindo sem cache local deste item'); }
+        return false;
+    }
+}
+function _torneiosParaCache() {
+    // Versão enxuta: sem as referências internas de configuração (recalculadas sozinhas)
+    return JSON.stringify(torneios.map(t => { if (!t) return t; const c = Object.assign({}, t); delete c._cfgBase; return c; }));
+}
 function _saveDataInner() {
-    localStorage.setItem('ps_jogadores',   JSON.stringify(jogadores));
-    localStorage.setItem('ps_torneios',    JSON.stringify(torneios));
-    localStorage.setItem('ps_bar_grupos',  JSON.stringify(barGrupos));
-    localStorage.setItem('ps_bar_produtos',JSON.stringify(barProdutos));
-    localStorage.setItem('ps_bar_comandas',JSON.stringify(barComandas));
-    localStorage.setItem('ps_cash_mesas',  JSON.stringify(cashMesas));
-    localStorage.setItem('ps_usuarios',    JSON.stringify(usuarios));
-    localStorage.setItem('ps_transacoes',  JSON.stringify(transacoes));
-    localStorage.setItem('ps_fechamentos', JSON.stringify(fechamentos));
-    localStorage.setItem('ps_bar_caixa',   JSON.stringify(barCaixa));
-    localStorage.setItem('ps_rankings',    JSON.stringify(rankings));
-    localStorage.setItem('ps_fichas_denom', JSON.stringify(fichasDenominacoes));
+    _lsSet('ps_jogadores',   JSON.stringify(jogadores));
+    if (!_lsSet('ps_torneios', _torneiosParaCache())) {
+        // Libera o espaço do valor antigo e tenta de novo
+        try { localStorage.removeItem('ps_torneios'); } catch (_) {}
+        _lsSet('ps_torneios', _torneiosParaCache());
+    }
+    _lsSet('ps_bar_grupos',  JSON.stringify(barGrupos));
+    _lsSet('ps_bar_produtos',JSON.stringify(barProdutos));
+    _lsSet('ps_bar_comandas',JSON.stringify(barComandas));
+    _lsSet('ps_cash_mesas',  JSON.stringify(cashMesas));
+    _lsSet('ps_usuarios',    JSON.stringify(usuarios));
+    _lsSet('ps_transacoes',  JSON.stringify(transacoes));
+    _lsSet('ps_fechamentos', JSON.stringify(fechamentos));
+    _lsSet('ps_bar_caixa',   JSON.stringify(barCaixa));
+    _lsSet('ps_rankings',    JSON.stringify(rankings));
+    _lsSet('ps_fichas_denom', JSON.stringify(fichasDenominacoes));
 }
 
 // Wrapper público — chama original + dispara sync com debounce
@@ -12453,13 +12472,20 @@ const _CFG_CAMPOS_TORNEIO = ['nome','tipo','formato','dia_label','series_id','se
 // Campos locais que NÃO são configuração (relógio, listas, caixa, estado local)
 const _CFG_PROPS_NAO_ADOTAR = new Set(['id','nivelAtual','tempoTotal','tempoRestante','tempoAlvo','status','rodando','relogioTs',
     'isBreak','iniciadoEm','tempoJogoAcumuladoMs','tempoJogoResumedAt','encerradoEm','encerradoPor','vencedorId','caixaTorneio',
-    'entries','eliminados','jackpotCompras','mesas','bounties','estornos','cfgTs','_cfgBase']);
+    'entries','eliminados','jackpotCompras','mesas','bounties','estornos','cfgTs','_cfgBase','_cfgBaseV']);
+// Hash curto (FNV-1a 32 bits) — guardar o JSON inteiro de blinds/premiação por torneio
+// estourava o espaço do navegador (Royal 11/11).
 function _cfgHashCampo(v) {
-    try { return JSON.stringify(v === undefined ? null : v); } catch (_) { return ''; }
+    let str;
+    try { str = JSON.stringify(v === undefined ? null : v); } catch (_) { return ''; }
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(36) + ':' + str.length;
 }
 function _cfgCarimbar(t, row) {
     try {
-        if (!t._cfgBase || typeof t._cfgBase !== 'object') t._cfgBase = {};
+        // Referências no formato antigo (JSON inteiro) ou ausentes: recomeça sem contar como alteração
+        if (!t._cfgBase || typeof t._cfgBase !== 'object' || t._cfgBaseV !== 2) { t._cfgBase = {}; t._cfgBaseV = 2; }
         if (!t.cfgTs || typeof t.cfgTs !== 'object') t.cfgTs = {};
         const agora = Date.now();
         _CFG_CAMPOS_TORNEIO.forEach(c => {
