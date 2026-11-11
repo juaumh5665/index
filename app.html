@@ -50262,15 +50262,21 @@ async function _confirmarPagamentoContaImpl() {
             .filter(c => c.jogadorId === pagamentoJogadorId && c.status === 'aberta')
             .sort((a, b) => (a.abertoEm || a.createdAt || 0) - (b.abertoEm || b.createdAt || 0)); // mais antigas primeiro
 
-        // Saldo devedor ANTES do pagamento (no caixa geral, sem cash)
-        const saldoAntes = getSaldoJogadorCaixaGeral(pagamentoJogadorId);
-        const dividaCaixa = Math.max(0, -saldoAntes);
+        // Saldo ANTES deste pagamento, no MESMO critério que a tela usa pra mostrar o "Total a pagar"
+        // (getSaldoJogador). Os pagamentos acima já foram registrados → desconta o que acabou de entrar.
+        // FIX (caso Saimon 06/11): antes usava o saldo "sem cash"; jogador que ganhou no cash e
+        // usou isso pra pagar torneio aparecia devendo R$ 1.606 ali → a comanda nunca fechava.
+        const saldoAntes = getSaldoJogador(pagamentoJogadorId) - valorBase - voucherAbatido;
+        const dividaCaixa = (_pjCobrancaModo === 'torneio')
+            ? Math.max(0, Number(_pjDividaTorneio) || 0)
+            : Math.max(0, -saldoAntes);
+        // Crédito que o jogador já tinha também ajuda a cobrir a comanda
+        const creditoAntes = (_pjCobrancaModo === 'torneio') ? 0 : Math.max(0, saldoAntes);
 
         // Valor disponível pra cobrir as comandas:
-        //   = valor total pago - dívida do caixa geral (porque a dívida do caixa também precisa ser paga)
-        // Se valorBase < dividaCaixa: nada sobra pra comandas; nenhuma fecha
-        // Se valorBase >= dividaCaixa: o que sobra é distribuído pras comandas (mais antigas primeiro)
-        let disponivelParaComandas = Math.max(0, valorBase - dividaCaixa);
+        //   = valor pago (+ crédito que já tinha) - dívida que esse pagamento precisa quitar primeiro
+        // O que sobra é distribuído pras comandas (mais antigas primeiro)
+        let disponivelParaComandas = Math.max(0, valorBase + voucherAbatido + creditoAntes - dividaCaixa);
 
         let comandasFechadas = 0;
         for (const c of comandasAbertas) {
