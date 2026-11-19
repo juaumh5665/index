@@ -3025,14 +3025,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
                     <!-- ABA 1: ENVIAR (tela unificada) -->
                     <div id="conv-tab-enviar" class="conv-tab-content">
+                        <div id="conv-retomar-banner" style="display:none;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.35);border-radius:.85rem;padding:.85rem 1rem;margin-bottom:1rem;"></div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;" id="conv-enviar-grid">
                             <!-- Coluna 1: Mensagem + Imagem -->
                             <div style="display:flex;flex-direction:column;gap:1rem;">
                                 <!-- Mensagem -->
                                 <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
                                     <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">✏️ Mensagem</div>
+                                    <div style="font-size:.62rem;color:#a1a1aa;font-weight:700;margin-bottom:.3rem;">Variação A</div>
 
-                                    <textarea id="conv-enviar-texto" class="inp" rows="7" placeholder="E aí {nome}! {Hoje tem|Bora pro|Cola no} {torneio} 🎰&#10;&#10;Use {chaves|com|opções} pra variar o texto automaticamente" oninput="convEnviarAtualizarPreview()" style="width:100%;font-family:var(--font-mono,monospace);font-size:.8rem;resize:vertical;line-height:1.5;"></textarea>
+                                    <textarea id="conv-enviar-texto" onfocus="_convPreviewVar=0;_convUltimoCampoTexto=null;convEnviarAtualizarPreview()" class="inp" rows="7" placeholder="E aí {nome}! {Hoje tem|Bora pro|Cola no} {torneio} 🎰&#10;&#10;Use {chaves|com|opções} pra variar o texto automaticamente" oninput="_convPreviewVar=0;_convVarAtualizarContador();convEnviarAtualizarPreview()" style="width:100%;font-family:var(--font-mono,monospace);font-size:.8rem;resize:vertical;line-height:1.5;"></textarea>
 
                                     <div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem;">
                                         <span class="conv-var-chip" onclick="convEnviarInserirVar('{nome}')">{nome}</span>
@@ -3043,6 +3045,12 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <span class="conv-var-chip" onclick="convEnviarInserirVar('{buyin}')">{buyin}</span>
                                         <span class="conv-var-chip" onclick="convEnviarInserirVar('{prize}')">{prize}</span>
                                         <span class="conv-var-chip" onclick="convEnviarInserirVar('{clube}')">{clube}</span>
+                                    </div>
+
+                                    <div id="conv-enviar-variacoes" style="display:flex;flex-direction:column;gap:.6rem;margin-top:.75rem;"></div>
+                                    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.6rem;">
+                                        <button onclick="convVarAdicionar()" id="conv-var-add" style="background:rgba(245,158,11,.08);border:1px dashed rgba(245,158,11,.45);color:#fbbf24;padding:.35rem .7rem;border-radius:.4rem;font-size:.7rem;cursor:pointer;font-weight:700;font-family:inherit;">＋ Adicionar variação</button>
+                                        <span id="conv-var-contador" style="font-size:.66rem;font-weight:700;"></span>
                                     </div>
 
                                     <div style="background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.15);border-radius:.45rem;padding:.55rem .75rem;margin-top:.75rem;font-size:.68rem;color:#c4b5fd;line-height:1.5;">
@@ -3110,7 +3118,7 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <div style="background:#111113;border:1px solid #1e1e23;border-radius:1rem;padding:1.25rem;">
                                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
                                         <div style="font-size:.65rem;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">👁️ Preview (variação aleatória)</div>
-                                        <button onclick="convEnviarAtualizarPreview()" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.2rem .55rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">🔄 Outra variação</button>
+                                        <button onclick="convPreviewSortear()" style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#a855f7;padding:.2rem .55rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">🔄 Outra variação</button>
                                     </div>
                                     <div style="background:#0d1418;border:1px solid #1e2833;border-radius:.75rem;padding:.85rem;">
                                         <div style="background:#054640;border-radius:.55rem .55rem 0 .55rem;padding:.65rem .85rem;max-width:95%;margin-left:auto;">
@@ -3344,6 +3352,43 @@ document.addEventListener('DOMContentLoaded', function(){
                                         <input type="number" id="conv-cfg-hora-fim" class="inp" min="0" max="23" value="22" style="width:100%;">
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- #22 Proteção do número -->
+                            <div style="background:#111113;border:1px solid #1e1e23;border-radius:.75rem;padding:1.25rem;">
+                                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;">
+                                    <div style="font-size:1.2rem;">🛡️</div>
+                                    <h3 style="font-size:.95rem;font-weight:800;color:#fff;">Proteção do número (envio automático)</h3>
+                                </div>
+                                <p style="font-size:.72rem;color:#71717a;margin-bottom:.85rem;line-height:1.5;">Quanto mais devagar e menos mensagens por dia, menor o risco de o WhatsApp bloquear o número. O que não couber no dia fica para o botão <b>Retomar campanha</b>.</p>
+                                <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.35rem;">Ritmo</div>
+                                <div id="conv-cfg-ritmo" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.5rem;margin-bottom:1rem;">
+                                    <label style="display:block;border:1px solid #27272a;border-radius:.55rem;padding:.65rem .75rem;cursor:pointer;"><input type="radio" name="conv-ritmo" value="cauteloso" onchange="convCfgAvisoLimite()" style="accent-color:#f59e0b;margin-right:.35rem;"><b style="font-size:.8rem;color:#fff;">🐢 Cauteloso</b> <span style="font-size:.6rem;color:#22c55e;font-weight:800;">RECOMENDADO</span><div style="font-size:.66rem;color:#a1a1aa;margin-top:.25rem;line-height:1.4;">45 a 150 s entre mensagens · pausa de 4 a 9 min a cada 6 a 12 envios · ~25 por hora</div></label>
+                                    <label style="display:block;border:1px solid #27272a;border-radius:.55rem;padding:.65rem .75rem;cursor:pointer;"><input type="radio" name="conv-ritmo" value="moderado" onchange="convCfgAvisoLimite()" style="accent-color:#f59e0b;margin-right:.35rem;"><b style="font-size:.8rem;color:#fff;">🚶 Moderado</b><div style="font-size:.66rem;color:#a1a1aa;margin-top:.25rem;line-height:1.4;">30 a 90 s · pausa de 3 a 6 min a cada 8 a 15 envios · ~40 por hora</div></label>
+                                    <label style="display:block;border:1px solid #27272a;border-radius:.55rem;padding:.65rem .75rem;cursor:pointer;"><input type="radio" name="conv-ritmo" value="atual" onchange="convCfgAvisoLimite()" style="accent-color:#f59e0b;margin-right:.35rem;"><b style="font-size:.8rem;color:#fff;">⚡ Rápido (antigo)</b><div style="font-size:.66rem;color:#a1a1aa;margin-top:.25rem;line-height:1.4;">10 a 25 s · pausa de 2 a 3 min a cada 10 · risco alto de bloqueio</div></label>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.85rem;">
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Limite por dia (mensagens)</div>
+                                        <input type="number" id="conv-cfg-limite-dia" class="inp" min="1" max="500" value="40" oninput="convCfgAvisoLimite()" style="width:100%;">
+                                        <div id="conv-cfg-limite-aviso" style="font-size:.66rem;margin-top:.3rem;line-height:1.4;"></div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Parar se der erro</div>
+                                        <select id="conv-cfg-erros-seguidos" class="inp" style="width:100%;">
+                                            <option value="2">2 erros seguidos (recomendado)</option>
+                                            <option value="3">3 erros seguidos</option>
+                                            <option value="5">5 erros seguidos</option>
+                                        </select>
+                                        <div style="font-size:.66rem;color:#71717a;margin-top:.3rem;">"Número sem WhatsApp" não conta como erro.</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size:.65rem;color:#71717a;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Aquecimento de número novo</div>
+                                        <label style="display:flex;gap:.45rem;align-items:flex-start;cursor:pointer;font-size:.74rem;color:#d4d4d8;"><input type="checkbox" id="conv-cfg-aquecimento" onchange="convCfgAvisoLimite()" style="margin-top:.15rem;accent-color:#f59e0b;"><span>Começa com 15 por dia e sobe 10 por semana até o limite. Use em número novo ou que acabou de ser bloqueado.</span></label>
+                                        <div id="conv-cfg-aquecimento-info" style="font-size:.66rem;color:#93c5fd;margin-top:.3rem;"></div>
+                                    </div>
+                                </div>
+                                <div style="font-size:.66rem;color:#71717a;margin-top:.75rem;">O horário de envio (início e fim) é o do bloco Anti-cansaço: fora dele a campanha pausa sozinha.</div>
                             </div>
 
                             <!-- Áudio nos convites (NOVO · desligado por padrão) -->
@@ -42796,6 +42841,7 @@ function convSetTab(tab) {
     document.querySelectorAll('.conv-tab-content').forEach(c => c.style.display = 'none');
     const tabEl = document.getElementById('conv-tab-' + tab);
     if (tabEl) tabEl.style.display = '';
+    if (tab === 'enviar') { try { _convCampRenderBanner(); } catch (_) {} }
 
     // Quando troca pra "campanha", popular torneios e templates
     if (tab === 'campanha') {
@@ -43325,6 +43371,15 @@ async function convConfigCarregar() {
         setVal('conv-cfg-assinatura', conviteConfig.assinatura || '');
         setVal('conv-cfg-link-rodape', conviteConfig.link_rodape || '');
         { const ck = document.getElementById('conv-cfg-audio-ativo'); if (ck) ck.checked = !!conviteConfig.audio_ativo; }
+        try {
+            const rit = conviteConfig.ritmo || 'cauteloso';
+            document.querySelectorAll('input[name="conv-ritmo"]').forEach(r => { r.checked = r.value === rit; });
+            setVal('conv-cfg-limite-dia', conviteConfig.limite_diario || 40);
+            setVal('conv-cfg-erros-seguidos', String(conviteConfig.erros_seguidos_max || 2));
+            const aq = document.getElementById('conv-cfg-aquecimento'); if (aq) aq.checked = !!conviteConfig.aquecimento_inicio;
+            convCfgAvisoLimite();
+            _convCampRenderBanner();
+        } catch (_) {}
         try { convAudioAtualizarVisibilidade(); } catch (_) {}
 
         // Popular dropdown de opt-out + lista atual
@@ -43335,6 +43390,34 @@ async function convConfigCarregar() {
         convWaPopularForm();
     } catch (e) {
         console.warn('[Convites] erro carregar config:', e);
+    }
+}
+
+// Aviso ao cliente sobre o risco do limite/ritmo escolhido (#22)
+function convCfgAvisoLimite() {
+    const el = document.getElementById('conv-cfg-limite-aviso');
+    const v = parseInt((document.getElementById('conv-cfg-limite-dia') || {}).value, 10) || 0;
+    const rit = (document.querySelector('input[name="conv-ritmo"]:checked') || {}).value || 'cauteloso';
+    document.querySelectorAll('#conv-cfg-ritmo label').forEach(l => {
+        const on = l.querySelector('input').checked;
+        l.style.borderColor = on ? '#f59e0b' : '#27272a';
+        l.style.background = on ? 'rgba(245,158,11,.07)' : 'transparent';
+    });
+    if (el) {
+        let cor = '#22c55e', txt = '✓ Faixa segura para a maioria dos números.';
+        if (v > 100) { cor = '#ef4444'; txt = '⛔ Acima de 100 por dia o risco de bloqueio é muito alto, ainda mais em número que já foi bloqueado.'; }
+        else if (v > 60) { cor = '#f59e0b'; txt = '⚠️ Acima de 60 por dia o risco de bloqueio aumenta bastante. Só use em número antigo, com muita gente respondendo.'; }
+        if (rit === 'atual' && v > 40) { cor = '#ef4444'; txt = '⛔ Ritmo rápido + esse volume foi o que bloqueou números antes. Prefira o Cauteloso.'; }
+        el.style.color = cor; el.textContent = txt;
+    }
+    const info = document.getElementById('conv-cfg-aquecimento-info');
+    const aq = document.getElementById('conv-cfg-aquecimento');
+    if (info) {
+        if (aq && aq.checked) {
+            const ini = (conviteConfig && conviteConfig.aquecimento_inicio) || new Date().toLocaleDateString('sv-SE');
+            const sem = Math.max(0, Math.floor((Date.now() - new Date(ini + 'T00:00:00').getTime()) / (7 * 86400000)));
+            info.textContent = `Hoje o limite fica em ${Math.min(v || 40, 15 + sem * 10)} por dia (semana ${sem + 1} do aquecimento).`;
+        } else info.textContent = '';
     }
 }
 
@@ -43358,7 +43441,13 @@ async function convConfigSalvar() {
         wa_api_token: ((document.getElementById('conv-wa-token') || {}).value || '').trim(),
         wa_session_name: ((document.getElementById('conv-wa-session') || {}).value || 'default').trim(),
         wa_connected: !!(conviteConfig && conviteConfig.wa_connected),
-        audio_ativo: !!((document.getElementById('conv-cfg-audio-ativo') || {}).checked)
+        audio_ativo: !!((document.getElementById('conv-cfg-audio-ativo') || {}).checked),
+        ritmo: ((document.querySelector('input[name="conv-ritmo"]:checked') || {}).value || 'cauteloso'),
+        limite_diario: getInt('conv-cfg-limite-dia', 40, 1, 500),
+        erros_seguidos_max: getInt('conv-cfg-erros-seguidos', 2, 1, 10),
+        aquecimento_inicio: ((document.getElementById('conv-cfg-aquecimento') || {}).checked)
+            ? ((conviteConfig && conviteConfig.aquecimento_inicio) || new Date().toLocaleDateString('sv-SE'))
+            : null
     };
     if (payload.horario_fim <= payload.horario_inicio) {
         showToast('⚠️ Horário fim precisa ser maior que início');
@@ -43370,8 +43459,9 @@ async function convConfigSalvar() {
         const { error } = await sb.from('convite_config')
             .upsert(payload, { onConflict: 'clube_id' });
         if (error) throw error;
-        conviteConfig = payload;
+        conviteConfig = Object.assign({}, conviteConfig, payload);
         try { convAudioAtualizarVisibilidade(); } catch (_) {}
+        try { convCfgAvisoLimite(); } catch (_) {}
         showToast('✅ Configurações salvas');
     } catch (e) {
         console.error('[Convites] erro salvar config:', e);
@@ -43710,8 +43800,10 @@ function convCarregarListaCampanha() {
         };
     });
 
+    _convCampanha.campanhaId = null;
     document.getElementById('conv-camp-lista-wrap').style.display = '';
     convRenderListaCampanha();
+    _convMarcarJaRecebidos();
 }
 
 function convRenderListaCampanha() {
@@ -43724,7 +43816,8 @@ function convRenderListaCampanha() {
     const enviados = _convCampanha.listaJogadores.filter(p => p.enviado).length;
     const bloqueados = total - validos;
 
-    meta.innerHTML = `<strong style="color:#22c55e;">${validos}</strong> com WhatsApp válido${bloqueados > 0 ? ` · <strong style="color:#ef4444;">${bloqueados}</strong> bloqueados (sem número ou inválido)` : ''} · <strong style="color:#fbbf24;">${enviados}</strong> enviados`;
+    meta.innerHTML = `<strong style="color:#22c55e;">${validos}</strong> com WhatsApp válido${bloqueados > 0 ? ` · <strong style="color:#ef4444;">${bloqueados}</strong> bloqueados (sem número ou inválido)` : ''} · <strong style="color:#fbbf24;">${enviados}</strong> enviados`
+        + (_convCampanha.jaRecebidos ? `<div style="margin-top:.3rem;color:#93c5fd;">↪️ ${_convCampanha.jaRecebidos} já receberam convite deste torneio e serão pulados · <a onclick="convIncluirJaRecebidos()" style="color:#fbbf24;cursor:pointer;text-decoration:underline;">incluir mesmo assim</a></div>` : '');
 
     const torneio = _convCampanha.torneioId ? (torneios || []).find(t => t.id === _convCampanha.torneioId) : null;
 
@@ -43749,7 +43842,7 @@ function convRenderListaCampanha() {
             const horaStr = p.ts ? new Date(p.ts).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : '';
             statusHtml = `
                 <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;">
-                    <div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ Enviado ${horaStr}</div>
+                    <div style="font-size:.7rem;color:#22c55e;font-weight:700;">✅ ${p._jaRecebeu ? 'Já recebeu' : 'Enviado'} ${horaStr}${p.variante ? ' · var. ' + p.variante : ''}</div>
                     ${p.audioIdx ? (p.erroAudio ? `<div style="font-size:.62rem;color:#f87171;font-weight:700;max-width:200px;text-align:right;" title="${esc(p.erroAudio)}">🎙️ Áudio ${p.audioIdx} não foi</div>` : `<div style="font-size:.62rem;color:#c4b5fd;font-weight:700;">🎙️ Áudio ${p.audioIdx}</div>`) : ''}
                     <button onclick="convMarcarSemWhatsapp(${idx})" title="Marcar como número sem WhatsApp (reverte envio)" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.15rem .45rem;border-radius:.3rem;font-size:.62rem;cursor:pointer;font-weight:700;font-family:inherit;">❌ Sem WA</button>
                 </div>`;
@@ -43800,6 +43893,14 @@ async function convEnviarJogadorIndividual(idx) {
     convRenderListaCampanha();
 }
 
+// Todas as variações de um template: texto principal + variacoes (novo) ou texto_b (antigo A/B)
+function _convTextosDoTemplate(tpl) {
+    if (!tpl) return [''];
+    const extras = Array.isArray(tpl.variacoes) ? tpl.variacoes : (tpl.texto_b ? [tpl.texto_b] : []);
+    const lista = [tpl.texto || ''].concat(extras).map(t => String(t || '').trim()).filter(Boolean);
+    return lista.length ? lista : [tpl.texto || ''];
+}
+
 async function _convEnviarUm(idx) {
     const p = _convCampanha.listaJogadores[idx];
     if (!p || !p.valido) return false;
@@ -43817,10 +43918,14 @@ async function _convEnviarUm(idx) {
     const tpl = conviteTemplates.find(t => t.id === _convCampanha.templateId);
     if (!tpl) return false;
 
-    // [A/B TESTING] Se template tiver texto_b preenchido, alterna aleatório
-    const temVariante = !!(tpl.texto_b && tpl.texto_b.trim());
-    const variante = temVariante && Math.random() < 0.5 ? 'B' : 'A';
-    const textoBase = (variante === 'B' && temVariante) ? tpl.texto_b : tpl.texto;
+    // [VARIAÇÕES] sorteia uma das variações do template, sem repetir a do envio anterior
+    const _textos = _convTextosDoTemplate(tpl);
+    let _vi = Math.floor(Math.random() * _textos.length);
+    if (_textos.length > 1 && _vi === _convCampanha._ultimaVar) _vi = (_vi + 1 + Math.floor(Math.random() * (_textos.length - 1))) % _textos.length;
+    _convCampanha._ultimaVar = _vi;
+    const variante = String.fromCharCode(65 + _vi);
+    const textoBase = _textos[_vi];
+    p.variante = variante;
 
     const torneio = _convCampanha.torneioId ? (torneios || []).find(t => t.id === _convCampanha.torneioId) : null;
     let mensagem = _convAplicarVariaveis(textoBase, p.jogador, torneio, sbClube, flyerUrl);
@@ -43927,6 +44032,7 @@ async function _convEnviarUm(idx) {
             metodo: metodo
         };
         if (p.audioIdx) { row.audio_idx = p.audioIdx; if (p.erroAudio) row.obs = 'Áudio ' + p.audioIdx + ' falhou: ' + String(p.erroAudio).slice(0, 180); }
+        if (!envioOk && p.erroApi) row.obs = 'Erro: ' + String(p.erroApi).slice(0, 200);
         let { error: insErr } = await sb.from('convite_envios').insert(row);
         if (insErr) {
             // 2ª tentativa só com o essencial (quem, quando, status) — o histórico não pode ficar sem o envio
@@ -44101,136 +44207,368 @@ async function _convPausaLonga(segundos, progressTextoEl) {
     }
 }
 
+// ─── #22 ENVIO SUSTENTÁVEL: ritmo, limite diário (pelo banco), horário, erros seguidos, retomar ───
+const _CONV_RITMOS = {
+    cauteloso: { nome: '🐢 Cauteloso', dMin: 45, dMax: 150, pCadaMin: 6, pCadaMax: 12, pMin: 240, pMax: 540 },
+    moderado:  { nome: '🚶 Moderado',  dMin: 30, dMax: 90,  pCadaMin: 8, pCadaMax: 15, pMin: 180, pMax: 360 },
+    atual:     { nome: '⚡ Rápido (antigo)', antigo: true }
+};
+function _convRitmo() {
+    const k = (conviteConfig && conviteConfig.ritmo) || 'cauteloso';
+    return _CONV_RITMOS[k] || _CONV_RITMOS.cauteloso;
+}
+function _convRand(a, b) { return a + Math.random() * (b - a); }
+// Delay entre mensagens (ms). Média de dois sorteios: concentra no meio, sem padrão fixo.
+function _convDelayMs(enviadosNesseLote) {
+    const r = _convRitmo();
+    if (r.antigo) {
+        const base = Math.min(_CONV_ANTI_BAN.DELAY_BASE + enviadosNesseLote * _CONV_ANTI_BAN.DELAY_INCREMENTO, _CONV_ANTI_BAN.DELAY_MAX);
+        return Math.max(5000, base + (Math.random() - 0.5) * 2 * _CONV_ANTI_BAN.JITTER);
+    }
+    return Math.round(((_convRand(r.dMin, r.dMax) + _convRand(r.dMin, r.dMax)) / 2) * 1000);
+}
+function _convProximaPausaEm() {
+    const r = _convRitmo();
+    if (r.antigo) return _CONV_ANTI_BAN.PAUSA_A_CADA;
+    return Math.round(_convRand(r.pCadaMin, r.pCadaMax));
+}
+function _convPausaSeg() {
+    const r = _convRitmo();
+    if (r.antigo) return _CONV_ANTI_BAN.PAUSA_MIN + Math.floor(Math.random() * (_CONV_ANTI_BAN.PAUSA_MAX - _CONV_ANTI_BAN.PAUSA_MIN));
+    return Math.round(_convRand(r.pMin, r.pMax));
+}
+function _convEstimativaMin(n) {
+    const r = _convRitmo();
+    if (r.antigo) return Math.round((n * 17 + Math.floor(n / _CONV_ANTI_BAN.PAUSA_A_CADA) * 150) / 60);
+    const dMed = (r.dMin + r.dMax) / 2, pCada = (r.pCadaMin + r.pCadaMax) / 2, pMed = (r.pMin + r.pMax) / 2;
+    return Math.round((n * dMed + Math.floor(n / pCada) * pMed) / 60);
+}
+
+// Limite do dia. Com aquecimento: 15/dia na 1ª semana, +10 por semana até o limite configurado.
+function _convLimiteDiario() {
+    const lim = parseInt(conviteConfig && conviteConfig.limite_diario, 10);
+    let limite = (isNaN(lim) || lim < 1) ? 40 : lim;
+    const ini = conviteConfig && conviteConfig.aquecimento_inicio;
+    if (ini) {
+        const semanas = Math.max(0, Math.floor((Date.now() - new Date(ini + 'T00:00:00').getTime()) / (7 * 86400000)));
+        limite = Math.min(limite, 15 + semanas * 10);
+    }
+    return limite;
+}
+function _convErrosSeguidosMax() {
+    const v = parseInt(conviteConfig && conviteConfig.erros_seguidos_max, 10);
+    return (isNaN(v) || v < 1) ? 2 : v;
+}
+function _convInicioDoDia() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+// Envios automáticos de hoje contados no banco (vale em qualquer computador).
+// Se a consulta falhar, usa o contador antigo do navegador.
+async function _convEnviosHojeDb() {
+    try {
+        const { count, error } = await sb.from('convite_envios')
+            .select('id', { count: 'exact', head: true })
+            .eq('clube_id', sbClube.id).eq('status', 'enviado').neq('metodo', 'manual')
+            .gte('ts', _convInicioDoDia().toISOString());
+        if (error) throw error;
+        return count || 0;
+    } catch (e) {
+        console.warn('[Convites] contagem do dia pelo banco falhou, usando a local:', e);
+        return _convGetEnviosHoje().count;
+    }
+}
+function _convHorario() {
+    const ini = parseInt(conviteConfig && (conviteConfig.horario_inicio ?? conviteConfig.hora_inicio), 10);
+    const fim = parseInt(conviteConfig && (conviteConfig.horario_fim ?? conviteConfig.hora_fim), 10);
+    return { ini: isNaN(ini) ? 9 : ini, fim: isNaN(fim) ? 22 : fim };
+}
+function _convDentroDoHorario() {
+    const { ini, fim } = _convHorario();
+    const h = new Date().getHours();
+    return h >= ini && h < fim;
+}
+function _convEhSemWhatsapp(msg) { return !!msg && (msg.includes('não tem WhatsApp') || msg.includes('NOT_ON_WHATSAPP')); }
+
+// ─── Campanha salva no banco (convite_config.campanha_ativa) para retomar depois ───
+async function _convCampSalvar(extra) {
+    if (!sb || !sbClube || !_waProvider.isApi()) return;
+    const tpl = (conviteTemplates || []).find(t => t.id === _convCampanha.templateId);
+    if (!tpl) return;
+    let atual = (conviteConfig && conviteConfig.campanha_ativa) || null;
+    if (atual && atual.id !== _convCampanha.campanhaId) atual = null; // lista nova substitui a campanha pausada anterior
+    const camp = Object.assign({
+        id: (atual && atual.id) || ('camp_' + Date.now()),
+        inicio: (atual && atual.inicio) || new Date().toISOString(),
+        nome: tpl.nome === 'Envio rápido' ? '' : (tpl.nome || ''),
+        template_id: tpl.id,
+        torneio_id: _convCampanha.torneioId || null,
+        textos: _convTextosDoTemplate(tpl),
+        flyer_url: _convCampanha.flyerUrlPublica || null,
+        jogador_ids: _convCampanha.listaJogadores.filter(p => p.valido).map(p => p.jogador.id),
+        enviados: _convCampanha.listaJogadores.filter(p => p.enviado).length,
+        atualizado: new Date().toISOString(),
+        motivo_pausa: null
+    }, extra || {});
+    conviteConfig.campanha_ativa = camp;
+    try {
+        await sb.from('convite_config').upsert({ clube_id: sbClube.id, campanha_ativa: camp }, { onConflict: 'clube_id' });
+    } catch (e) { console.warn('[Convites] erro salvar campanha:', e); }
+}
+async function _convCampLimpar() {
+    if (!conviteConfig || !conviteConfig.campanha_ativa) return;
+    conviteConfig.campanha_ativa = null;
+    try { await sb.from('convite_config').upsert({ clube_id: sbClube.id, campanha_ativa: null }, { onConflict: 'clube_id' }); } catch (_) {}
+    _convCampRenderBanner();
+}
+
+function _convCampRenderBanner() {
+    const el = document.getElementById('conv-retomar-banner');
+    if (!el) return;
+    const c = conviteConfig && conviteConfig.campanha_ativa;
+    if (!c || _convCampanha.enviando || (_convCampanha.campanhaId && _convCampanha.campanhaId === c.id)) { el.style.display = 'none'; return; }
+    const total = (c.jogador_ids || []).length;
+    const torneio = c.torneio_id ? (torneios || []).find(t => t.id === c.torneio_id) : null;
+    const quando = c.atualizado ? new Date(c.atualizado).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+    el.style.display = '';
+    el.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            <div style="min-width:0;">
+                <div style="font-size:.85rem;font-weight:800;color:#fff;">⏸ Campanha pausada${torneio ? ' · ' + esc(torneio.nome || '') : (c.nome ? ' · ' + esc(c.nome) : '')}</div>
+                <div style="font-size:.7rem;color:#a1a1aa;margin-top:.15rem;">${c.enviados || 0} de ${total} enviados · ${(c.textos || []).length} variação(ões) · última atividade ${quando}${c.motivo_pausa ? ' · <span style="color:#fbbf24;">' + esc(c.motivo_pausa) + '</span>' : ''}</div>
+            </div>
+            <div style="display:flex;gap:.5rem;">
+                <button onclick="convCampRetomar()" style="background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;padding:.5rem .9rem;border-radius:.45rem;font-weight:800;cursor:pointer;font-family:inherit;font-size:.75rem;">▶ Retomar campanha</button>
+                <button onclick="convCampEncerrar()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;padding:.5rem .8rem;border-radius:.45rem;cursor:pointer;font-weight:700;font-family:inherit;font-size:.72rem;">⏹ Encerrar</button>
+            </div>
+        </div>`;
+}
+
+async function convCampEncerrar() {
+    if (!confirm('Encerrar a campanha pausada? Quem não recebeu fica sem receber (dá pra montar outra depois).')) return;
+    await _convCampLimpar();
+    showToast('⏹ Campanha encerrada');
+}
+
+// Quem já recebeu desde o início da campanha (ou já foi marcado sem WhatsApp) não recebe de novo
+async function _convCampProcessados(camp) {
+    const ok = new Map(), semWa = new Set();
+    const ids = camp.jogador_ids || [];
+    for (let i = 0; i < ids.length; i += 150) {
+        const { data, error } = await sb.from('convite_envios').select('jogador_id,status,ts,obs')
+            .eq('clube_id', sbClube.id).in('jogador_id', ids.slice(i, i + 150)).gte('ts', camp.inicio);
+        if (error) throw error;
+        (data || []).forEach(r => {
+            if (r.status === 'enviado') ok.set(r.jogador_id, new Date(r.ts).getTime());
+            else if (r.status === 'numero_invalido' || _convEhSemWhatsapp(r.obs || '')) semWa.add(r.jogador_id);
+        });
+    }
+    return { ok, semWa };
+}
+
+async function convCampRetomar() {
+    const c = conviteConfig && conviteConfig.campanha_ativa;
+    if (!c) return;
+    if (_convCampanha.enviando) { showToast('⚠️ Já tem um envio em andamento'); return; }
+    if (!_waProvider.isApi()) { showToast('⚠️ Retomar só funciona com o WhatsApp conectado pelo servidor'); return; }
+    let proc;
+    try { proc = await _convCampProcessados(c); }
+    catch (e) { console.error(e); showToast('❌ Não foi possível ler o histórico da campanha'); return; }
+
+    const textos = (c.textos || []).filter(t => t && t.trim());
+    if (!textos.length) { showToast('❌ Campanha sem mensagem salva'); return; }
+    const tplId = '_envio_rapido_' + Date.now();
+    conviteTemplates.push({ id: tplId, nome: c.nome || 'Envio rápido', categoria: 'convite', texto: textos[0], texto_b: '', variacoes: textos.slice(1), _isSpinSyntax: true });
+    _convCampanha.templateId = tplId;
+    _convCampanha.torneioId = c.torneio_id || null;
+    _convCampanha.flyerFile = null;
+    _convCampanha.flyerUrl = c.flyer_url || null;
+    _convCampanha.flyerUrlPublica = c.flyer_url || null;
+    _convCampanha.audios = [];
+    _convCampanha.campanhaId = c.id;
+
+    const mapa = new Map((jogadores || []).map(j => [j.id, j]));
+    _convCampanha.listaJogadores = (c.jogador_ids || []).map(id => mapa.get(id)).filter(Boolean).map(j => {
+        const val = _normalizarWhatsappE164(j.whatsapp);
+        const ts = proc.ok.get(j.id);
+        return { jogador: j, valido: val.valido, numero: val.numero || null, motivoBloqueio: val.valido ? null : val.motivo,
+                 enviado: !!ts, ts: ts || null, semWhatsapp: proc.semWa.has(j.id) };
+    });
+    document.getElementById('conv-camp-lista-wrap').style.display = '';
+    _convCampRenderBanner();
+    convRenderListaCampanha();
+    document.getElementById('conv-camp-lista-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    convIniciarEnvioSequencial();
+}
+
+// Ao montar a lista de um torneio: marca quem já recebeu convite dele (pula no envio em sequência)
+async function _convMarcarJaRecebidos() {
+    const tid = _convCampanha.torneioId;
+    const uuidOk = typeof _isUuid === 'function' ? _isUuid(tid) : /^[0-9a-f-]{36}$/i.test(String(tid || ''));
+    _convCampanha.jaRecebidos = 0;
+    if (!tid || !uuidOk || !sb || !sbClube) return;
+    try {
+        const { data, error } = await sb.from('convite_envios').select('jogador_id,ts')
+            .eq('clube_id', sbClube.id).eq('torneio_id', tid).eq('status', 'enviado');
+        if (error) throw error;
+        const m = new Map((data || []).map(r => [r.jogador_id, new Date(r.ts).getTime()]));
+        let n = 0;
+        _convCampanha.listaJogadores.forEach(p => {
+            if (!p.enviado && m.has(p.jogador.id)) { p.enviado = true; p.ts = m.get(p.jogador.id); p._jaRecebeu = true; n++; }
+        });
+        _convCampanha.jaRecebidos = n;
+        if (n) convRenderListaCampanha();
+    } catch (e) { console.warn('[Convites] erro checar quem já recebeu:', e); }
+}
+function convIncluirJaRecebidos() {
+    _convCampanha.listaJogadores.forEach(p => { if (p._jaRecebeu) { p.enviado = false; p.ts = null; p._jaRecebeu = false; } });
+    _convCampanha.jaRecebidos = 0;
+    convRenderListaCampanha();
+    showToast('↩️ Quem já recebeu voltou pra fila');
+}
+
 async function convIniciarEnvioSequencial() {
     if (_convCampanha.enviando) return;
-    const validos = _convCampanha.listaJogadores.filter(p => p.valido && !p.enviado);
-    if (validos.length === 0) { showToast('⚠️ Ninguém pra enviar'); return; }
+    const validos = _convCampanha.listaJogadores.filter(p => p.valido && !p.enviado && !p.semWhatsapp);
+    if (validos.length === 0) { showToast('⚠️ Ninguém pra enviar'); if (_convCampanha.campanhaId) _convCampLimpar(); return; }
 
     const usandoApi = _waProvider.isApi();
+    let enviadosHoje = 0, limite = 0;
 
-    // ─── Checagem de limite diário ───
     if (usandoApi) {
-        const enviosHoje = _convGetEnviosHoje();
-        const restante = _CONV_ANTI_BAN.LIMITE_DIARIO - enviosHoje.count;
+        const { ini, fim } = _convHorario();
+        if (!_convDentroDoHorario()) {
+            showToast(`🕘 Fora do horário de envio (${ini}h às ${fim}h). Ajuste em Config se precisar.`);
+            return;
+        }
+        limite = _convLimiteDiario();
+        enviadosHoje = await _convEnviosHojeDb();
+        const restante = limite - enviadosHoje;
         if (restante <= 0) {
-            showToast('🚫 Limite diário de ' + _CONV_ANTI_BAN.LIMITE_DIARIO + ' mensagens atingido. Tente amanhã.');
+            showToast(`🚫 Limite do dia atingido (${enviadosHoje}/${limite}). A campanha continua amanhã a partir das ${ini}h.`);
+            if (!_convCampanha.campanhaId) { await _convCampSalvar({ motivo_pausa: 'limite do dia' }); _convCampanha.campanhaId = conviteConfig.campanha_ativa && conviteConfig.campanha_ativa.id; }
             return;
         }
         const aEnviar = Math.min(validos.length, restante);
-        const tempoEstimado = Math.round((aEnviar * 17 + Math.floor(aEnviar / _CONV_ANTI_BAN.PAUSA_A_CADA) * 150) / 60);
-        const msgConfirm = `Vai enviar ${aEnviar} convite${aEnviar!==1?'s':''} via API.\n\n🛡️ Proteção anti-ban ativa:\n• Delay progressivo de ${_CONV_ANTI_BAN.DELAY_BASE/1000}s a ${_CONV_ANTI_BAN.DELAY_MAX/1000}s\n• Pausa de ${_CONV_ANTI_BAN.PAUSA_MIN/60}-${_CONV_ANTI_BAN.PAUSA_MAX/60}min a cada ${_CONV_ANTI_BAN.PAUSA_A_CADA} envios\n• Limite diário: ${enviosHoje.count}/${_CONV_ANTI_BAN.LIMITE_DIARIO} usado\n\n⏱️ Tempo estimado: ~${tempoEstimado} min\n\nContinuar?`;
+        const r = _convRitmo();
+        const tpl = conviteTemplates.find(t => t.id === _convCampanha.templateId);
+        const nVar = tpl ? _convTextosDoTemplate(tpl).length : 1;
+        const ritmoTxt = r.antigo ? `• Ritmo rápido (antigo): ${_CONV_ANTI_BAN.DELAY_BASE/1000}–${_CONV_ANTI_BAN.DELAY_MAX/1000}s entre mensagens`
+            : `• Ritmo ${r.nome.replace(/^\S+\s/, '')}: ${r.dMin}s a ${r.dMax}s entre mensagens, pausa de ${Math.round(r.pMin/60)}–${Math.round(r.pMax/60)} min a cada ${r.pCadaMin}–${r.pCadaMax}`;
+        const sobra = validos.length - aEnviar;
+        const outra = conviteConfig.campanha_ativa && conviteConfig.campanha_ativa.id !== _convCampanha.campanhaId;
+        const msgConfirm = `Vai enviar ${aEnviar} convite${aEnviar!==1?'s':''} hoje.\n\n🛡️ Proteção do número:\n${ritmoTxt}\n• ${nVar} ${nVar!==1?'variações':'variação'} de mensagem${nVar < 3 ? ' (recomendado: 5 ou mais)' : ''}\n• Limite do dia: ${enviadosHoje}/${limite} usados\n• Para sozinha com ${_convErrosSeguidosMax()} erros seguidos ou às ${fim}h\n${sobra > 0 ? `\n📅 ${sobra} ficam para os próximos dias (botão "Retomar campanha").\n` : ''}${outra ? '\n⚠️ A campanha pausada anterior será substituída por esta.\n' : ''}\n⏱️ Tempo estimado: ~${_convEstimativaMin(aEnviar)} min\n\nContinuar?`;
         if (!confirm(msgConfirm)) return;
+        await _convCampSalvar();
+        _convCampanha.campanhaId = conviteConfig.campanha_ativa && conviteConfig.campanha_ativa.id;
+        _convCampRenderBanner();
     } else {
         const msgConfirm = `Vai enviar ${validos.length} convite${validos.length!==1?'s':''} sequencialmente, com 2s entre cada um. Cada um abrirá em uma nova aba do WhatsApp.\n\nContinuar?`;
         if (!confirm(msgConfirm)) return;
     }
 
     _convCampanha.enviando = true;
+    _convCampanha._finalizou = false;
     _convCampanha.indiceAtual = -1;
     document.getElementById('conv-progress-bar').style.display = '';
     document.getElementById('conv-btn-sequencial').disabled = true;
 
-    // Contadores pro relatório final
-    let errosApi = 0;
-    let semWhatsapp = 0;
-    let sucessos = 0;
-    let enviadosNesseLote = 0;
+    let errosApi = 0, errosSeguidos = 0, semWhatsapp = 0, sucessos = 0, enviadosNesseLote = 0;
+    let proximaPausa = _convProximaPausaEm(), desdeUltimaPausa = 0;
+    let motivoParada = null;
+    const errosMax = _convErrosSeguidosMax();
     const inicioEnvio = Date.now();
     const progressTextoEl = document.getElementById('conv-progress-texto');
+    const flyerAntes = _convCampanha.flyerUrlPublica;
 
     for (let i = 0; i < _convCampanha.listaJogadores.length; i++) {
-        if (!_convCampanha.enviando) break; // pausado/cancelado
+        if (!_convCampanha.enviando) break;
         const p = _convCampanha.listaJogadores[i];
-        if (!p.valido || p.enviado) continue;
+        if (!p.valido || p.enviado || p.semWhatsapp) continue;
 
-        // ─── Limite diário em tempo real ───
-        if (usandoApi && _convGetEnviosHoje().count >= _CONV_ANTI_BAN.LIMITE_DIARIO) {
-            showToast('🚫 Limite diário atingido (' + _CONV_ANTI_BAN.LIMITE_DIARIO + '). Restantes ficam pra amanhã.');
-            break;
+        if (usandoApi) {
+            if (enviadosHoje + sucessos >= limite) { motivoParada = `limite do dia (${limite}) atingido`; break; }
+            if (!_convDentroDoHorario()) { motivoParada = `fim do horário (${_convHorario().fim}h)`; break; }
         }
 
         _convCampanha.indiceAtual = i - 1;
-
-        // Feedback: verificando número
-        p._verificando = true;
-        p._enviando = false;
+        p._verificando = true; p._enviando = false;
         convRenderListaCampanha();
-
         await _convDormir(100);
-
-        // Troca pra "enviando"
-        p._verificando = false;
-        p._enviando = true;
+        p._verificando = false; p._enviando = true;
         convRenderListaCampanha();
 
         await _convEnviarUm(i);
+        p._verificando = false; p._enviando = false;
 
-        p._verificando = false;
-        p._enviando = false;
-
-        // Contadores
-        if (p.erroApi && (p.erroApi.includes('não tem WhatsApp') || p.erroApi.includes('NOT_ON_WHATSAPP'))) {
+        if (_convEhSemWhatsapp(p.erroApi)) {
             semWhatsapp++;
         } else if (p.erroApi) {
-            errosApi++;
+            errosApi++; errosSeguidos++;
         } else if (p.enviado) {
-            sucessos++;
-            enviadosNesseLote++;
+            sucessos++; enviadosNesseLote++; desdeUltimaPausa++; errosSeguidos = 0;
             if (usandoApi) _convIncrementarEnviosHoje();
         }
 
-        // Se muitos erros seguidos, pausa pra segurança
-        if (errosApi >= _CONV_ANTI_BAN.ERROS_MAX) {
-            _convCampanha.enviando = false;
-            showToast('⚠️ Muitos erros na API. Envio pausado. Verifique a conexão do WhatsApp.');
+        if (usandoApi && (errosSeguidos >= errosMax || errosApi >= _CONV_ANTI_BAN.ERROS_MAX)) {
+            motivoParada = `${errosSeguidos >= errosMax ? errosSeguidos + ' erros seguidos' : errosApi + ' erros'}: ${String(p.erroApi || '').slice(0, 80)}`;
             break;
         }
 
-        // Atualiza barra
         const total = validos.length;
         const processados = sucessos + errosApi + semWhatsapp;
         const pct = Math.round((processados / total) * 100);
         document.getElementById('conv-progress-fill').style.width = pct + '%';
-        if (progressTextoEl) progressTextoEl.textContent = `${processados} / ${total} processados` + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : '') + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '');
+        if (progressTextoEl) progressTextoEl.textContent = `${processados} / ${total} processados` + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : '') + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '') + (usandoApi ? ` · hoje ${enviadosHoje + sucessos}/${limite}` : '');
         document.getElementById('conv-progress-pct').textContent = pct + '%';
-
         convRenderListaCampanha();
 
         if (usandoApi) {
-            // ─── PAUSA LONGA a cada N envios ───
-            if (enviadosNesseLote > 0 && enviadosNesseLote % _CONV_ANTI_BAN.PAUSA_A_CADA === 0) {
-                const pausaSeg = _CONV_ANTI_BAN.PAUSA_MIN + Math.floor(Math.random() * (_CONV_ANTI_BAN.PAUSA_MAX - _CONV_ANTI_BAN.PAUSA_MIN));
+            // Progresso salvo a cada envio (e o link do flyer depois do 1º upload)
+            if (p.enviado && (sucessos % 5 === 0 || _convCampanha.flyerUrlPublica !== flyerAntes)) _convCampSalvar();
+            const faltam = _convCampanha.listaJogadores.slice(i + 1).some(x => x.valido && !x.enviado && !x.semWhatsapp);
+            if (!faltam) continue;
+            if (desdeUltimaPausa > 0 && desdeUltimaPausa >= proximaPausa) {
+                const pausaSeg = _convPausaSeg();
                 console.log(`[Convites] 🛡️ Pausa de segurança: ${pausaSeg}s após ${enviadosNesseLote} envios`);
                 await _convPausaLonga(pausaSeg, progressTextoEl);
+                desdeUltimaPausa = 0; proximaPausa = _convProximaPausaEm();
+            } else {
+                const delay = _convDelayMs(enviadosNesseLote);
+                const fimEspera = Date.now() + delay;
+                while (_convCampanha.enviando && Date.now() < fimEspera) {
+                    const s = Math.ceil((fimEspera - Date.now()) / 1000);
+                    if (progressTextoEl) progressTextoEl.textContent = `${sucessos + errosApi + semWhatsapp} / ${total} processados · próxima em ${s}s · hoje ${enviadosHoje + sucessos}/${limite}`;
+                    await _convDormir(Math.min(1000, fimEspera - Date.now()));
+                }
             }
-
-            // ─── DELAY PROGRESSIVO entre envios ───
-            const delayBase = Math.min(
-                _CONV_ANTI_BAN.DELAY_BASE + (enviadosNesseLote * _CONV_ANTI_BAN.DELAY_INCREMENTO),
-                _CONV_ANTI_BAN.DELAY_MAX
-            );
-            const jitter = (Math.random() - 0.5) * 2 * _CONV_ANTI_BAN.JITTER; // ±5s
-            const delay = Math.max(5000, delayBase + jitter);
-            await _convDormir(delay);
         } else {
             await _convDormir(2000);
         }
     }
 
+    const pausadoPeloUsuario = !_convCampanha.enviando && !motivoParada;
     _convCampanha.enviando = false;
     document.getElementById('conv-btn-sequencial').disabled = false;
 
-    // ─── RELATÓRIO PÓS-ENVIO ───
+    if (usandoApi && !_convCampanha._finalizou) {
+        const faltam = _convCampanha.listaJogadores.filter(x => x.valido && !x.enviado && !x.semWhatsapp).length;
+        if (faltam === 0) { await _convCampLimpar(); _convCampanha.campanhaId = null; }
+        else await _convCampSalvar({ motivo_pausa: motivoParada || (pausadoPeloUsuario ? 'pausada por você' : null) });
+    }
+
     const tempoTotal = Math.round((Date.now() - inicioEnvio) / 1000);
-    const minutos = Math.floor(tempoTotal / 60);
-    const segundos = tempoTotal % 60;
+    const minutos = Math.floor(tempoTotal / 60), segundos = tempoTotal % 60;
     const tempoStr = minutos > 0 ? `${minutos}min ${segundos}s` : `${segundos}s`;
+    const faltamFinal = _convCampanha.listaJogadores.filter(x => x.valido && !x.enviado && !x.semWhatsapp).length;
+    const ehErro = motivoParada && /erro/.test(motivoParada);
 
     const relatorio = document.getElementById('conv-relatorio-envio');
     if (relatorio) {
         relatorio.style.display = '';
         relatorio.innerHTML = `
             <div style="font-size:.75rem;font-weight:800;color:#fff;margin-bottom:.75rem;">📊 Relatório de Envio</div>
+            ${motivoParada ? `<div style="margin-bottom:.75rem;padding:.6rem .75rem;border-radius:.5rem;font-size:.72rem;line-height:1.5;${ehErro ? 'background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:#fca5a5;' : 'background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);color:#fcd34d;'}">
+                ${ehErro ? '⛔' : '⏸'} <strong>Campanha pausada:</strong> ${esc(motivoParada)}.${ehErro ? ' Pode ser sinal de bloqueio temporário do número: espere pelo menos 24h antes de retomar.' : ''}
+                ${faltamFinal ? `<br>${faltamFinal} ainda não receberam. Use <strong>▶ Retomar campanha</strong> no topo da tela Enviar${ehErro ? '' : ' (amanhã, ou quando voltar ao horário)'}.` : ''}
+            </div>` : ''}
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem;margin-bottom:.65rem;">
                 <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:.5rem;padding:.55rem .65rem;text-align:center;">
                     <div style="font-size:1.3rem;font-weight:900;color:#22c55e;">${sucessos}</div>
@@ -44253,7 +44591,8 @@ async function convIniciarEnvioSequencial() {
         `;
     }
 
-    showToast(`🎉 Envio concluído! ${sucessos} enviado${sucessos!==1?'s':''}` + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '') + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : ''));
+    if (motivoParada) showToast(`⏸ Campanha pausada: ${motivoParada}. ${sucessos} enviado${sucessos!==1?'s':''} nesta rodada.`);
+    else if (!pausadoPeloUsuario) showToast(`🎉 Envio concluído! ${sucessos} enviado${sucessos!==1?'s':''}` + (semWhatsapp ? ` · ${semWhatsapp} sem WA` : '') + (errosApi ? ` · ${errosApi} erro${errosApi!==1?'s':''}` : ''));
 }
 
 function convPausarEnvio() {
@@ -44264,6 +44603,7 @@ function convPausarEnvio() {
 
 function convFinalizarEnvio() {
     _convCampanha.enviando = false;
+    if (_convCampanha.campanhaId) { _convCampanha._finalizou = true; _convCampanha.campanhaId = null; _convCampLimpar(); }
     document.getElementById('conv-progress-bar').style.display = 'none';
     document.getElementById('conv-btn-sequencial').disabled = false;
 }
@@ -44300,9 +44640,81 @@ function _convCountVariacoes(texto) {
     return total;
 }
 
-// Inserir variável no textarea
+// ─── #22 Variações de mensagem (B, C, D…) na tela Enviar ───
+const _CONV_VAR_MAX = 8;
+let _convPreviewVar = 0;     // qual variação aparece no preview
+let _convUltimoCampoTexto = null; // textarea onde os chips de variável inserem
+function _convVarCampos() { return Array.from(document.querySelectorAll('#conv-enviar-variacoes textarea')); }
+function _convVarLer() { return _convVarCampos().map(t => t.value.trim()).filter(Boolean); }
+function _convTodasVariacoes() {
+    const a = (document.getElementById('conv-enviar-texto')?.value || '').trim();
+    return [a].concat(_convVarCampos().map(t => t.value.trim()));
+}
+function _convPreviewTexto() {
+    const todas = _convTodasVariacoes();
+    return todas[_convPreviewVar] || todas[0] || '';
+}
+function convPreviewSortear() {
+    const todas = _convTodasVariacoes();
+    const idxs = todas.map((t, i) => t ? i : -1).filter(i => i >= 0);
+    if (idxs.length > 1) {
+        const outras = idxs.filter(i => i !== _convPreviewVar);
+        _convPreviewVar = outras[Math.floor(Math.random() * outras.length)];
+    }
+    convEnviarAtualizarPreview();
+}
+function _convVarParecidas(a, b) {
+    const pal = t => new Set(_convSpinText(t).toLowerCase().replace(/\{[a-z]+\}/g, ' ').split(/[^a-zà-ú0-9]+/i).filter(w => w.length > 2));
+    const A = pal(a), B = pal(b);
+    if (A.size < 3 || B.size < 3) return false;
+    let inter = 0; A.forEach(w => { if (B.has(w)) inter++; });
+    return inter / (A.size + B.size - inter) >= 0.75;
+}
+function _convVarAtualizarContador() {
+    const el = document.getElementById('conv-var-contador');
+    const campos = _convVarCampos();
+    campos.forEach((t, i) => { const lb = t.parentElement.querySelector('[data-letra]'); if (lb) lb.textContent = String.fromCharCode(66 + i); });
+    const add = document.getElementById('conv-var-add');
+    if (add) add.style.display = campos.length >= _CONV_VAR_MAX - 1 ? 'none' : '';
+    if (!el) return;
+    const todas = _convTodasVariacoes().filter(Boolean);
+    const n = todas.length;
+    let parecidas = null;
+    for (let i = 0; i < todas.length && !parecidas; i++) for (let j = i + 1; j < todas.length; j++) if (_convVarParecidas(todas[i], todas[j])) { parecidas = [i, j]; break; }
+    const letras = _convTodasVariacoes().map((t, i) => t ? String.fromCharCode(65 + i) : null).filter(Boolean);
+    el.innerHTML = (n >= 5 ? `<span style="color:#22c55e;">✓ ${n} variações</span>` : `<span style="color:#fbbf24;">${n} variaç${n === 1 ? 'ão' : 'ões'} · recomendado 5 ou mais</span>`)
+        + (parecidas ? ` <span style="color:#fbbf24;">· ${letras[parecidas[0]]} e ${letras[parecidas[1]]} estão parecidas demais</span>` : '');
+}
+function convVarAdicionar(texto) {
+    const box = document.getElementById('conv-enviar-variacoes');
+    if (!box) return;
+    if (_convVarCampos().length >= _CONV_VAR_MAX - 1) { showToast('⚠️ Máximo de ' + _CONV_VAR_MAX + ' variações'); return; }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">
+            <span style="font-size:.62rem;color:#a1a1aa;font-weight:700;">Variação <span data-letra></span></span>
+            <button type="button" title="Remover variação" style="background:none;border:1px solid #27272a;color:#71717a;border-radius:.3rem;padding:.1rem .45rem;cursor:pointer;font-size:.65rem;font-family:inherit;">✕</button>
+        </div>
+        <textarea class="inp" rows="4" style="width:100%;font-family:var(--font-mono,monospace);font-size:.8rem;resize:vertical;line-height:1.5;" placeholder="Outra forma de dizer a mesma coisa. Ex: {Salve|Fala} {apelido}, hoje tem {torneio} às {hora}…"></textarea>`;
+    const ta = wrap.querySelector('textarea');
+    ta.value = texto || '';
+    ta.addEventListener('input', () => { _convPreviewVar = _convVarCampos().indexOf(ta) + 1; _convVarAtualizarContador(); convEnviarAtualizarPreview(); });
+    ta.addEventListener('focus', () => { _convUltimoCampoTexto = ta; _convPreviewVar = _convVarCampos().indexOf(ta) + 1; convEnviarAtualizarPreview(); });
+    wrap.querySelector('button').onclick = () => { wrap.remove(); if (_convUltimoCampoTexto === ta) _convUltimoCampoTexto = null; _convPreviewVar = 0; _convVarAtualizarContador(); convEnviarAtualizarPreview(); };
+    box.appendChild(wrap);
+    _convVarAtualizarContador();
+    if (!texto) ta.focus();
+}
+function _convVarPreencher(lista) {
+    const box = document.getElementById('conv-enviar-variacoes');
+    if (box) box.innerHTML = '';
+    _convPreviewVar = 0; _convUltimoCampoTexto = null;
+    (lista || []).filter(t => t && String(t).trim()).slice(0, _CONV_VAR_MAX - 1).forEach(t => convVarAdicionar(String(t)));
+    _convVarAtualizarContador();
+}
+
+// Inserir variável no textarea (no campo de variação em foco, ou na A)
 function convEnviarInserirVar(varStr) {
-    const ta = document.getElementById('conv-enviar-texto');
+    const ta = (_convUltimoCampoTexto && document.body.contains(_convUltimoCampoTexto)) ? _convUltimoCampoTexto : document.getElementById('conv-enviar-texto');
     if (!ta) return;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
@@ -44315,7 +44727,7 @@ function convEnviarInserirVar(varStr) {
 
 // Atualizar preview com spin syntax aplicado
 function convEnviarAtualizarPreview() {
-    const texto = document.getElementById('conv-enviar-texto')?.value || '';
+    const texto = _convPreviewTexto();
     const previewEl = document.getElementById('conv-enviar-preview-texto');
     const imgPreview = document.getElementById('conv-enviar-preview-img');
     const imgTag = document.getElementById('conv-enviar-preview-img-tag');
@@ -44717,6 +45129,7 @@ function convEnviarCarregarTemplate(id) {
     const ta = document.getElementById('conv-enviar-texto');
     if (ta) {
         ta.value = tpl.texto || '';
+        _convVarPreencher(Array.isArray(tpl.variacoes) ? tpl.variacoes : (tpl.texto_b ? [tpl.texto_b] : []));
         convEnviarAtualizarPreview();
     }
     showToast(`📝 Template "${tpl.nome}" carregado`);
@@ -44728,12 +45141,14 @@ function convEnviarSalvarTemplate() {
     const nome = prompt('Nome do template:');
     if (!nome || !nome.trim()) return;
 
+    const _vars = _convVarLer();
     const novoTpl = {
-        id: 'tpl_' + Date.now(),
+        id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('tpl_' + Date.now()),
         nome: nome.trim(),
         categoria: 'convite',
         texto: texto,
-        texto_b: '',
+        texto_b: _vars[0] || '',
+        variacoes: _vars,
         criado: new Date().toISOString()
     };
 
@@ -44748,8 +45163,10 @@ function convEnviarSalvarTemplate() {
             nome: novoTpl.nome,
             categoria: novoTpl.categoria,
             texto: novoTpl.texto,
-            texto_b: novoTpl.texto_b
-        }).then(() => {}).catch(e => console.warn('[Convites] erro salvar template:', e));
+            texto_b: novoTpl.texto_b,
+            variacoes: novoTpl.variacoes
+        }).then(({ error }) => { if (error) { console.warn('[Convites] erro salvar template:', error); showToast('⚠️ Template ficou só nesta tela: não foi possível salvar no banco'); } })
+          .catch(e => console.warn('[Convites] erro salvar template:', e));
     }
 
     convEnviarRenderTemplates();
@@ -44923,6 +45340,7 @@ async function convEnviarIniciar() {
         categoria: 'convite',
         texto: texto,
         texto_b: '',
+        variacoes: _convVarLer(),
         _isSpinSyntax: true // flag interna
     };
 
@@ -44979,8 +45397,10 @@ async function convEnviarIniciar() {
         };
     });
 
+    _convCampanha.campanhaId = null;
     document.getElementById('conv-camp-lista-wrap').style.display = '';
     convRenderListaCampanha();
+    _convMarcarJaRecebidos();
 
     // Scroll até a lista
     document.getElementById('conv-camp-lista-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
