@@ -9006,6 +9006,8 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <i class="fa-solid fa-mug-hot"></i> Break
                             </button>
                         </div>
+                        <!-- #25: Early Bird / Bônus de registro — estender ou encerrar com o torneio rodando -->
+                        <div id="mt-early-wrap" style="display:none;margin-top:.75rem;"></div>
                         <!-- PAINEL DE BOUNTIES (só aparece em torneios KO) -->
                         <div id="mt-bounties-wrap" style="display:none;margin-top:.85rem;">
                             <div style="font-size:.65rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;"><i class="fa-solid fa-crosshairs"></i> Bounties por Jogador</div>
@@ -12513,7 +12515,7 @@ const _CFG_CAMPOS_TORNEIO = ['nome','tipo','formato','dia_label','series_id','se
     'buyin_duplo_valor','buyin_duplo_fichas','reentry_valor','reentry_multiplo_max','jackpot_valor','jackpot_fichas',
     'jackpot_paga_rake','last_chance_ativo','last_chance_valor','last_chance_fichas','last_chance_ate','last_chance_paga_rake',
     'bounty_valor','bounty_ko_split','capile_modo','ranking_id','ranking_rake_pct','blinds','tv_layout','tv_prolive_bg',
-    'tv_prolive_text','tv_prolive_custom','tv_show_prize','pw_stats_visiveis','premiacao_proj','prize_pool'];
+    'tv_prolive_text','tv_prolive_custom','tv_show_prize','pw_stats_visiveis','premiacao_proj','prize_pool','early_fim_ts'];
 // Campos locais que NÃO são configuração (relógio, listas, caixa, estado local)
 const _CFG_PROPS_NAO_ADOTAR = new Set(['id','nivelAtual','tempoTotal','tempoRestante','tempoAlvo','status','rodando','relogioTs',
     'isBreak','iniciadoEm','tempoJogoAcumuladoMs','tempoJogoResumedAt','encerradoEm','encerradoPor','vencedorId','caixaTorneio',
@@ -12603,6 +12605,7 @@ function _torneioToDb(t) {
         buyin_promo_valor: t.buyinPromoValor || 0,
         buyin_promo_fichas: t.buyinPromoFichas || 0,
         buyin_promo_ate_nivel: t.buyinPromoAteNivel || null,
+        early_fim_ts: Number(t.earlyFimTs) > 0 ? Math.round(Number(t.earlyFimTs)) : null,
         imprimir_comprovante_compra: !!t.imprimirComprovanteCompra,
         imprimir_comprovante_jackpot: !!t.imprimirComprovanteJackpot,
         comprovante_vias: t.comprovanteVias || 1,
@@ -13917,6 +13920,7 @@ function _torneioFromDb(r, entries, elims, jackpots, mesas) {
         buyinPromoValor: parseFloat(r.buyin_promo_valor) || 0,
         buyinPromoFichas: parseInt(r.buyin_promo_fichas) || 0,
         buyinPromoAteNivel: r.buyin_promo_ate_nivel || null,
+        earlyFimTs: r.early_fim_ts != null ? Number(r.early_fim_ts) : null,
         imprimirComprovanteCompra:  !!r.imprimir_comprovante_compra,
         imprimirComprovanteJackpot: !!r.imprimir_comprovante_jackpot,
         comprovanteVias:            r.comprovante_vias || 1,
@@ -30539,6 +30543,8 @@ async function _salvarEditarTorneio() {
     t.comprovanteAssinatura = impAssin;
     t.blinds = JSON.parse(JSON.stringify(_editBlinds));
     // FASE I.1: Early Bird
+    // #25: mudou o "Até nível" aqui → volta a valer o nível (cancela prazo por horário)
+    if ((Number(promoAteNivel) || 0) !== (Number(t.buyinPromoAteNivel) || 0) || !!promoAtivo !== !!t.buyinPromoAtivo) t.earlyFimTs = null;
     t.buyinPromoAtivo    = promoAtivo;
     t.buyinPromoValor    = promoValor;
     t.buyinPromoFichas   = promoFichas;
@@ -30562,6 +30568,7 @@ async function _salvarEditarTorneio() {
                 buyin_promo_valor:     t.buyinPromoValor,
                 buyin_promo_fichas:    t.buyinPromoFichas,
                 buyin_promo_ate_nivel: t.buyinPromoAteNivel,
+                early_fim_ts: Number(t.earlyFimTs) > 0 ? Math.round(Number(t.earlyFimTs)) : null,
             };
             // Reentrada múltipla (NOVO)
             if (_rmEditAlterado) {
@@ -38448,6 +38455,17 @@ function _getFichasExtrasBonus(t) {
     }, 0);
 }
 
+// #25: prazo do Early Bird / Bônus de registro por horário (estender/encerrar com o torneio rodando).
+// Só decide SE a entrada feita agora está na janela. Valor e fichas continuam os configurados
+// e ficam gravados em cada entrada — rake, prize, chipcount e média não mudam de regra.
+function _earlyAgora() { return (typeof _nowServidor === 'function') ? _nowServidor() : Date.now(); }
+function _earlyTsValido(t) {
+    const ts = Number(t && t.earlyFimTs) || 0;
+    if (!ts) return 0;
+    const ini = typeof t.iniciadoEm === 'number' ? t.iniciadoEm : (t.iniciadoEm ? new Date(t.iniciadoEm).getTime() : 0);
+    return (ini && ts <= ini) ? 0 : ts; // carimbo de outro torneio (cópia) não vale
+}
+
 // FASE H: Retorna o valor de fichas extras do bônus pra um BUY-IN feito AGORA, ou 0 se não elegível.
 function _calcBonusFichasParaEntry(t, tipo) {
     if (!t || !t.bonusRegistroAtivo) return 0;
@@ -38457,6 +38475,9 @@ function _calcBonusFichasParaEntry(t, tipo) {
     const ateNivel = Number(t.bonusRegistroAteNivel) || 0;
     if (ateNivel <= 0) return 0;
     if (!t.iniciadoEm) return fichasBonus;
+    // #25: prazo estendido/encerrado por horário substitui o "até nível"
+    const _fimTs = _earlyTsValido(t);
+    if (_fimTs) return (_earlyAgora() < _fimTs) ? fichasBonus : 0;
     const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
     return (nivelAtual <= ateNivel) ? fichasBonus : 0;
 }
@@ -38469,6 +38490,9 @@ function _isBuyinPromoElegivel(t, tipo) {
     const ateNivel = Number(t.buyinPromoAteNivel) || 0;
     if (ateNivel <= 0) return false;
     if (!t.iniciadoEm) return true;
+    // #25: prazo estendido/encerrado por horário substitui o "até nível"
+    const _fimTs = _earlyTsValido(t);
+    if (_fimTs) return _earlyAgora() < _fimTs;
     const nivelAtual = (typeof _nivelHumano === 'function') ? _nivelHumano(t) : 1;
     return nivelAtual <= ateNivel;
 }
@@ -38480,6 +38504,154 @@ function _calcFichasBuyinPromo(t, tipo) {
     if (!_isBuyinPromoElegivel(t, tipo)) return null;
     return Number(t.buyinPromoFichas) || 0;
 }
+
+// ─── #25: cartão Early Bird / Bônus de registro na aba Controle ───
+function _earlyFeatures(t) {
+    const f = [];
+    if (t && t.buyinPromoAtivo && Number(t.buyinPromoAteNivel) > 0) f.push('promo');
+    if (t && t.bonusRegistroAtivo && Number(t.bonusRegistroFichas) > 0 && Number(t.bonusRegistroAteNivel) > 0) f.push('bonus');
+    return f;
+}
+function _earlyAteNivelMax(t) {
+    let n = 0;
+    if (t.buyinPromoAtivo) n = Math.max(n, Number(t.buyinPromoAteNivel) || 0);
+    if (t.bonusRegistroAtivo) n = Math.max(n, Number(t.bonusRegistroAteNivel) || 0);
+    return n;
+}
+// Quanto falta (ms) para acabar o nível N, somando os níveis/intervalos que ainda vêm antes dele.
+function _earlyMsAteFimNivel(t, ateNivel) {
+    if (!t || !Array.isArray(t.blinds)) return 0;
+    if (_nivelHumano(t) > ateNivel) return 0;
+    const bl = t.blinds, idx = Number(t.nivelAtual || 0);
+    let seg = (t.rodando && t.tempoAlvo) ? Math.max(0, (Number(t.tempoAlvo) - _earlyAgora()) / 1000) : (Number(t.tempoRestante) || 0);
+    if (t.isBreak && !(bl[idx] && bl[idx].isBreak) && t._tempoAntes != null) seg += Number(t._tempoAntes) || 0;
+    let conta = 0;
+    for (let i = 0; i <= idx; i++) if (bl[i] && !bl[i].isBreak) conta++;
+    for (let i = idx + 1; i < bl.length; i++) {
+        const b = bl[i];
+        if (!b) continue;
+        if (!b.isBreak) { if (conta + 1 > ateNivel) break; conta++; }
+        seg += (b.tempo || t.tempoNivel || 15) * 60;
+    }
+    return seg * 1000;
+}
+function _earlyAberto(t) {
+    return _isBuyinPromoElegivel(t, 'buyin') || _calcBonusFichasParaEntry(t, 'buyin') > 0;
+}
+function _earlyHora(ms) { return new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+function _earlyMMSS(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0');
+}
+function _earlyTitulo(t) {
+    const f = _earlyFeatures(t);
+    return f.length === 2 ? 'Early Bird + Bônus' : (f[0] === 'promo' ? 'Early Bird' : 'Bônus de registro');
+}
+
+let _earlyKey = null;
+function _earlyRender() {
+    const wrap = document.getElementById('mt-early-wrap');
+    if (!wrap) return;
+    const t = (activeTorneioIdx !== null && activeTorneioIdx !== undefined) ? torneios[activeTorneioIdx] : null;
+    const feats = t ? _earlyFeatures(t) : [];
+    const encerrado = t && (t.status === 'finished' || t.status === 'encerrado');
+    if (!t || !feats.length || !t.iniciadoEm || encerrado) { wrap.style.display = 'none'; _earlyKey = null; return; }
+    wrap.style.display = '';
+    const agora = _earlyAgora();
+    const ts = _earlyTsValido(t);
+    const aberto = _earlyAberto(t);
+    const modo = !aberto ? 'off' : (ts ? 'ext' : 'on');
+    const key = t.id + '|' + modo + '|' + feats.join(',') + '|' + (ts || _earlyAteNivelMax(t));
+    const titulo = _earlyTitulo(t);
+
+    if (key !== _earlyKey) {
+        _earlyKey = key;
+        const det = [];
+        if (feats.includes('promo')) det.push(`${formatMoney(Number(t.buyinPromoValor) || 0)} · ${(Number(t.buyinPromoFichas) || 0).toLocaleString('pt-BR')} fichas`);
+        if (feats.includes('bonus')) det.push(`🎁 +${(Number(t.bonusRegistroFichas) || 0).toLocaleString('pt-BR')} fichas de bônus`);
+        const btn = 'background:rgba(255,255,255,.04);border:1px solid #3f3f46;color:#fafafa;border-radius:.4rem;padding:.4rem 0;font-size:.72rem;font-weight:700;font-family:inherit;cursor:pointer;';
+        const cores = { on: ['rgba(34,197,94,.06)', 'rgba(34,197,94,.35)', '#4ade80'], ext: ['rgba(245,158,11,.07)', 'rgba(245,158,11,.4)', '#fbbf24'], off: ['rgba(113,113,122,.07)', '#27272a', '#a1a1aa'] }[modo];
+        const nomeEst = modo === 'off' ? `${titulo} encerrado` : (modo === 'ext' ? `${titulo} estendido` : `${titulo} ativo`);
+        wrap.innerHTML = `<div style="background:${cores[0]};border:1px solid ${cores[1]};border-radius:.7rem;padding:.75rem .8rem;display:flex;flex-direction:column;gap:.5rem;text-align:left;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;">
+                <span style="font-size:.8rem;font-weight:800;color:${modo === 'off' ? '#a1a1aa' : '#fafafa'};">★ ${nomeEst}</span>
+                <span id="mt-early-cnt" class="mono" style="font-weight:800;font-size:.95rem;color:${cores[2]};"></span>
+            </div>
+            <div style="font-size:.68rem;color:#a1a1aa;line-height:1.4;">${det.join(' · ')}</div>
+            <div id="mt-early-prazo" style="font-size:.68rem;color:#a1a1aa;line-height:1.4;margin-top:-.25rem;"></div>
+            ${modo === 'off' ? `
+            <button onclick="earlyAjustar('reabrir')" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.35);color:#4ade80;border-radius:.4rem;padding:.45rem;font-size:.72rem;font-weight:700;font-family:inherit;cursor:pointer;">↺ Reabrir por 10 min</button>` : `
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.3rem;">
+                <button onclick="earlyAjustar('nivel')" style="${btn}">+1 nível</button>
+                <button onclick="earlyAjustar(10)" style="${btn}">+10 min</button>
+                <button onclick="earlyAjustar(15)" style="${btn}">+15 min</button>
+                <button onclick="earlyAjustar(30)" style="${btn}">+30 min</button>
+            </div>
+            <button onclick="earlyAjustar('encerrar')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);color:#f87171;border-radius:.4rem;padding:.45rem;font-size:.72rem;font-weight:700;font-family:inherit;cursor:pointer;">⏹ Encerrar agora</button>`}
+        </div>`;
+    }
+
+    const cnt = document.getElementById('mt-early-cnt');
+    const prazo = document.getElementById('mt-early-prazo');
+    if (modo === 'ext') {
+        if (cnt) cnt.textContent = _earlyMMSS(ts - agora);
+        if (prazo) prazo.innerHTML = `Vale até as <b style="color:#fafafa;">${_earlyHora(ts)}</b> (horário, não pausa com o relógio)`;
+    } else if (modo === 'on') {
+        const ate = _earlyAteNivelMax(t);
+        const ms = _earlyMsAteFimNivel(t, ate);
+        if (cnt) cnt.textContent = _earlyMMSS(ms);
+        if (prazo) prazo.innerHTML = `Vale até o fim do <b style="color:#fafafa;">Nível ${ate}</b>` + (t.rodando ? ` (~${_earlyHora(agora + ms)})` : ' · relógio pausado');
+    } else {
+        if (cnt) cnt.textContent = ts ? _earlyHora(ts) : '';
+        if (prazo) prazo.textContent = 'Buy-in agora entra no valor e nas fichas normais.';
+    }
+}
+
+function earlyAjustar(acao) {
+    const t = (activeTorneioIdx !== null && activeTorneioIdx !== undefined) ? torneios[activeTorneioIdx] : null;
+    if (!t || !_earlyFeatures(t).length) return;
+    const agora = _earlyAgora();
+    const titulo = _earlyTitulo(t);
+    const ts = _earlyTsValido(t);
+    let msg = '';
+    if (acao === 'nivel') {
+        // N2 → fim do N3; se já está estendido dentro do N3, vira "até o fim do N3"
+        const base = Math.max(_earlyAteNivelMax(t), _nivelHumano(t) - 1);
+        if (t.buyinPromoAtivo) t.buyinPromoAteNivel = base + 1;
+        if (t.bonusRegistroAtivo) t.bonusRegistroAteNivel = base + 1;
+        t.earlyFimTs = null;
+        msg = `${titulo} vai até o fim do Nível ${base + 1}`;
+    } else if (acao === 'encerrar') {
+        if (!confirm(`Encerrar o ${titulo} agora?\n\nOs próximos buy-ins entram no valor e nas fichas normais. Quem já entrou não muda.`)) return;
+        t.earlyFimTs = agora;
+        msg = `${titulo} encerrado`;
+    } else if (acao === 'reabrir') {
+        t.earlyFimTs = agora + 10 * 60000;
+        msg = `${titulo} reaberto até ${_earlyHora(t.earlyFimTs)}`;
+    } else {
+        const min = Number(acao) || 0;
+        if (!min) return;
+        let base;
+        if (ts && ts > agora) base = ts;
+        else if (!ts && _earlyAberto(t)) base = agora + _earlyMsAteFimNivel(t, _earlyAteNivelMax(t));
+        else base = agora;
+        t.earlyFimTs = Math.round(base + min * 60000);
+        msg = `${titulo} estendido +${min} min · agora até ${_earlyHora(t.earlyFimTs)}`;
+    }
+    try { saveData(); } catch (e) { console.warn('[early] saveData falhou:', e); }
+    try { if (typeof logAudit === 'function') logAudit('EARLY_BIRD_PRAZO', `${msg} · ${t.nome}`, { torneioId: t.id, acao: String(acao), earlyFimTs: t.earlyFimTs || null, promoAteNivel: t.buyinPromoAteNivel || null, bonusAteNivel: t.bonusRegistroAteNivel || null }); } catch (_) {}
+    _earlyKey = null;
+    _earlyRender();
+    showToast('✅ ' + msg);
+}
+window.earlyAjustar = earlyAjustar;
+setInterval(() => {
+    try {
+        const tab = document.getElementById('tab-controle');
+        if (tab && tab.style.display !== 'none' && tab.offsetParent !== null) _earlyRender();
+    } catch (_) {}
+}, 1000);
 
 function getPrize(t) {
     // Prize = (Bruto_comRake - Rake - Staff_que_sai_do_prize) + Bruto_semRake
