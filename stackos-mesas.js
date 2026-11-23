@@ -102,9 +102,62 @@
                 s.estado = { abertas: r.abertas || [], cadeiras: r.cadeiras, sorteio_entrada: r.sorteio_entrada };
                 agendarRender(r.torneio_id);
             })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'floor_pedidos', filter: 'clube_id=eq.' + canalClube }, () => carregarPedidos())
             .subscribe();
+        carregarPedidos();
     }
     let _rt = null;
+
+    // ─── pedidos de eliminação vindos do app do floor ───
+    let PED = [];
+    async function carregarPedidos() {
+        if (!sbOk()) return;
+        try {
+            const { data, error } = await sb.from('floor_pedidos').select('id,torneio_id,jogador_id,mesa,cadeira,criado_por,criado_em').eq('clube_id', sbClube.id).eq('status', 'pendente').order('criado_em');
+            if (error) throw error;
+            PED = (data || []).map(p => Object.assign(p, { jogador_id: String(p.jogador_id) }));
+            // Já eliminado no app (ex.: o caixa eliminou antes de ver o aviso): conclui sozinho
+            for (const p of PED.slice()) {
+                const t = (torneios || []).find(x => x.id === p.torneio_id);
+                if (t && (t.eliminados || []).some(e => String(e.jogadorId) === p.jogador_id)) {
+                    try { await sb.rpc('floor_pedido_resolver', { p_id: p.id, p_status: 'feito' }); } catch (_) {}
+                    PED = PED.filter(x => x.id !== p.id);
+                }
+            }
+        } catch (e) { console.warn('[Lugares] pedidos', e); }
+        renderPedidos();
+        const t = torneioAtivo(); if (t && abaVisivel()) agendarRender(t.id);
+    }
+    function renderPedidos() {
+        let el = document.getElementById('lg-pedidos');
+        if (!PED.length) { if (el) el.remove(); return; }
+        css();
+        if (!el) { el = document.createElement('div'); el.id = 'lg-pedidos'; document.body.appendChild(el); }
+        el.innerHTML = `<div class="lg-ped-h">📱 Floor pediu eliminação (${PED.length})</div>` + PED.slice(0, 5).map(p => {
+            const t = (torneios || []).find(x => x.id === p.torneio_id);
+            return `<div class="lg-ped"><div style="min-width:0"><b>${esc(nomeDe(p.jogador_id))}</b><small>${esc(t ? t.nome : 'Torneio')}${p.mesa ? ` · Mesa ${p.mesa} · Cad ${p.cadeira}` : ''} · por ${esc(p.criado_por || 'floor')}</small></div>
+                <button class="lg-btn bad" data-pe="${p.id}">Eliminar</button><button class="lg-btn" data-pi="${p.id}" title="Ignorar (o jogador continua no torneio, em Sem lugar)">✕</button></div>`;
+        }).join('');
+        el.querySelectorAll('[data-pe]').forEach(b => b.onclick = () => {
+            const p = PED.find(x => x.id === b.dataset.pe); if (!p) return;
+            const idx = (torneios || []).findIndex(x => x.id === p.torneio_id);
+            if (idx < 0) return toast('Torneio não encontrado');
+            try {
+                abrirDetalhesTorneio(idx);
+                setTimeout(() => {
+                    try {
+                        openModalEliminar(idx);
+                        const sel = document.getElementById('eliminar-jogador');
+                        if (sel) { sel.value = p.jogador_id; if (typeof sel.onchange === 'function') sel.onchange(); }
+                    } catch (err) { console.warn(err); }
+                }, 250);
+            } catch (err) { console.warn(err); }
+        });
+        el.querySelectorAll('[data-pi]').forEach(b => b.onclick = async () => {
+            try { await sb.rpc('floor_pedido_resolver', { p_id: b.dataset.pi, p_status: 'ignorado' }); } catch (_) {}
+            PED = PED.filter(x => x.id !== b.dataset.pi); renderPedidos(); toast('Pedido ignorado: o jogador continua no torneio (em Sem lugar)');
+        });
+    }
     function agendarRender(tid) {
         clearTimeout(_rt);
         _rt = setTimeout(() => { const t = torneioAtivo(); if (t && t.id === tid && abaVisivel()) desenhar(t); }, 120);
@@ -181,6 +234,10 @@
         if (!sbOk() || !t || !isUuid(t.id) || !jid) return;
         enfileirar(async () => {
             try {
+                if (PED.some(p => p.torneio_id === t.id && p.jogador_id === String(jid))) {
+                    try { await sb.rpc('floor_pedidos_concluir_jogador', { p_torneio: t.id, p_jogador: jid }); } catch (_) {}
+                    PED = PED.filter(p => !(p.torneio_id === t.id && p.jogador_id === String(jid))); renderPedidos();
+                }
                 await carregar(t.id);
                 if (!st(t.id).lugares.has(String(jid))) return;
                 await aplicar(t, [{ j: String(jid), para: 'remover' }], 'eliminar');
@@ -251,6 +308,9 @@
 .lg-sec{font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#f5b53d;margin-top:.3rem}
 .lg-legend{font-size:.66rem;color:var(--ld)}
 body.lg-dragging,body.lg-dragging *{cursor:grabbing!important}
+#lg-pedidos{position:fixed;left:16px;bottom:16px;z-index:100030;width:340px;max-width:calc(100vw - 32px);background:#141419;border:1px solid rgba(248,113,113,.45);border-radius:.8rem;padding:.6rem;box-shadow:0 16px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:.4rem;color:#ececf0;font-family:Manrope,system-ui,sans-serif;--lp:#0e0e11;--lp2:#16161b;--ll:#24242c;--lbad:#f87171}
+.lg-ped-h{font-size:.72rem;font-weight:800;color:#fca5a5}
+.lg-ped{display:flex;align-items:center;gap:.4rem;background:#0e0e11;border:1px solid #24242c;border-radius:.55rem;padding:.4rem .5rem}.lg-ped>div{flex:1}.lg-ped b{display:block;font-size:.8rem}.lg-ped small{display:block;font-size:.64rem;color:#9a9aa6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 `;
     function css() { if (document.getElementById('lg-css')) return; const s = document.createElement('style'); s.id = 'lg-css'; s.textContent = CSS; document.head.appendChild(s); }
 
@@ -348,6 +408,8 @@ body.lg-dragging,body.lg-dragging *{cursor:grabbing!important}
         else if (qb) av = `<div class="lg-al w">💥 Dá para <b>quebrar a Mesa ${qb.mesa}</b>: os jogadores dela cabem nas outras mesas.<button class="lg-btn gold" data-a="quebrar">Quebrar mesa</button></div>`;
         else if (bal.length) { const o = M.mesas.filter(m => ocup(m)).sort((a, b) => ocup(b) - ocup(a)); av = `<div class="lg-al w">⚖️ Mesa ${o[0].n} com ${ocup(o[0])} e Mesa ${o[o.length - 1].n} com ${ocup(o[o.length - 1])}: mover ${bal.length} jogador(es).<button class="lg-btn gold" data-a="balancear">Balancear</button></div>`; }
 
+        const pedT = PED.filter(p => p.torneio_id === t.id);
+        if (!V.modo && pedT.length) av = `<div class="lg-al i">📱 Floor pediu a eliminação de <b>${pedT.map(p => esc(nomeDe(p.jogador_id))).join(', ')}</b>: confirme no aviso do canto da tela.</div>` + av;
         const sorteio = sorteioLigado(t.id);
         const tray = (M.semLugar.length || M.fora.length) ? `<div class="lg-tray">
             ${M.semLugar.length ? `<span class="lg-lbl" style="margin-right:.2rem">🪑 Sem lugar (${M.semLugar.length})</span>${M.semLugar.map(j => `<span class="lg-chip ${V.pegou === j ? 'on' : ''}" data-j="${esc(j)}" title="${esc(nomeDe(j))}"><i>${esc(ini(nomeDe(j)))}</i>${esc(nomeDe(j))}</span>`).join('')}` : ''}
@@ -590,6 +652,9 @@ body.lg-dragging,body.lg-dragging *{cursor:grabbing!important}
             <label class="lg-ck"><input type="checkbox" data-k="c_sorteio" ${c.sorteioEntrada ? 'checked' : ''} ${admin ? '' : 'disabled'}><span><b>Sortear mesa e cadeira na entrada</b><small>Ao registrar o buy-in, o jogador já vai para a mesa aberta mais vazia, e o lugar sai na confirmação e no comprovante. Desligado: o floor senta os jogadores pela aba Mesas ou pelo app do floor.</small></span></label>
             <label class="lg-ck"><input type="checkbox" data-k="c_reent" ${c.reentradaMantem ? 'checked' : ''} ${admin ? '' : 'disabled'}><span><b>Na reentrada, manter a mesma cadeira</b><small>Só sorteia outra se a cadeira já tiver sido liberada. Rebuy e add-on sempre mantêm.</small></span></label>
             <label class="lg-ck"><input type="checkbox" data-k="c_auto" ${c.abrirAuto ? 'checked' : ''} ${admin ? '' : 'disabled'}><span><b>Abrir a próxima mesa sozinho quando as abertas lotarem</b><small>Desligado: o jogador fica em "Sem lugar" até alguém abrir a mesa.</small></span></label>
+            <div class="lg-sec">App do floor (celular)</div>
+            <div class="note">Endereço: <b style="color:#ececf0;user-select:all">${location.origin}/floor</b> · abra no celular e toque em "Adicionar à tela inicial". Login com o mesmo usuário do StackOS. Administradores sempre têm acesso.</div>
+            <div id="lg-floor-users" class="lg-mv"><div class="note">${admin ? 'Carregando usuários…' : 'Só o administrador libera o acesso.'}</div></div>
             <div class="rowb"><button class="lg-btn" data-x>Cancelar</button><button class="lg-btn pri" data-ok>Salvar</button></div>`, async (fechar, ov) => {
             const q = (k) => ov.querySelector(`[data-k="${k}"]`);
             const tCad = Math.max(2, Math.min(12, parseInt(q('t_cad').value, 10) || c.cadeiras));
@@ -611,11 +676,23 @@ body.lg-dragging,body.lg-dragging *{cursor:grabbing!important}
             }
             fechar(); toast('✅ Configuração de mesas salva'); desenhar(t);
         });
+        if (admin) (async () => {
+            const box = ov.querySelector('#lg-floor-users'); if (!box) return;
+            try {
+                const { data, error } = await sb.rpc('floor_admin_usuarios'); if (error) throw error;
+                const us = (data && data.usuarios) || [];
+                box.innerHTML = us.map(u => `<label class="row" style="cursor:${u.papel === 'admin' ? 'default' : 'pointer'}"><span>${esc(u.nome || u.email)} <small style="color:#9a9aa6">${esc(u.papel || '')}</small></span><input type="checkbox" data-fu="${u.id}" ${u.permitido ? 'checked' : ''} ${u.papel === 'admin' ? 'disabled title="Administrador sempre tem acesso"' : ''} style="accent-color:#a855f7;width:18px;height:18px"></label>`).join('') || '<div class="note">Nenhum usuário.</div>';
+                box.querySelectorAll('[data-fu]').forEach(ck => ck.onchange = async () => {
+                    try { const r = await sb.rpc('floor_definir_permissao', { p_user_id: ck.dataset.fu, p_permitir: ck.checked }); if (r.error || !(r.data && r.data.ok)) throw r.error || new Error('erro'); toast(ck.checked ? '✅ Acesso ao app do floor liberado' : 'Acesso ao app do floor removido'); }
+                    catch (err) { ck.checked = !ck.checked; toast('⚠️ Não foi possível alterar'); }
+                });
+            } catch (err) { box.innerHTML = '<div class="note">Não foi possível carregar os usuários.</div>'; }
+        })();
         return ov;
     }
 
     window.Lugares = { aoEntrar, aoSair, textoComprovante, renderAba, carregar, _T: T, _modelo: modelo, _sugestaoBalancear: sugestaoBalancear, _sugestaoQuebra: sugestaoQuebra };
 
     // Pré-carrega os lugares do torneio aberto (para o comprovante já sair com a mesa)
-    setInterval(() => { try { const t = torneioAtivo(); if (t && isUuid(t.id) && sbOk() && !st(t.id).ok && !st(t.id).carregando) { ligarRealtime(); carregar(t.id); } } catch (_) {} }, 5000);
+    setInterval(() => { try { if (sbOk()) ligarRealtime(); } catch (_) {} try { const t = torneioAtivo(); if (t && isUuid(t.id) && sbOk() && !st(t.id).ok && !st(t.id).carregando) { ligarRealtime(); carregar(t.id); } } catch (_) {} }, 5000);
 })();

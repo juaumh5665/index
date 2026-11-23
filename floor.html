@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07070a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Floor">
+<link rel="manifest" href="/floor-manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-floor.png">
+<link rel="icon" type="image/png" href="/icons/icon-floor-192.png">
+<title>StackFloor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#07070a;--p:#111114;--p2:#18181d;--line:#26262e;--fg:#ececf0;--mut:#9a9aa6;--dim:#5f5f6b;--acc:#a855f7;--acc-s:rgba(168,85,247,.18);--gold:#f5b53d;--gold-s:rgba(245,181,61,.12);--ok:#22c55e;--ok-s:rgba(34,197,94,.14);--bad:#f87171;--blu:#38bdf8;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 Manrope,system-ui,sans-serif;overscroll-behavior:none;height:100%}
+button,input,select{font-family:inherit}
+[hidden]{display:none!important}
+.scr{position:fixed;inset:0;display:flex;flex-direction:column}
+/* login */
+#scr-login{justify-content:center;padding:24px 22px;gap:18px;max-width:440px;margin:0 auto}
+#scr-login h1{margin:0;font-size:1.5rem}#scr-login p{margin:0;color:var(--mut);font-size:.85rem}
+.in{width:100%;font-size:16px;background:var(--p);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:.8rem .9rem}
+.btn{font:inherit;font-weight:800;font-size:.78rem;border-radius:11px;border:1px solid var(--line);background:var(--p2);color:var(--fg);padding:.6rem .85rem;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}.btn.gold{background:var(--gold);border-color:var(--gold);color:#1a1205}.btn.bad{color:var(--bad);border-color:rgba(248,113,113,.4);background:transparent}
+.btn.big{width:100%;padding:.9rem;font-size:.95rem}
+.erro{color:#fca5a5;font-size:.8rem;min-height:1em}
+/* app */
+.hdr{padding:calc(var(--safe-t) + 8px) 14px 10px;border-bottom:1px solid var(--line);background:#0b0b0e}
+.hdr .t{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hdr b{font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:.62rem;font-weight:800;padding:.15rem .5rem;border-radius:99px;background:var(--ok-s);color:var(--ok);white-space:nowrap}
+.pill.p{background:var(--gold-s);color:var(--gold)}
+.stats{display:flex;gap:12px;margin-top:6px;font-size:.68rem;color:var(--mut);flex-wrap:wrap}.stats b{color:var(--fg);font-family:'Space Mono',monospace}
+.trocar{font-size:.66rem;color:var(--acc);font-weight:800;background:none;border:0;padding:0;cursor:pointer}
+.body{flex:1;overflow:auto;padding:12px 12px calc(84px + var(--safe-b));display:flex;flex-direction:column;gap:10px}
+.body>*{flex-shrink:0}
+.alert{border-radius:12px;padding:9px 11px;font-size:.74rem;line-height:1.4;display:flex;gap:8px;align-items:center}
+.alert.w{background:var(--gold-s);border:1px solid rgba(245,181,61,.35);color:#fde68a}
+.alert.i{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.3);color:#bae6fd}
+.alert .btn{margin-left:auto;flex-shrink:0;padding:.45rem .7rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mini{background:var(--p);border:1px solid var(--line);border-radius:14px;padding:8px;cursor:pointer;text-align:left;font:inherit;color:var(--fg)}
+.mini .mh{display:flex;justify-content:space-between;font-size:.74rem;font-weight:800;margin-bottom:2px}.mini .mh span{font-family:'Space Mono',monospace;color:var(--mut);font-size:.66rem}
+.mini.cheia .mh span{color:var(--gold)}.mini.curta .mh span{color:var(--blu)}
+.tbl{position:relative;width:100%}
+.tbl.mn{aspect-ratio:1.6/1}.tbl.gr{aspect-ratio:1/1.3;margin-top:4px}
+.felt{position:absolute;border-radius:999px;background:radial-gradient(ellipse at 50% 45%,#16774a,#0f5132 55%,#0a3a24);border:7px solid #3b2414;box-shadow:inset 0 0 0 2px rgba(255,255,255,.06),0 10px 30px rgba(0,0,0,.5)}
+.tbl.mn .felt{left:10%;right:10%;top:16%;bottom:16%;border-width:4px}
+.tbl.gr .felt{left:19%;right:19%;top:11%;bottom:11%}
+.logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:rgba(255,255,255,.35);font-weight:800;letter-spacing:.12em;font-size:.6rem;pointer-events:none}
+.logo b{display:block;font-size:1.3rem;color:rgba(255,255,255,.55);letter-spacing:.03em}
+.dl{position:absolute;transform:translate(-50%,-50%);font-size:.55rem;font-weight:800;background:#fff;color:#111;border-radius:6px;padding:2px 6px}
+.ms{position:absolute;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:var(--acc);border:1.5px solid #c084fc}
+.ms.l{background:transparent;border:1.5px dashed rgba(34,197,94,.6)}
+.st{position:absolute;transform:translate(-50%,-50%);width:76px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border:0;background:none;font:inherit;color:var(--fg);padding:0;touch-action:none}
+.st .av{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;background:#25252d;border:2px solid #3a3a46;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.st .nm{font-size:.62rem;font-weight:800;max-width:76px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(10,10,14,.85);border-radius:5px;padding:1px 5px}
+.st .no{font-size:.5rem;color:var(--mut);font-weight:800}
+.st.livre .av{background:transparent;border:2px dashed rgba(34,197,94,.55);color:var(--ok);font-size:1.05rem}
+.st.livre .nm{color:var(--ok);background:transparent}
+.st.sel .av{border-color:var(--acc);box-shadow:0 0 0 4px rgba(168,85,247,.35)}
+.st.alvo .av{border-color:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.35);animation:pul 1s infinite}
+.st.drop .av{background:var(--ok-s);transform:scale(1.12)}
+@keyframes pul{50%{box-shadow:0 0 0 7px rgba(34,197,94,.15)}}
+.bar{display:flex;align-items:center;gap:8px}.bar .sp{flex:1}.bar b{font-size:1rem}
+.tray{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.chip{flex-shrink:0;display:flex;align-items:center;gap:6px;background:var(--p2);border:1px solid var(--line);border-radius:999px;padding:4px 10px 4px 4px;font-size:.72rem;font-weight:800;cursor:grab;touch-action:none;user-select:none}
+.chip i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--acc-s);color:#e9d5ff;display:flex;align-items:center;justify-content:center;font-size:.62rem}
+.chip.on{border-color:var(--acc);background:var(--acc-s)}
+.ghost{position:fixed;z-index:100;pointer-events:none;background:var(--acc);color:#fff;font-weight:800;font-size:.74rem;border-radius:999px;padding:7px 13px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.nav{position:fixed;left:0;right:0;bottom:0;height:calc(64px + var(--safe-b));padding-bottom:var(--safe-b);background:#0d0d11;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);z-index:3}
+.nav button{font:inherit;background:none;border:0;color:var(--dim);font-size:.64rem;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer}
+.nav button i{font-style:normal;font-size:1.15rem}.nav button.on{color:var(--acc)}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:#121217;border-top:1px solid var(--line);border-radius:20px 20px 0 0;padding:14px 14px calc(22px + var(--safe-b));transform:translateY(105%);transition:transform .2s;z-index:6;display:flex;flex-direction:column;gap:8px;max-height:80vh;overflow:auto}
+.sheet.on{transform:none}.sheet .grab{width:40px;height:4px;border-radius:4px;background:#333;margin:0 auto 4px}
+.sheet h3{margin:0;font-size:1rem}.sheet .sub{font-size:.72rem;color:var(--mut)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.acts .btn{padding:.85rem .5rem;font-size:.82rem}
+.shade{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5;display:none}.shade.on{display:block}
+.toast{position:fixed;left:12px;right:12px;top:calc(var(--safe-t) + 74px);background:#1f1f27;border:1px solid #3a3a46;border-radius:12px;padding:10px 12px;font-size:.78rem;font-weight:700;z-index:8;opacity:0;transform:translateY(-10px);transition:.2s;pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.mv{display:flex;flex-direction:column;gap:6px}
+.mv .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.78rem;background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.mv .row b{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--ok);white-space:nowrap}
+.lista .row{cursor:pointer}
+.note{font-size:.74rem;color:var(--mut);line-height:1.45}
+.vazio{text-align:center;color:var(--mut);font-size:.82rem;padding:30px 10px}
+.off{position:fixed;top:calc(var(--safe-t) + 4px);left:50%;transform:translateX(-50%);background:#7f1d1d;color:#fecaca;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:99px;z-index:9}
+.tcard{background:var(--p);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+<div class="off" id="off" hidden>Sem conexão</div>
+
+<!-- LOGIN -->
+<div class="scr" id="scr-login" hidden>
+  <div><h1>🃏 StackFloor</h1><p>Mesas e lugares dos torneios, em tempo real.</p></div>
+  <form id="frmLogin" style="display:flex;flex-direction:column;gap:12px">
+    <input class="in" id="inpEmail" type="email" autocomplete="username" placeholder="E-mail">
+    <input class="in" id="inpSenha" type="password" autocomplete="current-password" placeholder="Senha">
+    <div class="erro" id="erroLogin"></div>
+    <button class="btn pri big" id="btnLogin" type="submit">Entrar</button>
+  </form>
+  <p style="font-size:.72rem">Use o mesmo login do StackOS. O administrador do clube libera o acesso em Torneio → Mesas → ⚙.</p>
+</div>
+
+<!-- ESCOLHER TORNEIO -->
+<div class="scr" id="scr-torneios" hidden>
+  <div class="hdr"><div class="t"><b id="tClube">Torneios</b><button class="trocar" onclick="sair()">Sair</button></div></div>
+  <div class="body" id="listaT"></div>
+</div>
+
+<!-- APP -->
+<div class="scr" id="scr-app" hidden>
+  <div class="hdr"><div class="t"><b id="hNome">—</b><span class="pill" id="hStatus">—</span></div>
+    <div class="stats"><span>Ativos <b id="sAt">0</b></span><span>Mesas <b id="sMs">0</b></span><span>Livres <b id="sLv">0</b></span><span>Sem lugar <b id="sSl">0</b></span><span style="margin-left:auto"><button class="trocar" onclick="trocarTorneio()">Trocar torneio</button></span></div></div>
+  <div class="body" id="body"></div>
+  <div class="nav"><button class="on" data-v="mesas"><i>⬭</i>Mesas</button><button data-v="busca"><i>🔎</i>Jogadores</button><button data-v="mais"><i>☰</i>Mais</button><button data-v="log"><i>🕘</i>Histórico</button></div>
+</div>
+<div class="shade" id="shade"></div><div class="sheet" id="sheet"></div><div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://jvvgdkjohfomuafsafsx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_W8TlRO__dGOD539G6-9oFQ_aavbH2MA';
+// Sessão própria (não divide o login com o StackOS aberto no mesmo aparelho)
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storageKey: 'stackfloor-auth', persistSession: true, autoRefreshToken: true } });
+const $ = (id) => document.getElementById(id);
+const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} } };
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ini = (n) => String(n || '?').trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+const ERROS = { nao_logado: 'Faça login.', sem_permissao: 'Seu usuário não tem acesso ao app do floor. Peça ao administrador para liberar em Torneio → Mesas → ⚙.' };
+const MSG = { ocupada: 'Essa cadeira acabou de ser ocupada.', mudou: 'Alguém mudou esse lugar agora há pouco.', cadeira_invalida: 'Cadeira inválida.', mesa_com_jogadores: 'Ainda tem jogador nessa mesa.' };
+
+let SESS = null, TID = LS.get('stackfloor_torneio', null), D = null, view = 'mesas', aberta = null, sel = null, modo = null, pegou = null, canal = null, _ref = null;
+
+async function rpc(nome, args) { const { data, error } = await sb.rpc(nome, args || {}); if (error) throw error; return data; }
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2600); try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} }
+function show(id) { ['scr-login', 'scr-torneios', 'scr-app'].forEach(s => $(s).hidden = s !== id); }
+
+// ─── login ───
+$('frmLogin').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const email = $('inpEmail').value.trim(), senha = $('inpSenha').value, er = $('erroLogin'); er.textContent = '';
+  if (!email || !senha) { er.textContent = 'Preencha e-mail e senha.'; return; }
+  $('btnLogin').disabled = true;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+    if (error) throw new Error('E-mail ou senha incorretos.');
+    await validar();
+  } catch (e) { er.textContent = e.message || 'Erro de conexão.'; }
+  finally { $('btnLogin').disabled = false; }
+});
+async function validar() {
+  const d = await rpc('floor_validar_acesso');
+  if (!d || !d.ok) { try { await sb.auth.signOut(); } catch (_) {} throw new Error(ERROS[d && d.erro] || 'Acesso recusado.'); }
+  SESS = d;
+  await listarTorneios(true);
+}
+async function sair() { try { if (canal) sb.removeChannel(canal); } catch (_) {} try { await sb.auth.signOut(); } catch (_) {} SESS = null; show('scr-login'); }
+
+// ─── torneios ───
+async function listarTorneios(auto) {
+  const d = await rpc('floor_torneios');
+  const ts = (d && d.torneios) || [];
+  $('tClube').textContent = SESS.clube_nome || 'Torneios';
+  if (auto && TID && ts.some(t => t.id === TID)) return abrirTorneio(TID);
+  if (auto && ts.length === 1) return abrirTorneio(ts[0].id);
+  show('scr-torneios');
+  $('listaT').innerHTML = `<div class="note">Olá, ${esc((SESS.user_nome || '').split(' ')[0])}. Escolha o torneio:</div>` +
+    (ts.length ? ts.map(t => `<div class="tcard" onclick="abrirTorneio('${t.id}')"><b>${esc(t.nome)}</b><span class="pill ${t.status === 'running' ? '' : 'p'}">${stTxt(t)}</span></div>`).join('') : '<div class="vazio">Nenhum torneio aberto agora.<br><br><button class="btn" onclick="listarTorneios()">Atualizar</button></div>');
+}
+const stTxt = (t) => t.is_break ? 'Intervalo' : ({ running: 'Rodando', paused: 'Pausado', waiting: 'Aguardando', break: 'Intervalo' }[t.status] || t.status);
+function trocarTorneio() { TID = null; LS.set('stackfloor_torneio', null); try { if (canal) sb.removeChannel(canal); } catch (_) {} canal = null; listarTorneios(false); }
+async function abrirTorneio(id) {
+  TID = id; LS.set('stackfloor_torneio', id); aberta = null; sel = null; modo = null; pegou = null; view = 'mesas';
+  document.querySelectorAll('.nav button').forEach(x => x.classList.toggle('on', x.dataset.v === 'mesas'));
+  show('scr-app');
+  $('body').innerHTML = '<div class="vazio">Carregando…</div>';
+  await recarregar();
+  assinar();
+}
+
+// ─── dados ───
+async function recarregar() {
+  try {
+    const d = await rpc('floor_estado', { p_torneio: TID });
+    if (!d || !d.ok) { toast(ERROS[d && d.erro] || 'Não foi possível abrir o torneio'); return trocarTorneio(); }
+    D = d; $('off').hidden = true;
+    if (!modo && !pegou && !$('sheet').classList.contains('on') && !document.body.classList.contains('arrastando')) render();
+    else stats();
+  } catch (e) { console.warn(e); $('off').hidden = false; }
+}
+function agendar() { clearTimeout(_ref); _ref = setTimeout(recarregar, 350); }
+function assinar() {
+  try { if (canal) sb.removeChannel(canal); } catch (_) {}
+  const f = 'torneio_id=eq.' + TID;
+  canal = sb.channel('floor:' + TID);
+  ['torneio_lugares', 'torneio_mesas_estado', 'torneio_entries', 'torneio_eliminados', 'floor_pedidos'].forEach(tb => canal.on('postgres_changes', { event: '*', schema: 'public', table: tb, filter: f }, agendar));
+  canal.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'torneios', filter: 'id=eq.' + TID }, agendar);
+  canal.subscribe();
+}
+setInterval(() => { if (TID && SESS && document.visibilityState === 'visible') recarregar(); }, 20000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && TID && SESS) recarregar(); });
+window.addEventListener('online', () => { if (TID && SESS) recarregar(); });
+
+// ─── modelo ───
+function M() {
+  const cad = Number(D.estado.cadeiras) || Number(D.cfg.cadeiras) || 9;
+  const nomes = new Map(D.ativos.map(a => [a.id, a]));
+  const porMesa = new Map(), fora = [], sentados = new Set(), comLugar = new Set();
+  D.lugares.forEach(l => {
+    if (!nomes.has(l.j)) return;
+    comLugar.add(l.j);
+    if (l.status === 'sentado') { if (!porMesa.has(l.m)) porMesa.set(l.m, new Array(cad).fill(null)); const a = porMesa.get(l.m); if (l.c >= 1 && l.c <= cad) a[l.c - 1] = l.j; sentados.add(l.j); }
+    else fora.push(l.j);
+  });
+  const nums = new Set([...(D.estado.abertas || []), ...porMesa.keys()]);
+  const mesas = [...nums].sort((a, b) => a - b).map(n => ({ n, s: porMesa.get(n) || new Array(cad).fill(null) }));
+  const semLugar = D.ativos.filter(a => !comLugar.has(a.id)).map(a => a.id);
+  return { cad, mesas, fora, semLugar, sentados, nomes };
+}
+const nome = (j) => { const a = D && D.ativos.find(x => x.id === j); return a ? a.nome : 'Jogador'; };
+const ocup = (m) => m.s.filter(Boolean).length;
+function pos(i, n, mini) { const a = Math.PI / 2 + (i + 1) * 2 * Math.PI / (n + 1); return mini ? [50 + 44 * Math.cos(a), 50 + 40 * Math.sin(a)] : [50 + 39 * Math.cos(a), 50 + 43 * Math.sin(a)]; }
+
+function sugBal(m) {
+  const ms = m.mesas.filter(x => ocup(x)).map(x => ({ n: x.n, s: x.s.slice() })); if (ms.length < 2) return [];
+  const movs = [], foi = new Set();
+  for (let k = 0; k < 200; k++) {
+    ms.sort((a, b) => ocup(b) - ocup(a)); const mx = ms[0], mn = ms[ms.length - 1];
+    if (ocup(mx) - ocup(mn) < 2) break;
+    const cs = mx.s.map((j, i) => [j, i]).filter(x => x[0] && !foi.has(x[0])), lv = mn.s.map((j, i) => [j, i]).filter(x => !x[0]);
+    if (!cs.length || !lv.length) break;
+    const [j, i] = cs[Math.floor(Math.random() * cs.length)], [, li] = lv[Math.floor(Math.random() * lv.length)];
+    mx.s[i] = null; mn.s[li] = j; foi.add(j); movs.push({ j, de: { m: mx.n, c: i + 1 }, para: { m: mn.n, c: li + 1 } });
+  }
+  return movs;
+}
+function sugQuebra(m) {
+  const occ = m.mesas.filter(x => ocup(x)); const tot = occ.reduce((a, x) => a + ocup(x), 0);
+  if (occ.length < 2 || tot > (occ.length - 1) * m.cad) return null;
+  const alvo = occ.slice().sort((a, b) => ocup(a) - ocup(b) || b.n - a.n)[0];
+  const outras = occ.filter(x => x.n !== alvo.n).map(x => ({ n: x.n, s: x.s.slice() })); const movs = [];
+  alvo.s.forEach((j, i) => { if (!j) return; outras.sort((a, b) => ocup(a) - ocup(b)); const d = outras[0]; const lv = d.s.map((x, k) => [x, k]).filter(x => !x[0]); const [, li] = lv[Math.floor(Math.random() * lv.length)]; d.s[li] = j; movs.push({ j, de: { m: alvo.n, c: i + 1 }, para: { m: d.n, c: li + 1 } }); });
+  return { mesa: alvo.n, movs };
+}
+function sugFinal(m) {
+  const occ = m.mesas.filter(x => ocup(x)); const tot = occ.reduce((a, x) => a + ocup(x), 0);
+  const mf = Math.min(Number(D.cfg.mesaFinal) || 9, m.cad);
+  if (occ.length < 2 || tot > mf || tot < 2) return null;
+  const dest = occ[0].n, js = []; occ.forEach(x => x.s.forEach((j, i) => { if (j) js.push({ j, de: { m: x.n, c: i + 1 } }); }));
+  const cs = Array.from({ length: m.cad }, (_, i) => i + 1).sort(() => Math.random() - .5);
+  return { mesa: dest, movs: js.map((x, k) => ({ j: x.j, de: x.de, para: { m: dest, c: cs[k] } })) };
+}
+
+// ─── ações (sempre no servidor, tudo ou nada) ───
+async function aplicar(ops, acao) {
+  try {
+    const d = await rpc('lugares_aplicar', { p_torneio: TID, p_ops: ops, p_por: SESS.user_nome, p_acao: acao });
+    if (!d || !d.ok) { toast('⚠️ ' + (MSG[d && d.erro] || 'Não foi possível mudar o lugar.')); await recarregar(); return false; }
+    await recarregar(); return true;
+  } catch (e) { console.warn(e); toast('⚠️ Sem conexão: nada foi alterado.'); $('off').hidden = false; return false; }
+}
+async function estado(campos) {
+  try { const d = await rpc('mesas_estado_salvar', Object.assign({ p_torneio: TID, p_por: SESS.user_nome }, campos)); if (!d || !d.ok) { toast('⚠️ ' + (MSG[d && d.erro] || 'Não foi possível salvar.')); return false; } await recarregar(); return true; }
+  catch (e) { toast('⚠️ Sem conexão.'); return false; }
+}
+
+// ─── tela ───
+function stats() {
+  if (!D) return; const m = M();
+  $('hNome').textContent = D.torneio.nome; const s = $('hStatus'); s.textContent = stTxt(D.torneio); s.className = 'pill ' + (D.torneio.status === 'running' && !D.torneio.is_break ? '' : 'p');
+  $('sAt').textContent = D.ativos.length; $('sMs').textContent = m.mesas.filter(x => ocup(x)).length;
+  $('sLv').textContent = m.mesas.filter(x => ocup(x)).reduce((a, x) => a + x.s.filter(y => !y).length, 0); $('sSl').textContent = m.semLugar.length;
+}
+function avisos(m) {
+  if (modo) return `<div class="alert i">${modo.tipo === 'mover' ? '👉 Toque numa cadeira <b>livre</b> para mover' : '🔁 Toque em quem vai <b>trocar</b> com'} <b>${esc(nome(modo.j))}</b>. Use ‹ › para outra mesa.<button class="btn" onclick="cancelar()">Cancelar</button></div>`;
+  const f = sugFinal(m), q = f ? null : sugQuebra(m), b = (f || q) ? [] : sugBal(m);
+  if (f) return `<div class="alert w">🏆 Todos cabem numa mesa: <b>formar a mesa final</b>.<button class="btn gold" onclick="acFinal()">Formar</button></div>`;
+  if (q) return `<div class="alert w">💥 Dá para <b>quebrar a Mesa ${q.mesa}</b>.<button class="btn gold" onclick="acQuebrar()">Quebrar</button></div>`;
+  if (b.length) { const o = m.mesas.filter(x => ocup(x)).sort((a, c) => ocup(c) - ocup(a)); return `<div class="alert w">⚖️ Mesa ${o[0].n} com ${ocup(o[0])} e Mesa ${o[o.length - 1].n} com ${ocup(o[o.length - 1])}.<button class="btn gold" onclick="acBalancear()">Balancear</button></div>`; }
+  return '';
+}
+function tray(m) {
+  const pend = (D.pedidos || []).length ? `<div class="alert i">⏳ ${D.pedidos.length} eliminação(ões) aguardando o caixa: ${D.pedidos.map(p => esc(nome(p.j))).join(', ')}</div>` : '';
+  if (!m.semLugar.length) return pend;
+  return pend + `<div class="bar" style="font-size:.7rem;color:var(--mut);font-weight:800">🪑 SEM LUGAR (${m.semLugar.length}) · arraste até uma cadeira<span class="sp"></span><button class="btn pri" style="padding:.4rem .65rem" onclick="sortearTodos(this)">🎲 Sortear</button></div>
+    <div class="tray">${m.semLugar.map(j => `<span class="chip ${pegou === j ? 'on' : ''}" data-j="${esc(j)}"><i>${esc(ini(nome(j)))}</i>${esc(nome(j))}</span>`).join('')}</div>`;
+}
+function render() {
+  if (!D) return; stats(); const m = M(); let h = '';
+  if (view === 'mesas' && aberta == null) {
+    h += avisos(m) + tray(m);
+    h += m.mesas.length ? `<div class="grid">${m.mesas.map(x => `<button class="mini ${ocup(x) === m.cad ? 'cheia' : ocup(x) < m.cad - 3 ? 'curta' : ''}" onclick="abrirMesa(${x.n})"><div class="mh">Mesa ${x.n}<span>${ocup(x)}/${m.cad}</span></div><div class="tbl mn"><div class="felt"></div><div class="logo"><b style="font-size:.95rem">${x.n}</b></div>${x.s.map((j, i) => { const [a, b] = pos(i, m.cad, true); return `<span class="ms ${j ? '' : 'l'}" style="left:${a}%;top:${b}%"></span>`; }).join('')}</div></button>`).join('')}<button class="mini" onclick="acAbrirMesa()" style="display:flex;align-items:center;justify-content:center;color:var(--mut);border-style:dashed;min-height:90px">＋ Abrir mesa</button></div>`
+      : `<div class="vazio">Nenhuma mesa aberta.<br><br><button class="btn" onclick="acAbrirMesa()">＋ Abrir Mesa 1</button></div>`;
+  } else if (view === 'mesas') {
+    const x = m.mesas.find(y => y.n === aberta) || m.mesas[0]; if (!x) { aberta = null; return render(); }
+    const k = m.mesas.indexOf(x);
+    h += `<div class="bar"><button class="btn" onclick="aberta=null;sel=null;render()">← Mesas</button><span class="sp"></span><button class="btn" ${k <= 0 ? 'disabled style="opacity:.3"' : ''} onclick="abrirMesa(${(m.mesas[k - 1] || {}).n})">‹</button><b>Mesa ${x.n}</b><button class="btn" ${k >= m.mesas.length - 1 ? 'disabled style="opacity:.3"' : ''} onclick="abrirMesa(${(m.mesas[k + 1] || {}).n})">›</button></div>` + avisos(m) + tray(m);
+    h += `<div class="tbl gr"><div class="felt"></div><div class="logo">MESA<b>${x.n}</b>${ocup(x)}/${m.cad}</div><span class="dl" style="left:50%;top:84%">D</span>${x.s.map((j, i) => {
+      const [a, b] = pos(i, m.cad); const isSel = sel && sel.m === x.n && sel.c === i + 1;
+      const alvo = (modo && modo.tipo === 'mover' && !j) || (modo && modo.tipo === 'trocar' && j && j !== modo.j) || (pegou && !j);
+      return `<button class="st ${j ? '' : 'livre'} ${isSel ? 'sel' : ''} ${alvo ? 'alvo' : ''}" data-m="${x.n}" data-c="${i + 1}" ${j ? `data-j="${esc(j)}"` : ''} style="left:${a}%;top:${b}%"><span class="av">${j ? esc(ini(nome(j))) : '+'}</span><span class="nm">${j ? esc(nome(j)) : 'livre'}</span><span class="no">CADEIRA ${i + 1}</span></button>`;
+    }).join('')}</div>${ocup(x) === 0 ? `<button class="btn" onclick="acFecharMesa(${x.n})">Fechar Mesa ${x.n} (vazia)</button>` : ''}`;
+  } else if (view === 'busca') {
+    const lug = new Map(D.lugares.map(l => [l.j, l]));
+    h += `<input class="in" id="busca" placeholder="Buscar jogador…" oninput="filtrar(this.value)" autocomplete="off"><div class="mv lista" id="lista">${D.ativos.map(a => { const l = lug.get(a.id); const onde = l && l.status === 'sentado' ? `Mesa ${l.m} · Cad ${l.c}` : l ? 'Liberado' : 'Sem lugar'; return `<div class="row" data-n="${esc(a.nome.toLowerCase())}" onclick="irPara('${a.id}')"><span>${esc(a.nome)}</span><b style="color:${l && l.status === 'sentado' ? 'var(--ok)' : 'var(--gold)'}">${onde}</b></div>`; }).join('')}</div>`;
+  } else if (view === 'mais') {
+    h += `<div class="mv"><button class="btn big" onclick="acAbrirMesa()">＋ Abrir mesa</button><button class="btn big" onclick="sortearTodos(this)">🎲 Sortear quem está sem lugar</button>
+      ${m.fora.length ? `<div class="note" style="margin-top:8px">Liberados (saíram sem ser eliminados):</div>${m.fora.map(j => `<div class="row"><span>${esc(nome(j))}</span><button class="btn" onclick="sentarSorteio('${j}')">Sentar</button></div>`).join('')}` : ''}
+      <div class="note" style="margin-top:10px">Logado como <b>${esc(SESS.user_nome)}</b> · ${esc(SESS.clube_nome || '')}</div><button class="btn" onclick="trocarTorneio()">Trocar torneio</button><button class="btn bad" onclick="sair()">Sair</button></div>`;
+  } else {
+    const nm = (d) => d && d.j ? nome(d.j) : '';
+    const tx = { sortear: 'sorteou', mover: 'moveu', trocar: 'trocou', sentar: 'sentou', liberar: 'liberou', eliminar: 'eliminação', pedido_eliminar: 'pediu eliminação', balancear: 'balanceou', quebrar: 'quebrou mesa', mesa_final: 'formou mesa final', mesas: 'mesas', limpeza: 'limpeza' };
+    h += `<div class="mv">${(D.log || []).map(l => { const d = Array.isArray(l.detalhe) ? l.detalhe[0] : l.detalhe; const qtd = Array.isArray(l.detalhe) && l.detalhe.length > 1 ? ` (${l.detalhe.length})` : ''; return `<div class="row"><span>${new Date(l.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${esc(l.por || '—')} ${tx[l.acao] || l.acao}${qtd} ${esc(nm(d))}</span></div>`; }).join('') || '<div class="vazio">Nada ainda.</div>'}</div>`;
+  }
+  $('body').innerHTML = h; ligar();
+}
+function filtrar(v) { v = v.toLowerCase(); document.querySelectorAll('#lista .row').forEach(r => r.hidden = !r.dataset.n.includes(v)); }
+function irPara(j) { const l = D.lugares.find(x => x.j === j); if (!l || l.status !== 'sentado') { return toast('Sem lugar: use 🎲 Sortear ou arraste na mesa'); } view = 'mesas'; document.querySelectorAll('.nav button').forEach(x => x.classList.toggle('on', x.dataset.v === 'mesas')); aberta = l.m; sel = { m: l.m, c: l.c }; render(); }
+function abrirMesa(n) { if (n == null) return; aberta = n; if (!modo) sel = null; render(); }
+function cancelar() { modo = null; sel = null; pegou = null; render(); }
+function ligar() {
+  document.querySelectorAll('.st').forEach(b => b.onpointerdown = (e) => arrastar(e, { m: +b.dataset.m, c: +b.dataset.c, j: b.dataset.j || null }));
+  document.querySelectorAll('.chip').forEach(c => c.onpointerdown = (e) => arrastar(e, { j: c.dataset.j, chip: true }));
+}
+
+// ─── toque e arrastar ───
+function arrastar(e, src) {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault(); const x0 = e.clientX, y0 = e.clientY; let g = null, alvo = null;
+  const mv = (ev) => {
+    if (!g) {
+      if (!src.j || Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+      g = document.createElement('div'); g.className = 'ghost'; g.textContent = nome(src.j); document.body.appendChild(g); document.body.classList.add('arrastando');
+      if (src.chip && aberta == null) { const m = M(); const v = m.mesas.find(x => ocup(x) < m.cad); if (v) { aberta = v.n; pegou = src.j; render(); } }
+    }
+    g.style.left = ev.clientX + 10 + 'px'; g.style.top = ev.clientY + 10 + 'px';
+    document.querySelectorAll('.st.drop').forEach(x => x.classList.remove('drop'));
+    const el = document.elementFromPoint(ev.clientX, ev.clientY); alvo = el && el.closest('.st');
+    if (alvo && !src.chip && +alvo.dataset.m === src.m && +alvo.dataset.c === src.c) alvo = null;
+    if (alvo) alvo.classList.add('drop');
+  };
+  const up = async () => {
+    removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    document.body.classList.remove('arrastando'); if (g) g.remove();
+    if (!g) {
+      if (src.chip) { pegou = pegou === src.j ? null : src.j; if (pegou && aberta == null) { const m = M(); const v = m.mesas.find(x => ocup(x) < m.cad); if (v) aberta = v.n; } render(); if (pegou) toast('Agora toque numa cadeira livre'); return; }
+      return toque(src);
+    }
+    pegou = null;
+    if (!alvo) return render();
+    const am = +alvo.dataset.m, ac = +alvo.dataset.c, aj = alvo.dataset.j || null;
+    if (src.chip) { if (aj) { toast('Cadeira ocupada'); return render(); } if (await aplicar([{ j: src.j, para: { m: am, c: ac } }], 'sentar')) toast(`✅ ${nome(src.j)} → Mesa ${am} · Cadeira ${ac}`); return; }
+    const de = { m: src.m, c: src.c };
+    if (aj) { if (await aplicar([{ j: src.j, de, para: { m: am, c: ac } }, { j: aj, de: { m: am, c: ac }, para: de }], 'trocar')) toast(`🔁 ${nome(src.j)} ⇄ ${nome(aj)}`); }
+    else if (await aplicar([{ j: src.j, de, para: { m: am, c: ac } }], 'mover')) toast(`✅ ${nome(src.j)} → Mesa ${am} · Cadeira ${ac}`);
+  };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+}
+async function toque(a) {
+  if (pegou) { if (a.j) return toast('Escolha uma cadeira livre'); const j = pegou; pegou = null; if (await aplicar([{ j, para: { m: a.m, c: a.c } }], 'sentar')) toast(`✅ ${nome(j)} → Mesa ${a.m} · Cadeira ${a.c}`); return; }
+  if (modo) {
+    const md = modo;
+    if (md.tipo === 'mover') { if (a.j) return toast('Escolha uma cadeira livre'); modo = null; sel = null; if (await aplicar([{ j: md.j, de: md.de, para: { m: a.m, c: a.c } }], 'mover')) toast(`✅ ${nome(md.j)} → Mesa ${a.m} · Cadeira ${a.c}`); return; }
+    if (!a.j || a.j === md.j) return toast('Toque em outro jogador');
+    modo = null; sel = null; if (await aplicar([{ j: md.j, de: md.de, para: { m: a.m, c: a.c } }, { j: a.j, de: { m: a.m, c: a.c }, para: md.de }], 'trocar')) toast(`🔁 ${nome(md.j)} ⇄ ${nome(a.j)}`); return;
+  }
+  sel = { m: a.m, c: a.c }; render();
+  if (!a.j) {
+    const m = M(), cands = m.semLugar.concat(m.fora);
+    return sheet(`<h3>Mesa ${a.m} · Cadeira ${a.c}</h3><div class="sub">Cadeira livre${cands.length ? ' · quem senta aqui?' : ''}</div><div class="acts">${cands.slice(0, 12).map(j => `<button class="btn pri" onclick="sentarAqui('${j}',${a.m},${a.c})">${esc(nome(j))}</button>`).join('') || '<span class="sub">Ninguém sem lugar.</span>'}</div>`);
+  }
+  const at = D.ativos.find(x => x.id === a.j) || {};
+  sheet(`<h3>${esc(nome(a.j))}</h3><div class="sub">Mesa ${a.m} · Cadeira ${a.c} · ${at.entradas || 1} entrada(s)</div><div class="acts">
+    <button class="btn" onclick="iniciar('mover','${a.j}',${a.m},${a.c})">↗ Mover</button><button class="btn" onclick="iniciar('trocar','${a.j}',${a.m},${a.c})">🔁 Trocar lugar</button>
+    <button class="btn" onclick="liberar('${a.j}',${a.m},${a.c})">🪑 Liberar cadeira</button><button class="btn bad" onclick="pedirElim('${a.j}')">✖ Eliminar</button></div>
+    <div class="sub">Liberar = saiu da mesa sem ser eliminado. Eliminar avisa o caixa, que confirma a posição no StackOS.</div>`);
+}
+function sheet(h) { $('sheet').innerHTML = '<div class="grab"></div>' + h; $('sheet').classList.add('on'); $('shade').classList.add('on'); }
+function fechar() { $('sheet').classList.remove('on'); $('shade').classList.remove('on'); if (!modo) { sel = null; render(); } }
+$('shade').onclick = fechar;
+function iniciar(t, j, m, c) { modo = { tipo: t, j, de: { m, c } }; $('sheet').classList.remove('on'); $('shade').classList.remove('on'); render(); }
+async function liberar(j, m, c) { fechar(); if (await aplicar([{ j, de: { m, c }, para: 'fora' }], 'liberar')) toast(`🪑 Cadeira liberada (${nome(j)} não foi eliminado)`); }
+async function sentarAqui(j, m, c) { fechar(); if (await aplicar([{ j, para: { m, c } }], 'sentar')) toast(`✅ ${nome(j)} → Mesa ${m} · Cadeira ${c}`); }
+async function pedirElim(j) {
+  sheet(`<h3>Eliminar ${esc(nome(j))}?</h3><div class="sub">A cadeira fica livre agora e o caixa recebe o aviso para registrar a eliminação (posição e KO) no StackOS.</div><div class="acts"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn bad" id="okE">✖ Eliminar</button></div>`);
+  $('okE').onclick = async () => { fechar(); try { const d = await rpc('floor_pedir_eliminacao', { p_torneio: TID, p_jogador: j }); if (d && d.ok) toast(`✖ ${nome(j)}: eliminação enviada ao caixa`); else toast('⚠️ Não foi possível enviar'); } catch (e) { toast('⚠️ Sem conexão'); } recarregar(); };
+}
+async function sentarSorteio(j) { try { const r = await rpc('lugar_sortear', { p_torneio: TID, p_jogador: j, p_manter: true, p_por: SESS.user_nome }); toast(r && r.mesa ? `🎲 ${nome(j)} → Mesa ${r.mesa} · Cadeira ${r.cadeira}` : '⚠️ Sem cadeira livre'); } catch (e) { toast('⚠️ Sem conexão'); } recarregar(); }
+async function sortearTodos(b) {
+  const m = M(); if (!m.semLugar.length) return toast('Todo mundo já tem lugar'); if (b) b.disabled = true; let ok = 0, sem = 0;
+  for (const j of m.semLugar) { try { const r = await rpc('lugar_sortear', { p_torneio: TID, p_jogador: j, p_manter: true, p_por: SESS.user_nome }); if (r && r.mesa) ok++; else sem++; } catch (_) { sem++; } }
+  toast(`🎲 ${ok} sentado(s)${sem ? ` · ${sem} sem cadeira livre` : ''}`); recarregar();
+}
+function confirmar(titulo, sub, movs, acao, depois) {
+  sheet(`<h3>${titulo}</h3><div class="sub">${sub}</div><div class="mv">${movs.map(x => `<div class="row"><span>${esc(nome(x.j))}</span><b>M${x.de.m}·C${x.de.c} → M${x.para.m}·C${x.para.c}</b></div>`).join('')}</div><div class="acts"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" id="okM">Confirmar</button></div>`);
+  $('okM').onclick = async () => { $('sheet').classList.remove('on'); $('shade').classList.remove('on'); sel = null; if (await aplicar(movs, acao)) { if (depois) await depois(); toast(`✅ ${movs.length} jogador(es) mudaram de lugar`); } };
+}
+function acBalancear() { const v = sugBal(M()); if (v.length) confirmar('⚖️ Balancear mesas', 'Só quem precisa mudar de lugar:', v, 'balancear'); }
+function acQuebrar() { const q = sugQuebra(M()); if (q) confirmar(`💥 Quebrar Mesa ${q.mesa}`, 'Sorteio nas cadeiras livres das outras mesas:', q.movs, 'quebrar', async () => { await estado({ p_abertas: (D.estado.abertas || []).filter(x => x !== q.mesa) }); if (aberta === q.mesa) aberta = null; }); }
+function acFinal() { const f = sugFinal(M()); if (f) confirmar('🏆 Formar mesa final', `Todos na Mesa ${f.mesa}, cadeiras sorteadas:`, f.movs, 'mesa_final', async () => { await estado({ p_abertas: [f.mesa] }); aberta = f.mesa; }); }
+function acAbrirMesa() {
+  const m = M(), usados = new Set(m.mesas.map(x => x.n)); let n = 1; while (usados.has(n)) n++;
+  const livres = m.mesas.filter(x => ocup(x)).reduce((a, x) => a + x.s.filter(y => !y).length, 0);
+  sheet(`<h3>Abrir Mesa ${n}?</h3><div class="sub">${livres} cadeira(s) livre(s) nas mesas abertas.</div><div class="acts"><button class="btn" onclick="fechar()">Cancelar</button><button class="btn pri" id="okA">Abrir mesa</button></div>`);
+  $('okA').onclick = async () => { fechar(); if (await estado({ p_abertas: [...new Set([...(D.estado.abertas || []), ...m.mesas.map(x => x.n), n])] })) toast(`Mesa ${n} aberta`); };
+}
+async function acFecharMesa(n) { if (await estado({ p_abertas: (D.estado.abertas || []).filter(x => x !== n) })) { aberta = null; toast(`Mesa ${n} fechada`); render(); } }
+
+document.querySelectorAll('.nav button').forEach(b => b.onclick = () => { document.querySelectorAll('.nav button').forEach(x => x.classList.remove('on')); b.classList.add('on'); view = b.dataset.v; modo = null; pegou = null; sel = null; if (view === 'mesas') aberta = null; render(); });
+window.addEventListener('offline', () => $('off').hidden = false);
+
+// ─── início ───
+(async () => {
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data && data.session) { await validar(); return; }
+  } catch (e) { console.warn(e); }
+  show('scr-login');
+})().catch(e => { $('erroLogin').textContent = e.message || ''; show('scr-login'); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/floor-sw.js', { scope: '/floor' }).catch(() => {});
+</script>
+</body>
+</html>
