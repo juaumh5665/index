@@ -8343,6 +8343,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 <!-- ═══════════════ COLUNA DIREITA: BLINDS ═══════════════ -->
                 <div style="display:flex;flex-direction:column;gap:.65rem;">
 
+                    <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de blinds</div>
+                    <!-- Controles antigos: só aparecem se o editor novo (stackos-blinds-editor.js) não carregar -->
+                    <div id="blinds-old-ctrls" style="display:none;flex-direction:column;gap:.65rem;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.4rem;">
                         <div style="font-size:.65rem;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">Estrutura de blinds</div>
                         <div style="display:flex;gap:.3rem;">
@@ -8370,8 +8373,9 @@ document.addEventListener('DOMContentLoaded', function(){
                         <span></span>
                     </div>
 
+                    </div>
                     <!-- Container dos níveis (populado via JS) -->
-                    <div id="blinds-setup" style="display:flex;flex-direction:column;gap:.25rem;max-height:280px;overflow-y:auto;padding-right:.25rem;"></div>
+                    <div id="blinds-setup"></div>
 
                     <!-- Resumo do torneio -->
                     <div id="torneio-resumo" style="margin-top:.4rem;padding:.75rem .9rem;background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(99,102,241,.05));border:1px solid rgba(255,255,255,.06);border-radius:.55rem;">
@@ -9272,6 +9276,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
             <!-- TAB: BLINDS -->
             <div id="tab-blinds" class="tab-content" style="display:none;">
+                <!-- #15: editor novo (stackos-blinds-editor.js) -->
+                <div id="be-rodando"></div>
+                <!-- Editor antigo: só aparece se o módulo novo não carregar -->
+                <div id="blinds-old-tab" style="display:none;">
                 <!-- Cabeçalho da aba -->
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.85rem;gap:1rem;flex-wrap:wrap;">
                     <div>
@@ -9305,6 +9313,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 <!-- Estrutura completa -->
                 <div id="mt-blinds-full" style="display:flex;flex-direction:column;gap:.25rem;max-height:60vh;overflow-y:auto;"></div>
+                </div>
             </div>
             
             <!-- TAB: DEALERS / CAPILÉ -->
@@ -27758,6 +27767,10 @@ function _toggleFiltroJogador(el) {
 // TORNEIOS — CRUD
 // ============================================================
 function renderBlindsInputs() {
+    // #15: editor novo (botões + arrastar). Se o módulo não carregou, usa o editor antigo abaixo.
+    if (window.BlindEditor && window.BlindEditor.renderCriar()) return;
+    { const oc = document.getElementById('blinds-old-ctrls'); if (oc) oc.style.display = 'flex'; }
+    { const bs = document.getElementById('blinds-setup'); if (bs) bs.style.cssText = 'display:flex;flex-direction:column;gap:.25rem;max-height:280px;overflow-y:auto;padding-right:.25rem;'; }
     const c = document.getElementById('blinds-setup');
     // Numeração só conta níveis "normais" (não intervalos)
     let numNivel = 0;
@@ -28274,6 +28287,12 @@ function saveTournament() {
             document.getElementById('t-buyin-free-ate-nivel')?.focus();
             return;
         }
+    }
+
+    // #15: estrutura não pode terminar num intervalo (depois dele o relógio não tem nível)
+    if (Array.isArray(blindStructure) && blindStructure.length && blindStructure[blindStructure.length - 1].isBreak) {
+        showToast('⛔ A estrutura de blinds termina num intervalo. Acrescente níveis depois dele.');
+        return;
     }
 
     // VALIDAÇÃO EDUCATIVA: Add-on configurado mas sem intervalo de compras marcado.
@@ -30992,6 +31011,9 @@ let _blindsInlineDirty = false;
 function renderTabBlinds() {
     const t = torneios[activeTorneioIdx];
     if (!t) return;
+    // #15: editor novo (botões + arrastar). Se o módulo não carregou, usa o editor antigo abaixo.
+    if (window.BlindEditor && window.BlindEditor.renderRodando()) return;
+    { const ot = document.getElementById('blinds-old-tab'); if (ot) ot.style.display = ''; }
     
     // Info no cabeçalho
     const infoEl = document.getElementById('eba-info-inline');
@@ -58664,6 +58686,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <script src="/stackos-ranking.js?v=2" defer></script>
 <script src="/stackos-ranking-arte.js?v=2" defer></script>
 <script src="/stackos-pix.js?v=3" defer></script>
+<script src="/stackos-blinds-editor.js?v=1" defer></script>
 <script src="/tv-som.js"></script>
 <style>
 #cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }
