@@ -249,7 +249,7 @@
         const col = (typeof _printColWidth === 'function') ? _printColWidth() : 32;
         const linha = (typeof _printLine === 'function') ? _printLine('=', col) : '='.repeat(col);
         const centro = (x) => (typeof _printCenter === 'function') ? _printCenter(x, col) : x;
-        return '\n' + linha + '\n' + centro(`MESA ${l.m}  -  CADEIRA ${l.c}`) + '\n' + linha + '\n';
+        return '\n' + linha + '\n' + centro(`MESA ${l.m}  -  POSIÇÃO ${l.c}`) + '\n' + linha + '\n';
     }
 
     // ─── CSS ───
