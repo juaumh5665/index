@@ -34025,6 +34025,26 @@ function openModalEliminar(idx) {
     openModal('modal-eliminar');
 }
 
+// Abre o Eliminar Jogador já com o jogador escolhido (usado pela aba Mesas e pelos pedidos do app do floor).
+// O campo de busca (PlayerSearch) limpa o select logo depois de montado, então a escolha é aplicada
+// depois disso, do mesmo jeito que um clique do operador na lista.
+function openModalEliminarJogador(idx, jid) {
+    openModalEliminar(idx);
+    const aplicar = () => {
+        const sel = document.getElementById('eliminar-jogador');
+        if (!sel || !jid) return false;
+        if (!Array.from(sel.options).some(o => o.value === String(jid))) return false;
+        sel.__pickedByUser = true;
+        sel.value = String(jid);
+        try { if (typeof sel.onchange === 'function') sel.onchange(); } catch (e) { console.warn(e); }
+        try { PlayerSearch.mount('eliminar-jogador'); } catch (_) {}
+        setTimeout(() => { sel.__pickedByUser = false; }, 120);
+        return sel.value === String(jid);
+    };
+    setTimeout(aplicar, 60);
+    setTimeout(() => { const sel = document.getElementById('eliminar-jogador'); if (sel && sel.value !== String(jid)) aplicar(); }, 250);
+}
+
 // =====================================================================
 // KO: depois de eliminar, aparece um atalho "Reentrar agora?" para o jogador
 // (só se a reentrada estiver liberada pelas travas). Clicar abre o Nova Entrada
@@ -58703,7 +58723,7 @@ if (typeof localStorage !== 'undefined' && localStorage.getItem('ps_debug') === 
 <script src="/stackos-ranking-arte.js?v=2" defer></script>
 <script src="/stackos-pix.js?v=3" defer></script>
 <script src="/stackos-blinds-editor.js?v=2" defer></script>
-<script src="/stackos-mesas.js?v=2" defer></script>
+<script src="/stackos-mesas.js?v=3" defer></script>
 <script src="/tv-som.js"></script>
 <style>
 #cfg-somtv .somtv-opts button { text-align:left; line-height:1.3; font-family:inherit; font-weight:700; font-size:.78rem; cursor:pointer; border-radius:.55rem; padding:.6rem .7rem; border:1px solid #27272a; background:#18181b; color:#e4e4e7; }

@@ -145,11 +145,7 @@
             try {
                 abrirDetalhesTorneio(idx);
                 setTimeout(() => {
-                    try {
-                        openModalEliminar(idx);
-                        const sel = document.getElementById('eliminar-jogador');
-                        if (sel) { sel.value = p.jogador_id; if (typeof sel.onchange === 'function') sel.onchange(); }
-                    } catch (err) { console.warn(err); }
+                    try { openModalEliminarJogador(idx, p.jogador_id); } catch (err) { console.warn(err); }
                 }, 250);
             } catch (err) { console.warn(err); }
         });
@@ -561,11 +557,7 @@ body.lg-dragging,body.lg-dragging *{cursor:grabbing!important}
             if (p === 'liberar') { if (await aplicar(t, [{ j: alvo.j, de, para: 'fora' }], 'liberar')) toast(`🪑 Cadeira liberada (${nomeDe(alvo.j)} não foi eliminado)`); return desenhar(t); }
             if (p === 'eliminar') {
                 desenhar(t);
-                try {
-                    openModalEliminar(activeTorneioIdx);
-                    const sel = document.getElementById('eliminar-jogador');
-                    if (sel) { sel.value = alvo.j; if (typeof sel.onchange === 'function') sel.onchange(); }
-                } catch (err) { console.warn(err); toast('Use o botão Eliminar Jogador do torneio'); }
+                try { openModalEliminarJogador(activeTorneioIdx, alvo.j); } catch (err) { console.warn(err); toast('Use o botão Eliminar Jogador do torneio'); }
             }
         });
     }
