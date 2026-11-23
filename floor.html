@@ -91,6 +91,14 @@ button,input,select{font-family:inherit}
 .note{font-size:.74rem;color:var(--mut);line-height:1.45}
 .vazio{text-align:center;color:var(--mut);font-size:.82rem;padding:30px 10px}
 .off{position:fixed;top:calc(var(--safe-t) + 4px);left:50%;transform:translateX(-50%);background:#7f1d1d;color:#fecaca;font-size:.68rem;font-weight:800;padding:3px 10px;border-radius:99px;z-index:9}
+.inst{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center;padding:12px 12px calc(12px + var(--safe-b))}
+.inst .cx{width:100%;max-width:440px;background:#131318;border:1px solid #2f2f38;border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.inst .ic{display:flex;gap:12px;align-items:center}.inst .ic img{width:56px;height:56px;border-radius:14px}
+.inst h3{margin:0;font-size:1.05rem}.inst p{margin:0;font-size:.82rem;color:var(--mut);line-height:1.5}
+.inst ol{margin:0;padding-left:1.2rem;font-size:.86rem;line-height:1.9}.inst ol b{color:#fff}
+.inst .shr{display:inline-flex;vertical-align:-4px;width:20px;height:20px}
+.boxinst{background:var(--p);border:1px dashed #3a3a46;border-radius:12px;padding:10px 12px;font-size:.78rem;color:var(--mut);display:flex;gap:10px;align-items:center}
+.boxinst .btn{margin-left:auto;flex-shrink:0}
 .tcard{background:var(--p);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
 </style>
 </head>
@@ -106,6 +114,7 @@ button,input,select{font-family:inherit}
     <div class="erro" id="erroLogin"></div>
     <button class="btn pri big" id="btnLogin" type="submit">Entrar</button>
   </form>
+  <div class="boxinst" id="boxInst" hidden><span>📲 Instale o StackFloor na tela inicial do celular.</span><button class="btn pri" type="button" onclick="mostrarInstalar(true)">Como instalar</button></div>
   <p style="font-size:.72rem">Use o mesmo login do StackOS. O administrador do clube libera o acesso em Torneio → Mesas → ⚙.</p>
 </div>
 
@@ -425,6 +434,40 @@ window.addEventListener('offline', () => $('off').hidden = false);
   show('scr-login');
 })().catch(e => { $('erroLogin').textContent = e.message || ''; show('scr-login'); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/floor-sw.js', { scope: '/floor' }).catch(() => {});
+
+// ─── sugestão de instalar o app (Android: botão de instalar · iPhone: passo a passo) ───
+let _promptInst = null;
+const ehStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const ehAndroid = () => /android/i.test(navigator.userAgent);
+const ehSafariIOS = () => ehIOS() && !/crios|fxios|edgios|opios|gsa\//i.test(navigator.userAgent);
+const ehCelular = () => ehIOS() || ehAndroid();
+const SHARE_SVG = '<svg class="shr" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>';
+function mostrarInstalar(forcar) {
+  if (ehStandalone()) return;
+  if (!forcar) { const ate = LS.get('stackfloor_inst_adiado', 0); if (Date.now() < ate || !ehCelular()) return; }
+  if (document.getElementById('inst')) return;
+  let corpo;
+  if (_promptInst) corpo = `<p>Fica na tela inicial, abre em tela cheia e mantém o login.</p><button class="btn pri big" id="btnInst">📲 Instalar StackFloor</button>`;
+  else if (ehIOS() && !ehSafariIOS()) corpo = `<p>No iPhone, a instalação é feita pelo <b>Safari</b>. Copie o endereço e abra no Safari:</p><p style="color:#fff;font-weight:800;user-select:all">${location.origin}/floor</p><button class="btn big" id="btnCopiar">Copiar endereço</button>`;
+  else if (ehIOS()) corpo = `<ol><li>Toque em <b>Compartilhar</b> ${SHARE_SVG} na barra do Safari</li><li>Role e toque em <b>Adicionar à Tela de Início</b></li><li>Toque em <b>Adicionar</b></li></ol><p>O ícone do StackFloor aparece na tela inicial.</p>`;
+  else corpo = `<ol><li>Toque no menu <b>⋮</b> do Chrome (canto de cima)</li><li>Toque em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b></li><li>Confirme em <b>Instalar</b></li></ol>`;
+  const ov = document.createElement('div'); ov.className = 'inst'; ov.id = 'inst';
+  ov.innerHTML = `<div class="cx"><div class="ic"><img src="/icons/icon-floor-192.png" alt=""><div><h3>Instale o StackFloor</h3><p>App do floor: mesas e lugares em tempo real</p></div></div>${corpo}<button class="btn" id="btnDepois">Agora não</button></div>`;
+  document.body.appendChild(ov);
+  const fecharInst = () => { ov.remove(); LS.set('stackfloor_inst_adiado', Date.now() + 3 * 86400000); };
+  ov.querySelector('#btnDepois').onclick = fecharInst;
+  ov.addEventListener('click', (e) => { if (e.target === ov) fecharInst(); });
+  const bi = ov.querySelector('#btnInst');
+  if (bi) bi.onclick = async () => { try { _promptInst.prompt(); const r = await _promptInst.userChoice; if (r && r.outcome === 'accepted') toast('✅ StackFloor instalado'); } catch (_) {} _promptInst = null; ov.remove(); renderBoxInst(); };
+  const bc = ov.querySelector('#btnCopiar');
+  if (bc) bc.onclick = async () => { try { await navigator.clipboard.writeText(location.origin + '/floor'); toast('Endereço copiado: cole no Safari'); } catch (_) { toast('Copie o endereço acima'); } };
+}
+function renderBoxInst() { const b = $('boxInst'); if (b) b.hidden = ehStandalone(); }
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); _promptInst = e; renderBoxInst(); const o = document.getElementById('inst'); if (o) { o.remove(); mostrarInstalar(true); } else mostrarInstalar(false); });
+window.addEventListener('appinstalled', () => { const o = document.getElementById('inst'); if (o) o.remove(); renderBoxInst(); });
+renderBoxInst();
+setTimeout(() => mostrarInstalar(false), 1200);
 </script>
 </body>
 </html>
