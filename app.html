@@ -32977,7 +32977,8 @@ function atualizarResumoEntrada() {
         // Opção "só no buy-in FREE": prévia igual ao que será cobrado
         if ((acoes.includes('buyin') && _taxaAdmAplica(t, 'buyin'))
             || (acoes.includes('buyin_duplo') && _taxaAdmAplica(t, 'buyin_duplo'))) taxaAdm = Number(t.taxaAdm);
-    } else if (acoes.includes('buyin') && Number(t.taxaAdm) > 0) {
+    } else if ((acoes.includes('buyin') || acoes.includes('buyin_duplo')) && Number(t.taxaAdm) > 0) {
+        // Mesma regra do registro: uma taxa por combo (buy-in e/ou buy-in duplo)
         taxaAdm = Number(t.taxaAdm);
     }
 
@@ -33318,6 +33319,8 @@ async function _registrarEntradasCombo(t, jid, acoes) {
     try {
 
     let i = 0;
+    // Taxa administrativa: UMA por combo (ex.: buy-in free + buy-in duplo juntos pagam uma taxa só)
+    let _taxaAdmComboCobrada = false;
     for (const tipo of acoesOrdenadas) {
         // Calcula valor base por tipo (mesma lógica do _registrarEntradaImpl single)
         let valorBase = 0;
@@ -33348,7 +33351,8 @@ async function _registrarEntradasCombo(t, jid, acoes) {
         }
 
         // Taxa adm: só no buy-in/buyin_duplo
-        const taxaAdm = _taxaAdmAplica(t, tipo) ? Number(t.taxaAdm) : 0;
+        const taxaAdm = (!_taxaAdmComboCobrada && _taxaAdmAplica(t, tipo)) ? Number(t.taxaAdm) : 0;
+        if (taxaAdm > 0) _taxaAdmComboCobrada = true;
 
         // Passaporte: anexar SÓ na primeira entry (buy-in geralmente) pra evitar duplicação
         // mas com TODAS as fichas extras somadas (do combo inteiro)
