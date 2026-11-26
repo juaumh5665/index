@@ -41424,11 +41424,12 @@ function renderJogadoresCashMesa(m) {
             const positivo = resultado >= 0;
             const mesaCheia = m.jogadores.filter(jj => jj.status === 'ativo').length >= 9;
             return `
-            <div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:.75rem;align-items:center;padding:.6rem 1rem;background:#0a0a0b;border:1px solid #18181b;border-radius:.6rem;margin-bottom:.3rem;opacity:.75;">
+            <div style="display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:.75rem;align-items:center;padding:.6rem 1rem;background:#0a0a0b;border:1px solid #18181b;border-radius:.6rem;margin-bottom:.3rem;opacity:.75;">
                 <div style="width:28px;height:28px;border-radius:50%;background:#1e1e23;color:#71717a;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;">${(jog?jog.nome:'?').substring(0,2).toUpperCase()}</div>
                 <div style="font-weight:700;font-size:.85rem;color:#a1a1aa;">${jog ? jog.nome : '?'}</div>
                 <div style="font-family:var(--font-mono);font-size:.75rem;color:#52525b;">${formatMoney(j.totalInvestido)} → ${formatMoney(j.saiuCom)}${(j.saidasAnteriores||0) > 0 ? ` <span style="color:#3b82f6;">(+${formatMoney(j.saidasAnteriores)} ant.)</span>` : ''}</div>
                 <div style="font-family:var(--font-mono);font-weight:800;font-size:.85rem;color:${positivo?'#22c55e':'#ef4444'};">${positivo?'+':''}${formatMoney(resultado)}</div>
+                <button onclick="reimprimirExtratoCashJogador('${m.id}', '${j.jogadorId}', '${j.id || ''}')" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);color:#38bdf8;border-radius:.4rem;padding:.35rem .6rem;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;" title="Reimprimir extrato"><i class="fa-solid fa-print"></i></button>
                 <button onclick="voltarJogadorCash('${m.id}', '${j.jogadorId}')" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#22c55e;border-radius:.4rem;padding:.35rem .6rem;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'Manrope',sans-serif;white-space:nowrap;${mesaCheia?'opacity:.4;pointer-events:none;':''}" title="${mesaCheia?'Mesa cheia':'Voltar à mesa'}"><i class="fa-solid fa-rotate-left"></i> Voltar</button>
             </div>`;
         }).join('');
